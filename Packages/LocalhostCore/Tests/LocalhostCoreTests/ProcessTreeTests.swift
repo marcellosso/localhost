@@ -219,15 +219,28 @@ struct ProcessTreeTests {
         #expect(exit.strongestSignalSent == nil)
     }
 
-    @Test func `processes left behind when the shell exits are cleaned up`() async throws {
+    @Test func `processes left behind when the shell exits are cleaned up, starting with SIGTERM`() async throws {
         let tree = try launch("sleep 1000 & echo $!; exit 0")
         let leftover = try #require(await firstLines(1, of: tree).first.flatMap { pid_t($0.text) })
 
         let exit = await tree.waitForExit()
 
         #expect(exit.termination == .exited(code: 0))
+        #expect(exit.strongestSignalSent == SIGTERM)
         #expect(!isAlive(leftover))
         #expect(!processGroupExists(tree.pid))
+    }
+
+    @Test func `reports the shell's exit before leftovers are cleaned up`() async throws {
+        let tree = try launch(leftoverIgnoringSignals(thenParent: "exit 1"))
+
+        let termination = await tree.waitForShellExit()
+
+        #expect(termination == .exited(code: 1))
+        #expect(processGroupExists(tree.pid))
+        let exit = await tree.waitForExit()
+        #expect(exit.termination == termination)
+        #expect(exit.wasForceKilled)
     }
 
     @Test func `output ends once the tree has ended`() async throws {
@@ -250,6 +263,17 @@ struct ProcessTreeTests {
 }
 
 // MARK: Helpers
+
+/// A command line whose shell leaves behind a subshell that ignores SIGINT
+/// and SIGTERM. The parent runs `thenParent` only once the subshell's trap is
+/// in place, so the fixture can't race the signals.
+func leftoverIgnoringSignals(thenParent parentCommands: String) -> String {
+    let marker = NSTemporaryDirectory() + "localhost-ready-\(UUID().uuidString)"
+    return """
+    (trap '' INT TERM; touch '\(marker)'; sleep 1000) & \
+    while [ ! -e '\(marker)' ]; do sleep 0.01; done; rm '\(marker)'; \(parentCommands)
+    """
+}
 
 func isAlive(_ pid: pid_t) -> Bool {
     kill(pid, 0) == 0 || errno == EPERM

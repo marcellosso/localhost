@@ -40,6 +40,12 @@ public actor ProjectLibrary {
         return project
     }
 
+    /// A Service together with the Project it belongs to.
+    public func service(id: UUID) throws(LocalhostError) -> (project: Project, service: Service) {
+        let (project, index) = try locateService(id)
+        return (project, project.services[index])
+    }
+
     /// A stream of every change made after subscribing.
     public func events() -> AsyncStream<ProjectLibraryEvent> {
         let (stream, continuation) = AsyncStream.makeStream(of: ProjectLibraryEvent.self)
