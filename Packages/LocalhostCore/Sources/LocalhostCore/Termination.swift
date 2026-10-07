@@ -11,6 +11,29 @@ public enum Termination: Sendable, Hashable, Codable {
         self = signal == 0 ? .exited(code: (status >> 8) & 0xff) : .signaled(signal)
     }
 
+    /// A short human-readable summary, e.g. "Exited with code 1".
+    public var summary: String {
+        switch self {
+        case .exited(let code): "Exited with code \(code)"
+        case .signaled(let signal): "Terminated by signal \(Self.signalName(signal))"
+        }
+    }
+
+    static func signalName(_ signal: Int32) -> String {
+        switch signal {
+        case SIGHUP: "SIGHUP"
+        case SIGINT: "SIGINT"
+        case SIGQUIT: "SIGQUIT"
+        case SIGABRT: "SIGABRT"
+        case SIGKILL: "SIGKILL"
+        case SIGBUS: "SIGBUS"
+        case SIGSEGV: "SIGSEGV"
+        case SIGPIPE: "SIGPIPE"
+        case SIGTERM: "SIGTERM"
+        default: "\(signal)"
+        }
+    }
+
     /// The launch failure this termination stands for, by shell convention.
     public var launchError: LocalhostError? {
         switch self {
