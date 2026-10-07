@@ -8,6 +8,7 @@ import Foundation
 public actor ServiceManager {
     private let library: ProjectLibrary
     private let logs: LogStore
+    private let runRegistry: RunRegistry
     private let baseEnvironment: [String: String]
     private let gracePeriod: Duration
     private let stopPolicy: StopPolicy
@@ -26,12 +27,14 @@ public actor ServiceManager {
     public init(
         library: ProjectLibrary,
         logs: LogStore,
+        runRegistry: RunRegistry,
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         gracePeriod: Duration = .milliseconds(1500),
         stopPolicy: StopPolicy = .default
     ) {
         self.library = library
         self.logs = logs
+        self.runRegistry = runRegistry
         self.baseEnvironment = baseEnvironment
         self.gracePeriod = gracePeriod
         self.stopPolicy = stopPolicy
@@ -115,6 +118,9 @@ public actor ServiceManager {
         }
 
         trees[serviceID] = tree
+        if let startTime = ProcessStartTime.of(tree.pid) {
+            runRegistry.record(run, pid: tree.pid, startTime: startTime)
+        }
         await logs.beginRun(run)
         broadcast(.runStarted(run))
         update(ServiceStatus(serviceID: serviceID, state: .starting, run: run))
@@ -193,6 +199,7 @@ public actor ServiceManager {
         status.run = run
         status.state = Self.stateAfterEnding(status.state, termination: exit.termination)
         trees[serviceID] = nil
+        runRegistry.remove(runID)
         update(status)
         broadcast(.runEnded(run))
     }

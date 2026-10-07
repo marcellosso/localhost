@@ -192,6 +192,7 @@ final class ServiceLogTests: Sendable {
         manager = ServiceManager(
             library: library,
             logs: logs,
+            runRegistry: RunRegistry(root: root),
             baseEnvironment: ["PATH": "/usr/bin:/bin", "HOME": NSHomeDirectory(), "SHELL": "/bin/sh"],
             gracePeriod: .milliseconds(200),
             stopPolicy: StopPolicy(interruptTimeout: .milliseconds(300), terminateTimeout: .milliseconds(300))
