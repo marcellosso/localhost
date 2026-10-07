@@ -20,6 +20,11 @@ public actor ServiceManager {
     /// The last queued operation of each Service.
     private var operations: [UUID: Task<Void, Never>] = [:]
     private var subscribers: [UUID: AsyncStream<ServiceEvent>.Continuation] = [:]
+    /// Services that are Starting but still waiting for their Dependencies,
+    /// with a token identifying that start request.
+    private var pendingStarts: [UUID: UUID] = [:]
+    /// Waiting for the next status update of a Service.
+    private var updateWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
 
     /// - Parameters:
     ///   - baseEnvironment: The environment every Run starts from (see `RunEnvironment`).
@@ -63,33 +68,88 @@ public actor ServiceManager {
     /// Starts a Run unless one is Starting or Running. If the Service is
     /// Stopping, waits for that to finish first. A Run that cannot launch
     /// leaves the Service Failed, with the reason in `run.failure`.
+    ///
+    /// Dependencies that are not Running or Exited are started first, and the
+    /// Service stays Starting until they are. If one Fails, the Service Fails
+    /// with `dependencyFailed`; if one is stopped meanwhile, it ends Stopped.
     @discardableResult
     public func start(_ serviceID: UUID, origin: Origin) async throws(LocalhostError) -> ServiceStatus {
-        _ = try await library.service(id: serviceID)
-        return await serialized(serviceID) { await self.performStart(serviceID, origin: origin) }
+        let (project, service) = try await library.service(id: serviceID)
+        if service.dependencies.isEmpty {
+            return await serialized(serviceID) { await self.performStart(serviceID, origin: origin) }
+        }
+        await startWithDependencies(serviceID, in: project, origin: origin)
+        return status(of: serviceID)
     }
 
     /// Stops the active Run, if any, and returns once its whole process tree
-    /// has ended. A requested stop always ends Stopped.
+    /// has ended. A requested stop always ends Stopped, including a start
+    /// still waiting for its Dependencies.
     @discardableResult
     public func stop(_ serviceID: UUID, origin: Origin) async throws(LocalhostError) -> ServiceStatus {
         _ = try await library.service(id: serviceID)
+        if cancelPendingStart(serviceID) { return status(of: serviceID) }
         return await serialized(serviceID) { await self.performStop(serviceID, origin: origin) }
     }
 
-    /// Stops the active Run, if any, then starts a new one.
+    /// Stops the active Run, if any, then starts a new one (with its
+    /// Dependencies, like `start`). Dependents are left alone.
     @discardableResult
     public func restart(_ serviceID: UUID, origin: Origin) async throws(LocalhostError) -> ServiceStatus {
-        _ = try await library.service(id: serviceID)
-        return await serialized(serviceID) {
-            _ = await self.performStop(serviceID, origin: origin)
-            return await self.performStart(serviceID, origin: origin)
+        let (_, service) = try await library.service(id: serviceID)
+        if service.dependencies.isEmpty && pendingStarts[serviceID] == nil {
+            return await serialized(serviceID) {
+                _ = await self.performStop(serviceID, origin: origin)
+                return await self.performStart(serviceID, origin: origin)
+            }
         }
+        try await stop(serviceID, origin: origin)
+        return try await start(serviceID, origin: origin)
+    }
+
+    /// Starts every Service of the Project except those excluded from Start
+    /// All, each after its Dependencies. Returns once every start has taken
+    /// effect (launched, Failed, or cancelled).
+    public func startAll(inProject projectID: UUID, origin: Origin) async throws(LocalhostError) {
+        let project = try await library.project(id: projectID)
+        let serviceIDs = project.services.filter { !$0.isExcludedFromStartAll }.map(\.id)
+        // Mark every Service Starting before any of them checks its
+        // Dependencies, so none mistakes an earlier Run's Exited for this one.
+        let begun = serviceIDs.compactMap { id in beginPendingStart(id).map { (id, $0) } }
+        await withDiscardingTaskGroup { group in
+            for (serviceID, token) in begun {
+                group.addTask { await self.completePendingStart(serviceID, token: token, in: project, origin: origin) }
+            }
+            for serviceID in serviceIDs where !begun.contains(where: { $0.0 == serviceID }) {
+                group.addTask { await self.startWithDependencies(serviceID, in: project, origin: origin) }
+            }
+        }
+    }
+
+    /// Stops every Service of the Project, each after the Services that
+    /// depend on it. Starts still waiting for their Dependencies are cancelled.
+    public func stopAll(inProject projectID: UUID, origin: Origin) async throws(LocalhostError) {
+        let project = try await library.project(id: projectID)
+        for service in project.services {
+            cancelPendingStart(service.id)
+        }
+        var stops: [UUID: Task<Void, Never>] = [:]
+        for serviceID in project.dependencyOrder(of: project.services.map(\.id)).reversed() {
+            let dependentStops = project.dependents(of: serviceID).compactMap { stops[$0.id] }
+            stops[serviceID] = Task {
+                for stop in dependentStops { await stop.value }
+                _ = await self.serialized(serviceID) { await self.performStop(serviceID, origin: origin) }
+            }
+        }
+        for stop in stops.values { await stop.value }
     }
 
     /// Stops every live process tree in parallel, e.g. before quitting.
     /// Returns once all of them have ended.
     public func stopAll(origin: Origin) async {
+        for serviceID in Array(pendingStarts.keys) {
+            cancelPendingStart(serviceID)
+        }
         let serviceIDs = Array(trees.keys)
         await withDiscardingTaskGroup { group in
             for serviceID in serviceIDs {
@@ -100,16 +160,148 @@ public actor ServiceManager {
         }
     }
 
+    // MARK: Dependencies
+
+    private enum DependencyOutcome: Sendable {
+        case satisfied
+        case failed(Key)
+        case stopped
+    }
+
+    /// `start` for a Service with Dependencies.
+    private func startWithDependencies(_ serviceID: UUID, in project: Project, origin: Origin) async {
+        while status(of: serviceID).state == .stopping {
+            await nextUpdate(of: serviceID)
+        }
+        guard let token = beginPendingStart(serviceID) else { return }
+        await completePendingStart(serviceID, token: token, in: project, origin: origin)
+    }
+
+    /// Marks the Service Starting, waiting for its Dependencies. Returns `nil`
+    /// if it is already Starting, Running or Stopping.
+    private func beginPendingStart(_ serviceID: UUID) -> UUID? {
+        var status = status(of: serviceID)
+        guard !status.state.isActive, pendingStarts[serviceID] == nil else { return nil }
+        let token = UUID()
+        pendingStarts[serviceID] = token
+        status.state = .starting
+        update(status)
+        return token
+    }
+
+    /// Waits for the Dependencies of a pending start, then launches its Run
+    /// unless the start was cancelled meanwhile.
+    private func completePendingStart(_ serviceID: UUID, token: UUID, in project: Project, origin: Origin) async {
+        let dependencies = project.service(id: serviceID)?.dependencies ?? []
+        setAwaitedDependencies(dependencies, of: serviceID, token: token)
+        let outcomes = await withTaskGroup(of: DependencyOutcome.self) { group in
+            for dependency in dependencies {
+                group.addTask {
+                    let outcome = await self.awaitDependency(dependency, in: project, origin: origin)
+                    await self.dependencySettled(dependency, of: serviceID, token: token)
+                    return outcome
+                }
+            }
+            var outcomes: [DependencyOutcome] = []
+            for await outcome in group { outcomes.append(outcome) }
+            return outcomes
+        }
+        guard pendingStarts[serviceID] == token else { return }
+
+        if let failed = outcomes.lazy.compactMap({ if case .failed(let key) = $0 { key } else { nil } }).first {
+            pendingStarts[serviceID] = nil
+            recordFailedLaunch(serviceID, origin: origin, failure: .dependencyFailed(failed))
+        } else if outcomes.contains(where: { if case .stopped = $0 { true } else { false } }) {
+            cancelPendingStart(serviceID)
+        } else {
+            _ = await serialized(serviceID) {
+                await self.launchPendingStart(serviceID, token: token, origin: origin)
+            }
+        }
+    }
+
+    private func launchPendingStart(_ serviceID: UUID, token: UUID, origin: Origin) async -> ServiceStatus {
+        // Leftovers of the previous Run end while the Service is still pending.
+        await waitForActiveRunToEnd(serviceID)
+        guard pendingStarts[serviceID] == token else { return status(of: serviceID) }
+        pendingStarts[serviceID] = nil
+        return await launch(serviceID, origin: origin)
+    }
+
+    /// Waits until a Dependency is Running or Exited, starting it if needed.
+    private func awaitDependency(_ serviceID: UUID, in project: Project, origin: Origin) async -> DependencyOutcome {
+        // A Dependency removed from the Project no longer holds anything up.
+        guard let key = project.service(id: serviceID)?.key else { return .satisfied }
+        // Once the Dependency is (being) started for us, its ending Failed or
+        // Stopped is final; before that, it is a state to start it from.
+        var isEngaged = false
+        while true {
+            switch status(of: serviceID).state {
+            case .running, .exited:
+                return .satisfied
+            case .starting:
+                isEngaged = true
+                await nextUpdate(of: serviceID)
+            case .stopping:
+                await nextUpdate(of: serviceID)
+            case .failed where isEngaged:
+                return .failed(key)
+            case .stopped where isEngaged:
+                return .stopped
+            case .stopped, .failed:
+                isEngaged = true
+                if let token = beginPendingStart(serviceID) {
+                    Task { await self.completePendingStart(serviceID, token: token, in: project, origin: origin) }
+                }
+            }
+        }
+    }
+
+    private func setAwaitedDependencies(_ dependencies: [UUID], of serviceID: UUID, token: UUID) {
+        guard pendingStarts[serviceID] == token else { return }
+        var status = status(of: serviceID)
+        status.awaitedDependencies = dependencies
+        update(status)
+    }
+
+    private func dependencySettled(_ dependency: UUID, of serviceID: UUID, token: UUID) {
+        guard pendingStarts[serviceID] == token else { return }
+        var status = status(of: serviceID)
+        status.awaitedDependencies.removeAll { $0 == dependency }
+        update(status)
+    }
+
+    /// Ends a start that is still waiting for its Dependencies as Stopped.
+    /// Returns whether there was one.
+    @discardableResult
+    private func cancelPendingStart(_ serviceID: UUID) -> Bool {
+        guard pendingStarts.removeValue(forKey: serviceID) != nil else { return false }
+        var status = status(of: serviceID)
+        status.state = .stopped
+        status.awaitedDependencies = []
+        update(status)
+        return true
+    }
+
+    private func nextUpdate(of serviceID: UUID) async {
+        await withCheckedContinuation { updateWaiters[serviceID, default: []].append($0) }
+    }
+
     // MARK: Operations
 
     private func performStart(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
         if status(of: serviceID).state == .starting || status(of: serviceID).state == .running {
             return status(of: serviceID)
         }
+        return await launch(serviceID, origin: origin)
+    }
+
+    /// Launches a new Run once the previous one has fully ended.
+    private func launch(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
         // A Run that ended on its own may still be stopping its leftovers.
         await waitForActiveRunToEnd(serviceID)
 
-        var run = Run(id: UUID(), serviceID: serviceID, origin: origin, startedAt: Date())
+        let run = Run(id: UUID(), serviceID: serviceID, origin: origin, startedAt: Date())
         let tree: ProcessTree
         do {
             let (project, service) = try await library.service(id: serviceID)
@@ -122,11 +314,7 @@ public actor ServiceManager {
                 stopPolicy: stopPolicy
             )
         } catch {
-            run.failure = error
-            run.endedAt = Date()
-            broadcast(.runStarted(run))
-            update(ServiceStatus(serviceID: serviceID, state: .failed, run: run))
-            broadcast(.runEnded(run))
+            recordFailedLaunch(serviceID, origin: origin, failure: error)
             return status(of: serviceID)
         }
 
@@ -159,6 +347,16 @@ public actor ServiceManager {
             self.runEnded(serviceID, runID: runID, exit: exit)
         }
         return status(of: serviceID)
+    }
+
+    /// Records a Run that could not be launched at all, leaving the Service Failed.
+    private func recordFailedLaunch(_ serviceID: UUID, origin: Origin, failure: LocalhostError) {
+        var run = Run(id: UUID(), serviceID: serviceID, origin: origin, startedAt: Date())
+        run.failure = failure
+        run.endedAt = Date()
+        broadcast(.runStarted(run))
+        update(ServiceStatus(serviceID: serviceID, state: .failed, run: run))
+        broadcast(.runEnded(run))
     }
 
     private func performStop(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
@@ -223,7 +421,10 @@ public actor ServiceManager {
         run.failure = exit.termination.launchError
         run.wasForceKilled = exit.wasForceKilled
         status.run = run
-        status.state = Self.stateAfterEnding(status.state, termination: exit.termination)
+        // A pending start stays Starting while the previous Run's leftovers end.
+        if pendingStarts[serviceID] == nil {
+            status.state = Self.stateAfterEnding(status.state, termination: exit.termination)
+        }
         trees[serviceID] = nil
         runRegistry.remove(runID)
         update(status)
@@ -244,20 +445,25 @@ public actor ServiceManager {
     private static func stateAfterEnding(_ state: ServiceState, termination: Termination) -> ServiceState {
         switch state {
         case .stopping: .stopped
-        case .starting: .failed
-        case .running: termination == .exited(code: 0) ? .exited : .failed
+        // A one-shot command (e.g. a migration) may finish within Starting.
+        case .starting, .running: termination == .exited(code: 0) ? .exited : .failed
         case .stopped, .exited, .failed: state
         }
     }
 
     // MARK: Plumbing
 
-    /// Stores `status`, broadcasting `serviceStateChanged` if the state changed.
+    /// Stores `status`, broadcasting `serviceStateChanged` if its state, Run
+    /// or awaited Dependencies changed.
     private func update(_ status: ServiceStatus) {
-        let previousState = statuses[status.serviceID]?.state
+        let previous = statuses[status.serviceID]
         statuses[status.serviceID] = status
-        if status.state != previousState {
+        if status.state != previous?.state || status.run?.id != previous?.run?.id
+            || status.awaitedDependencies != previous?.awaitedDependencies {
             broadcast(.serviceStateChanged(status))
+        }
+        for waiter in updateWaiters.removeValue(forKey: status.serviceID) ?? [] {
+            waiter.resume()
         }
     }
 
