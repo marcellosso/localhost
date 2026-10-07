@@ -17,6 +17,15 @@ public enum LocalhostError: Error, Sendable, Equatable {
     case projectNotFound(UUID)
     case serviceNotFound(UUID)
 
+    // Launching a Run
+    case workingDirectoryMissing(String)
+    case shellNotFound(String)
+    case launchFailed(errno: Int32)
+    /// The shell exited with 127: the command was not found.
+    case commandNotFound
+    /// The shell exited with 126: the command was found but could not be executed.
+    case commandNotExecutable
+
     // Persistence
     case unsupportedSchemaVersion(Int, path: String)
     case persistenceFailed(path: String, reason: String)
