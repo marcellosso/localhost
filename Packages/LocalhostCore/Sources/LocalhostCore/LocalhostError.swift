@@ -12,6 +12,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case invalidEnvironmentVariableName(String)
     case duplicateProjectKey(Key)
     case duplicateServiceKey(Key, projectID: UUID)
+    /// The Dependency would make a Service depend on itself, e.g. `[api, worker, api]`.
+    case dependencyCycle([Key])
 
     // Lookup
     case projectNotFound(UUID)
@@ -25,6 +27,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case commandNotFound
     /// The shell exited with 126: the command was found but could not be executed.
     case commandNotExecutable
+    /// A Dependency Failed, so the Service was not started.
+    case dependencyFailed(Key)
 
     // Persistence
     case unsupportedSchemaVersion(Int, path: String)
@@ -51,6 +55,8 @@ extension LocalhostError {
             "Another project already uses the key “\(key)”."
         case .duplicateServiceKey(let key, _):
             "Another service in this project already uses the key “\(key)”."
+        case .dependencyCycle(let keys):
+            "\(keys.map(\.rawValue).joined(separator: " → ")) would be a dependency cycle."
         case .projectNotFound:
             "The project no longer exists."
         case .serviceNotFound:
@@ -65,6 +71,8 @@ extension LocalhostError {
             "Command not found."
         case .commandNotExecutable:
             "The command is not executable."
+        case .dependencyFailed(let key):
+            "Not started: its dependency “\(key)” failed."
         case .unsupportedSchemaVersion(let version, let path):
             "\(path) was saved by a newer version of localhost (schema \(version))."
         case .persistenceFailed(let path, let reason):

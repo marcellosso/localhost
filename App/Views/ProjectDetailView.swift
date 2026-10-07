@@ -62,11 +62,17 @@ struct ProjectDetailView: View {
                 .truncationMode(.middle)
                 .textSelection(.enabled)
             Spacer()
+            Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id) }
+                .help("Start All (⇧⌘R)")
+                .disabled(project.services.isEmpty)
+            Button("Stop All", systemImage: "stop.fill") { model.stopAll(inProject: project.id) }
+                .help("Stop All (⇧⌘.)")
+                .disabled(!project.services.contains { model.status(of: $0).state.isActive })
             Button("Edit", systemImage: "slider.horizontal.3") { model.presentedSheet = .editProject(project.id) }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
                 .help("Edit Project")
         }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.borderless)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -92,15 +98,22 @@ struct ServiceRow: View {
                     .truncationMode(.tail)
             }
             Spacer(minLength: 8)
-            Text(status.summary)
+            Text(summary)
                 .font(.caption)
                 .foregroundStyle(status.state == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
                 .lineLimit(1)
-                .help(status.run?.failure?.message ?? status.run?.termination?.summary ?? status.summary)
+                .help(status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
             controls
         }
         .padding(.vertical, 3)
         .animation(.easeOut(duration: 0.15), value: status.state)
+    }
+
+    /// The status summary, naming the Dependencies a Starting Service waits for.
+    private var summary: String {
+        let awaited = status.awaitedDependencies.compactMap { id in model.service(id)?.service.name }
+        guard status.state == .starting, !awaited.isEmpty else { return status.summary }
+        return "Waiting for \(ListFormatter.localizedString(byJoining: awaited))…"
     }
 
     @ViewBuilder

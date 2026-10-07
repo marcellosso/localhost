@@ -48,6 +48,9 @@ public struct ServiceStatus: Sendable, Hashable, Codable {
     public let serviceID: UUID
     public internal(set) var state: ServiceState
     public internal(set) var run: Run?
+    /// While Starting: the Dependencies the Service is still waiting for
+    /// before its Run is launched. `run` is then the previous Run, if any.
+    public internal(set) var awaitedDependencies: [UUID] = []
 
     public static func neverRun(_ serviceID: UUID) -> ServiceStatus {
         ServiceStatus(serviceID: serviceID, state: .stopped, run: nil)

@@ -57,8 +57,8 @@ struct MainView: View {
                     }
                 }
             }
-        } message: { _ in
-            Text("Running services are stopped first. Their configuration is deleted; the project folder is not touched.")
+        } message: { removal in
+            Text(removalMessage(removal))
         }
         .alert(model.orphanAlertTitle, isPresented: $model.isShowingOrphanAlert) {
             Button("Stop Them") { Task { await model.stopOrphans() } }
@@ -93,6 +93,17 @@ struct MainView: View {
         case .service(let id): "Remove “\(model.service(id)?.service.name ?? "service")”?"
         case nil: ""
         }
+    }
+
+    private func removalMessage(_ removal: AppModel.Removal) -> String {
+        var message = "Running services are stopped first. Their configuration is deleted; the project folder is not touched."
+        if case .service(let id) = removal, let (project, _) = model.service(id) {
+            let dependents = project.dependents(of: id).map { "“\($0.name)”" }
+            if !dependents.isEmpty {
+                message += "\n\n\(ListFormatter.localizedString(byJoining: dependents)) will no longer depend on it."
+            }
+        }
+        return message
     }
 
     private var isConfirmingRemoval: Binding<Bool> {

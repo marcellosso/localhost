@@ -28,7 +28,9 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 - **Output**: stdout and stderr via separate pipes (ADR-0005). Viewer renders ANSI colour; stderr lines get a subtle marker.
 - **Logs**: in-memory ring buffer per Run for the viewer, plus each Run's output written to `~/Library/Application Support/localhost/logs/…`. Keep last 5 Runs per Service, 10 MB cap each (rotate). The combined project stream is a merged read-time view.
 - **Service States**: Stopped / Starting / Running / Stopping / Exited / Failed, exactly as defined in `GLOSSARY.md`. A requested stop always ends in **Stopped** regardless of exit code. A Service has at most one active Run.
-- **Starting → Running**: no port configured → alive after a ~1.5s grace period; port configured (M1) → port accepts connections (timeout → Running with a warning). Dying during Starting → **Failed** with output visible.
+- **Starting → Running**: no Port configured → alive after a ~1.5s grace period; Port configured (M1) → the Port accepts connections (global 30s timeout → Running with a warning that clears once the Port opens). Dying during Starting → **Failed** with output visible; exiting with code 0 during Starting → **Exited** (one-shot commands such as migrations).
+- **Configuration changes** (variables, active Profile, command line, …) apply on the next start. A Run whose launch configuration differs from what would be built now shows "Restart to apply" (computed in the core). Nothing restarts automatically.
+- **Failed** shows the typed reason (or exit code/signal) plus the last 20 lines of both streams. A Failed Run whose output contains `Cannot connect to the Docker daemon` reports `dockerDaemonUnavailable` instead (diagnosed after the fact, never a pre-check).
 - **Stop escalation**: SIGINT to the process group → wait ~5s → SIGTERM → wait ~3s → SIGKILL. State stays **Stopping** until the whole tree is gone; log a line if force-killed. Global defaults for now.
 - **Orphans**: each active Run's (pid, pgid, process start time) is recorded on disk. On launch, survivors are detected (start time guards against PID reuse) and the user is asked "N services from the last session are still running — Stop them / Leave them" (default Stop). Never re-adopt them as Running.
 - **App lifetime**: closing the main window does not quit; Services keep running. ⌘Q / menu-bar Quit asks for confirmation if anything is running, then stops everything in parallel. Dock icon only while the main window is open (`.regular` ↔ `.accessory`), once the menu bar exists.
@@ -38,11 +40,39 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 - Start All starts in dependency order and waits for each Dependency to reach Running.
 - Starting one Service also starts its not-yet-running Dependencies.
 - Stopping one Service does **not** stop its dependents. Stop All stops in reverse dependency order.
-- If a Dependency fails, dependents don't start and show the reason. Cycles are rejected at edit time.
+- If a Dependency fails, dependents don't start and show the reason. Cycles are rejected at edit time (`dependencyCycle([Key])`; the form disables choices that would close a cycle). Deleting a Service removes it from every Dependency list, after confirming.
+- A Dependency is satisfied when it is Running **or has Exited** (one-shot steps such as migrations). A Service waiting for its Dependencies is **Starting** with no new Run yet; its Run is launched once they are satisfied.
+- Restart = Stop + Start of that one Service; dependents are untouched.
+- A per-Service **"Not in Start All"** flag skips it in Start All, unless something being started depends on it (Dependencies always win).
+- Stop All (or stopping a Service others are waiting on) cancels pending starts; those Services end **Stopped**, not Failed.
+
+## Ports and Listeners (M1)
+
+- One optional **Port** per Service (plus an optional URL). Other ports a Service opens are visible via discovery but aren't its Port.
+- The Port reaches the command as `PORT=<actual port>` (ADR-0006); command lines use `$PORT`. No placeholder syntax, no framework flags.
+- Open URL priority: configured URL with its port rewritten to the actual port → `http://localhost:<actual port>` → first URL detected in the Run's output. Detected URLs are clickable in logs; `0.0.0.0` displays as `localhost`.
+- **Listener discovery** in the core via libproc (`proc_listpids`, `proc_pidfdinfo`, `proc_pidinfo` for cwd), not `lsof`. Scanned on demand (before starting a Service with a Port, when a Listener view opens) and polled ~2s only while a Listener view is visible.
+- Attribution: owned by a Run (its process group) → inside a Project (cwd under the Project path) → **Unmanaged Listener**.
+- Stopping a Listener we don't run: confirm (command, PID, cwd); signal its process group unless the group leader is a session leader (then the PID and its descendants); SIGINT → SIGTERM → SIGKILL. Refuse localhost itself and launchd jobs. No "keep/pin/ignore" action: Listeners appear while they listen.
+- **Automatic port move**: app setting (default on) + per-Service "Port can change" (default on; the form hints when the command line doesn't mention `$PORT`). Next free port searching upward up to +100, skipping ports configured as other Services' Ports. The moved port belongs to that Run only; configuration is never rewritten. The UI says which port and why.
+- Never auto-move when the Service has dependents (#15), or when the port is held by a Listener inside the same Project (likely its own leftover).
+- A blocked start shows the owner and offers **Stop it and start** / **Start on <next free port>** (explicit, warns about dependents) / **Cancel**. During Start All a blocked Service fails with `portConflict`; its dependents get `dependencyFailed`.
+
+## Environment (M1)
+
+- Environment Profiles are Project-wide (per-Service overrides: #14).
+- Any variable on any layer (Project, Service, Profile) can be a Secret: one Keychain generic-password item per Secret; JSON stores the name and `isSecret` only. Reveal is an eye-icon click (no authentication in V1); copying never logs the value.
 
 ## Docker Compose (M1)
 
 No adapter in V1. A Compose service is just a command line run in the foreground (`docker compose up postgres`); Stop's SIGINT makes Compose shut down cleanly. Detection suggests the foreground form (the `-d` form would just end as Exited). Only extra: recognise "Docker daemon not running" and surface it as a typed error.
+
+## UI (M1)
+
+- Sidebar: Projects, plus a **Ports** view listing every Listener. The Project's Service list starts with an **All services** row (merged stream, Key-prefixed lines, colour stable per Service); clear there clears every visible buffer, never log files.
+- Menu bar: Projects with any active or Failed Service, plus favourites; a red dot on the icon while any Service is Failed; only warns about Unmanaged Listeners holding a configured Port.
+- "Open in editor": an app picked once (`NSWorkspace.open(_:withApplicationAt:)`), no default.
+- Shortcuts: ⌘R start/restart, ⌘. stop, ⇧⌘R Start All, ⇧⌘. Stop All, ⌘F find, ⌃L clear logs, ⇧⌘O open URL, ⌥⌘T Terminal, ⌥⌘E editor, ⌥⌘F Finder, ⌘1–9 Projects, ⌘0 Ports, ⌥⌘1–9 Services, ⌘[ / ⌘] previous/next Service. Holding ⌘ (or ⌥⌘) ~0.4s shows number badges. **⌘K is reserved** for the M2 command palette.
 
 ## UI direction
 

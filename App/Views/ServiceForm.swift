@@ -3,7 +3,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Adds or edits a Service: name, key, working directory relative to the
-/// Project, command line and environment variables.
+/// Project, command line, environment variables, Dependencies and whether
+/// Start All includes it.
 struct ServiceForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +17,8 @@ struct ServiceForm: View {
     @State private var workingDirectory = "."
     @State private var commandLine = ""
     @State private var variables: [Variable] = []
+    @State private var dependencies: [UUID] = []
+    @State private var isExcludedFromStartAll = false
     @State private var isChoosingFolder = false
     @State private var error: String?
     @State private var isSaving = false
@@ -71,6 +74,7 @@ struct ServiceForm: View {
                 Button("Add Variable", systemImage: "plus") { variables.append(Variable()) }
                     .buttonStyle(.borderless)
             }
+            startSection
             if let error {
                 Text(error)
                     .foregroundStyle(.red)
@@ -101,7 +105,66 @@ struct ServiceForm: View {
             workingDirectory = editing.workingDirectory
             commandLine = editing.commandLine
             variables = editing.environment.sorted { $0.key < $1.key }.map { Variable(name: $0.key, value: $0.value) }
+            dependencies = editing.dependencies
+            isExcludedFromStartAll = editing.isExcludedFromStartAll
         }
+    }
+
+    private var otherServices: [Service] {
+        project.services.filter { $0.id != editing?.id }
+    }
+
+    @ViewBuilder
+    private var startSection: some View {
+        Section {
+            if !otherServices.isEmpty {
+                LabeledContent("Depends On") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(otherServices) { other in
+                            dependencyToggle(other)
+                        }
+                    }
+                }
+            }
+            Toggle("Not in Start All", isOn: $isExcludedFromStartAll)
+        } header: {
+            Text("Starting")
+        } footer: {
+            Text(startFooter)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func dependencyToggle(_ other: Service) -> some View {
+        // Only an existing Service can have dependents, so only it can close a cycle.
+        let cycle = editing.flatMap { project.dependencyCycle(from: $0.id, to: other.id) }
+        let isOn = Binding {
+            dependencies.contains(other.id)
+        } set: { isOn in
+            if isOn { dependencies.append(other.id) } else { dependencies.removeAll { $0 == other.id } }
+        }
+        return Toggle(isOn: isOn) {
+            HStack(spacing: 6) {
+                Text(other.name)
+                Text(other.key.rawValue)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .disabled(cycle != nil)
+        .help(cycle.map { "\($0.map(\.rawValue).joined(separator: " → ")) would be a dependency cycle." } ?? "")
+    }
+
+    private var startFooter: String {
+        var footer = "Starting this service starts the services it depends on first, and waits until they are running or have exited."
+        let dependents = editing.map { project.dependents(of: $0.id).map { "“\($0.name)”" } } ?? []
+        if isExcludedFromStartAll {
+            footer = dependents.isEmpty
+                ? "Start All skips this service."
+                : "Start All skips this service, but still starts it for \(ListFormatter.localizedString(byJoining: dependents)), which depend\(dependents.count == 1 ? "s" : "") on it."
+        }
+        return footer
     }
 
     private var keyBinding: Binding<String> {
@@ -126,12 +189,14 @@ struct ServiceForm: View {
             if let editing {
                 try await model.editService(
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
-                    commandLine: commandLine, environment: environment
+                    commandLine: commandLine, environment: environment, dependencies: dependencies,
+                    isExcludedFromStartAll: isExcludedFromStartAll
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
-                    commandLine: commandLine, environment: environment
+                    commandLine: commandLine, environment: environment, dependencies: dependencies,
+                    isExcludedFromStartAll: isExcludedFromStartAll
                 )
             }
             dismiss()

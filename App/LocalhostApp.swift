@@ -69,15 +69,25 @@ struct AppCommands: Commands {
         }
         CommandMenu("Service") {
             let status = model.selectedService.map { model.status(of: $0) }
-            Button("Start") { model.selectedServiceID.map(model.start) }
-                .keyboardShortcut("r")
-                .disabled(status == nil || status?.state.isActive == true)
+            let isLive = status?.state == .starting || status?.state == .running
+            Button(isLive ? "Restart" : "Start") {
+                guard let id = model.selectedServiceID else { return }
+                isLive ? model.restart(id) : model.start(id)
+            }
+            .keyboardShortcut("r")
+            .disabled(status == nil || status?.state == .stopping)
             Button("Stop") { model.selectedServiceID.map(model.stop) }
                 .keyboardShortcut(".")
-                .disabled(!(status?.state == .starting || status?.state == .running))
-            Button("Restart") { model.selectedServiceID.map(model.restart) }
+                .disabled(!isLive)
+        }
+        CommandMenu("Project") {
+            let project = model.selectedProject
+            Button("Start All") { project.map { model.startAll(inProject: $0.id) } }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(status == nil || status?.state == .stopping)
+                .disabled(project?.services.isEmpty ?? true)
+            Button("Stop All") { project.map { model.stopAll(inProject: $0.id) } }
+                .keyboardShortcut(".", modifiers: [.command, .shift])
+                .disabled(!(project.map { $0.services.contains { model.status(of: $0).state.isActive } } ?? false))
         }
     }
 }

@@ -154,14 +154,17 @@ final class ServiceManagerTests: Sendable {
 
     // MARK: Ending on its own
 
-    @Test func `dying during Starting is Failed, even with exit code 0`() async throws {
-        let service = try await service("exit 0")
+    @Test(arguments: [("exit 0", ServiceState.exited), ("exit 1", ServiceState.failed)])
+    func `ending during Starting is Exited on success, Failed otherwise`(
+        commandLine: String, expectedState: ServiceState
+    ) async throws {
+        let service = try await service(commandLine)
         let (_, events) = await manager.subscribe()
         try await manager.start(service.id, origin: .mainWindow)
 
         let seen = await self.events(for: service.id, events) { if case .runEnded = $0 { true } else { false } }
-        #expect(states(seen) == [.starting, .failed])
-        #expect(await manager.status(of: service.id).state == .failed)
+        #expect(states(seen) == [.starting, expectedState])
+        #expect(await manager.status(of: service.id).state == expectedState)
     }
 
     @Test(arguments: [

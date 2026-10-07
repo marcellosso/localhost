@@ -125,6 +125,8 @@ public actor ProjectLibrary {
         workingDirectory: String = ".",
         commandLine: String,
         environment: [String: String] = [:],
+        dependencies: [UUID] = [],
+        isExcludedFromStartAll: Bool = false,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var project = try self.project(id: projectID)
@@ -134,12 +136,14 @@ public actor ProjectLibrary {
             key: key,
             workingDirectory: try Validate.workingDirectory(workingDirectory),
             commandLine: try Validate.commandLine(commandLine),
-            environment: try Validate.environment(environment)
+            environment: try Validate.environment(environment),
+            isExcludedFromStartAll: isExcludedFromStartAll
         )
         project.services.append(service)
+        try setDependencies(dependencies, of: service.id, in: &project)
         try commit(project)
         broadcast(.projectUpdated(project, origin: origin))
-        return service
+        return project.services[project.services.count - 1]
     }
 
     /// Changes the given fields of a Service; `nil` leaves a field as it is.
@@ -151,6 +155,8 @@ public actor ProjectLibrary {
         workingDirectory: String? = nil,
         commandLine: String? = nil,
         environment: [String: String]? = nil,
+        dependencies: [UUID]? = nil,
+        isExcludedFromStartAll: Bool? = nil,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var (project, index) = try locateService(id)
@@ -163,15 +169,21 @@ public actor ProjectLibrary {
         if let workingDirectory { service.workingDirectory = try Validate.workingDirectory(workingDirectory) }
         if let commandLine { service.commandLine = try Validate.commandLine(commandLine) }
         if let environment { service.environment = try Validate.environment(environment) }
+        if let isExcludedFromStartAll { service.isExcludedFromStartAll = isExcludedFromStartAll }
         project.services[index] = service
+        if let dependencies { try setDependencies(dependencies, of: id, in: &project) }
         try commit(project)
         broadcast(.projectUpdated(project, origin: origin))
-        return service
+        return project.services[index]
     }
 
+    /// Removes the Service, and removes it from every other Service's Dependencies.
     public func removeService(id: UUID, origin: Origin) throws(LocalhostError) {
         var (project, index) = try locateService(id)
         project.services.remove(at: index)
+        for i in project.services.indices {
+            project.services[i].dependencies.removeAll { $0 == id }
+        }
         try commit(project)
         broadcast(.projectUpdated(project, origin: origin))
     }
@@ -181,6 +193,24 @@ public actor ProjectLibrary {
     private func commit(_ project: Project) throws(LocalhostError) {
         try storage.save(project)
         projectsByID[project.id] = project
+    }
+
+    /// Replaces the Dependencies of `serviceID`, rejecting Services of other
+    /// Projects and cycles. Duplicates are dropped; the order is kept.
+    private func setDependencies(_ dependencies: [UUID], of serviceID: UUID, in project: inout Project) throws(LocalhostError) {
+        guard let index = project.services.firstIndex(where: { $0.id == serviceID }) else {
+            throw .serviceNotFound(serviceID)
+        }
+        project.services[index].dependencies = []
+        var accepted: [UUID] = []
+        for dependency in dependencies where !accepted.contains(dependency) {
+            guard project.service(id: dependency) != nil else { throw .serviceNotFound(dependency) }
+            if let cycle = project.dependencyCycle(from: serviceID, to: dependency) {
+                throw .dependencyCycle(cycle)
+            }
+            accepted.append(dependency)
+            project.services[index].dependencies = accepted
+        }
     }
 
     private func locateService(_ id: UUID) throws(LocalhostError) -> (Project, Int) {
