@@ -8,7 +8,8 @@ import Synchronization
 ///
 /// The tree has ended once the shell has exited *and* no process is left in
 /// its group. Processes still in the group when the shell exits on its own are
-/// stopped, so a Run never leaves anything behind.
+/// stopped (starting at SIGTERM: background jobs of a non-interactive shell
+/// ignore SIGINT), so a Run never leaves anything behind.
 public actor ProcessTree {
     /// The shell's pid, which is also the process group and session id.
     public nonisolated let pid: pid_t
@@ -18,6 +19,8 @@ public actor ProcessTree {
     private let stopPolicy: StopPolicy
     private let readers: [PipeReader]
     private let outputEnded = Latch()
+    private var shellTermination: Termination?
+    private var shellExitWaiters: [CheckedContinuation<Termination, Never>] = []
     private var isEscalating = false
     private var strongestSignalSent: Int32?
     private var exit: ProcessTreeExit?
@@ -86,6 +89,13 @@ public actor ProcessTree {
         ]
     }
 
+    /// Waits until the shell has exited. Processes it left in the group may
+    /// still be running; `waitForExit()` waits for those too.
+    public func waitForShellExit() async -> Termination {
+        if let shellTermination { return shellTermination }
+        return await withCheckedContinuation { shellExitWaiters.append($0) }
+    }
+
     /// Waits until the tree has ended.
     public func waitForExit() async -> ProcessTreeExit {
         if let exit { return exit }
@@ -107,8 +117,12 @@ public actor ProcessTree {
     private func monitor() async {
         let status = await Self.waitForShell(pid)
         let termination = Termination(waitStatus: status)
+        shellTermination = termination
+        for waiter in shellExitWaiters { waiter.resume(returning: termination) }
+        shellExitWaiters = []
+
         // Anything still in the group is left over from the shell: stop it.
-        if processGroupExists() { await escalate() }
+        if processGroupExists() { await escalate(from: SIGTERM) }
         while processGroupExists() { try? await Task.sleep(for: Self.pollInterval) }
         await waitForOutputToEnd(timeout: Self.outputDrainTimeout)
 
@@ -118,9 +132,10 @@ public actor ProcessTree {
         exitWaiters = []
     }
 
-    /// Sends the escalating signals until the group is gone. Only one
-    /// escalation runs at a time; later callers return immediately.
-    private func escalate() async {
+    /// Sends the escalating signals, beginning with `firstSignal`, until the
+    /// group is gone. Only one escalation runs at a time; later callers return
+    /// immediately.
+    private func escalate(from firstSignal: Int32 = SIGINT) async {
         guard !isEscalating else { return }
         isEscalating = true
         let steps: [(Int32, Duration?)] = [
@@ -128,7 +143,7 @@ public actor ProcessTree {
             (SIGTERM, stopPolicy.terminateTimeout),
             (SIGKILL, nil),
         ]
-        for (signal, timeout) in steps {
+        for (signal, timeout) in steps.drop(while: { $0.0 != firstSignal }) {
             guard processGroupExists() else { return }
             strongestSignalSent = signal
             kill(-pid, signal)

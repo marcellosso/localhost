@@ -2,7 +2,7 @@ import Foundation
 
 /// Every failure the core reports. Clients switch over these cases; they are
 /// never flattened into strings inside the core.
-public enum LocalhostError: Error, Sendable, Equatable {
+public enum LocalhostError: Error, Sendable, Hashable, Codable {
     // Validation
     case invalidKey(String)
     case invalidName
