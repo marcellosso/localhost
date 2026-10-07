@@ -20,6 +20,12 @@ xcodebuild -project localhost.xcodeproj -scheme localhost -configuration Debug -
 open build/Build/Products/Debug/localhost.app
 ```
 
+To try a build without touching your real data (`~/Library/Application Support/localhost`), point it at another folder:
+
+```sh
+open -n --env LOCALHOST_STORAGE_ROOT=/tmp/localhost-dev build/Build/Products/Debug/localhost.app
+```
+
 The app is not sandboxed (ADR-0002). Code signing uses automatic signing; to build without a signing identity, add `CODE_SIGNING_ALLOWED=NO`.
 
 ### Core package

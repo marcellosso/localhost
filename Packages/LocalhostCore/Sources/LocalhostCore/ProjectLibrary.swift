@@ -46,6 +46,12 @@ public actor ProjectLibrary {
         return (project, project.services[index])
     }
 
+    /// All Projects plus a stream of every change after that snapshot. Taking
+    /// both at once means no change falls between them.
+    public func subscribe() -> (projects: [Project], events: AsyncStream<ProjectLibraryEvent>) {
+        (projects(), events())
+    }
+
     /// A stream of every change made after subscribing.
     public func events() -> AsyncStream<ProjectLibraryEvent> {
         let (stream, continuation) = AsyncStream.makeStream(of: ProjectLibraryEvent.self)

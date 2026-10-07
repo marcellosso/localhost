@@ -87,6 +87,19 @@ public actor ServiceManager {
         }
     }
 
+    /// Stops every live process tree in parallel, e.g. before quitting.
+    /// Returns once all of them have ended.
+    public func stopAll(origin: Origin) async {
+        let serviceIDs = Array(trees.keys)
+        await withDiscardingTaskGroup { group in
+            for serviceID in serviceIDs {
+                group.addTask {
+                    _ = await self.serialized(serviceID) { await self.performStopForQuit(serviceID, origin: origin) }
+                }
+            }
+        }
+    }
+
     // MARK: Operations
 
     private func performStart(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
@@ -160,6 +173,19 @@ public actor ServiceManager {
         let exit = await tree.stop()
         runEnded(serviceID, runID: runID, exit: exit)
         return self.status(of: serviceID)
+    }
+
+    /// Like `performStop`, but also ends a Run whose shell already exited and
+    /// whose leftovers are still being cleaned up.
+    private func performStopForQuit(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
+        let state = status(of: serviceID).state
+        if state == .starting || state == .running {
+            return await performStop(serviceID, origin: origin)
+        }
+        guard let tree = trees[serviceID], let runID = statuses[serviceID]?.run?.id else { return status(of: serviceID) }
+        let exit = await tree.stop()
+        runEnded(serviceID, runID: runID, exit: exit)
+        return status(of: serviceID)
     }
 
     private func waitForActiveRunToEnd(_ serviceID: UUID) async {

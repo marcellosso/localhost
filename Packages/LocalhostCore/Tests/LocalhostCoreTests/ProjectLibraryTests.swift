@@ -290,6 +290,18 @@ final class ProjectLibraryTests {
         #expect(await events.next() == .projectRemoved(id: project.id, origin: .menuBar))
     }
 
+    @Test func `subscribe returns the current projects with the stream`() async throws {
+        let library = try makeLibrary()
+        let existing = try await library.addProject(name: "A", key: Key("a"), path: "/tmp/a", origin: .mainWindow)
+
+        let (projects, events) = await library.subscribe()
+        var iterator = events.makeAsyncIterator()
+        let added = try await library.addProject(name: "B", key: Key("b"), path: "/tmp/b", origin: .menuBar)
+
+        #expect(projects == [existing])
+        #expect(await iterator.next() == .projectAdded(added, origin: .menuBar))
+    }
+
     @Test func `failed changes are not broadcast`() async throws {
         let library = try makeLibrary()
         var events = await library.events().makeAsyncIterator()
