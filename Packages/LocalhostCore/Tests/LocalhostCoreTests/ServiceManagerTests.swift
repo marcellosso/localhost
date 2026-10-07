@@ -330,6 +330,42 @@ final class ServiceManagerTests: Sendable {
         #expect(run.termination == .exited(code: 7))
     }
 
+    // MARK: Stopping everything
+
+    @Test func `stopAll stops every live Run in parallel and leaves the rest alone`() async throws {
+        let stubborn = try await service("trap '' INT; while :; do sleep 0.05; done")
+        let plain = try await service("trap '' INT; while :; do sleep 0.05; done")
+        let idle = try await service("sleep 1000")
+        let (_, events) = await manager.subscribe()
+        try await manager.start(stubborn.id, origin: .mainWindow)
+        try await manager.start(plain.id, origin: .mainWindow)
+        await waitForState(.running, of: plain.id, in: events)
+
+        let started = ContinuousClock.now
+        await manager.stopAll(origin: .mainWindow)
+
+        #expect(await manager.status(of: stubborn.id).state == .stopped)
+        #expect(await manager.status(of: plain.id).state == .stopped)
+        #expect(await manager.status(of: idle.id).state == .stopped)
+        #expect(await manager.status(of: idle.id).run == nil)
+        // Both needed SIGTERM after a 500 ms SIGINT timeout; in sequence it would take twice as long.
+        #expect(ContinuousClock.now - started < .milliseconds(900))
+    }
+
+    @Test func `stopAll also ends Runs whose leftovers are still being cleaned up`() async throws {
+        let service = try await service(leftoverIgnoringSignals(thenParent: "sleep 0.4; exit 1"))
+        let (_, events) = await manager.subscribe()
+        try await manager.start(service.id, origin: .mainWindow)
+        await waitForState(.failed, of: service.id, in: events)
+        #expect(await manager.status(of: service.id).run?.endedAt == nil)
+
+        await manager.stopAll(origin: .mainWindow)
+
+        let status = await manager.status(of: service.id)
+        #expect(status.state == .failed)
+        #expect(status.run?.endedAt != nil)
+    }
+
     // MARK: Observing
 
     @Test func `subscribe returns the current snapshot with the stream`() async throws {

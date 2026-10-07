@@ -19,7 +19,8 @@ public enum Termination: Sendable, Hashable, Codable {
         }
     }
 
-    static func signalName(_ signal: Int32) -> String {
+    /// The conventional name of a signal, e.g. "SIGTERM".
+    public static func signalName(_ signal: Int32) -> String {
         switch signal {
         case SIGHUP: "SIGHUP"
         case SIGINT: "SIGINT"

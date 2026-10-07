@@ -30,3 +30,45 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case unsupportedSchemaVersion(Int, path: String)
     case persistenceFailed(path: String, reason: String)
 }
+
+extension LocalhostError {
+    /// A short, user-facing explanation.
+    public var message: String {
+        switch self {
+        case .invalidKey(let raw):
+            "“\(raw)” is not a valid key. Use lowercase letters, digits and single hyphens, e.g. my-app."
+        case .invalidName:
+            "Enter a name."
+        case .invalidProjectPath:
+            "The project folder must be an absolute path."
+        case .invalidWorkingDirectory:
+            "The working directory must be relative to the project folder."
+        case .emptyCommandLine:
+            "Enter a command line."
+        case .invalidEnvironmentVariableName(let name):
+            "“\(name)” is not a valid environment variable name."
+        case .duplicateProjectKey(let key):
+            "Another project already uses the key “\(key)”."
+        case .duplicateServiceKey(let key, _):
+            "Another service in this project already uses the key “\(key)”."
+        case .projectNotFound:
+            "The project no longer exists."
+        case .serviceNotFound:
+            "The service no longer exists."
+        case .workingDirectoryMissing(let path):
+            "The working directory \(path) does not exist."
+        case .shellNotFound(let path):
+            "The shell \(path) was not found."
+        case .launchFailed(let code):
+            "The command could not be launched: \(String(cString: strerror(code)))."
+        case .commandNotFound:
+            "Command not found."
+        case .commandNotExecutable:
+            "The command is not executable."
+        case .unsupportedSchemaVersion(let version, let path):
+            "\(path) was saved by a newer version of localhost (schema \(version))."
+        case .persistenceFailed(let path, let reason):
+            "Could not read or write \(path): \(reason)"
+        }
+    }
+}
