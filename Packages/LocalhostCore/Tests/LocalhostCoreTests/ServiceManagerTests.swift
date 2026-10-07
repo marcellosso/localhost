@@ -16,6 +16,7 @@ final class ServiceManagerTests: Sendable {
         library = try ProjectLibrary(storageRoot: root)
         manager = ServiceManager(
             library: library,
+            logs: LogStore(root: root),
             baseEnvironment: ["PATH": "/usr/bin:/bin", "HOME": NSHomeDirectory(), "SHELL": "/bin/sh"],
             gracePeriod: .milliseconds(300),
             stopPolicy: StopPolicy(interruptTimeout: .milliseconds(500), terminateTimeout: .milliseconds(500))

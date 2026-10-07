@@ -7,6 +7,7 @@ import Foundation
 /// returns the Service's status once it has taken effect.
 public actor ServiceManager {
     private let library: ProjectLibrary
+    private let logs: LogStore
     private let baseEnvironment: [String: String]
     private let gracePeriod: Duration
     private let stopPolicy: StopPolicy
@@ -24,11 +25,13 @@ public actor ServiceManager {
     ///   - gracePeriod: How long a Run must stay alive in Starting to be Running.
     public init(
         library: ProjectLibrary,
+        logs: LogStore,
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         gracePeriod: Duration = .milliseconds(1500),
         stopPolicy: StopPolicy = .default
     ) {
         self.library = library
+        self.logs = logs
         self.baseEnvironment = baseEnvironment
         self.gracePeriod = gracePeriod
         self.stopPolicy = stopPolicy
@@ -112,11 +115,20 @@ public actor ServiceManager {
         }
 
         trees[serviceID] = tree
+        await logs.beginRun(run)
         broadcast(.runStarted(run))
         update(ServiceStatus(serviceID: serviceID, state: .starting, run: run))
 
-        // Output is drained here until logs (m0/logs) store it.
-        Task { for await _ in tree.output {} }
+        Task { [logs, runID = run.id] in
+            for await line in tree.output {
+                await logs.append(line, toRun: runID)
+            }
+            let exit = await tree.waitForExit()
+            for note in Self.logNotes(for: exit) {
+                await logs.append(OutputLine(channel: .localhost, text: note, timestamp: Date()), toRun: runID)
+            }
+            await logs.endRun(runID)
+        }
         Task { [gracePeriod, runID = run.id] in
             try? await Task.sleep(for: gracePeriod)
             self.gracePeriodElapsed(serviceID, runID: runID)
@@ -183,6 +195,16 @@ public actor ServiceManager {
         trees[serviceID] = nil
         update(status)
         broadcast(.runEnded(run))
+    }
+
+    /// What localhost writes into a Run's log once it has ended.
+    private static func logNotes(for exit: ProcessTreeExit) -> [String] {
+        var notes: [String] = []
+        if exit.wasForceKilled {
+            notes.append("Force-killed: the process group did not stop in time")
+        }
+        notes.append(exit.termination.summary)
+        return notes
     }
 
     /// The state a Service moves to when its command ends while in `state`.
