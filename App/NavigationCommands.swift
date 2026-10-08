@@ -2,7 +2,7 @@ import LocalhostCore
 import SwiftUI
 
 /// ⌘1–9 select Projects, ⌥⌘1–9 select the selected Project's Services,
-/// ⌘[ / ⌘] step through its Services. (⌘0 Ports lives in the Window menu.)
+/// ⌘[ / ⌘] step through its rows ("All services", then its Services). (⌘0 Ports lives in the Window menu.)
 struct NavigationCommands: Commands {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
@@ -39,14 +39,16 @@ struct NavigationCommands: Commands {
 }
 
 extension AppModel {
-    /// Selects the Service `offset` rows away in the selected Project, stopping
-    /// at either end. With none selected, steps in from the first or last.
+    /// Selects the row `offset` rows away in the selected Project's list
+    /// ("All services", then its Services), stopping at either end. With
+    /// none selected, steps in from the first or last.
     func selectAdjacentService(by offset: Int) {
         guard let services = selectedProject?.services, !services.isEmpty else { return }
-        guard let current = services.firstIndex(where: { $0.id == selectedServiceID }) else {
-            selectedServiceID = (offset > 0 ? services.first : services.last)?.id
+        let rows = [Self.allServicesID] + services.map(\.id)
+        guard let current = rows.firstIndex(of: selectedServiceID ?? UUID()) else {
+            selectedServiceID = offset > 0 ? rows.first : rows.last
             return
         }
-        selectedServiceID = services[min(max(current + offset, 0), services.count - 1)].id
+        selectedServiceID = rows[min(max(current + offset, 0), rows.count - 1)]
     }
 }
