@@ -10,6 +10,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case invalidWorkingDirectory(String)
     case emptyCommandLine
     case invalidEnvironmentVariableName(String)
+    case invalidPort(Int)
+    case invalidURL(String)
     case duplicateProjectKey(Key)
     case duplicateServiceKey(Key, projectID: UUID)
     /// The Dependency would make a Service depend on itself, e.g. `[api, worker, api]`.
@@ -51,6 +53,10 @@ extension LocalhostError {
             "Enter a command line."
         case .invalidEnvironmentVariableName(let name):
             "“\(name)” is not a valid environment variable name."
+        case .invalidPort(let port):
+            "\(port) is not a valid port. Use a number from 1 to 65535."
+        case .invalidURL(let raw):
+            "“\(raw)” is not a valid URL. Use a full http:// or https:// address."
         case .duplicateProjectKey(let key):
             "Another project already uses the key “\(key)”."
         case .duplicateServiceKey(let key, _):

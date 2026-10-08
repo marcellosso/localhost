@@ -3,8 +3,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Adds or edits a Service: name, key, working directory relative to the
-/// Project, command line, environment variables, Dependencies and whether
-/// Start All includes it.
+/// Project, command line, Port and URL, environment variables, Dependencies
+/// and whether Start All includes it.
 struct ServiceForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +16,8 @@ struct ServiceForm: View {
     @State private var isKeyEdited = false
     @State private var workingDirectory = "."
     @State private var commandLine = ""
+    @State private var port = ""
+    @State private var url = ""
     @State private var variables: [Variable] = []
     @State private var dependencies: [UUID] = []
     @State private var isExcludedFromStartAll = false
@@ -52,6 +54,16 @@ struct ServiceForm: View {
                     .font(.body.monospaced())
             } footer: {
                 Text("Relative to \(project.path). The command line runs in your login shell.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                TextField("Port", text: $port, prompt: Text("3000"))
+                    .font(.body.monospaced())
+                TextField("URL", text: $url, prompt: Text(port.isEmpty ? "http://localhost:3000" : "http://localhost:\(port)"))
+                    .font(.body.monospaced())
+            } footer: {
+                Text(portFooter)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -104,10 +116,23 @@ struct ServiceForm: View {
             isKeyEdited = true
             workingDirectory = editing.workingDirectory
             commandLine = editing.commandLine
+            port = editing.port.map(String.init) ?? ""
+            url = editing.url ?? ""
             variables = editing.environment.sorted { $0.key < $1.key }.map { Variable(name: $0.key, value: $0.value) }
             dependencies = editing.dependencies
             isExcludedFromStartAll = editing.isExcludedFromStartAll
         }
+    }
+
+    private var portFooter: String {
+        guard !port.isEmpty else {
+            return "Optional. With a port, the service counts as running once the port accepts connections."
+        }
+        var footer = "The command gets the port as $PORT, e.g. “next dev -p $PORT”. The service counts as running once the port accepts connections."
+        if variables.contains(where: { $0.name == "PORT" }) {
+            footer += " The PORT variable below is replaced by this port."
+        }
+        return footer
     }
 
     private var otherServices: [Service] {
@@ -182,6 +207,12 @@ struct ServiceForm: View {
             return
         }
         let environment = Dictionary(uniqueKeysWithValues: filled.map { ($0.name, $0.value) })
+        let trimmedPort = port.trimmingCharacters(in: .whitespaces)
+        let parsedPort = Int(trimmedPort)
+        if !trimmedPort.isEmpty, parsedPort == nil {
+            error = "The port must be a number, e.g. 3000."
+            return
+        }
 
         isSaving = true
         defer { isSaving = false }
@@ -190,13 +221,13 @@ struct ServiceForm: View {
                 try await model.editService(
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, environment: environment, dependencies: dependencies,
-                    isExcludedFromStartAll: isExcludedFromStartAll
+                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, environment: environment, dependencies: dependencies,
-                    isExcludedFromStartAll: isExcludedFromStartAll
+                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url
                 )
             }
             dismiss()

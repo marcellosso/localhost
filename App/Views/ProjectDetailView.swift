@@ -91,7 +91,7 @@ struct ServiceRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.name)
                     .lineLimit(1)
-                Text(service.commandLine)
+                Text(service.port.map { ":\($0) · \(service.commandLine)" } ?? service.commandLine)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -100,7 +100,7 @@ struct ServiceRow: View {
             Spacer(minLength: 8)
             Text(summary)
                 .font(.caption)
-                .foregroundStyle(status.state == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                .foregroundStyle(summaryStyle)
                 .lineLimit(1)
                 .help(status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
             controls
@@ -116,9 +116,19 @@ struct ServiceRow: View {
         return "Waiting for \(ListFormatter.localizedString(byJoining: awaited))…"
     }
 
+    private var summaryStyle: AnyShapeStyle {
+        if status.state == .failed { return AnyShapeStyle(.red) }
+        if status.hasPortWarning { return AnyShapeStyle(.orange) }
+        return AnyShapeStyle(.secondary)
+    }
+
     @ViewBuilder
     private var controls: some View {
         HStack(spacing: 2) {
+            if status.state == .starting || status.state == .running, let url = model.urlToOpen(service) {
+                Button("Open", systemImage: "arrow.up.right.square") { model.openURL(of: service.id) }
+                    .help("Open \(url.absoluteString) (⇧⌘O)")
+            }
             switch status.state {
             case .starting, .running:
                 Button("Restart", systemImage: "arrow.clockwise") { model.restart(service.id) }
@@ -134,6 +144,6 @@ struct ServiceRow: View {
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
-        .frame(minWidth: 44, alignment: .trailing)
+        .frame(minWidth: 66, alignment: .trailing)
     }
 }

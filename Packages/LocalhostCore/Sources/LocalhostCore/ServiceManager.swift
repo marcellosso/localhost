@@ -11,6 +11,8 @@ public actor ServiceManager {
     private let runRegistry: RunRegistry
     private let baseEnvironment: [String: String]
     private let gracePeriod: Duration
+    private let portTimeout: Duration
+    private let portProbeInterval: Duration
     private let stopPolicy: StopPolicy
 
     private var statuses: [UUID: ServiceStatus] = [:]
@@ -28,13 +30,18 @@ public actor ServiceManager {
 
     /// - Parameters:
     ///   - baseEnvironment: The environment every Run starts from (see `RunEnvironment`).
-    ///   - gracePeriod: How long a Run must stay alive in Starting to be Running.
+    ///   - gracePeriod: How long a Run without a Port must stay alive in Starting to be Running.
+    ///   - portTimeout: How long a Run with a Port waits in Starting for the
+    ///     Port to accept connections before it is Running anyway, with a warning.
+    ///   - portProbeInterval: How often the Port is checked meanwhile.
     public init(
         library: ProjectLibrary,
         logs: LogStore,
         runRegistry: RunRegistry,
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         gracePeriod: Duration = .milliseconds(1500),
+        portTimeout: Duration = .seconds(30),
+        portProbeInterval: Duration = .milliseconds(250),
         stopPolicy: StopPolicy = .default
     ) {
         self.library = library
@@ -42,6 +49,8 @@ public actor ServiceManager {
         self.runRegistry = runRegistry
         self.baseEnvironment = baseEnvironment
         self.gracePeriod = gracePeriod
+        self.portTimeout = portTimeout
+        self.portProbeInterval = portProbeInterval
         self.stopPolicy = stopPolicy
     }
 
@@ -301,15 +310,18 @@ public actor ServiceManager {
         // A Run that ended on its own may still be stopping its leftovers.
         await waitForActiveRunToEnd(serviceID)
 
-        let run = Run(id: UUID(), serviceID: serviceID, origin: origin, startedAt: Date())
+        var run = Run(id: UUID(), serviceID: serviceID, origin: origin, startedAt: Date())
         let tree: ProcessTree
         do {
             let (project, service) = try await library.service(id: serviceID)
+            run.port = service.port
             tree = try ProcessTree.launch(
                 LaunchConfiguration(
                     commandLine: service.commandLine,
                     workingDirectory: project.workingDirectoryURL(for: service),
-                    environment: RunEnvironment.merged(base: baseEnvironment, service: service.environment)
+                    environment: RunEnvironment.merged(
+                        base: baseEnvironment, service: service.environment, port: run.port
+                    )
                 ),
                 stopPolicy: stopPolicy
             )
@@ -327,8 +339,13 @@ public actor ServiceManager {
         update(ServiceStatus(serviceID: serviceID, state: .starting, run: run))
 
         Task { [logs, runID = run.id] in
+            var hasDetectedURL = false
             for await line in tree.output {
                 await logs.append(line, toRun: runID)
+                if !hasDetectedURL, line.channel != .localhost, let url = LocalURL.first(in: ANSI.strip(line.text)) {
+                    hasDetectedURL = true
+                    self.urlDetected(url, serviceID: serviceID, runID: runID)
+                }
             }
             let exit = await tree.waitForExit()
             for note in Self.logNotes(for: exit) {
@@ -336,9 +353,13 @@ public actor ServiceManager {
             }
             await logs.endRun(runID)
         }
-        Task { [gracePeriod, runID = run.id] in
-            try? await Task.sleep(for: gracePeriod)
-            self.gracePeriodElapsed(serviceID, runID: runID)
+        if let port = run.port {
+            Task { [runID = run.id] in await self.watchPort(port, serviceID: serviceID, runID: runID) }
+        } else {
+            Task { [gracePeriod, runID = run.id] in
+                try? await Task.sleep(for: gracePeriod)
+                self.gracePeriodElapsed(serviceID, runID: runID)
+            }
         }
         Task { [runID = run.id] in
             let termination = await tree.waitForShellExit()
@@ -401,6 +422,47 @@ public actor ServiceManager {
         update(status)
     }
 
+    /// Keeps a Run Starting until its Port accepts connections. After the
+    /// timeout it is Running with `isPortUnresponsive`, and the Port is still
+    /// watched so the warning clears once it opens.
+    private func watchPort(_ port: Int, serviceID: UUID, runID: UUID) async {
+        let deadline = ContinuousClock.now + portTimeout
+        while let status = statuses[serviceID], status.run?.id == runID,
+              status.state == .starting || status.state == .running {
+            if await PortProbe.isAccepting(port) {
+                portAccepted(serviceID, runID: runID)
+                return
+            }
+            if ContinuousClock.now >= deadline {
+                portTimedOut(serviceID, runID: runID)
+            }
+            try? await Task.sleep(for: portProbeInterval)
+        }
+    }
+
+    private func portAccepted(_ serviceID: UUID, runID: UUID) {
+        var status = status(of: serviceID)
+        guard status.run?.id == runID, status.state == .starting || status.state == .running else { return }
+        status.state = .running
+        status.run?.isPortUnresponsive = false
+        update(status)
+    }
+
+    private func portTimedOut(_ serviceID: UUID, runID: UUID) {
+        var status = status(of: serviceID)
+        guard status.run?.id == runID, status.state == .starting else { return }
+        status.state = .running
+        status.run?.isPortUnresponsive = true
+        update(status)
+    }
+
+    private func urlDetected(_ url: URL, serviceID: UUID, runID: UUID) {
+        var status = status(of: serviceID)
+        guard status.run?.id == runID, status.run?.endedAt == nil else { return }
+        status.run?.detectedURL = url
+        update(status)
+    }
+
     /// The shell exited: the Service is no longer up, even if leftovers in its
     /// process group are still being stopped.
     private func shellExited(_ serviceID: UUID, runID: UUID, termination: Termination) {
@@ -453,13 +515,15 @@ public actor ServiceManager {
 
     // MARK: Plumbing
 
-    /// Stores `status`, broadcasting `serviceStateChanged` if its state, Run
-    /// or awaited Dependencies changed.
+    /// Stores `status`, broadcasting `serviceStateChanged` if its state, Run,
+    /// awaited Dependencies, Port warning or detected URL changed.
     private func update(_ status: ServiceStatus) {
         let previous = statuses[status.serviceID]
         statuses[status.serviceID] = status
         if status.state != previous?.state || status.run?.id != previous?.run?.id
-            || status.awaitedDependencies != previous?.awaitedDependencies {
+            || status.awaitedDependencies != previous?.awaitedDependencies
+            || status.run?.isPortUnresponsive != previous?.run?.isPortUnresponsive
+            || status.run?.detectedURL != previous?.run?.detectedURL {
             broadcast(.serviceStateChanged(status))
         }
         for waiter in updateWaiters.removeValue(forKey: status.serviceID) ?? [] {

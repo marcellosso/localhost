@@ -16,6 +16,11 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
     public internal(set) var dependencies: [UUID]
     /// Start All skips this Service, unless a Service it starts depends on it.
     public internal(set) var isExcludedFromStartAll: Bool
+    /// The TCP port the Service listens on: it is Running once the Port
+    /// accepts connections, and its command gets it as `PORT` (ADR-0006).
+    public internal(set) var port: Int?
+    /// Where to open the Service, e.g. `http://localhost:3000/admin`.
+    public internal(set) var url: String?
 
     init(
         id: UUID = UUID(),
@@ -25,7 +30,9 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         commandLine: String,
         environment: [String: String] = [:],
         dependencies: [UUID] = [],
-        isExcludedFromStartAll: Bool = false
+        isExcludedFromStartAll: Bool = false,
+        port: Int? = nil,
+        url: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -35,10 +42,12 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         self.environment = environment
         self.dependencies = dependencies
         self.isExcludedFromStartAll = isExcludedFromStartAll
+        self.port = port
+        self.url = url
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, key, workingDirectory, commandLine, environment, dependencies, isExcludedFromStartAll
+        case id, name, key, workingDirectory, commandLine, environment, dependencies, isExcludedFromStartAll, port, url
     }
 
     /// Fields added after schema version 1 shipped are optional when reading.
@@ -52,5 +61,20 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         environment = try container.decode([String: String].self, forKey: .environment)
         dependencies = try container.decodeIfPresent([UUID].self, forKey: .dependencies) ?? []
         isExcludedFromStartAll = try container.decodeIfPresent(Bool.self, forKey: .isExcludedFromStartAll) ?? false
+        port = try container.decodeIfPresent(Int.self, forKey: .port)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
+    }
+
+    /// The URL to open for this Service while `run` is its latest Run: the
+    /// configured URL with its port moved to the Run's, else `localhost` at
+    /// the Run's port, else the first local URL the Run printed.
+    public func urlToOpen(for run: Run?) -> URL? {
+        let actualPort = run?.port ?? port
+        if let url, var components = URLComponents(string: url) {
+            if let port, let actualPort, components.port == port { components.port = actualPort }
+            return components.url
+        }
+        if let actualPort { return URL(string: "http://localhost:\(actualPort)") }
+        return run?.detectedURL
     }
 }
