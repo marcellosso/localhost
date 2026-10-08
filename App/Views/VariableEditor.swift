@@ -38,22 +38,24 @@ struct VariableEditor: View {
     let layer: VariableLayer?
 
     var body: some View {
-        ForEach($variables) { $variable in
+        ForEach(variables) { draft in
+            let binding = $variables.element(draft)
+            let variable = binding.wrappedValue
             HStack {
-                TextField("Name", text: $variable.name, prompt: Text("NAME"))
+                TextField("Name", text: binding.name, prompt: Text("NAME"))
                     .labelsHidden()
                     .font(.body.monospaced())
-                valueField($variable)
+                valueField(binding)
                 if variable.isSecret {
                     Button(variable.isRevealed ? "Hide Value" : "Reveal Value",
                            systemImage: variable.isRevealed ? "eye.slash" : "eye") {
-                        Task { await toggleReveal($variable) }
+                        Task { await toggleReveal(binding) }
                     }
                     .help(variable.isRevealed ? "Hide the value" : "Reveal the value")
                 }
                 Button(variable.isSecret ? "Make Plain" : "Make Secret",
                        systemImage: variable.isSecret ? "lock.fill" : "lock.open") {
-                    Task { await toggleSecret($variable) }
+                    Task { await toggleSecret(binding) }
                 }
                 .help(variable.isSecret
                       ? "Secret: stored in your Keychain, never in the project file. Click to make it a plain variable."
@@ -108,5 +110,19 @@ struct VariableEditor: View {
         else { return }
         variable.wrappedValue.value = await model.secretValue(named: name, in: layer) ?? ""
         variable.wrappedValue.isValueKnown = true
+    }
+}
+
+extension Binding {
+    /// A binding to the element with `element`'s id. Unlike `ForEach($array)`'s
+    /// index-based bindings, it survives the element being removed: reads fall
+    /// back to the last known value and writes are dropped.
+    func element<Element: Identifiable>(_ element: Element) -> Binding<Element> where Value == [Element] {
+        Binding<Element> {
+            wrappedValue.first { $0.id == element.id } ?? element
+        } set: { newValue in
+            guard let index = wrappedValue.firstIndex(where: { $0.id == element.id }) else { return }
+            wrappedValue[index] = newValue
+        }
     }
 }

@@ -25,12 +25,14 @@ struct EnvironmentForm: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            ForEach($profiles) { $profile in
+            ForEach(profiles) { draft in
+                let binding = $profiles.element(draft)
+                let profile = binding.wrappedValue
                 Section {
-                    VariableEditor(variables: $profile.variables, layer: profile.profileID.map { .profile($0) })
+                    VariableEditor(variables: binding.variables, layer: profile.profileID.map { .profile($0) })
                 } header: {
                     HStack {
-                        TextField("Profile Name", text: $profile.name, prompt: Text("Testing"))
+                        TextField("Profile Name", text: binding.name, prompt: Text("Testing"))
                             .labelsHidden()
                             .textFieldStyle(.plain)
                             .font(.headline)
