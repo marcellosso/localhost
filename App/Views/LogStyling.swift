@@ -6,17 +6,38 @@ extension NSAttributedString.Key {
     static let logGutter = NSAttributedString.Key("localhost.logGutter")
 }
 
-/// Turns output lines into attributed text: a gutter marking the stream, then
-/// the line with its ANSI colours and attributes, and local URLs as links.
+/// Which Service a line of the combined stream came from: its Key, padded so
+/// lines align, in the Service's colour.
+struct LogPrefix: Equatable {
+    let text: String
+    let color: NSColor
+}
+
+/// Turns output lines into attributed text: a gutter marking the stream, the
+/// Service's prefix in the combined stream, then the line with its ANSI
+/// colours and attributes, local URLs as links and `highlight` matches marked.
 enum LogStyling {
+    /// Colours told apart in light and dark mode, assigned to a Project's
+    /// Services in order.
+    static let serviceColors: [NSColor] = [
+        .systemBlue, .systemGreen, .systemOrange, .systemPurple, .systemPink,
+        .systemTeal, .systemYellow, .systemIndigo, .systemBrown, .systemMint,
+    ]
+
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     private static let boldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
     private static let italicFont = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
     private static let boldItalicFont = NSFontManager.shared.convert(boldFont, toHaveTrait: .italicFontMask)
 
-    static func attributedLine(_ line: OutputLine) -> NSAttributedString {
+    static func attributedLine(_ line: OutputLine, prefix: LogPrefix? = nil, highlight: String = "") -> NSAttributedString {
         let result = NSMutableAttributedString()
         result.append(gutter(for: line.channel))
+        if let prefix {
+            result.append(NSAttributedString(string: prefix.text + " ", attributes: [
+                .font: boldFont, .foregroundColor: prefix.color,
+            ]))
+        }
+        let textStart = result.length
         if line.channel == .localhost {
             result.append(NSAttributedString(string: line.text, attributes: [
                 .font: italicFont,
@@ -34,8 +55,27 @@ enum LogStyling {
                 result.addAttribute(.link, value: match.url, range: NSRange(location: start + range.location, length: range.length))
             }
         }
+        if !highlight.isEmpty {
+            let text = result.string as NSString
+            var searchRange = NSRange(location: textStart, length: text.length - textStart)
+            while true {
+                let match = text.range(of: highlight, options: [.caseInsensitive, .diacriticInsensitive], range: searchRange)
+                guard match.location != NSNotFound, match.length > 0 else { break }
+                result.addAttributes([.backgroundColor: NSColor.findHighlightColor, .foregroundColor: NSColor.black], range: match)
+                searchRange = NSRange(location: match.upperBound, length: text.length - match.upperBound)
+            }
+        }
         result.append(NSAttributedString(string: "\n", attributes: [.font: font]))
         return result
+    }
+
+    /// Whether a line matches the log filter (its text without ANSI
+    /// sequences, or its Service's prefix).
+    static func matches(_ line: OutputLine, prefix: LogPrefix?, filter: String) -> Bool {
+        guard !filter.isEmpty else { return true }
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        return ANSI.strip(line.text).range(of: filter, options: options) != nil
+            || prefix?.text.range(of: filter, options: options) != nil
     }
 
     private static func gutter(for channel: OutputLine.Channel) -> NSAttributedString {

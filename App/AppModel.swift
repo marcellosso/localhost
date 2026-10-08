@@ -59,6 +59,12 @@ final class AppModel {
         set { sidebarSelection = newValue.map(SidebarItem.project) }
     }
     var selectedServiceID: UUID?
+    /// Text the log views are filtered by (⌘F focuses it).
+    var logFilter = ""
+    /// Incremented to ask the visible log view to focus its filter.
+    private(set) var logFindCount = 0
+    /// Incremented once log buffers were cleared, so log views start over.
+    private(set) var logClearCount = 0
     var presentedSheet: Sheet?
     var pendingRemoval: Removal?
     /// A failed action to report, e.g. a removal that could not be saved.
@@ -135,6 +141,14 @@ final class AppModel {
 
     var selectedProject: Project? {
         projects.first { $0.id == selectedProjectID }
+    }
+
+    /// The `selectedServiceID` of the "All services" row, which shows every
+    /// Service of the selected Project in one stream.
+    static let allServicesID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+    var isAllServicesSelected: Bool {
+        selectedProject != nil && selectedServiceID == Self.allServicesID
     }
 
     var selectedService: Service? {
@@ -237,6 +251,32 @@ final class AppModel {
     func openURL(of serviceID: UUID) {
         guard let (_, service) = service(serviceID), let url = urlToOpen(service) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: Logs
+
+    func findInLog() {
+        logFindCount += 1
+    }
+
+    /// Whether a log is shown that ⌃L can clear.
+    var canClearLogs: Bool {
+        selectedService != nil || isAllServicesSelected
+    }
+
+    /// Clears the shown log's buffers: the selected Service's, or every
+    /// Service's of the Project for "All services". Log files are kept.
+    func clearLogs() {
+        guard let logs = core?.logs else { return }
+        let serviceIDs = isAllServicesSelected
+            ? selectedProject?.services.map(\.id) ?? []
+            : selectedService.map { [$0.id] } ?? []
+        Task {
+            for serviceID in serviceIDs {
+                await logs.clearBuffer(ofService: serviceID)
+            }
+            logClearCount += 1
+        }
     }
 
     func stopAllServices(origin: Origin = .mainWindow) async {

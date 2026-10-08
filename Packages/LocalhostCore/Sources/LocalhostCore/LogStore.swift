@@ -22,6 +22,8 @@ public actor LogStore {
     private var files: [UUID: LogFile] = [:]
     private var fileURLs: [UUID: URL] = [:]
     private var subscribers: [UUID: [AsyncStream<OutputLine>.Continuation]] = [:]
+    private var serviceOfRun: [UUID: UUID] = [:]
+    private var serviceSubscribers: [UUID: ServiceSubscriber] = [:]
 
     public init(
         root: URL = ProjectLibrary.defaultStorageRoot,
@@ -48,6 +50,12 @@ public actor LogStore {
         buffers[runID]?.recentLines(limit) ?? []
     }
 
+    /// The last `limit` buffered stdout and stderr lines of a Run, leaving
+    /// out what localhost wrote, e.g. for a Failed Service's summary.
+    public func recentOutput(forRun runID: UUID, limit: Int) -> [OutputLine] {
+        Array((buffers[runID]?.lines ?? []).lazy.filter { $0.channel != .localhost }.suffix(limit))
+    }
+
     public func latestRunID(ofService serviceID: UUID) -> UUID? {
         latestRunOfService[serviceID]
     }
@@ -64,6 +72,32 @@ public actor LogStore {
         return (lines(forRun: runID), stream)
     }
 
+    /// The combined stream of several Services: the buffered lines of each
+    /// one's latest Run merged by time, plus a stream of every line appended
+    /// to any of their Runs after that, including Runs that begin later.
+    /// The stream finishes when the subscriber stops iterating it.
+    public func subscribe(toServices serviceIDs: Set<UUID>) -> (lines: [ServiceOutputLine], updates: AsyncStream<ServiceOutputLine>) {
+        let (stream, continuation) = AsyncStream.makeStream(of: ServiceOutputLine.self)
+        let id = UUID()
+        serviceSubscribers[id] = ServiceSubscriber(serviceIDs: serviceIDs, continuation: continuation)
+        continuation.onTermination = { _ in Task { await self.unsubscribeFromServices(id) } }
+        var lines: [ServiceOutputLine] = []
+        for serviceID in serviceIDs {
+            guard let runID = latestRunOfService[serviceID] else { continue }
+            lines += self.lines(forRun: runID).map { ServiceOutputLine(serviceID: serviceID, line: $0) }
+        }
+        // Stable, so each Service's lines keep their order.
+        lines.sort { $0.line.timestamp < $1.line.timestamp }
+        return (lines, stream)
+    }
+
+    /// Empties the in-memory buffer of the Service's latest Run, so viewers
+    /// start from new output. Its log file is untouched.
+    public func clearBuffer(ofService serviceID: UUID) {
+        guard let runID = latestRunOfService[serviceID] else { return }
+        buffers[runID]?.removeAll()
+    }
+
     public func logFileURL(forRun runID: UUID) -> URL? {
         fileURLs[runID]
     }
@@ -75,6 +109,7 @@ public actor LogStore {
             buffers[previous] = nil
         }
         latestRunOfService[run.serviceID] = run.id
+        serviceOfRun[run.id] = run.serviceID
         buffers[run.id] = LogBuffer(capacity: maxLinesPerRun)
 
         let directory = logsDirectory.appending(path: run.serviceID.uuidString, directoryHint: .isDirectory)
@@ -85,11 +120,21 @@ public actor LogStore {
     }
 
     func append(_ line: OutputLine, toRun runID: UUID) {
-        guard files[runID] != nil else { return }
-        buffers[runID]?.append(line)
-        files[runID]?.write(line)
-        for subscriber in subscribers[runID] ?? [] {
-            subscriber.yield(line)
+        append(contentsOf: [line], toRun: runID)
+    }
+
+    func append(contentsOf lines: [OutputLine], toRun runID: UUID) {
+        guard files[runID] != nil, let serviceID = serviceOfRun[runID] else { return }
+        let serviceSubscribers = serviceSubscribers.values.filter { $0.serviceIDs.contains(serviceID) }
+        for line in lines {
+            buffers[runID]?.append(line)
+            files[runID]?.write(line)
+            for subscriber in subscribers[runID] ?? [] {
+                subscriber.yield(line)
+            }
+            for subscriber in serviceSubscribers {
+                subscriber.continuation.yield(ServiceOutputLine(serviceID: serviceID, line: line))
+            }
         }
     }
 
@@ -99,9 +144,19 @@ public actor LogStore {
         for subscriber in subscribers.removeValue(forKey: runID) ?? [] {
             subscriber.finish()
         }
+        serviceOfRun[runID] = nil
     }
 
     // MARK: Private
+
+    private struct ServiceSubscriber {
+        let serviceIDs: Set<UUID>
+        let continuation: AsyncStream<ServiceOutputLine>.Continuation
+    }
+
+    private func unsubscribeFromServices(_ id: UUID) {
+        serviceSubscribers[id] = nil
+    }
 
     /// Deletes all but the newest `retainedRunsPerService` Run files.
     private func removeOldRuns(in directory: URL) {

@@ -14,3 +14,9 @@ public struct OutputLine: Sendable, Hashable {
     public let text: String
     public let timestamp: Date
 }
+
+/// A line of one Service's output, in a stream that combines several Services.
+public struct ServiceOutputLine: Sendable, Hashable {
+    public let serviceID: UUID
+    public let line: OutputLine
+}

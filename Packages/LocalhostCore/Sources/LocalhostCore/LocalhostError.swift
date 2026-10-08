@@ -37,6 +37,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case dependencyFailed(Key)
     /// A Secret of the Run's environment has no stored value.
     case secretMissing(String)
+    /// The Run failed after printing `Cannot connect to the Docker daemon`.
+    case dockerDaemonUnavailable
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -106,6 +108,8 @@ extension LocalhostError {
             "Not started: its dependency “\(key)” failed."
         case .secretMissing(let name):
             "The secret “\(name)” has no stored value. Set it again."
+        case .dockerDaemonUnavailable:
+            "Docker isn’t running. Start Docker Desktop (or your Docker engine), then start the service again."
         case .portConflict(let port, let owner?):
             "Port \(port) is in use by \(owner.name) (PID \(owner.pid))."
         case .portConflict(let port, nil):

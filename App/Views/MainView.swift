@@ -37,6 +37,8 @@ struct MainView: View {
                     ContentUnavailableView("No Listener Selected", systemImage: "network",
                                            description: Text("Select a listener to see its process."))
                 }
+            } else if model.isAllServicesSelected, let project = model.selectedProject {
+                CombinedLogPane(project: project)
             } else if let service = model.selectedService {
                 LogPane(service: service)
             } else {
@@ -101,6 +103,7 @@ struct MainView: View {
         } message: { error in
             Text(error.message)
         }
+        .shortcutBadgeHost()
         .overlay(alignment: .bottom) {
             if model.isStoppingOrphans {
                 ProgressView("Stopping services from the last session…")

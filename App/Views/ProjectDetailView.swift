@@ -9,8 +9,13 @@ struct ProjectDetailView: View {
     var body: some View {
         @Bindable var model = model
         List(selection: $model.selectedServiceID) {
+            if !project.services.isEmpty {
+                AllServicesRow(project: project)
+                    .tag(AppModel.allServicesID)
+            }
             ForEach(project.services) { service in
                 ServiceRow(service: service, status: model.status(of: service))
+                    .shortcutBadge(project.services.firstIndex { $0.id == service.id }.map { $0 + 1 }, shownIn: .services)
                     .tag(service.id)
             }
         }
@@ -18,13 +23,15 @@ struct ProjectDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color(nsColor: .windowBackgroundColor))
         .contextMenu(forSelectionType: UUID.self) { ids in
-            if let id = ids.first {
+            if let id = ids.first, id != AppModel.allServicesID {
                 Button("Edit Service…") { model.presentedSheet = .editService(id) }
+                Divider()
+                if let folder = model.folder(ofService: id) { FolderActionButtons(folder: folder) }
                 Divider()
                 Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id) }
             }
         } primaryAction: { ids in
-            if let id = ids.first { model.presentedSheet = .editService(id) }
+            if let id = ids.first, id != AppModel.allServicesID { model.presentedSheet = .editService(id) }
         }
         .overlay {
             if project.services.isEmpty {
@@ -101,6 +108,33 @@ struct ProjectDetailView: View {
         .padding(.vertical, 8)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+/// Selects the combined stream of every Service in the Project.
+struct AllServicesRow: View {
+    @Environment(AppModel.self) private var model
+    let project: Project
+
+    var body: some View {
+        let states = project.services.map { model.status(of: $0).state }
+        HStack(spacing: 10) {
+            Image(systemName: "square.stack")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("All services")
+                    .lineLimit(1)
+                Text("\(states.filter(\.isActive).count) of \(states.count) running"
+                     + (states.contains(.failed) ? " · \(states.filter { $0 == .failed }.count) failed" : ""))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 3)
     }
 }
 

@@ -18,6 +18,7 @@ struct LocalhostApp: App {
         .defaultSize(width: 1100, height: 700)
         .commands {
             AppCommands(model: delegate.model)
+            NavigationCommands(model: delegate.model)
         }
         MenuBarExtra {
             MenuBarContent()
@@ -90,6 +91,14 @@ struct AppCommands: Commands {
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(model.selectedProject == nil)
         }
+        CommandGroup(replacing: .textEditing) {
+            Button("Find in Log") { model.findInLog() }
+                .keyboardShortcut("f")
+                .disabled(!model.canClearLogs)
+            Button("Clear Log") { model.clearLogs() }
+                .keyboardShortcut("l", modifiers: .control)
+                .disabled(!model.canClearLogs)
+        }
         CommandMenu("Service") {
             let status = model.selectedService.map { model.status(of: $0) }
             let isLive = status?.state == .starting || status?.state == .running
@@ -115,6 +124,8 @@ struct AppCommands: Commands {
             Button("Stop All") { project.map { model.stopAll(inProject: $0.id) } }
                 .keyboardShortcut(".", modifiers: [.command, .shift])
                 .disabled(!(project.map { $0.services.contains { model.status(of: $0).state.isActive } } ?? false))
+            Divider()
+            FolderActionCommands(model: model)
         }
     }
 }
