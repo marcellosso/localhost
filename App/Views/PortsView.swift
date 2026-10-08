@@ -23,11 +23,27 @@ struct PortsView: View {
                 }
             }
             if !others.isEmpty {
-                Section("Apps & macOS (\(others.count))", isExpanded: $showsAppListeners) {
-                    ForEach(others) { listener in
-                        ListenerRow(listener: listener)
-                            .tag(listener.id)
+                // Collapsible sections only work in sidebar lists, so the header toggles them itself.
+                Section {
+                    if showsAppListeners {
+                        ForEach(others) { listener in
+                            ListenerRow(listener: listener)
+                                .tag(listener.id)
+                        }
                     }
+                } header: {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { showsAppListeners.toggle() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.right")
+                                .rotationEffect(.degrees(showsAppListeners ? 90 : 0))
+                                .font(.caption2.weight(.semibold))
+                            Text("Apps & macOS (\(others.count))")
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
