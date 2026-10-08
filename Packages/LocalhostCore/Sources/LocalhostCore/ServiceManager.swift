@@ -219,10 +219,12 @@ public actor ServiceManager {
             } else {
                 owner = .unmanaged
             }
+            let launchdLabel = jobs[process.pid] ?? jobs[process.processGroupID]
             return Listener(
                 pid: process.pid, processGroupID: process.processGroupID, name: process.name,
-                command: process.command, ports: process.ports, workingDirectory: process.workingDirectory,
-                owner: owner, launchdLabel: jobs[process.pid] ?? jobs[process.processGroupID],
+                command: process.command, executablePath: process.executablePath, ports: process.ports,
+                workingDirectory: process.workingDirectory, owner: owner, launchdLabel: launchdLabel,
+                kind: .of(executablePath: process.executablePath, launchdLabel: launchdLabel, owner: owner),
                 startTime: process.startTime
             )
         }
@@ -232,8 +234,8 @@ public actor ServiceManager {
     /// Stops a Listener and returns once it has ended. One that belongs to a
     /// Run stops that Service. Any other gets SIGINT → SIGTERM → SIGKILL on
     /// its process group (or, if the group is led by a session leader such as
-    /// a terminal's shell, on its process and descendants). localhost itself
-    /// and launchd jobs are refused.
+    /// a terminal's shell, on its process and descendants). localhost itself,
+    /// launchd jobs and Docker's backend are refused.
     public func stopListener(_ listener: Listener, origin: Origin) async throws(LocalhostError) {
         if case .run(let serviceID, let runID) = listener.owner {
             guard statuses[serviceID]?.run?.id == runID else { return }
@@ -242,6 +244,7 @@ public actor ServiceManager {
         }
         guard listener.pid != getpid() else { throw .listenerIsLocalhost }
         if let label = listener.launchdLabel { throw .listenerIsLaunchdJob(label: label) }
+        if listener.kind == .docker { throw .listenerIsDocker }
         await ListenerStopper.stop(listener, policy: stopPolicy)
     }
 

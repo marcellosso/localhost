@@ -11,6 +11,8 @@ public struct Listener: Identifiable, Sendable, Hashable, Codable {
     public let name: String
     /// The full command line, e.g. `python3 -m http.server 3000`.
     public let command: String
+    /// The executable's path, if it could be read.
+    public let executablePath: String?
     /// The TCP ports it listens on, ascending.
     public let ports: [Int]
     /// Its current working directory, if it could be read.
@@ -19,10 +21,39 @@ public struct Listener: Identifiable, Sendable, Hashable, Codable {
     /// The label of the launchd job it belongs to, if any (e.g. a Homebrew
     /// service or an app). localhost never stops those.
     public let launchdLabel: String?
+    public let kind: ListenerKind
     let startTime: ProcessStartTime
 
     /// Whether it belongs to no Run and no Project.
     public var isUnmanaged: Bool { owner == .unmanaged }
+}
+
+/// What kind of program a Listener is, so development servers can be told
+/// apart from the apps and system services that also listen on ports.
+public enum ListenerKind: String, Sendable, Hashable, Codable {
+    /// A development server or tool: anything not recognised as below, and
+    /// always a Listener of a Run or inside a Project.
+    case development
+    /// Docker's backend, which listens on the ports of running containers.
+    case docker
+    /// A Mac app (or a helper inside one).
+    case app
+    /// Part of macOS.
+    case system
+
+    /// Classifies by owner, executable path and launchd label.
+    static func of(executablePath: String?, launchdLabel: String?, owner: ListenerOwner) -> ListenerKind {
+        if owner != .unmanaged { return .development }
+        let path = executablePath ?? ""
+        if path.contains("/Docker.app/"), (path as NSString).lastPathComponent.hasPrefix("com.docker.") { return .docker }
+        let systemFolders = ["/System/", "/usr/libexec/", "/usr/sbin/", "/sbin/", "/Library/Apple/"]
+        if systemFolders.contains(where: path.hasPrefix) || launchdLabel?.hasPrefix("com.apple.") == true { return .system }
+        // Interpreters like Homebrew's Python run from an `.app` inside their framework.
+        if (path.contains(".app/") && !path.contains(".framework/")) || launchdLabel?.hasPrefix("application.") == true {
+            return .app
+        }
+        return .development
+    }
 }
 
 /// Who a Listener is attributed to.
@@ -43,6 +74,7 @@ enum ListenerScanner {
         let sessionID: pid_t
         let name: String
         let command: String
+        let executablePath: String?
         let ports: [Int]
         let workingDirectory: String?
         let startTime: ProcessStartTime
@@ -63,6 +95,7 @@ enum ListenerScanner {
                 sessionID: getsid(pid),
                 name: name.isEmpty ? shortName : name,
                 command: commandLine(of: pid) ?? shortName,
+                executablePath: executablePath(of: pid),
                 ports: ports,
                 workingDirectory: workingDirectory(of: pid),
                 startTime: ProcessStartTime(seconds: info.pbi_start_tvsec, microseconds: info.pbi_start_tvusec)
@@ -119,6 +152,13 @@ enum ListenerScanner {
             if port != 0 { ports.insert(Int(port)) }
         }
         return ports.sorted()
+    }
+
+    private static func executablePath(of pid: pid_t) -> String? {
+        // PROC_PIDPATHINFO_MAXSIZE, which Swift does not import.
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
     }
 
     private static func workingDirectory(of pid: pid_t) -> String? {

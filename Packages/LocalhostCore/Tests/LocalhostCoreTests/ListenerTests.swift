@@ -90,6 +90,8 @@ final class ListenerTests: Sendable {
         #expect(listener.workingDirectory == ListenerScanner.resolvedPath(outsideFolder.path))
         #expect(listener.owner == .unmanaged)
         #expect(listener.launchdLabel == nil)
+        #expect(listener.executablePath == "/usr/bin/nc")
+        #expect(listener.kind == .development)
         await tree.stop()
     }
 
@@ -118,6 +120,27 @@ final class ListenerTests: Sendable {
     @Test func `reads the running launchd jobs from launchctl list`() {
         let output = "PID\tStatus\tLabel\n412\t0\thomebrew.mxcl.postgresql@16\n-\t0\tcom.apple.idle\n77\t-9\tapplication.com.example.1.2\n"
         #expect(LaunchdJobs.parse(output) == [412: "homebrew.mxcl.postgresql@16", 77: "application.com.example.1.2"])
+    }
+
+    @Test(arguments: [
+        ("/opt/homebrew/Cellar/node/22.1.0/bin/node", nil, ListenerKind.development),
+        ("/opt/homebrew/Cellar/python@3.13/3.13.1/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python", nil, .development),
+        ("/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python", nil, .development),
+        ("/usr/bin/nc", nil, .development),
+        ("/Applications/Docker.app/Contents/MacOS/com.docker.backend", nil, .docker),
+        ("/Applications/Spotify.app/Contents/MacOS/Spotify", "application.com.spotify.client.1.2", .app),
+        ("/Applications/Cursor.app/Contents/Frameworks/Cursor Helper (Plugin).app/Contents/MacOS/Cursor Helper (Plugin)", nil, .app),
+        ("/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter", "com.apple.controlcenter", .system),
+        ("/usr/libexec/rapportd", nil, .system),
+    ] as [(String, String?, ListenerKind)])
+    func `tells development servers from apps and macOS`(path: String, launchdLabel: String?, expected: ListenerKind) {
+        #expect(ListenerKind.of(executablePath: path, launchdLabel: launchdLabel, owner: .unmanaged) == expected)
+    }
+
+    @Test func `a Listener of a Run or a Project is always development`() {
+        let app = "/Applications/Some.app/Contents/MacOS/Some"
+        #expect(ListenerKind.of(executablePath: app, launchdLabel: nil, owner: .project(UUID())) == .development)
+        #expect(ListenerKind.of(executablePath: app, launchdLabel: nil, owner: .run(serviceID: UUID(), runID: UUID())) == .development)
     }
 
     // MARK: Stopping
@@ -162,17 +185,20 @@ final class ListenerTests: Sendable {
         #expect(await manager.status(of: service.id).run?.stopOrigin == .mainWindow)
     }
 
-    @Test func `refuses to stop localhost itself and launchd jobs`() async throws {
+    @Test func `refuses to stop localhost itself, launchd jobs and Docker`() async throws {
         let startTime = try #require(ProcessStartTime.of(getpid()))
-        func listener(pid: pid_t, launchdLabel: String?) -> Listener {
-            Listener(pid: pid, processGroupID: getpgrp(), name: "x", command: "x", ports: [1], workingDirectory: nil,
-                     owner: .unmanaged, launchdLabel: launchdLabel, startTime: startTime)
+        func listener(pid: pid_t, launchdLabel: String?, kind: ListenerKind = .development) -> Listener {
+            Listener(pid: pid, processGroupID: getpgrp(), name: "x", command: "x", executablePath: nil, ports: [1],
+                     workingDirectory: nil, owner: .unmanaged, launchdLabel: launchdLabel, kind: kind, startTime: startTime)
         }
         await #expect(throws: LocalhostError.listenerIsLocalhost) {
             try await self.manager.stopListener(listener(pid: getpid(), launchdLabel: nil), origin: .mainWindow)
         }
         await #expect(throws: LocalhostError.listenerIsLaunchdJob(label: "homebrew.mxcl.redis")) {
             try await self.manager.stopListener(listener(pid: 1, launchdLabel: "homebrew.mxcl.redis"), origin: .mainWindow)
+        }
+        await #expect(throws: LocalhostError.listenerIsDocker) {
+            try await self.manager.stopListener(listener(pid: 1, launchdLabel: nil, kind: .docker), origin: .mainWindow)
         }
     }
 

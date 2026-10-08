@@ -324,6 +324,7 @@ final class AppModel {
     func reasonNotStoppable(_ listener: Listener) -> String? {
         if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.listenerIsLocalhost.message }
         if let label = listener.launchdLabel { return LocalhostError.listenerIsLaunchdJob(label: label).message }
+        if listener.kind == .docker { return LocalhostError.listenerIsDocker.message }
         return nil
     }
 
@@ -344,7 +345,7 @@ final class AppModel {
         await refreshListeners()
     }
 
-    /// Who a Listener belongs to, e.g. "My SaaS › API", "In My SaaS", "Unmanaged".
+    /// Who a Listener belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
     func ownerDescription(_ listener: Listener) -> String {
         switch listener.owner {
         case .run(let serviceID, _):
@@ -353,7 +354,12 @@ final class AppModel {
         case .project(let projectID):
             return "In \(project(projectID)?.name ?? "a removed project")"
         case .unmanaged:
-            return "Unmanaged"
+            switch listener.kind {
+            case .docker: return "Docker"
+            case .app: return "App"
+            case .system: return "macOS"
+            case .development: return "Unmanaged"
+            }
         }
     }
 

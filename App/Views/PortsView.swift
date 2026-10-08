@@ -1,16 +1,34 @@
 import LocalhostCore
 import SwiftUI
 
-/// Every Listener on this machine, refreshed every 2 seconds while visible.
+/// Every Listener on this machine, refreshed every 2 seconds while visible:
+/// development servers and Docker first, apps and macOS collapsed below.
 struct PortsView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("showsAppListeners") private var showsAppListeners = false
 
     var body: some View {
         @Bindable var model = model
+        let development = model.listeners.filter { $0.kind == .development || $0.kind == .docker }
+        let others = model.listeners.filter { $0.kind == .app || $0.kind == .system }
         List(selection: $model.selectedListenerID) {
-            ForEach(model.listeners) { listener in
-                ListenerRow(listener: listener)
-                    .tag(listener.id)
+            Section("Development") {
+                ForEach(development) { listener in
+                    ListenerRow(listener: listener)
+                        .tag(listener.id)
+                }
+                if development.isEmpty, !model.listeners.isEmpty {
+                    Text("No development servers are listening.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if !others.isEmpty {
+                Section("Apps & macOS (\(others.count))", isExpanded: $showsAppListeners) {
+                    ForEach(others) { listener in
+                        ListenerRow(listener: listener)
+                            .tag(listener.id)
+                    }
+                }
             }
         }
         .listStyle(.inset)
@@ -102,6 +120,14 @@ struct ListenerDetailView: View {
                         .textSelection(.enabled)
                         .multilineTextAlignment(.trailing)
                 }
+                if let path = listener.executablePath {
+                    LabeledContent("Executable") {
+                        Text(path)
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+                            .truncationMode(.middle)
+                    }
+                }
                 LabeledContent("PID", value: String(listener.pid))
                 LabeledContent("Process Group", value: String(listener.processGroupID))
                 LabeledContent("Working Directory") {
@@ -115,7 +141,7 @@ struct ListenerDetailView: View {
                     LabeledContent("launchd Job", value: label)
                 }
             } footer: {
-                if listener.isUnmanaged {
+                if listener.isUnmanaged, listener.kind == .development {
                     Text("localhost didn’t start this process and it isn’t inside a project folder.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

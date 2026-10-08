@@ -40,6 +40,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case listenerIsLocalhost
     /// launchd would restart it (a Homebrew service, an app): stop it there instead.
     case listenerIsLaunchdJob(label: String)
+    /// Docker's backend holds the ports of every running container.
+    case listenerIsDocker
 
     // Persistence
     case unsupportedSchemaVersion(Int, path: String)
@@ -96,6 +98,8 @@ extension LocalhostError {
             "localhost can't stop itself."
         case .listenerIsLaunchdJob(let label):
             "It is managed by launchd (\(label)), which would start it again. Stop it with the tool that started it."
+        case .listenerIsDocker:
+            "This is Docker listening for a container. Stop the container instead."
         case .unsupportedSchemaVersion(let version, let path):
             "\(path) was saved by a newer version of localhost (schema \(version))."
         case .persistenceFailed(let path, let reason):
