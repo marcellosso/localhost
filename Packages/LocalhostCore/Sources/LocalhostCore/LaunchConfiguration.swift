@@ -23,8 +23,8 @@ public struct LaunchConfiguration: Sendable, Hashable {
 }
 
 /// Builds the environment of a Run. Later layers override earlier ones:
-/// base (the app's environment) → Service variables, plus output hints that
-/// keep colour and unbuffered output when writing to pipes (ADR-0005).
+/// base (the app's environment) → Service variables → `PORT`, plus output
+/// hints that keep colour and unbuffered output when writing to pipes (ADR-0005).
 ///
 /// The command runs through a login shell, so the user's login profile is
 /// applied on top when the shell starts (ADR-0003).
@@ -37,13 +37,15 @@ public enum RunEnvironment {
 
     public static func merged(
         base: [String: String] = ProcessInfo.processInfo.environment,
-        service: [String: String]
+        service: [String: String],
+        port: Int? = nil
     ) -> [String: String] {
         // Loader variables injected into the app (e.g. by Xcode's debugger)
         // must not leak into the user's commands.
         base.filter { !$0.key.hasPrefix("DYLD_") && !$0.key.hasPrefix("__XPC_") }
             .merging(outputHints) { _, hint in hint }
             .merging(service) { _, service in service }
+            .merging(port.map { ["PORT": String($0)] } ?? [:]) { _, port in port }
     }
 
     /// The user's shell: `$SHELL`, or zsh (the macOS default).

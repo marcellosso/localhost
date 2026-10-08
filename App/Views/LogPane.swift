@@ -14,7 +14,8 @@ struct LogPane: View {
                 StateIndicator(state: status.state)
                 Text(service.name).fontWeight(.medium)
                 Text(status.summary)
-                    .foregroundStyle(status.state == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(status.state == .failed ? AnyShapeStyle(.red)
+                        : status.hasPortWarning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                     .lineLimit(1)
                 Spacer()
                 if let run = status.run {

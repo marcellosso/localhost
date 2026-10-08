@@ -127,6 +127,8 @@ public actor ProjectLibrary {
         environment: [String: String] = [:],
         dependencies: [UUID] = [],
         isExcludedFromStartAll: Bool = false,
+        port: Int? = nil,
+        url: String? = nil,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var project = try self.project(id: projectID)
@@ -137,7 +139,9 @@ public actor ProjectLibrary {
             workingDirectory: try Validate.workingDirectory(workingDirectory),
             commandLine: try Validate.commandLine(commandLine),
             environment: try Validate.environment(environment),
-            isExcludedFromStartAll: isExcludedFromStartAll
+            isExcludedFromStartAll: isExcludedFromStartAll,
+            port: try Validate.port(port),
+            url: try Validate.url(url)
         )
         project.services.append(service)
         try setDependencies(dependencies, of: service.id, in: &project)
@@ -147,6 +151,7 @@ public actor ProjectLibrary {
     }
 
     /// Changes the given fields of a Service; `nil` leaves a field as it is.
+    /// For `port` and `url`, `.some(nil)` removes the value.
     @discardableResult
     public func editService(
         id: UUID,
@@ -157,6 +162,8 @@ public actor ProjectLibrary {
         environment: [String: String]? = nil,
         dependencies: [UUID]? = nil,
         isExcludedFromStartAll: Bool? = nil,
+        port: Int?? = nil,
+        url: String?? = nil,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var (project, index) = try locateService(id)
@@ -170,6 +177,8 @@ public actor ProjectLibrary {
         if let commandLine { service.commandLine = try Validate.commandLine(commandLine) }
         if let environment { service.environment = try Validate.environment(environment) }
         if let isExcludedFromStartAll { service.isExcludedFromStartAll = isExcludedFromStartAll }
+        if let port { service.port = try Validate.port(port) }
+        if let url { service.url = try Validate.url(url) }
         project.services[index] = service
         if let dependencies { try setDependencies(dependencies, of: id, in: &project) }
         try commit(project)
@@ -274,6 +283,22 @@ private enum Validate {
         let commandLine = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !commandLine.isEmpty else { throw .emptyCommandLine }
         return commandLine
+    }
+
+    static func port(_ port: Int?) throws(LocalhostError) -> Int? {
+        guard let port else { return nil }
+        guard (1...65_535).contains(port) else { throw .invalidPort(port) }
+        return port
+    }
+
+    /// An absolute http(s) URL with a host; blank means none.
+    static func url(_ raw: String?) throws(LocalhostError) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        guard let components = URLComponents(string: trimmed),
+              ["http", "https"].contains(components.scheme?.lowercased()),
+              components.host?.isEmpty == false
+        else { throw .invalidURL(trimmed) }
+        return trimmed
     }
 
     /// Variable names must be portable shell names: `[A-Za-z_][A-Za-z0-9_]*`.

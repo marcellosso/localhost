@@ -49,12 +49,21 @@ struct StateIndicator: View {
 }
 
 extension ServiceStatus {
+    /// Running although its Port has not accepted connections in time.
+    var hasPortWarning: Bool {
+        state == .running && run?.isPortUnresponsive == true
+    }
+
     /// e.g. "Running", "Exited · code 0", "Failed · exit 1", "Failed · Command not found."
     var summary: String {
         switch state {
         case .stopped: return "Stopped"
-        case .starting: return "Starting…"
-        case .running: return "Running"
+        case .starting:
+            if let port = run?.port, run?.endedAt == nil, awaitedDependencies.isEmpty { return "Starting · waiting for port \(port)…" }
+            return "Starting…"
+        case .running:
+            if hasPortWarning, let port = run?.port { return "Running · port \(port) not open" }
+            return "Running"
         case .stopping: return "Stopping…"
         case .exited: return "Exited · code 0"
         case .failed:

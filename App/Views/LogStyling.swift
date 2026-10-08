@@ -7,7 +7,7 @@ extension NSAttributedString.Key {
 }
 
 /// Turns output lines into attributed text: a gutter marking the stream, then
-/// the line with its ANSI colours and attributes.
+/// the line with its ANSI colours and attributes, and local URLs as links.
 enum LogStyling {
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     private static let boldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
@@ -23,8 +23,15 @@ enum LogStyling {
                 .foregroundColor: NSColor.secondaryLabelColor,
             ]))
         } else {
-            for span in ANSI.parse(line.text).spans {
+            let start = result.length
+            let spans = ANSI.parse(line.text).spans
+            for span in spans {
                 result.append(NSAttributedString(string: span.text, attributes: attributes(for: span.style)))
+            }
+            let text = spans.map(\.text).joined()
+            for match in LocalURL.matches(in: text) {
+                let range = NSRange(match.range, in: text)
+                result.addAttribute(.link, value: match.url, range: NSRange(location: start + range.location, length: range.length))
             }
         }
         result.append(NSAttributedString(string: "\n", attributes: [.font: font]))

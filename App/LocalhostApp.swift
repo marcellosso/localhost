@@ -79,6 +79,10 @@ struct AppCommands: Commands {
             Button("Stop") { model.selectedServiceID.map(model.stop) }
                 .keyboardShortcut(".")
                 .disabled(!isLive)
+            Divider()
+            Button("Open URL") { model.selectedServiceID.map { model.openURL(of: $0) } }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+                .disabled(!isLive || model.selectedService.flatMap(model.urlToOpen) == nil)
         }
         CommandMenu("Project") {
             let project = model.selectedProject

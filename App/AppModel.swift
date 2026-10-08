@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import LocalhostCore
 import Observation
 
@@ -165,6 +165,16 @@ final class AppModel {
         Task { await report { () throws(LocalhostError) in try await services.stopAll(inProject: projectID, origin: .mainWindow) } }
     }
 
+    /// The URL "Open" uses for a Service, or `nil` if there is none to open.
+    func urlToOpen(_ service: Service) -> URL? {
+        service.urlToOpen(for: status(of: service).run)
+    }
+
+    func openURL(of serviceID: UUID) {
+        guard let (_, service) = service(serviceID), let url = urlToOpen(service) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     func stopAllServices() async {
         await core?.services.stopAll(origin: .mainWindow)
     }
@@ -205,13 +215,14 @@ final class AppModel {
     @discardableResult
     func addService(
         to projectID: UUID, name: String, key: String, workingDirectory: String,
-        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool
+        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
+        port: Int?, url: String?
     ) async throws(LocalhostError) -> Service {
         guard let library = core?.library else { throw .projectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, environment: environment, dependencies: dependencies,
-            isExcludedFromStartAll: isExcludedFromStartAll, origin: .mainWindow
+            isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, origin: .mainWindow
         )
         projects = await library.projects()
         selectedServiceID = service.id
@@ -220,13 +231,14 @@ final class AppModel {
 
     func editService(
         _ id: UUID, name: String, key: String, workingDirectory: String,
-        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool
+        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
+        port: Int?, url: String?
     ) async throws(LocalhostError) {
         guard let library = core?.library else { throw .serviceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, environment: environment, dependencies: dependencies,
-            isExcludedFromStartAll: isExcludedFromStartAll, origin: .mainWindow
+            isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url), origin: .mainWindow
         )
     }
 

@@ -41,6 +41,13 @@ public struct Run: Identifiable, Sendable, Hashable, Codable {
     public internal(set) var stopOrigin: Origin?
     /// Whether the process group had to be killed with SIGKILL.
     public internal(set) var wasForceKilled = false
+    /// The TCP port the Run was given as `PORT`, if its Service has a Port.
+    public internal(set) var port: Int?
+    /// Whether the Run became Running because its Port did not accept
+    /// connections in time; cleared once it does.
+    public internal(set) var isPortUnresponsive = false
+    /// The first `localhost` URL the Run printed (`0.0.0.0` shown as `localhost`).
+    public internal(set) var detectedURL: URL?
 }
 
 /// A Service's state together with its active Run, or its most recent one.
