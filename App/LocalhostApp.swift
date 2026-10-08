@@ -15,6 +15,7 @@ struct LocalhostApp: App {
         .defaultSize(width: 1100, height: 700)
         .commands {
             AppCommands(model: delegate.model)
+            NavigationCommands(model: delegate.model)
         }
         Settings {
             SettingsView()
@@ -100,6 +101,8 @@ struct AppCommands: Commands {
             Button("Stop All") { project.map { model.stopAll(inProject: $0.id) } }
                 .keyboardShortcut(".", modifiers: [.command, .shift])
                 .disabled(!(project.map { $0.services.contains { model.status(of: $0).state.isActive } } ?? false))
+            Divider()
+            FolderActionCommands(model: model)
         }
     }
 }

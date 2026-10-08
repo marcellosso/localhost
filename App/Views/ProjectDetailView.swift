@@ -11,6 +11,7 @@ struct ProjectDetailView: View {
         List(selection: $model.selectedServiceID) {
             ForEach(project.services) { service in
                 ServiceRow(service: service, status: model.status(of: service))
+                    .shortcutBadge(project.services.firstIndex { $0.id == service.id }.map { $0 + 1 }, shownIn: .services)
                     .tag(service.id)
             }
         }
@@ -20,6 +21,8 @@ struct ProjectDetailView: View {
         .contextMenu(forSelectionType: UUID.self) { ids in
             if let id = ids.first {
                 Button("Edit Service…") { model.presentedSheet = .editService(id) }
+                Divider()
+                if let folder = model.folder(ofService: id) { FolderActionButtons(folder: folder) }
                 Divider()
                 Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id) }
             }

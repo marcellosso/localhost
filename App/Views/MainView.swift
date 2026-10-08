@@ -101,6 +101,7 @@ struct MainView: View {
         } message: { error in
             Text(error.message)
         }
+        .shortcutBadgeHost()
         .overlay(alignment: .bottom) {
             if model.isStoppingOrphans {
                 ProgressView("Stopping services from the last session…")
