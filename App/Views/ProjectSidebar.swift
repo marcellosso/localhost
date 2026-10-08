@@ -30,6 +30,7 @@ struct ProjectSidebar: View {
         .contextMenu(forSelectionType: AppModel.SidebarItem.self) { items in
             if case .project(let id) = items.first, let project = model.project(id) {
                 Button("Edit Project…") { model.presentedSheet = .editProject(id) }
+                Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(id, !project.isFavorite) }
                 Divider()
                 Button("Remove Project…", role: .destructive) { model.pendingRemoval = .project(id) }

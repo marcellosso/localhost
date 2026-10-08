@@ -135,7 +135,7 @@ final class ServiceManagerTests: Sendable {
         let service = try await library.addService(
             toProject: project.id, name: "Web", key: Key("web"), workingDirectory: "web",
             commandLine: #"pwd -P > out.txt; echo "$PORT $FORCE_COLOR" >> out.txt"#,
-            environment: ["PORT": "3000"], origin: .mainWindow
+            variables: VariableInput.plain(["PORT": "3000"]), origin: .mainWindow
         )
         let (_, events) = await manager.subscribe()
         try await manager.start(service.id, origin: .mainWindow)

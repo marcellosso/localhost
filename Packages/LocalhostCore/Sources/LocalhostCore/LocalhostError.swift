@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Every failure the core reports. Clients switch over these cases; they are
 /// never flattened into strings inside the core.
@@ -10,6 +11,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case invalidWorkingDirectory(String)
     case emptyCommandLine
     case invalidEnvironmentVariableName(String)
+    case duplicateVariableName(String)
+    case duplicateProfileName(String)
     case invalidPort(Int)
     case invalidURL(String)
     case duplicateProjectKey(Key)
@@ -20,6 +23,7 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     // Lookup
     case projectNotFound(UUID)
     case serviceNotFound(UUID)
+    case profileNotFound(UUID)
 
     // Launching a Run
     case workingDirectoryMissing(String)
@@ -31,6 +35,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case commandNotExecutable
     /// A Dependency Failed, so the Service was not started.
     case dependencyFailed(Key)
+    /// A Secret of the Run's environment has no stored value.
+    case secretMissing(String)
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -44,6 +50,8 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case listenerIsDocker
 
     // Persistence
+    /// A Keychain call failed with this `OSStatus`.
+    case keychainFailed(status: Int32)
     case unsupportedSchemaVersion(Int, path: String)
     case persistenceFailed(path: String, reason: String)
 }
@@ -64,6 +72,10 @@ extension LocalhostError {
             "Enter a command line."
         case .invalidEnvironmentVariableName(let name):
             "“\(name)” is not a valid environment variable name."
+        case .duplicateVariableName(let name):
+            "“\(name)” is defined more than once."
+        case .duplicateProfileName(let name):
+            "Another profile in this project is already called “\(name)”."
         case .invalidPort(let port):
             "\(port) is not a valid port. Use a number from 1 to 65535."
         case .invalidURL(let raw):
@@ -78,6 +90,8 @@ extension LocalhostError {
             "The project no longer exists."
         case .serviceNotFound:
             "The service no longer exists."
+        case .profileNotFound:
+            "The environment profile no longer exists."
         case .workingDirectoryMissing(let path):
             "The working directory \(path) does not exist."
         case .shellNotFound(let path):
@@ -90,6 +104,8 @@ extension LocalhostError {
             "The command is not executable."
         case .dependencyFailed(let key):
             "Not started: its dependency “\(key)” failed."
+        case .secretMissing(let name):
+            "The secret “\(name)” has no stored value. Set it again."
         case .portConflict(let port, let owner?):
             "Port \(port) is in use by \(owner.name) (PID \(owner.pid))."
         case .portConflict(let port, nil):
@@ -102,6 +118,8 @@ extension LocalhostError {
             "This is Docker listening for a container. Stop the container instead."
         case .unsupportedSchemaVersion(let version, let path):
             "\(path) was saved by a newer version of localhost (schema \(version))."
+        case .keychainFailed(let status):
+            "The Keychain refused: \((SecCopyErrorMessageString(status, nil) as String?) ?? "error \(status)")."
         case .persistenceFailed(let path, let reason):
             "Could not read or write \(path): \(reason)"
         }
