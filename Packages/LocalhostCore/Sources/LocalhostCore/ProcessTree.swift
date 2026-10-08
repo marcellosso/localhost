@@ -13,8 +13,10 @@ import Synchronization
 public actor ProcessTree {
     /// The shell's pid, which is also the process group and session id.
     public nonisolated let pid: pid_t
-    /// Every output line, in arrival order. Finishes after the tree has ended.
-    public nonisolated let output: AsyncStream<OutputLine>
+    /// Every output line, in arrival order, in batches as read from the
+    /// pipes (so chatty commands cost one element per read, not per line).
+    /// Reading pauses while batches aren't taken. Finishes after the tree has ended.
+    public nonisolated let output: OutputBatches
 
     private let stopPolicy: StopPolicy
     private let readers: [PipeReader]
@@ -67,8 +69,9 @@ public actor ProcessTree {
     private init(pid: pid_t, stdout: Int32, stderr: Int32, stopPolicy: StopPolicy) {
         self.pid = pid
         self.stopPolicy = stopPolicy
-        let (output, continuation) = AsyncStream.makeStream(of: OutputLine.self)
-        self.output = output
+        let (output, continuation) = AsyncStream.makeStream(of: [OutputLine].self)
+        let flow = OutputFlow()
+        self.output = OutputBatches(stream: output, flow: flow)
 
         // The stream finishes when both pipes have ended.
         let openPipes = Mutex(2)
@@ -82,10 +85,10 @@ public actor ProcessTree {
             continuation.finish()
             outputEnded.open()
         }
-        let yield: @Sendable (OutputLine) -> Void = { continuation.yield($0) }
+        let yield: @Sendable ([OutputLine]) -> Void = { continuation.yield($0) }
         readers = [
-            PipeReader(fileDescriptor: stdout, channel: .stdout, onLine: yield, onEnd: reportEnd),
-            PipeReader(fileDescriptor: stderr, channel: .stderr, onLine: yield, onEnd: reportEnd),
+            PipeReader(fileDescriptor: stdout, channel: .stdout, flow: flow, onLines: yield, onEnd: reportEnd),
+            PipeReader(fileDescriptor: stderr, channel: .stderr, flow: flow, onLines: yield, onEnd: reportEnd),
         ]
     }
 

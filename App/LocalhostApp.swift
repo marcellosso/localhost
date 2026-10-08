@@ -76,6 +76,14 @@ struct AppCommands: Commands {
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(model.selectedProject == nil)
         }
+        CommandGroup(replacing: .textEditing) {
+            Button("Find in Log") { model.findInLog() }
+                .keyboardShortcut("f")
+                .disabled(!model.canClearLogs)
+            Button("Clear Log") { model.clearLogs() }
+                .keyboardShortcut("l", modifiers: .control)
+                .disabled(!model.canClearLogs)
+        }
         CommandMenu("Service") {
             let status = model.selectedService.map { model.status(of: $0) }
             let isLive = status?.state == .starting || status?.state == .running

@@ -26,6 +26,12 @@ public struct LogBuffer: Sendable {
         Array(lines.suffix(limit))
     }
 
+    /// Empties the buffer; `droppedCount` keeps counting.
+    public mutating func removeAll() {
+        storage.removeAll(keepingCapacity: true)
+        head = 0
+    }
+
     public mutating func append(_ line: OutputLine) {
         if storage.count < capacity {
             storage.append(line)

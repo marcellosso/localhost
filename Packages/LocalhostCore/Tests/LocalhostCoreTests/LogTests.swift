@@ -161,6 +161,63 @@ final class LogStoreTests: Sendable {
         #expect(live == ["after"])
     }
 
+    @Test func `the combined stream merges Services by time and follows their next Runs`() async throws {
+        let store = LogStore(root: root)
+        let (web, api, other) = (UUID(), UUID(), UUID())
+        let webRun = makeRun(service: web)
+        let apiRun = makeRun(service: api)
+        let otherRun = makeRun(service: other)
+        for run in [webRun, apiRun, otherRun] { await store.beginRun(run) }
+        let at = { (seconds: Double) in Date(timeIntervalSince1970: seconds) }
+        await store.append(OutputLine(channel: .stdout, text: "web 1", timestamp: at(1)), toRun: webRun.id)
+        await store.append(OutputLine(channel: .stdout, text: "web 3", timestamp: at(3)), toRun: webRun.id)
+        await store.append(OutputLine(channel: .stderr, text: "api 2", timestamp: at(2)), toRun: apiRun.id)
+        await store.append(OutputLine(channel: .stdout, text: "other", timestamp: at(2)), toRun: otherRun.id)
+
+        let (lines, updates) = await store.subscribe(toServices: [web, api])
+        #expect(lines.map(\.line.text) == ["web 1", "api 2", "web 3"])
+        #expect(lines.map(\.serviceID) == [web, api, web])
+
+        await store.append(line("api live"), toRun: apiRun.id)
+        await store.append(line("other live"), toRun: otherRun.id)
+        await store.endRun(webRun.id)
+        let nextWebRun = makeRun(service: web)
+        await store.beginRun(nextWebRun)
+        await store.append(line("web again"), toRun: nextWebRun.id)
+
+        var live: [ServiceOutputLine] = []
+        for await line in updates {
+            live.append(line)
+            if live.count == 2 { break }
+        }
+        #expect(live.map(\.line.text) == ["api live", "web again"])
+        #expect(live.map(\.serviceID) == [api, web])
+    }
+
+    @Test func `clearing a Service's buffer keeps its log file and new output`() async throws {
+        let store = LogStore(root: root)
+        let run = makeRun()
+        await store.beginRun(run)
+        await store.append(line("old"), toRun: run.id)
+        await store.clearBuffer(ofService: run.serviceID)
+        await store.append(line("new"), toRun: run.id)
+
+        #expect(await store.lines(forRun: run.id).map(\.text) == ["new"])
+        let file = try #require(await store.logFileURL(forRun: run.id))
+        #expect(try fileContents(file).split(separator: "\n").count == 2)
+    }
+
+    @Test func `recent output leaves out localhost's own lines`() async throws {
+        let store = LogStore(root: root)
+        let run = makeRun()
+        await store.beginRun(run)
+        for text in ["a", "b", "c"] { await store.append(line(text), toRun: run.id) }
+        await store.append(line("d", .stderr), toRun: run.id)
+        await store.append(line("Exited with code 1", .localhost), toRun: run.id)
+
+        #expect(await store.recentOutput(forRun: run.id, limit: 3).map(\.text) == ["b", "c", "d"])
+    }
+
     @Test func `subscribing to an ended Run returns its lines and a finished stream`() async throws {
         let store = LogStore(root: root)
         let run = makeRun()
@@ -238,6 +295,40 @@ final class ServiceLogTests: Sendable {
             "Force-killed: the process group did not stop in time",
             "Terminated by signal SIGKILL",
         ])
+    }
+
+    /// The Service's status once its Run has fully ended.
+    func endedStatus() async throws -> ServiceStatus {
+        let service = try #require(await library.project(id: project.id).services.first)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < deadline {
+            let status = await manager.status(of: service.id)
+            if status.run?.endedAt != nil { return status }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        Issue.record("the Run did not end")
+        return await manager.status(of: service.id)
+    }
+
+    @Test(arguments: [
+        "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?",
+        "failed to connect to the docker API at unix:///Users/me/.docker/run/docker.sock; check if the path is correct and if the daemon is running",
+    ])
+    func `a Run that fails after Docker's daemon error is dockerDaemonUnavailable`(error: String) async throws {
+        _ = try await runLines("echo '\(error)' >&2; exit 1")
+        let status = try await endedStatus()
+
+        #expect(status.state == .failed)
+        #expect(status.run?.failure == .dockerDaemonUnavailable)
+        #expect(status.run?.termination == .exited(code: 1))
+    }
+
+    @Test func `Docker's daemon error is not a failure when the Run succeeds`() async throws {
+        _ = try await runLines("echo 'Cannot connect to the Docker daemon' >&2; exit 0")
+        let status = try await endedStatus()
+
+        #expect(status.state == .exited)
+        #expect(status.run?.failure == nil)
     }
 
     @Test func `the Run's file is written`() async throws {
