@@ -55,6 +55,8 @@ struct MainView: View {
                 if let project = model.project(projectID) { ServiceForm(project: project, editing: nil) }
             case .editService(let id):
                 if let (project, service) = model.service(id) { ServiceForm(project: project, editing: service) }
+            case .projectEnvironment(let id):
+                if let project = model.project(id) { EnvironmentForm(project: project) }
             }
         }
         .confirmationDialog(removalTitle, isPresented: isConfirmingRemoval, presenting: model.pendingRemoval) { removal in

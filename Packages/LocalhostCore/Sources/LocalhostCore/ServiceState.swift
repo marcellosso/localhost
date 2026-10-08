@@ -75,6 +75,10 @@ public struct ServiceStatus: Sendable, Hashable, Codable {
     /// While Starting: the Dependencies the Service is still waiting for
     /// before its Run is launched. `run` is then the previous Run, if any.
     public internal(set) var awaitedDependencies: [UUID] = []
+    /// While the Run is Starting or Running: its launch configuration
+    /// (command line, working directory, variables, Port) differs from what
+    /// a start would use now. Nothing restarts on its own.
+    public internal(set) var isRestartNeeded = false
 
     public static func neverRun(_ serviceID: UUID) -> ServiceStatus {
         ServiceStatus(serviceID: serviceID, state: .stopped, run: nil)

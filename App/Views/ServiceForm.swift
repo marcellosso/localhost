@@ -19,18 +19,12 @@ struct ServiceForm: View {
     @State private var port = ""
     @State private var url = ""
     @State private var portCanChange = true
-    @State private var variables: [Variable] = []
+    @State private var variables: [VariableDraft] = []
     @State private var dependencies: [UUID] = []
     @State private var isExcludedFromStartAll = false
     @State private var isChoosingFolder = false
     @State private var error: String?
     @State private var isSaving = false
-
-    struct Variable: Identifiable {
-        let id = UUID()
-        var name = ""
-        var value = ""
-    }
 
     var body: some View {
         Form {
@@ -71,24 +65,14 @@ struct ServiceForm: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Environment Variables") {
-                ForEach($variables) { $variable in
-                    HStack {
-                        TextField("Name", text: $variable.name, prompt: Text("NAME"))
-                            .labelsHidden()
-                            .font(.body.monospaced())
-                        TextField("Value", text: $variable.value, prompt: Text("value"))
-                            .labelsHidden()
-                            .font(.body.monospaced())
-                        Button("Remove Variable", systemImage: "minus.circle") {
-                            variables.removeAll { $0.id == variable.id }
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                    }
-                }
-                Button("Add Variable", systemImage: "plus") { variables.append(Variable()) }
-                    .buttonStyle(.borderless)
+            Section {
+                VariableEditor(variables: $variables, layer: editing.map { .service($0.id) })
+            } header: {
+                Text("Environment Variables")
+            } footer: {
+                Text("These override the project’s variables; the active environment profile overrides both. Changes apply on the next start.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             startSection
             if let error {
@@ -123,7 +107,7 @@ struct ServiceForm: View {
             port = editing.port.map(String.init) ?? ""
             url = editing.url ?? ""
             portCanChange = editing.portCanChange
-            variables = editing.environment.sorted { $0.key < $1.key }.map { Variable(name: $0.key, value: $0.value) }
+            variables = VariableDraft.drafts(from: editing.variables)
             dependencies = editing.dependencies
             isExcludedFromStartAll = editing.isExcludedFromStartAll
         }
@@ -211,13 +195,7 @@ struct ServiceForm: View {
     }
 
     private func save() async {
-        let filled = variables.filter { !$0.name.isEmpty || !$0.value.isEmpty }
-        let names = filled.map(\.name)
-        if let duplicate = names.first(where: { name in names.filter { $0 == name }.count > 1 }) {
-            error = "“\(duplicate)” is defined more than once."
-            return
-        }
-        let environment = Dictionary(uniqueKeysWithValues: filled.map { ($0.name, $0.value) })
+        let inputs = variables.compactMap(\.input)
         let trimmedPort = port.trimmingCharacters(in: .whitespaces)
         let parsedPort = Int(trimmedPort)
         if !trimmedPort.isEmpty, parsedPort == nil {
@@ -231,14 +209,14 @@ struct ServiceForm: View {
             if let editing {
                 try await model.editService(
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
-                    commandLine: commandLine, environment: environment, dependencies: dependencies,
+                    commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
                     portCanChange: portCanChange
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
-                    commandLine: commandLine, environment: environment, dependencies: dependencies,
+                    commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
                     portCanChange: portCanChange
                 )

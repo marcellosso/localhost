@@ -18,6 +18,7 @@ final class AppModel {
         case editProject(UUID)
         case addService(projectID: UUID)
         case editService(UUID)
+        case projectEnvironment(UUID)
 
         var id: Self { self }
     }
@@ -270,13 +271,13 @@ final class AppModel {
     @discardableResult
     func addService(
         to projectID: UUID, name: String, key: String, workingDirectory: String,
-        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
+        commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
         port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) -> Service {
         guard let library = core?.library else { throw .projectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
-            commandLine: commandLine, environment: environment, dependencies: dependencies,
+            commandLine: commandLine, variables: variables, dependencies: dependencies,
             isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, portCanChange: portCanChange,
             origin: .mainWindow
         )
@@ -287,16 +288,68 @@ final class AppModel {
 
     func editService(
         _ id: UUID, name: String, key: String, workingDirectory: String,
-        commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
+        commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
         port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) {
         guard let library = core?.library else { throw .serviceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
-            commandLine: commandLine, environment: environment, dependencies: dependencies,
+            commandLine: commandLine, variables: variables, dependencies: dependencies,
             isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url),
             portCanChange: portCanChange, origin: .mainWindow
         )
+    }
+
+    // MARK: Environment
+
+    /// One Environment Profile as edited in the Environment sheet.
+    struct ProfileDraft: Identifiable {
+        let id = UUID()
+        /// `nil` for a Profile added in the sheet.
+        var profileID: UUID?
+        var name: String
+        var variables: [VariableDraft]
+    }
+
+    func setActiveProfile(_ profileID: UUID?, inProject projectID: UUID) {
+        guard let library = core?.library else { return }
+        Task { await report { () throws(LocalhostError) in try await library.setActiveProfile(profileID, inProject: projectID, origin: .mainWindow) } }
+    }
+
+    /// Saves the Environment sheet: the Project's variables, its Profiles
+    /// (added, edited, removed), then which one is active.
+    func saveEnvironment(
+        of projectID: UUID, variables: [VariableInput], profiles: [ProfileDraft], activeDraftID: UUID?
+    ) async throws(LocalhostError) {
+        guard let library = core?.library, let project = project(projectID) else { throw .projectNotFound(projectID) }
+        try await library.editProject(id: projectID, variables: variables, origin: .mainWindow)
+        let kept = Set(profiles.compactMap(\.profileID))
+        for profile in project.profiles where !kept.contains(profile.id) {
+            try await library.removeProfile(id: profile.id, origin: .mainWindow)
+        }
+        var activeProfileID: UUID?
+        for draft in profiles {
+            let inputs = draft.variables.compactMap(\.input)
+            let id: UUID
+            if let profileID = draft.profileID {
+                id = try await library.editProfile(id: profileID, name: draft.name, variables: inputs, origin: .mainWindow).id
+            } else {
+                id = try await library.addProfile(toProject: projectID, name: draft.name, variables: inputs, origin: .mainWindow).id
+            }
+            if draft.id == activeDraftID { activeProfileID = id }
+        }
+        try await library.setActiveProfile(activeProfileID, inProject: projectID, origin: .mainWindow)
+    }
+
+    /// A Secret's stored value, to reveal it; `nil` if it has none.
+    func secretValue(named name: String, in layer: VariableLayer) async -> String? {
+        guard let library = core?.library else { return nil }
+        do {
+            return try await library.secretValue(named: name, in: layer)
+        } catch {
+            actionError = error
+            return nil
+        }
     }
 
     /// Stops the Service, then removes it.

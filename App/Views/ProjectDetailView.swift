@@ -49,6 +49,29 @@ struct ProjectDetailView: View {
         }
     }
 
+    /// Switches the active Environment Profile; opens the Environment sheet.
+    private var profileMenu: some View {
+        Menu {
+            Picker("Environment Profile", selection: Binding {
+                project.activeProfileID
+            } set: { model.setActiveProfile($0, inProject: project.id) }) {
+                Text("No Profile").tag(UUID?.none)
+                ForEach(project.profiles) { profile in
+                    Text(profile.name).tag(UUID?.some(profile.id))
+                }
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id) }
+        } label: {
+            Text(project.activeProfile?.name ?? "No Profile")
+                .font(.caption)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Environment profile")
+    }
+
     private var header: some View {
         HStack(spacing: 6) {
             Text(project.key.rawValue)
@@ -62,6 +85,7 @@ struct ProjectDetailView: View {
                 .truncationMode(.middle)
                 .textSelection(.enabled)
             Spacer()
+            profileMenu
             Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id) }
                 .help("Start All (⇧⌘R)")
                 .disabled(project.services.isEmpty)
@@ -102,7 +126,9 @@ struct ServiceRow: View {
                 .font(.caption)
                 .foregroundStyle(summaryStyle)
                 .lineLimit(1)
-                .help(status.portChangeExplanation ?? status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
+                .help(status.isRestartNeeded
+                      ? "Its configuration changed since it started. Restart it to apply."
+                      : status.portChangeExplanation ?? status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
             controls
         }
         .padding(.vertical, 3)
@@ -117,13 +143,14 @@ struct ServiceRow: View {
     /// The status summary, naming the Dependencies a Starting Service waits for.
     private var summary: String {
         let awaited = status.awaitedDependencies.compactMap { id in model.service(id)?.service.name }
+        if status.isRestartNeeded { return "\(status.summary) · restart to apply" }
         guard status.state == .starting, !awaited.isEmpty else { return status.summary }
         return "Waiting for \(ListFormatter.localizedString(byJoining: awaited))…"
     }
 
     private var summaryStyle: AnyShapeStyle {
         if status.state == .failed { return AnyShapeStyle(.red) }
-        if status.hasPortWarning || status.portChangeExplanation != nil { return AnyShapeStyle(.orange) }
+        if status.hasPortWarning || status.portChangeExplanation != nil || status.isRestartNeeded { return AnyShapeStyle(.orange) }
         return AnyShapeStyle(.secondary)
     }
 

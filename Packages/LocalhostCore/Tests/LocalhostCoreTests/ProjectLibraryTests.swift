@@ -44,7 +44,7 @@ final class ProjectLibraryTests {
         let project = try await library.addProject(name: "App", key: Key("app"), path: "/tmp/app", origin: .mainWindow)
         try await library.addService(
             toProject: project.id, name: "Web", key: Key("web"), workingDirectory: "web",
-            commandLine: "pnpm dev", environment: ["PORT": "3000"], origin: .mainWindow
+            commandLine: "pnpm dev", variables: VariableInput.plain(["PORT": "3000"]), origin: .mainWindow
         )
         try await library.editProject(id: project.id, isFavorite: true, origin: .menuBar)
 
@@ -138,7 +138,7 @@ final class ProjectLibraryTests {
         #expect(api.commandLine == "uv run fastapi dev")
 
         let edited = try await library.editService(
-            id: api.id, commandLine: "uv run fastapi dev --port 8001", environment: ["DEBUG": "1"], origin: .mainWindow
+            id: api.id, commandLine: "uv run fastapi dev --port 8001", variables: VariableInput.plain(["DEBUG": "1"]), origin: .mainWindow
         )
         #expect(edited.name == "API")
         #expect(edited.environment == ["DEBUG": "1"])
@@ -214,7 +214,7 @@ final class ProjectLibraryTests {
         await #expect(throws: LocalhostError.invalidEnvironmentVariableName(name)) {
             try await library.addService(
                 toProject: project.id, name: "Web", key: Key("web"), commandLine: "pnpm dev",
-                environment: [name: "x", "_OK_1": "y"], origin: .mainWindow
+                variables: VariableInput.plain([name: "x", "_OK_1": "y"]), origin: .mainWindow
             )
         }
     }

@@ -110,15 +110,16 @@ final class PortTests: Sendable {
 
     @Test func `the command gets the Port as PORT, overriding a Service variable`() async throws {
         let marker = root.appending(path: "port.txt")
+        let port = freePort()
         let service = try await library.addService(
             toProject: project.id, name: "Web", key: Key("web"),
             commandLine: "echo $PORT > '\(marker.path)'; exec sleep 1000",
-            environment: ["PORT": "1"], port: 4321, origin: .mainWindow
+            variables: VariableInput.plain(["PORT": "1"]), port: port, origin: .mainWindow
         )
         try await manager.start(service.id, origin: .mainWindow)
         try await Task.sleep(for: .milliseconds(300))
 
-        #expect(try String(contentsOf: marker, encoding: .utf8) == "4321\n")
+        #expect(try String(contentsOf: marker, encoding: .utf8) == "\(port)\n")
         try await manager.stop(service.id, origin: .mainWindow)
     }
 

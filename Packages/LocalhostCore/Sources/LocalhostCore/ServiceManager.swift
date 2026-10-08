@@ -31,6 +31,9 @@ public actor ServiceManager {
     private var updateWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
     /// The port of each Service's active Run, from launch until its tree has ended.
     private var runPorts: [UUID: Int] = [:]
+    /// The launch configuration each Service's latest Run was started with,
+    /// hashed (it includes Secret values, so it is never stored or sent).
+    private var launchFingerprints: [UUID: Int] = [:]
 
     /// - Parameters:
     ///   - baseEnvironment: The environment every Run starts from (see `RunEnvironment`).
@@ -60,6 +63,12 @@ public actor ServiceManager {
         self.portProbeInterval = portProbeInterval
         self.stopPolicy = stopPolicy
         self.isAutomaticPortMoveEnabled = isAutomaticPortMoveEnabled
+        Task { [weak self] in
+            for await event in await library.events() {
+                guard let self else { return }
+                if case .projectUpdated(let project, _) = event { await self.configurationChanged(project) }
+            }
+        }
     }
 
     // MARK: Observing
@@ -455,6 +464,8 @@ public actor ServiceManager {
         let tree: ProcessTree
         do {
             let (project, service) = try await library.service(id: serviceID)
+            let variables = try await library.resolvedVariables(forService: serviceID)
+            launchFingerprints[serviceID] = Self.launchFingerprint(of: service, in: project, variables: variables)
             if let port = service.port {
                 (run.port, run.portChange) = try await portForRun(of: service, configuredPort: port, in: project, requestedPort: requestedPort)
             }
@@ -462,9 +473,7 @@ public actor ServiceManager {
                 LaunchConfiguration(
                     commandLine: service.commandLine,
                     workingDirectory: project.workingDirectoryURL(for: service),
-                    environment: RunEnvironment.merged(
-                        base: baseEnvironment, service: service.environment, port: run.port
-                    )
+                    environment: RunEnvironment.merged(base: baseEnvironment, variables: variables, port: run.port)
                 ),
                 stopPolicy: stopPolicy
             )
@@ -558,6 +567,33 @@ public actor ServiceManager {
         guard let tree = trees[serviceID], let runID = statuses[serviceID]?.run?.id else { return }
         let exit = await tree.waitForExit()
         runEnded(serviceID, runID: runID, exit: exit)
+    }
+
+    // MARK: Restart to apply
+
+    /// Marks each live Run of the Project whose launch configuration changed.
+    private func configurationChanged(_ project: Project) async {
+        for service in project.services {
+            guard trees[service.id] != nil, let launched = launchFingerprints[service.id],
+                  let runID = statuses[service.id]?.run?.id
+            else { continue }
+            // A Secret that can't be read any more is a change, too.
+            let variables = try? await library.resolvedVariables(forService: service.id)
+            let current = variables.map { Self.launchFingerprint(of: service, in: project, variables: $0) }
+            var status = status(of: service.id)
+            guard status.run?.id == runID, status.state == .starting || status.state == .running else { continue }
+            status.isRestartNeeded = current != launched
+            update(status)
+        }
+    }
+
+    private static func launchFingerprint(of service: Service, in project: Project, variables: [String: String]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(service.commandLine)
+        hasher.combine(project.workingDirectoryURL(for: service))
+        hasher.combine(variables)
+        hasher.combine(service.port)
+        return hasher.finalize()
     }
 
     // MARK: Transitions
@@ -676,14 +712,17 @@ public actor ServiceManager {
     // MARK: Plumbing
 
     /// Stores `status`, broadcasting `serviceStateChanged` if its state, Run,
-    /// awaited Dependencies, Port warning or detected URL changed.
+    /// awaited Dependencies, Port warning, detected URL or restart need changed.
     private func update(_ status: ServiceStatus) {
+        var status = status
+        if status.state != .starting && status.state != .running { status.isRestartNeeded = false }
         let previous = statuses[status.serviceID]
         statuses[status.serviceID] = status
         if status.state != previous?.state || status.run?.id != previous?.run?.id
             || status.awaitedDependencies != previous?.awaitedDependencies
             || status.run?.isPortUnresponsive != previous?.run?.isPortUnresponsive
-            || status.run?.detectedURL != previous?.run?.detectedURL {
+            || status.run?.detectedURL != previous?.run?.detectedURL
+            || status.isRestartNeeded != previous?.isRestartNeeded {
             broadcast(.serviceStateChanged(status))
         }
         for waiter in updateWaiters.removeValue(forKey: status.serviceID) ?? [] {
