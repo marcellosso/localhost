@@ -34,6 +34,13 @@ public actor ServiceManager {
     /// The launch configuration each Service's latest Run was started with,
     /// hashed (it includes Secret values, so it is never stored or sent).
     private var launchFingerprints: [UUID: Int] = [:]
+    /// Live Runs that printed Docker's "daemon not running" error.
+    private var runsWithDockerDaemonError: Set<UUID> = []
+
+    /// What Docker's CLI prints when its daemon isn't running: older
+    /// versions, then current ones (`failed to connect to the docker API at
+    /// unix://…; check if the path is correct and if the daemon is running`).
+    static let dockerDaemonErrorTexts = ["Cannot connect to the Docker daemon", "failed to connect to the docker API"]
 
     /// - Parameters:
     ///   - baseEnvironment: The environment every Run starts from (see `RunEnvironment`).
@@ -496,11 +503,18 @@ public actor ServiceManager {
 
         Task { [logs, runID = run.id] in
             var hasDetectedURL = false
-            for await line in tree.output {
-                await logs.append(line, toRun: runID)
-                if !hasDetectedURL, line.channel != .localhost, let url = LocalURL.first(in: ANSI.strip(line.text)) {
-                    hasDetectedURL = true
-                    self.urlDetected(url, serviceID: serviceID, runID: runID)
+            var hasDetectedDockerDaemonError = false
+            for await lines in tree.output {
+                await logs.append(contentsOf: lines, toRun: runID)
+                for line in lines where line.channel != .localhost {
+                    if !hasDetectedURL, line.text.contains("://"), let url = LocalURL.first(in: ANSI.strip(line.text)) {
+                        hasDetectedURL = true
+                        self.urlDetected(url, serviceID: serviceID, runID: runID)
+                    }
+                    if !hasDetectedDockerDaemonError, Self.dockerDaemonErrorTexts.contains(where: line.text.contains) {
+                        hasDetectedDockerDaemonError = true
+                        self.dockerDaemonErrorDetected(serviceID: serviceID, runID: runID)
+                    }
                 }
             }
             let exit = await tree.waitForExit()
@@ -646,14 +660,30 @@ public actor ServiceManager {
         update(status)
     }
 
+    /// The Run printed Docker's "daemon not running" error. If it fails (or
+    /// already has), that is the reason given.
+    private func dockerDaemonErrorDetected(serviceID: UUID, runID: UUID) {
+        var status = status(of: serviceID)
+        guard status.run?.id == runID else { return }
+        if status.run?.endedAt == nil { runsWithDockerDaemonError.insert(runID) }
+        guard status.state == .failed, status.run?.failure == nil else { return }
+        status.run?.failure = .dockerDaemonUnavailable
+        update(status)
+    }
+
+    /// Why a Run that ended with `termination` failed, if there is a typed reason.
+    private func failure(ofRun runID: UUID, termination: Termination?) -> LocalhostError? {
+        termination?.launchError ?? (runsWithDockerDaemonError.contains(runID) ? .dockerDaemonUnavailable : nil)
+    }
+
     /// The shell exited: the Service is no longer up, even if leftovers in its
     /// process group are still being stopped.
     private func shellExited(_ serviceID: UUID, runID: UUID, termination: Termination) {
         var status = status(of: serviceID)
         guard status.run?.id == runID, status.run?.endedAt == nil else { return }
         status.run?.termination = termination
-        status.run?.failure = termination.launchError
         status.state = Self.stateAfterEnding(status.state, termination: termination)
+        status.run?.failure = status.state == .failed ? failure(ofRun: runID, termination: termination) : termination.launchError
         update(status)
     }
 
@@ -663,13 +693,14 @@ public actor ServiceManager {
         guard var run = status.run, run.id == runID, run.endedAt == nil else { return }
         run.endedAt = Date()
         run.termination = exit.termination
-        run.failure = exit.termination.launchError
         run.wasForceKilled = exit.wasForceKilled
-        status.run = run
         // A pending start stays Starting while the previous Run's leftovers end.
         if pendingStarts[serviceID] == nil {
             status.state = Self.stateAfterEnding(status.state, termination: exit.termination)
         }
+        run.failure = status.state == .failed ? failure(ofRun: runID, termination: exit.termination) : exit.termination.launchError
+        runsWithDockerDaemonError.remove(runID)
+        status.run = run
         trees[serviceID] = nil
         runPorts[serviceID] = nil
         runRegistry.remove(runID)
@@ -722,6 +753,7 @@ public actor ServiceManager {
             || status.awaitedDependencies != previous?.awaitedDependencies
             || status.run?.isPortUnresponsive != previous?.run?.isPortUnresponsive
             || status.run?.detectedURL != previous?.run?.detectedURL
+            || status.run?.failure != previous?.run?.failure
             || status.isRestartNeeded != previous?.isRestartNeeded {
             broadcast(.serviceStateChanged(status))
         }

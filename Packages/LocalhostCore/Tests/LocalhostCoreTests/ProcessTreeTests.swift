@@ -28,16 +28,16 @@ struct ProcessTreeTests {
     /// Reads output lines until `count` have arrived.
     func firstLines(_ count: Int, of tree: ProcessTree) async -> [OutputLine] {
         var lines: [OutputLine] = []
-        for await line in tree.output {
-            lines.append(line)
-            if lines.count == count { break }
+        for await batch in tree.output {
+            lines += batch
+            if lines.count >= count { break }
         }
-        return lines
+        return Array(lines.prefix(count))
     }
 
     func allLines(of tree: ProcessTree) async -> [OutputLine] {
         var lines: [OutputLine] = []
-        for await line in tree.output { lines.append(line) }
+        for await batch in tree.output { lines += batch }
         return lines
     }
 
@@ -112,6 +112,22 @@ struct ProcessTreeTests {
         let tree = try launch("[[ -o login ]] && echo login || echo not-login", shell: "/bin/zsh")
         let lines = await allLines(of: tree)
         #expect(lines.last?.text == "login")
+    }
+
+    @Test func `output that isn't taken makes the command wait, without losing lines`() async throws {
+        let marker = NSTemporaryDirectory() + "localhost-backpressure-\(UUID().uuidString)"
+        defer { try? FileManager.default.removeItem(atPath: marker) }
+        // 11 MB, far more than the pipes and the pending batches hold.
+        let tree = try launch("yes 0123456789 | head -n 1000000; echo done; touch '\(marker)'")
+
+        try await Task.sleep(for: .seconds(1))
+        #expect(!FileManager.default.fileExists(atPath: marker))
+
+        let lines = await allLines(of: tree)
+        #expect(lines.count == 1_000_001)
+        #expect(lines.dropLast().allSatisfy { $0.text == "0123456789" && $0.channel == .stdout })
+        #expect(lines.last?.text == "done")
+        #expect(FileManager.default.fileExists(atPath: marker))
     }
 
     @Test func `stdin is empty`() async throws {
