@@ -43,11 +43,28 @@ public struct Run: Identifiable, Sendable, Hashable, Codable {
     public internal(set) var wasForceKilled = false
     /// The TCP port the Run was given as `PORT`, if its Service has a Port.
     public internal(set) var port: Int?
+    /// Why `port` is not the Service's Port, if it isn't.
+    public internal(set) var portChange: PortChange?
     /// Whether the Run became Running because its Port did not accept
     /// connections in time; cleared once it does.
     public internal(set) var isPortUnresponsive = false
     /// The first `localhost` URL the Run printed (`0.0.0.0` shown as `localhost`).
     public internal(set) var detectedURL: URL?
+}
+
+/// A Run started on another port than its Service's Port. The Project
+/// Configuration keeps the Port; the change lasts for that Run (ADR-0006).
+public struct PortChange: Sendable, Hashable, Codable {
+    public enum Reason: Sendable, Hashable, Codable {
+        /// Moved automatically because the Port was taken, by `holder` if
+        /// localhost could see who.
+        case portInUse(holder: Listener?)
+        /// Someone asked to start on this port.
+        case requested
+    }
+
+    public let configuredPort: Int
+    public let reason: Reason
 }
 
 /// A Service's state together with its active Run, or its most recent one.

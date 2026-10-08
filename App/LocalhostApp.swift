@@ -16,6 +16,10 @@ struct LocalhostApp: App {
         .commands {
             AppCommands(model: delegate.model)
         }
+        Settings {
+            SettingsView()
+                .environment(delegate.model)
+        }
     }
 }
 
@@ -54,7 +58,11 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(before: .windowList) {
             Button("Main Window") { openWindow(id: "main") }
-                .keyboardShortcut("0")
+            Button("Ports") {
+                openWindow(id: "main")
+                model.sidebarSelection = .ports
+            }
+            .keyboardShortcut("0")
             Divider()
         }
         CommandGroup(replacing: .newItem) {

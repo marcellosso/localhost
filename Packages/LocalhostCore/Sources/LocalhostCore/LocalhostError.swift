@@ -32,6 +32,15 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     /// A Dependency Failed, so the Service was not started.
     case dependencyFailed(Key)
 
+    // Ports and Listeners
+    /// Something already listens on the port; `owner` is that Listener, if
+    /// localhost can see it (processes of other users can't be inspected).
+    case portConflict(port: Int, owner: Listener?)
+    /// localhost does not stop itself.
+    case listenerIsLocalhost
+    /// launchd would restart it (a Homebrew service, an app): stop it there instead.
+    case listenerIsLaunchdJob(label: String)
+
     // Persistence
     case unsupportedSchemaVersion(Int, path: String)
     case persistenceFailed(path: String, reason: String)
@@ -79,6 +88,14 @@ extension LocalhostError {
             "The command is not executable."
         case .dependencyFailed(let key):
             "Not started: its dependency “\(key)” failed."
+        case .portConflict(let port, let owner?):
+            "Port \(port) is in use by \(owner.name) (PID \(owner.pid))."
+        case .portConflict(let port, nil):
+            "Port \(port) is in use by another process."
+        case .listenerIsLocalhost:
+            "localhost can't stop itself."
+        case .listenerIsLaunchdJob(let label):
+            "It is managed by launchd (\(label)), which would start it again. Stop it with the tool that started it."
         case .unsupportedSchemaVersion(let version, let path):
             "\(path) was saved by a newer version of localhost (schema \(version))."
         case .persistenceFailed(let path, let reason):

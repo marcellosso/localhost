@@ -54,6 +54,20 @@ extension ServiceStatus {
         state == .running && run?.isPortUnresponsive == true
     }
 
+    /// Why the active Run is not on the Service's Port, e.g. "Port 3000 is
+    /// in use by python3 (PID 123), so this run uses port 3001."
+    var portChangeExplanation: String? {
+        guard state.isActive, let run, let port = run.port, let change = run.portChange else { return nil }
+        switch change.reason {
+        case .portInUse(let holder?):
+            return "Port \(change.configuredPort) is in use by \(holder.name) (PID \(holder.pid)), so this run uses port \(port)."
+        case .portInUse(nil):
+            return "Port \(change.configuredPort) is in use, so this run uses port \(port)."
+        case .requested:
+            return "Started on port \(port) instead of \(change.configuredPort)."
+        }
+    }
+
     /// e.g. "Running", "Exited · code 0", "Failed · exit 1", "Failed · Command not found."
     var summary: String {
         switch state {
@@ -63,6 +77,12 @@ extension ServiceStatus {
             return "Starting…"
         case .running:
             if hasPortWarning, let port = run?.port { return "Running · port \(port) not open" }
+            if let port = run?.port, let change = run?.portChange {
+                switch change.reason {
+                case .portInUse: return "Running · moved to port \(port)"
+                case .requested: return "Running · on port \(port)"
+                }
+            }
             return "Running"
         case .stopping: return "Stopping…"
         case .exited: return "Exited · code 0"
