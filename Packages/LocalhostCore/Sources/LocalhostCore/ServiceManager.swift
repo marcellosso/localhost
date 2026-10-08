@@ -14,6 +14,8 @@ public actor ServiceManager {
     private let portTimeout: Duration
     private let portProbeInterval: Duration
     private let stopPolicy: StopPolicy
+    /// Whether a Run may move to a free port when its Service's Port is taken.
+    private var isAutomaticPortMoveEnabled: Bool
 
     private var statuses: [UUID: ServiceStatus] = [:]
     /// The process tree of each Service's active Run. It outlives the Service's
@@ -27,6 +29,8 @@ public actor ServiceManager {
     private var pendingStarts: [UUID: UUID] = [:]
     /// Waiting for the next status update of a Service.
     private var updateWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
+    /// The port of each Service's active Run, from launch until its tree has ended.
+    private var runPorts: [UUID: Int] = [:]
 
     /// - Parameters:
     ///   - baseEnvironment: The environment every Run starts from (see `RunEnvironment`).
@@ -34,6 +38,8 @@ public actor ServiceManager {
     ///   - portTimeout: How long a Run with a Port waits in Starting for the
     ///     Port to accept connections before it is Running anyway, with a warning.
     ///   - portProbeInterval: How often the Port is checked meanwhile.
+    ///   - isAutomaticPortMoveEnabled: Whether a Run may move to a free port
+    ///     when its Service's Port is taken (see `setAutomaticPortMove`).
     public init(
         library: ProjectLibrary,
         logs: LogStore,
@@ -42,7 +48,8 @@ public actor ServiceManager {
         gracePeriod: Duration = .milliseconds(1500),
         portTimeout: Duration = .seconds(30),
         portProbeInterval: Duration = .milliseconds(250),
-        stopPolicy: StopPolicy = .default
+        stopPolicy: StopPolicy = .default,
+        isAutomaticPortMoveEnabled: Bool = true
     ) {
         self.library = library
         self.logs = logs
@@ -52,6 +59,7 @@ public actor ServiceManager {
         self.portTimeout = portTimeout
         self.portProbeInterval = portProbeInterval
         self.stopPolicy = stopPolicy
+        self.isAutomaticPortMoveEnabled = isAutomaticPortMoveEnabled
     }
 
     // MARK: Observing
@@ -81,13 +89,20 @@ public actor ServiceManager {
     /// Dependencies that are not Running or Exited are started first, and the
     /// Service stays Starting until they are. If one Fails, the Service Fails
     /// with `dependencyFailed`; if one is stopped meanwhile, it ends Stopped.
+    ///
+    /// A Service with a Port whose Port is taken moves to the next free port
+    /// when allowed (see `nextFreePort(for:)`), else Fails with `portConflict`.
+    ///
+    /// - Parameter port: Start on this port instead of the Service's Port, for
+    ///   this Run only. Ignored for a Service without a Port.
     @discardableResult
-    public func start(_ serviceID: UUID, origin: Origin) async throws(LocalhostError) -> ServiceStatus {
+    public func start(_ serviceID: UUID, onPort port: Int? = nil, origin: Origin) async throws(LocalhostError) -> ServiceStatus {
         let (project, service) = try await library.service(id: serviceID)
+        if let port, !(1...65_535).contains(port) { throw .invalidPort(port) }
         if service.dependencies.isEmpty {
-            return await serialized(serviceID) { await self.performStart(serviceID, origin: origin) }
+            return await serialized(serviceID) { await self.performStart(serviceID, requestedPort: port, origin: origin) }
         }
-        await startWithDependencies(serviceID, in: project, origin: origin)
+        await startWithDependencies(serviceID, in: project, requestedPort: port, origin: origin)
         return status(of: serviceID)
     }
 
@@ -109,7 +124,7 @@ public actor ServiceManager {
         if service.dependencies.isEmpty && pendingStarts[serviceID] == nil {
             return await serialized(serviceID) {
                 _ = await self.performStop(serviceID, origin: origin)
-                return await self.performStart(serviceID, origin: origin)
+                return await self.performStart(serviceID, requestedPort: nil, origin: origin)
             }
         }
         try await stop(serviceID, origin: origin)
@@ -169,6 +184,130 @@ public actor ServiceManager {
         }
     }
 
+    // MARK: Listeners
+
+    /// Turns automatic port moves on or off (an app setting, on by default).
+    public func setAutomaticPortMove(_ isEnabled: Bool) {
+        isAutomaticPortMoveEnabled = isEnabled
+    }
+
+    /// Every Listener on this machine, by first port, attributed to the Run
+    /// whose process tree it is in, else to the Project whose folder holds its
+    /// working directory (the deepest one), else to no one.
+    public func listeners() async -> [Listener] {
+        async let launchdJobs = LaunchdJobs.running()
+        let processes = await ListenerScanner.scan()
+        let projectFolders = await library.projects().map { project in
+            // The kernel reports working directories with symlinks resolved.
+            (project.id, ListenerScanner.resolvedPath(project.path))
+        }
+        let jobs = await launchdJobs
+        // Each Run's shell leads its own session and process group (ADR-0003).
+        var runsBySession: [pid_t: (serviceID: UUID, runID: UUID)] = [:]
+        for (serviceID, tree) in trees {
+            if let runID = statuses[serviceID]?.run?.id { runsBySession[tree.pid] = (serviceID, runID) }
+        }
+        return processes.map { process in
+            let owner: ListenerOwner
+            if let run = runsBySession[process.sessionID] ?? runsBySession[process.processGroupID] {
+                owner = .run(serviceID: run.serviceID, runID: run.runID)
+            } else if let directory = process.workingDirectory,
+                      let project = projectFolders
+                          .filter({ directory == $0.1 || directory.hasPrefix($0.1.hasSuffix("/") ? $0.1 : $0.1 + "/") })
+                          .max(by: { $0.1.count < $1.1.count }) {
+                owner = .project(project.0)
+            } else {
+                owner = .unmanaged
+            }
+            let launchdLabel = jobs[process.pid] ?? jobs[process.processGroupID]
+            return Listener(
+                pid: process.pid, processGroupID: process.processGroupID, name: process.name,
+                command: process.command, executablePath: process.executablePath, ports: process.ports,
+                workingDirectory: process.workingDirectory, owner: owner, launchdLabel: launchdLabel,
+                kind: .of(executablePath: process.executablePath, launchdLabel: launchdLabel, owner: owner),
+                startTime: process.startTime
+            )
+        }
+        .sorted { ($0.ports.first ?? 0, $0.pid) < ($1.ports.first ?? 0, $1.pid) }
+    }
+
+    /// Stops a Listener and returns once it has ended. One that belongs to a
+    /// Run stops that Service. Any other gets SIGINT → SIGTERM → SIGKILL on
+    /// its process group (or, if the group is led by a session leader such as
+    /// a terminal's shell, on its process and descendants). localhost itself,
+    /// launchd jobs and Docker's backend are refused.
+    public func stopListener(_ listener: Listener, origin: Origin) async throws(LocalhostError) {
+        if case .run(let serviceID, let runID) = listener.owner {
+            guard statuses[serviceID]?.run?.id == runID else { return }
+            try await stop(serviceID, origin: origin)
+            return
+        }
+        guard listener.pid != getpid() else { throw .listenerIsLocalhost }
+        if let label = listener.launchdLabel { throw .listenerIsLaunchdJob(label: label) }
+        if listener.kind == .docker { throw .listenerIsDocker }
+        await ListenerStopper.stop(listener, policy: stopPolicy)
+    }
+
+    /// The port a start of the Service would move to if its Port were taken:
+    /// the first free port above it, up to +100, that is not another
+    /// Service's Port. `nil` if the Service has no Port or none is free.
+    public func nextFreePort(for serviceID: UUID) async throws(LocalhostError) -> Int? {
+        let (_, service) = try await library.service(id: serviceID)
+        guard let port = service.port else { return nil }
+        return await nextFreePort(above: port, for: serviceID, listeners: listeners())
+    }
+
+    /// The port a Run of `service` gets, and why it is not the Port if it isn't.
+    private func portForRun(
+        of service: Service, configuredPort: Int, in project: Project, requestedPort: Int?
+    ) async throws(LocalhostError) -> (Int, PortChange?) {
+        let listeners = await listeners()
+        if let requestedPort {
+            let (isTaken, holder) = await holder(of: requestedPort, for: service.id, listeners: listeners)
+            if isTaken { throw .portConflict(port: requestedPort, owner: holder) }
+            let change = requestedPort == configuredPort ? nil : PortChange(configuredPort: configuredPort, reason: .requested)
+            return (requestedPort, change)
+        }
+        let (isTaken, holder) = await holder(of: configuredPort, for: service.id, listeners: listeners)
+        guard isTaken else { return (configuredPort, nil) }
+        guard canMoveAutomatically(service, in: project, awayFrom: holder),
+              let freePort = await nextFreePort(above: configuredPort, for: service.id, listeners: listeners)
+        else { throw .portConflict(port: configuredPort, owner: holder) }
+        return (freePort, PortChange(configuredPort: configuredPort, reason: .portInUse(holder: holder)))
+    }
+
+    /// Whether `port` is taken, and by which Listener if localhost can see it.
+    private func holder(of port: Int, for serviceID: UUID, listeners: [Listener]) async -> (isTaken: Bool, holder: Listener?) {
+        if let listener = listeners.first(where: { $0.ports.contains(port) }) { return (true, listener) }
+        // Another Run launched on it that isn't listening yet.
+        if runPorts.contains(where: { $0.key != serviceID && $0.value == port }) { return (true, nil) }
+        return (await PortProbe.isAccepting(port), nil)
+    }
+
+    /// Never when it is off, for this Service or app-wide; when dependents may
+    /// expect the Port (#15); or when the holder is inside the same Project,
+    /// likely its own leftover.
+    private func canMoveAutomatically(_ service: Service, in project: Project, awayFrom holder: Listener?) -> Bool {
+        guard isAutomaticPortMoveEnabled, service.portCanChange, project.dependents(of: service.id).isEmpty else { return false }
+        switch holder?.owner {
+        case .project(let projectID): return projectID != project.id
+        case .run(let holderServiceID, _): return project.service(id: holderServiceID) == nil
+        case .unmanaged, nil: return true
+        }
+    }
+
+    private func nextFreePort(above port: Int, for serviceID: UUID, listeners: [Listener]) async -> Int? {
+        guard port < 65_535 else { return nil }
+        let otherServicePorts = await library.projects().flatMap(\.services).filter { $0.id != serviceID }.compactMap(\.port)
+        let taken = Set(otherServicePorts)
+            .union(listeners.flatMap(\.ports))
+            .union(runPorts.filter { $0.key != serviceID }.values)
+        for candidate in (port + 1)...min(port + 100, 65_535) where !taken.contains(candidate) {
+            if await !PortProbe.isAccepting(candidate) { return candidate }
+        }
+        return nil
+    }
+
     // MARK: Dependencies
 
     private enum DependencyOutcome: Sendable {
@@ -178,12 +317,12 @@ public actor ServiceManager {
     }
 
     /// `start` for a Service with Dependencies.
-    private func startWithDependencies(_ serviceID: UUID, in project: Project, origin: Origin) async {
+    private func startWithDependencies(_ serviceID: UUID, in project: Project, requestedPort: Int? = nil, origin: Origin) async {
         while status(of: serviceID).state == .stopping {
             await nextUpdate(of: serviceID)
         }
         guard let token = beginPendingStart(serviceID) else { return }
-        await completePendingStart(serviceID, token: token, in: project, origin: origin)
+        await completePendingStart(serviceID, token: token, in: project, requestedPort: requestedPort, origin: origin)
     }
 
     /// Marks the Service Starting, waiting for its Dependencies. Returns `nil`
@@ -200,7 +339,9 @@ public actor ServiceManager {
 
     /// Waits for the Dependencies of a pending start, then launches its Run
     /// unless the start was cancelled meanwhile.
-    private func completePendingStart(_ serviceID: UUID, token: UUID, in project: Project, origin: Origin) async {
+    private func completePendingStart(
+        _ serviceID: UUID, token: UUID, in project: Project, requestedPort: Int? = nil, origin: Origin
+    ) async {
         let dependencies = project.service(id: serviceID)?.dependencies ?? []
         setAwaitedDependencies(dependencies, of: serviceID, token: token)
         let outcomes = await withTaskGroup(of: DependencyOutcome.self) { group in
@@ -224,17 +365,17 @@ public actor ServiceManager {
             cancelPendingStart(serviceID)
         } else {
             _ = await serialized(serviceID) {
-                await self.launchPendingStart(serviceID, token: token, origin: origin)
+                await self.launchPendingStart(serviceID, token: token, requestedPort: requestedPort, origin: origin)
             }
         }
     }
 
-    private func launchPendingStart(_ serviceID: UUID, token: UUID, origin: Origin) async -> ServiceStatus {
+    private func launchPendingStart(_ serviceID: UUID, token: UUID, requestedPort: Int?, origin: Origin) async -> ServiceStatus {
         // Leftovers of the previous Run end while the Service is still pending.
         await waitForActiveRunToEnd(serviceID)
         guard pendingStarts[serviceID] == token else { return status(of: serviceID) }
         pendingStarts[serviceID] = nil
-        return await launch(serviceID, origin: origin)
+        return await launch(serviceID, requestedPort: requestedPort, origin: origin)
     }
 
     /// Waits until a Dependency is Running or Exited, starting it if needed.
@@ -298,15 +439,15 @@ public actor ServiceManager {
 
     // MARK: Operations
 
-    private func performStart(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
+    private func performStart(_ serviceID: UUID, requestedPort: Int?, origin: Origin) async -> ServiceStatus {
         if status(of: serviceID).state == .starting || status(of: serviceID).state == .running {
             return status(of: serviceID)
         }
-        return await launch(serviceID, origin: origin)
+        return await launch(serviceID, requestedPort: requestedPort, origin: origin)
     }
 
     /// Launches a new Run once the previous one has fully ended.
-    private func launch(_ serviceID: UUID, origin: Origin) async -> ServiceStatus {
+    private func launch(_ serviceID: UUID, requestedPort: Int? = nil, origin: Origin) async -> ServiceStatus {
         // A Run that ended on its own may still be stopping its leftovers.
         await waitForActiveRunToEnd(serviceID)
 
@@ -314,7 +455,9 @@ public actor ServiceManager {
         let tree: ProcessTree
         do {
             let (project, service) = try await library.service(id: serviceID)
-            run.port = service.port
+            if let port = service.port {
+                (run.port, run.portChange) = try await portForRun(of: service, configuredPort: port, in: project, requestedPort: requestedPort)
+            }
             tree = try ProcessTree.launch(
                 LaunchConfiguration(
                     commandLine: service.commandLine,
@@ -331,10 +474,14 @@ public actor ServiceManager {
         }
 
         trees[serviceID] = tree
+        runPorts[serviceID] = run.port
         if let startTime = ProcessStartTime.of(tree.pid) {
             runRegistry.record(run, pid: tree.pid, startTime: startTime)
         }
         await logs.beginRun(run)
+        if let port = run.port, let change = run.portChange {
+            await logs.append(OutputLine(channel: .localhost, text: Self.logNote(forPort: port, change: change), timestamp: Date()), toRun: run.id)
+        }
         broadcast(.runStarted(run))
         update(ServiceStatus(serviceID: serviceID, state: .starting, run: run))
 
@@ -488,9 +635,22 @@ public actor ServiceManager {
             status.state = Self.stateAfterEnding(status.state, termination: exit.termination)
         }
         trees[serviceID] = nil
+        runPorts[serviceID] = nil
         runRegistry.remove(runID)
         update(status)
         broadcast(.runEnded(run))
+    }
+
+    /// What localhost writes into a Run's log when it starts on another port.
+    private static func logNote(forPort port: Int, change: PortChange) -> String {
+        switch change.reason {
+        case .portInUse(let holder?):
+            "Port \(change.configuredPort) is in use by \(holder.name) (PID \(holder.pid)): starting on port \(port) instead"
+        case .portInUse(nil):
+            "Port \(change.configuredPort) is in use: starting on port \(port) instead"
+        case .requested:
+            "Starting on port \(port) instead of \(change.configuredPort), as requested"
+        }
     }
 
     /// What localhost writes into a Run's log once it has ended.

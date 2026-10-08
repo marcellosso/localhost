@@ -129,6 +129,7 @@ public actor ProjectLibrary {
         isExcludedFromStartAll: Bool = false,
         port: Int? = nil,
         url: String? = nil,
+        portCanChange: Bool = true,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var project = try self.project(id: projectID)
@@ -141,7 +142,8 @@ public actor ProjectLibrary {
             environment: try Validate.environment(environment),
             isExcludedFromStartAll: isExcludedFromStartAll,
             port: try Validate.port(port),
-            url: try Validate.url(url)
+            url: try Validate.url(url),
+            portCanChange: portCanChange
         )
         project.services.append(service)
         try setDependencies(dependencies, of: service.id, in: &project)
@@ -164,6 +166,7 @@ public actor ProjectLibrary {
         isExcludedFromStartAll: Bool? = nil,
         port: Int?? = nil,
         url: String?? = nil,
+        portCanChange: Bool? = nil,
         origin: Origin
     ) throws(LocalhostError) -> Service {
         var (project, index) = try locateService(id)
@@ -179,6 +182,7 @@ public actor ProjectLibrary {
         if let isExcludedFromStartAll { service.isExcludedFromStartAll = isExcludedFromStartAll }
         if let port { service.port = try Validate.port(port) }
         if let url { service.url = try Validate.url(url) }
+        if let portCanChange { service.portCanChange = portCanChange }
         project.services[index] = service
         if let dependencies { try setDependencies(dependencies, of: id, in: &project) }
         try commit(project)

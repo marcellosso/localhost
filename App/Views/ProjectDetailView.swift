@@ -91,7 +91,7 @@ struct ServiceRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.name)
                     .lineLimit(1)
-                Text(service.port.map { ":\($0) · \(service.commandLine)" } ?? service.commandLine)
+                Text(port.map { ":\(String($0)) · \(service.commandLine)" } ?? service.commandLine)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -102,11 +102,16 @@ struct ServiceRow: View {
                 .font(.caption)
                 .foregroundStyle(summaryStyle)
                 .lineLimit(1)
-                .help(status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
+                .help(status.portChangeExplanation ?? status.run?.failure?.message ?? status.run?.termination?.summary ?? summary)
             controls
         }
         .padding(.vertical, 3)
         .animation(.easeOut(duration: 0.15), value: status.state)
+    }
+
+    /// The active Run's port, which may have moved, else the Service's Port.
+    private var port: Int? {
+        status.state.isActive ? status.run?.port ?? service.port : service.port
     }
 
     /// The status summary, naming the Dependencies a Starting Service waits for.
@@ -118,7 +123,7 @@ struct ServiceRow: View {
 
     private var summaryStyle: AnyShapeStyle {
         if status.state == .failed { return AnyShapeStyle(.red) }
-        if status.hasPortWarning { return AnyShapeStyle(.orange) }
+        if status.hasPortWarning || status.portChangeExplanation != nil { return AnyShapeStyle(.orange) }
         return AnyShapeStyle(.secondary)
     }
 

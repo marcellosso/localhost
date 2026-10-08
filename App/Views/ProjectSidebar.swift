@@ -6,7 +6,9 @@ struct ProjectSidebar: View {
 
     var body: some View {
         @Bindable var model = model
-        List(selection: $model.selectedProjectID) {
+        List(selection: $model.sidebarSelection) {
+            Label("Ports", systemImage: "network")
+                .tag(AppModel.SidebarItem.ports)
             Section("Projects") {
                 ForEach(model.projects) { project in
                     HStack(spacing: 8) {
@@ -20,13 +22,13 @@ struct ProjectSidebar: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .tag(project.id)
+                    .tag(AppModel.SidebarItem.project(project.id))
                 }
             }
         }
         .listStyle(.sidebar)
-        .contextMenu(forSelectionType: UUID.self) { ids in
-            if let id = ids.first, let project = model.project(id) {
+        .contextMenu(forSelectionType: AppModel.SidebarItem.self) { items in
+            if case .project(let id) = items.first, let project = model.project(id) {
                 Button("Edit Project…") { model.presentedSheet = .editProject(id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(id, !project.isFavorite) }
                 Divider()

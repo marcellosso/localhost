@@ -18,6 +18,7 @@ struct ServiceForm: View {
     @State private var commandLine = ""
     @State private var port = ""
     @State private var url = ""
+    @State private var portCanChange = true
     @State private var variables: [Variable] = []
     @State private var dependencies: [UUID] = []
     @State private var isExcludedFromStartAll = false
@@ -62,6 +63,9 @@ struct ServiceForm: View {
                     .font(.body.monospaced())
                 TextField("URL", text: $url, prompt: Text(port.isEmpty ? "http://localhost:3000" : "http://localhost:\(port)"))
                     .font(.body.monospaced())
+                if !port.isEmpty {
+                    Toggle("Port can change", isOn: $portCanChange)
+                }
             } footer: {
                 Text(portFooter)
                     .font(.caption)
@@ -118,6 +122,7 @@ struct ServiceForm: View {
             commandLine = editing.commandLine
             port = editing.port.map(String.init) ?? ""
             url = editing.url ?? ""
+            portCanChange = editing.portCanChange
             variables = editing.environment.sorted { $0.key < $1.key }.map { Variable(name: $0.key, value: $0.value) }
             dependencies = editing.dependencies
             isExcludedFromStartAll = editing.isExcludedFromStartAll
@@ -131,6 +136,12 @@ struct ServiceForm: View {
         var footer = "The command gets the port as $PORT, e.g. “next dev -p $PORT”. The service counts as running once the port accepts connections."
         if variables.contains(where: { $0.name == "PORT" }) {
             footer += " The PORT variable below is replaced by this port."
+        }
+        if portCanChange {
+            footer += " If the port is in use, the service can start on the next free port for that run."
+            if !Service.commandLineUsesPort(commandLine) {
+                footer += " The command line doesn’t mention $PORT: if the command ignores PORT, turn off “Port can change”."
+            }
         }
         return footer
     }
@@ -221,13 +232,15 @@ struct ServiceForm: View {
                 try await model.editService(
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, environment: environment, dependencies: dependencies,
-                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url
+                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
+                    portCanChange: portCanChange
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, environment: environment, dependencies: dependencies,
-                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url
+                    isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
+                    portCanChange: portCanChange
                 )
             }
             dismiss()

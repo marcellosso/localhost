@@ -22,6 +22,22 @@ final class AppModel {
         var id: Self { self }
     }
 
+    enum SidebarItem: Hashable {
+        case ports
+        case project(UUID)
+    }
+
+    /// A start that failed because its port is taken, waiting for the user
+    /// to stop the holder, start on another port, or cancel.
+    struct BlockedStart: Identifiable {
+        let serviceID: UUID
+        let port: Int
+        let holder: Listener?
+        let nextFreePort: Int?
+
+        var id: UUID { serviceID }
+    }
+
     enum Removal: Identifiable, Hashable {
         case project(UUID)
         case service(UUID)
@@ -34,8 +50,12 @@ final class AppModel {
     let startupError: LocalhostError?
 
     private(set) var projects: [Project] = []
+    var sidebarSelection: SidebarItem? {
+        didSet { if sidebarSelection != oldValue { selectedServiceID = selectedProject?.services.first?.id } }
+    }
     var selectedProjectID: UUID? {
-        didSet { if selectedProjectID != oldValue { selectedServiceID = selectedProject?.services.first?.id } }
+        get { if case .project(let id) = sidebarSelection { id } else { nil } }
+        set { sidebarSelection = newValue.map(SidebarItem.project) }
     }
     var selectedServiceID: UUID?
     var presentedSheet: Sheet?
@@ -48,6 +68,25 @@ final class AppModel {
     private(set) var orphanDescriptions: [String] = []
     private(set) var isStoppingOrphans = false
     var isShowingOrphanAlert = false
+
+    /// Every Listener, as of the last refresh (only while a Listener view is visible).
+    private(set) var listeners: [Listener] = []
+    var selectedListenerID: pid_t?
+    /// A Listener localhost didn't start, waiting for the user to confirm stopping it.
+    var pendingListenerStop: Listener?
+    private(set) var stoppingListenerIDs: Set<pid_t> = []
+    var blockedStart: BlockedStart?
+
+    /// Whether a Service may move to a free port when its Port is taken.
+    var isAutomaticPortMoveEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAutomaticPortMoveEnabled, forKey: Self.automaticPortMoveKey)
+            guard let services = core?.services else { return }
+            Task { [isAutomaticPortMoveEnabled] in await services.setAutomaticPortMove(isAutomaticPortMoveEnabled) }
+        }
+    }
+
+    private static let automaticPortMoveKey = "automaticPortMove"
 
     @ObservationIgnored private let runRegistry: RunRegistry
     @ObservationIgnored private var projectObservation: Task<Void, Never>?
@@ -65,10 +104,15 @@ final class AppModel {
         let root = Self.storageRoot
         let runRegistry = RunRegistry(root: root)
         self.runRegistry = runRegistry
+        let isAutomaticPortMoveEnabled = UserDefaults.standard.object(forKey: Self.automaticPortMoveKey) as? Bool ?? true
+        self.isAutomaticPortMoveEnabled = isAutomaticPortMoveEnabled
         do {
             let library = try ProjectLibrary(storageRoot: root)
             let logs = LogStore(root: root)
-            let services = ServiceManager(library: library, logs: logs, runRegistry: runRegistry)
+            let services = ServiceManager(
+                library: library, logs: logs, runRegistry: runRegistry,
+                isAutomaticPortMoveEnabled: isAutomaticPortMoveEnabled
+            )
             core = Core(library: library, services: services, logs: logs, statuses: ServiceStatusStore(manager: services))
             startupError = nil
         } catch {
@@ -140,9 +184,15 @@ final class AppModel {
 
     // MARK: Lifecycle
 
-    func start(_ serviceID: UUID) {
+    /// Starts the Service; if its port is taken, asks what to do (`blockedStart`).
+    func start(_ serviceID: UUID, onPort port: Int? = nil) {
         guard let services = core?.services else { return }
-        Task { await report { () throws(LocalhostError) in try await services.start(serviceID, origin: .mainWindow) } }
+        Task {
+            await report { () throws(LocalhostError) in
+                let status = try await services.start(serviceID, onPort: port, origin: .mainWindow)
+                await presentIfBlocked(status)
+            }
+        }
     }
 
     func stop(_ serviceID: UUID) {
@@ -152,7 +202,12 @@ final class AppModel {
 
     func restart(_ serviceID: UUID) {
         guard let services = core?.services else { return }
-        Task { await report { () throws(LocalhostError) in try await services.restart(serviceID, origin: .mainWindow) } }
+        Task {
+            await report { () throws(LocalhostError) in
+                let status = try await services.restart(serviceID, origin: .mainWindow)
+                await presentIfBlocked(status)
+            }
+        }
     }
 
     func startAll(inProject projectID: UUID) {
@@ -216,13 +271,14 @@ final class AppModel {
     func addService(
         to projectID: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?
+        port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) -> Service {
         guard let library = core?.library else { throw .projectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, environment: environment, dependencies: dependencies,
-            isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, origin: .mainWindow
+            isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, portCanChange: portCanChange,
+            origin: .mainWindow
         )
         projects = await library.projects()
         selectedServiceID = service.id
@@ -232,13 +288,14 @@ final class AppModel {
     func editService(
         _ id: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, environment: [String: String], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?
+        port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) {
         guard let library = core?.library else { throw .serviceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, environment: environment, dependencies: dependencies,
-            isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url), origin: .mainWindow
+            isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url),
+            portCanChange: portCanChange, origin: .mainWindow
         )
     }
 
@@ -250,6 +307,77 @@ final class AppModel {
             try await core.library.removeService(id: id, origin: .mainWindow)
         }
         if selectedServiceID == id { selectedServiceID = nil }
+    }
+
+    // MARK: Listeners
+
+    func listener(_ id: pid_t) -> Listener? {
+        listeners.first { $0.id == id }
+    }
+
+    func refreshListeners() async {
+        guard let services = core?.services else { return }
+        listeners = await services.listeners()
+    }
+
+    /// Why localhost won't stop the Listener, or `nil` if it can.
+    func reasonNotStoppable(_ listener: Listener) -> String? {
+        if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.listenerIsLocalhost.message }
+        if let label = listener.launchdLabel { return LocalhostError.listenerIsLaunchdJob(label: label).message }
+        if listener.kind == .docker { return LocalhostError.listenerIsDocker.message }
+        return nil
+    }
+
+    /// Stops a Run's Listener (its Service) at once; asks before stopping any other.
+    func requestStop(_ listener: Listener) {
+        if case .run(let serviceID, _) = listener.owner {
+            stop(serviceID)
+        } else {
+            pendingListenerStop = listener
+        }
+    }
+
+    func stopListener(_ listener: Listener) async {
+        guard let services = core?.services else { return }
+        stoppingListenerIDs.insert(listener.id)
+        await report { () throws(LocalhostError) in try await services.stopListener(listener, origin: .mainWindow) }
+        stoppingListenerIDs.remove(listener.id)
+        await refreshListeners()
+    }
+
+    /// Who a Listener belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
+    func ownerDescription(_ listener: Listener) -> String {
+        switch listener.owner {
+        case .run(let serviceID, _):
+            if let (project, service) = service(serviceID) { return "\(project.name) › \(service.name)" }
+            return "A removed service"
+        case .project(let projectID):
+            return "In \(project(projectID)?.name ?? "a removed project")"
+        case .unmanaged:
+            switch listener.kind {
+            case .docker: return "Docker"
+            case .app: return "App"
+            case .system: return "macOS"
+            case .development: return "Unmanaged"
+            }
+        }
+    }
+
+    /// Stops whatever holds the blocked start's port, then starts the Service.
+    func stopHolderAndStart(_ blocked: BlockedStart) async {
+        guard let services = core?.services, let holder = blocked.holder else { return }
+        await report { () throws(LocalhostError) in
+            try await services.stopListener(holder, origin: .mainWindow)
+        }
+        start(blocked.serviceID)
+    }
+
+    private func presentIfBlocked(_ status: ServiceStatus) async {
+        guard status.state == .failed, case .portConflict(let port, let holder) = status.run?.failure,
+              let services = core?.services
+        else { return }
+        let nextFreePort = try? await services.nextFreePort(for: status.serviceID)
+        blockedStart = BlockedStart(serviceID: status.serviceID, port: port, holder: holder, nextFreePort: nextFreePort)
     }
 
     // MARK: Orphans

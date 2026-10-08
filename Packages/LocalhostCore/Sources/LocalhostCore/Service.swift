@@ -21,6 +21,9 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
     public internal(set) var port: Int?
     /// Where to open the Service, e.g. `http://localhost:3000/admin`.
     public internal(set) var url: String?
+    /// Whether a Run may use another port when the Port is taken. Off for
+    /// commands that ignore `$PORT` (ADR-0006).
+    public internal(set) var portCanChange: Bool
 
     init(
         id: UUID = UUID(),
@@ -32,7 +35,8 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         dependencies: [UUID] = [],
         isExcludedFromStartAll: Bool = false,
         port: Int? = nil,
-        url: String? = nil
+        url: String? = nil,
+        portCanChange: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -44,10 +48,11 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         self.isExcludedFromStartAll = isExcludedFromStartAll
         self.port = port
         self.url = url
+        self.portCanChange = portCanChange
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, key, workingDirectory, commandLine, environment, dependencies, isExcludedFromStartAll, port, url
+        case id, name, key, workingDirectory, commandLine, environment, dependencies, isExcludedFromStartAll, port, url, portCanChange
     }
 
     /// Fields added after schema version 1 shipped are optional when reading.
@@ -63,11 +68,17 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         isExcludedFromStartAll = try container.decodeIfPresent(Bool.self, forKey: .isExcludedFromStartAll) ?? false
         port = try container.decodeIfPresent(Int.self, forKey: .port)
         url = try container.decodeIfPresent(String.self, forKey: .url)
+        portCanChange = try container.decodeIfPresent(Bool.self, forKey: .portCanChange) ?? true
     }
 
     /// The URL to open for this Service while `run` is its latest Run: the
     /// configured URL with its port moved to the Run's, else `localhost` at
     /// the Run's port, else the first local URL the Run printed.
+    /// Whether a command line mentions `$PORT`, so a moved port reaches it.
+    public static func commandLineUsesPort(_ commandLine: String) -> Bool {
+        commandLine.contains("$PORT") || commandLine.contains("${PORT")
+    }
+
     public func urlToOpen(for run: Run?) -> URL? {
         let actualPort = run?.port ?? port
         if let url, var components = URLComponents(string: url) {
