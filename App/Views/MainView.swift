@@ -32,24 +32,37 @@ struct MainView: View {
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 380)
         } detail: {
-            if model.sidebarSelection == .ports {
-                if let listener = model.selectedListenerID.flatMap(model.listener) {
-                    ListenerDetailView(listener: listener)
+            Group {
+                if model.sidebarSelection == .ports {
+                    if let listener = model.selectedListenerID.flatMap(model.listener) {
+                        ListenerDetailView(listener: listener)
+                    } else {
+                        ContentUnavailableView("No Listener Selected", systemImage: "network",
+                                               description: Text("Select a listener to see its process."))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
+                    }
+                } else if model.isAllServicesSelected, let project = model.selectedProject {
+                    CombinedLogPane(project: project)
+                } else if let service = model.selectedService {
+                    LogPane(service: service)
                 } else {
-                    ContentUnavailableView("No Listener Selected", systemImage: "network",
-                                           description: Text("Select a listener to see its process."))
+                    ContentUnavailableView("No Service Selected", systemImage: "text.alignleft",
+                                           description: Text("Select a service to see its output."))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
                 }
-            } else if model.isAllServicesSelected, let project = model.selectedProject {
-                CombinedLogPane(project: project)
-            } else if let service = model.selectedService {
-                LogPane(service: service)
-            } else {
-                ContentUnavailableView("No Service Selected", systemImage: "text.alignleft",
-                                       description: Text("Select a service to see its output."))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: Theme.logBackground))
+            }
+            // The toolbar above the log is glass like the services column; the log stays opaque.
+            .columnGlass()
+            .toolbar {
+                if model.sidebarSelection != .ports, let project = model.selectedProject {
+                    ProjectToolbar(model: model, project: project)
+                }
             }
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(ToolbarStripSplitView())
         .sheet(item: $model.presentedSheet) { sheet in
             switch sheet {
             case .addProject:

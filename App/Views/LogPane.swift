@@ -15,17 +15,25 @@ struct LogPane: View {
         let status = model.status(of: service)
         VStack(spacing: 0) {
             LogHeader {
-                StateIndicator(state: status.state)
-                Text(service.name).fontWeight(.medium)
-                Text(status.summary)
-                    .foregroundStyle(status.state == .failed ? AnyShapeStyle(.red)
-                        : status.hasPortWarning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color(nsColor: model.color(of: service)))
+                    .frame(width: 8, height: 8)
+                Text(service.name).fontWeight(.semibold)
                     .lineLimit(1)
-                Spacer()
-                if let run = status.run {
-                    Text("Started \(run.startedAt.formatted(date: .omitted, time: .standard))")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    .layoutPriority(1)
+                Text(status.summary)
+                    .foregroundStyle(status.state == .failed ? AnyShapeStyle(Color(nsColor: Theme.failed))
+                        : status.hasPortWarning ? AnyShapeStyle(Color(nsColor: Theme.transitioning)) : AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                // Without room, the run time goes first, then the URL.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        runTime(status)
+                        url(status)
+                    }
+                    url(status)
+                    Color.clear.frame(width: 0, height: 0)
                 }
             }
 
@@ -46,7 +54,30 @@ struct LogPane: View {
                     }
             }
         }
-        .background(Color(nsColor: Theme.logBackground))
+        .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
+    }
+
+    @ViewBuilder
+    private func runTime(_ status: ServiceStatus) -> some View {
+        if let run = status.run { RunTime(run: run) }
+    }
+
+    @ViewBuilder
+    private func url(_ status: ServiceStatus) -> some View {
+        if status.state.isActive, let url = model.urlToOpen(service) {
+            Button { model.openURL(of: service.id) } label: {
+                HStack(spacing: 2) {
+                    Text(url.absoluteString.replacingOccurrences(of: "http://", with: ""))
+                        .font(.callout.monospaced())
+                        .lineLimit(1)
+                    Image(systemName: "arrow.up.right").font(.system(size: 8.5, weight: .bold))
+                }
+                .foregroundStyle(Theme.accentText)
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .help("Open \(url.absoluteString) (⇧⌘O)")
+        }
     }
 }
 
@@ -60,21 +91,18 @@ struct CombinedLogPane: View {
         let running = project.services.filter { model.status(of: $0).state.isActive }.count
         VStack(spacing: 0) {
             LogHeader {
-                Image(systemName: "square.stack")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 14)
-                Text("All services").fontWeight(.medium)
+                ServiceDots(services: model.serviceDots(of: project))
+                Text("All services").fontWeight(.semibold)
                 Text("\(running) of \(project.services.count) running")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Spacer()
             }
             if let logs = model.core?.logs {
                 LogView(source: .services(Self.prefixes(of: project)), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: 0)
             }
         }
-        .background(Color(nsColor: Theme.logBackground))
+        .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
     }
 
     /// Each Service's Key, padded to the longest, in a colour stable for its
@@ -93,7 +121,7 @@ struct CombinedLogPane: View {
     }
 }
 
-/// The bar above a log: what it shows, then filter, copy and clear.
+/// The bar above a log: what it shows, then the filter and a `⋯` menu.
 private struct LogHeader<Content: View>: View {
     @Environment(AppModel.self) private var model
     @FocusState private var isFilterFocused: Bool
@@ -103,28 +131,66 @@ private struct LogHeader<Content: View>: View {
         @Bindable var model = model
         HStack(spacing: 8) {
             content
-            TextField("Filter", text: $model.logFilter)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .frame(width: 160)
-                .focused($isFilterFocused)
-                .onExitCommand { model.logFilter = "" }
-                .help("Show only lines containing this text (⌘F)")
-            Button("Copy Log", systemImage: "doc.on.doc") {
-                NSApp.sendAction(#selector(LogTextView.copyLog(_:)), to: nil, from: nil)
+            Spacer(minLength: 8)
+            HStack(spacing: 5) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Filter", text: $model.logFilter)
+                    .textFieldStyle(.plain)
+                    .focused($isFilterFocused)
+                    .onExitCommand { model.logFilter = "" }
+                if model.logFilter.isEmpty, !isFilterFocused {
+                    KeyHint("⌘F")
+                } else if !model.logFilter.isEmpty {
+                    Button("Clear Filter", systemImage: "xmark.circle.fill") { model.logFilter = "" }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .help("Copy the lines shown")
-            Button("Clear Log", systemImage: "trash") { model.clearLogs() }
-                .help("Clear the log view (⌃L). Log files are kept.")
+            .font(.callout)
+            .padding(.horizontal, 7)
+            .frame(width: 170, height: 24)
+            .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 6))
+            .help("Show only lines containing this text (⌘F)")
+            MoreMenu(help: "More log actions") {
+                Button("Copy Log") { NSApp.sendAction(#selector(LogTextView.copyLog(_:)), to: nil, from: nil) }
+                Button("Clear Log") { model.clearLogs() }
+                    .keyboardShortcut("l", modifiers: .control)
+            }
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.borderless)
         .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color(nsColor: Theme.logBackground))
+        .padding(.leading, 16)
+        .padding(.trailing, 10)
+        .frame(height: 40)
+        .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
         .overlay(alignment: .bottom) { Divider() }
         .onChange(of: model.logFindCount) { isFilterFocused = true }
+    }
+}
+
+/// How long the active Run has been up, or when the last one ended, kept current.
+private struct RunTime: View {
+    let run: Run
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(text(now: context.date))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help("Started \(run.startedAt.formatted(date: .abbreviated, time: .standard))"
+                      + (run.endedAt.map { ", ended \($0.formatted(date: .omitted, time: .standard))" } ?? ""))
+        }
+    }
+
+    private func text(now: Date) -> String {
+        if let endedAt = run.endedAt {
+            return "· " + endedAt.formatted(date: .omitted, time: .shortened)
+        }
+        let seconds = max(0, now.timeIntervalSince(run.startedAt))
+        if seconds < 60 { return "· just now" }
+        return "· " + (Duration.seconds(seconds).formatted(.units(allowed: [.days, .hours, .minutes], width: .narrow, maximumUnitCount: 2)))
     }
 }
 
