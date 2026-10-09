@@ -45,6 +45,11 @@ enum Theme {
     static let logBackground = dynamic(light: 0xFCFCFD, dark: 0x141417)
     /// Laid over the blurred desktop in the services column and its header.
     static let columnTint = dynamic(light: 0xFCFCFD, dark: 0x1A1A1F, lightAlpha: 0.72, darkAlpha: 0.66)
+    /// The services column with translucency off.
+    static let columnSolid = dynamic(light: 0xF7F7F9, dark: 0x1C1C21)
+    /// The sidebar with translucency off, and the Settings rail's tint.
+    static let sidebarSolid = dynamic(light: 0xEDECF0, dark: 0x232329)
+    static let sidebarTint = dynamic(light: 0xF6F5F8, dark: 0x202026, lightAlpha: 0.55, darkAlpha: 0.48)
 
     private static func dynamic(
         light: UInt32, dark: UInt32, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1
@@ -65,13 +70,34 @@ enum Theme {
 
 extension View {
     /// The middle step of the glass gradient: the desktop shows through,
-    /// blurred and tinted, less than in the sidebar. Opaque under Reduce
-    /// Transparency.
+    /// blurred and tinted, less than in the sidebar. Solid with translucency
+    /// off in Settings, and under Reduce Transparency.
     func columnGlass() -> some View {
-        background {
-            ZStack {
-                BehindWindowBlur()
-                Color(nsColor: Theme.columnTint)
+        modifier(Glass(tint: Theme.columnTint, solid: Theme.columnSolid))
+    }
+
+    /// The most translucent step, like the sidebar: the Settings rail.
+    func sidebarGlass() -> some View {
+        modifier(Glass(tint: Theme.sidebarTint, solid: Theme.sidebarSolid))
+    }
+}
+
+private struct Glass: ViewModifier {
+    @AppStorage(Preferences.translucencyKey) private var isTranslucent = true
+    let tint: NSColor
+    let solid: NSColor
+
+    func body(content: Content) -> some View {
+        content.background {
+            Group {
+                if isTranslucent {
+                    ZStack {
+                        BehindWindowBlur()
+                        Color(nsColor: tint)
+                    }
+                } else {
+                    Color(nsColor: solid)
+                }
             }
             .ignoresSafeArea()
         }

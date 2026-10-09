@@ -328,6 +328,7 @@ struct LogView: NSViewRepresentable {
 
     let source: Source
     let logs: LogStore
+    @AppStorage(Preferences.logFontSizeKey) private var fontSize = Preferences.defaultLogFontSize
     /// Only lines containing this text are shown, with matches highlighted.
     let filter: String
     /// Changes when the buffers were cleared: show the log again from scratch.
@@ -344,6 +345,7 @@ struct LogView: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.setFontSize(fontSize)
         context.coordinator.show(source, clearCount: clearCount)
         context.coordinator.setFilter(filter)
         context.coordinator.reveal(revealCount)
@@ -370,6 +372,7 @@ final class LogViewController {
     private var source: LogView.Source?
     private var clearCount = 0
     private var filter = ""
+    private var fontSize = Preferences.defaultLogFontSize
     private var revealCount = 0
     private var subscription: Task<Void, Never>?
     private var feeder: Task<Void, Never>?
@@ -426,6 +429,13 @@ final class LogViewController {
         self.source = source
         self.clearCount = clearCount
         subscribe(to: source)
+    }
+
+    /// Shows the log again in the new size.
+    func setFontSize(_ size: Double) {
+        guard size != fontSize else { return }
+        fontSize = size
+        render()
     }
 
     func setFilter(_ filter: String) {

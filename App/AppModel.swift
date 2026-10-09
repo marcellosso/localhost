@@ -65,6 +65,8 @@ final class AppModel {
     var selectedServiceID: UUID? {
         didSet { if selectedServiceID != oldValue { saveSelection() } }
     }
+    /// Text the sidebar's Projects are filtered by.
+    var projectSearch = ""
     /// Text the log views are filtered by (⌘F focuses it).
     var logFilter = ""
     /// Incremented to ask the visible log view to focus its filter.
