@@ -92,26 +92,30 @@ private struct BehindWindowBlur: NSViewRepresentable {
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
-/// Makes the toolbar one strip across the services column and the log by
-/// hiding the divider between them, which would run up through the toolbar.
-/// The sidebar's divider (a different view) is untouched; the divider can
-/// still be dragged.
+/// Makes the toolbar one strip across the services column and the log: the
+/// divider between them would run up through the toolbar. The split view's
+/// dividers are drawn clear and the services/log divider view stays hidden
+/// (AppKit shows it again on layout and when the window becomes key). The
+/// dividers can still be dragged.
 struct ToolbarStripSplitView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async { Self.hideDivider(from: view) }
+        DispatchQueue.main.async { Self.adopt(from: view) }
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async { Self.hideDivider(from: view) }
+        DispatchQueue.main.async { Self.adopt(from: view) }
     }
 
-    private static func hideDivider(from view: NSView) {
+    private static func adopt(from view: NSView) {
         guard let root = view.window?.contentView?.superview, let splitView = splitView(in: root) else { return }
-        for divider in splitView.subviews where type(of: divider) == NSClassFromString("NSSplitDividerView") {
-            divider.isHidden = true
+        if type(of: splitView) == NSSplitView.self {
+            // No stored properties, so the swap keeps the instance's layout.
+            object_setClass(splitView, StripSplitView.self)
         }
+        splitView.needsLayout = true
+        splitView.needsDisplay = true
     }
 
     private static func splitView(in view: NSView) -> NSSplitView? {
@@ -119,5 +123,26 @@ struct ToolbarStripSplitView: NSViewRepresentable {
             return splitView
         }
         return view.subviews.lazy.compactMap(splitView(in:)).first
+    }
+}
+
+private final class StripSplitView: NSSplitView {
+    override var dividerColor: NSColor { .clear }
+
+    override func layout() {
+        super.layout()
+        hideDivider()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        hideDivider()
+    }
+
+    /// The services/log divider; the sidebar's is a different (vibrant) view.
+    private func hideDivider() {
+        for divider in subviews where type(of: divider) == NSClassFromString("NSSplitDividerView") {
+            divider.isHidden = true
+        }
     }
 }
