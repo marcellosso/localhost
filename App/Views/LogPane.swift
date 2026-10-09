@@ -39,7 +39,7 @@ struct LogPane: View {
 
             if let logs = model.core?.logs {
                 if status.state == .failed, let run = status.run, run.id != dismissedBannerRunID {
-                    FailedBanner(run: run, logs: logs) {
+                    FailedBanner(service: service, run: run, logs: logs) {
                         dismissedBannerRunID = run.id
                         revealCount += 1
                     }
@@ -48,8 +48,15 @@ struct LogPane: View {
                         clearCount: model.logClearCount, revealCount: revealCount)
                     .overlay {
                         if status.run == nil {
-                            Text("No output yet. Start the service to see its logs.")
-                                .foregroundStyle(.secondary)
+                            VStack(spacing: 10) {
+                                Text("No output yet.")
+                                    .foregroundStyle(.secondary)
+                                if status.state == .stopped {
+                                    Button("Start \(service.name)", systemImage: "play.fill") { model.start(service.id) }
+                                        .buttonStyle(AccentButtonStyle())
+                                        .help("Start (⌘R)")
+                                }
+                            }
                         }
                     }
             }
@@ -194,72 +201,109 @@ private struct RunTime: View {
     }
 }
 
-/// Why a Service Failed and the last 20 lines of its output.
+/// Why a Service Failed: what ended it and when, the error line from its
+/// output when the log below doesn't already show it all, and Start / Edit.
 private struct FailedBanner: View {
+    @Environment(AppModel.self) private var model
+    let service: Service
     let run: Run
     let logs: LogStore
-    let showInLog: () -> Void
-    @State private var lines: [OutputLine] = []
+    let dismiss: () -> Void
+    @State private var excerpt: [OutputLine] = []
 
-    static let lineLimit = 20
+    /// About a pane of output: with no more than this, the log below shows
+    /// the error already, so the banner doesn't repeat it.
+    static let shortRunLineCount = 30
+    static let excerptLineCount = 4
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "exclamationmark.octagon.fill")
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).fontWeight(.medium)
-                    if let detail {
-                        Text(detail).font(.caption).foregroundStyle(.secondary)
-                    }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 9) {
+                StateIndicator(state: .failed)
+                Text(title)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color(nsColor: Theme.failed))
+                    .lineLimit(2)
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                Spacer()
-                Button("Show in Log", action: showInLog)
-                    .controlSize(.small)
+                Spacer(minLength: 8)
+                Button("Start") { model.start(service.id) }
+                    .buttonStyle(AccentButtonStyle(isCompact: true))
+                    .help("Start (⌘R)")
+                Button("Edit Service…") { model.presentedSheet = .editService(service.id) }
+                    .buttonStyle(PillButtonStyle(isCompact: true))
+                Button("Hide", systemImage: "xmark") { dismiss() }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Hide this and show the end of the log")
             }
-            if !lines.isEmpty {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                        // The stderr mark is an overlay: as a sibling in an HStack
-                        // it would take all spare height and stretch every line.
+            if !excerpt.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(excerpt.enumerated()), id: \.offset) { _, line in
                         Text(ANSI.strip(line.text))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                            .padding(.leading, 6)
-                            .overlay(alignment: .leading) {
-                                if line.channel == .stderr {
-                                    Rectangle().fill(Color.red.opacity(0.7)).frame(width: 2)
-                                }
-                            }
                     }
                 }
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 11.5, design: .monospaced))
                 .textSelection(.enabled)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Color(nsColor: Theme.failed).opacity(0.55)).frame(width: 2)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(10)
-        .background(Color.red.opacity(0.08))
-        .overlay(alignment: .bottom) { Divider() }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: Theme.failed).opacity(0.08), in: .rect(cornerRadius: 8))
+        .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color(nsColor: Theme.failed).opacity(0.25)) }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
         .task(id: run.id) {
             // Lines may still arrive after the Service turned Failed.
             let (_, updates) = await logs.subscribe(toRun: run.id)
-            lines = await logs.recentOutput(forRun: run.id, limit: Self.lineLimit)
+            excerpt = Self.excerpt(of: await logs.recentOutput(forRun: run.id, limit: 40))
             for await _ in updates {
-                lines = await logs.recentOutput(forRun: run.id, limit: Self.lineLimit)
+                excerpt = Self.excerpt(of: await logs.recentOutput(forRun: run.id, limit: 40))
             }
         }
     }
 
-    /// The typed reason if there is one, else how the command ended.
+    /// e.g. "Worker exited with code 1", or the typed reason ("Command not found.").
     private var title: String {
         if let failure = run.failure { return failure.message }
-        return run.termination?.summary ?? "Failed"
+        switch run.termination {
+        case .exited(let code): return "\(service.name) exited with code \(code)"
+        case .signaled(let signal): return "\(service.name) was ended by \(Termination.signalName(signal))"
+        case nil: return "\(service.name) failed"
+        }
     }
 
+    /// How long it ran, e.g. "after 1.2s".
     private var detail: String? {
-        run.failure == nil ? nil : run.termination?.summary
+        guard let endedAt = run.endedAt else { return nil }
+        let seconds = endedAt.timeIntervalSince(run.startedAt)
+        if seconds < 60 { return "after \(seconds.formatted(.number.precision(.fractionLength(1))))s" }
+        return "after " + Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .narrow, maximumUnitCount: 2))
+    }
+
+    /// The first line that reads like an error and the few after it, else the
+    /// last lines; nothing for short output, which the log shows whole.
+    static func excerpt(of lines: [OutputLine]) -> [OutputLine] {
+        let output = lines.filter { $0.channel != .localhost }
+        guard output.count > shortRunLineCount else { return [] }
+        let pattern = /(?i)\b(error|exception|fatal|panic|traceback|failed)\b/
+        if let start = output.firstIndex(where: { ANSI.strip($0.text).contains(pattern) }) {
+            return Array(output[start...].prefix(excerptLineCount))
+        }
+        return Array(output.suffix(excerptLineCount))
     }
 }
 
@@ -356,6 +400,19 @@ final class LogViewController {
         scrollView.drawsBackground = true
         scrollView.backgroundColor = Theme.logBackground
         scrollView.borderType = .noBorder
+        // Following is decided by the user's scrolling, not by where the view
+        // happens to be: a banner or a resize must not stop it.
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: NSScrollView.didEndLiveScrollNotification, object: scrollView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateFollowing() }
+        })
+        scrollView.postsFrameChangedNotifications = true
+        observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isFollowing else { return }
+                self.textView.scrollToEndOfDocument(nil)
+            }
+        })
     }
 
     func show(_ source: LogView.Source, clearCount: Int) {
@@ -380,7 +437,12 @@ final class LogViewController {
     func reveal(_ count: Int) {
         guard count != revealCount else { return }
         revealCount = count
+        isFollowing = true
         textView.scrollToEndOfDocument(nil)
+    }
+
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
     }
 
     func stop() {
@@ -427,7 +489,7 @@ final class LogViewController {
 
     private func append(_ newLines: [Line]) {
         guard !newLines.isEmpty, let storage = textView.textStorage else { return }
-        let followOutput = isScrolledToBottom
+        let followOutput = isFollowing
         lines += newLines
         if lines.count > Self.maxLines + 1_000 {
             lines.removeFirst(lines.count - Self.maxLines)
@@ -464,6 +526,7 @@ final class LogViewController {
             text.append(attributed)
         }
         storage.setAttributedString(text)
+        isFollowing = true
         textView.scrollToEndOfDocument(nil)
     }
 
@@ -478,6 +541,17 @@ final class LogViewController {
 
     private func attributedLine(_ line: Line) -> NSAttributedString {
         LogStyling.attributedLine(line.line, prefix: prefix(of: line), highlight: filter)
+    }
+
+    // Only touched on the main actor, and in deinit once nothing else can.
+    nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
+
+    /// Whether new output scrolls into view: until the user scrolls up, and
+    /// again once they scroll back to the bottom.
+    private var isFollowing = true
+
+    private func updateFollowing() {
+        isFollowing = isScrolledToBottom
     }
 
     private var isScrolledToBottom: Bool {

@@ -52,13 +52,19 @@ final class AppModel {
 
     private(set) var projects: [Project] = []
     var sidebarSelection: SidebarItem? {
-        didSet { if sidebarSelection != oldValue { selectedServiceID = selectedProject?.services.first?.id } }
+        didSet {
+            guard sidebarSelection != oldValue else { return }
+            selectedServiceID = selectedProject?.services.first?.id
+            saveSelection()
+        }
     }
     var selectedProjectID: UUID? {
         get { if case .project(let id) = sidebarSelection { id } else { nil } }
         set { sidebarSelection = newValue.map(SidebarItem.project) }
     }
-    var selectedServiceID: UUID?
+    var selectedServiceID: UUID? {
+        didSet { if selectedServiceID != oldValue { saveSelection() } }
+    }
     /// Text the log views are filtered by (⌘F focuses it).
     var logFilter = ""
     /// Incremented to ask the visible log view to focus its filter.
@@ -543,6 +549,7 @@ final class AppModel {
         projectObservation = Task { [weak self] in
             let (projects, events) = await library.subscribe()
             self?.projects = projects
+            self?.restoreSelection()
             for await event in events {
                 guard let self else { return }
                 switch event {
@@ -551,6 +558,45 @@ final class AppModel {
                 }
             }
         }
+    }
+
+    // MARK: Selection
+
+    private static let sidebarSelectionKey = "selection.sidebar"
+    private static let serviceSelectionKey = "selection.service"
+    @ObservationIgnored private var isRestoringSelection = false
+
+    /// The last selection, else the first Project's "All services", so the
+    /// window never opens on an empty selection.
+    private func restoreSelection() {
+        guard sidebarSelection == nil, !projects.isEmpty else { return }
+        isRestoringSelection = true
+        defer { isRestoringSelection = false }
+        let defaults = UserDefaults.standard
+        let savedSidebar = defaults.string(forKey: Self.sidebarSelectionKey)
+        if savedSidebar == "ports" {
+            sidebarSelection = .ports
+            return
+        }
+        let project = savedSidebar.flatMap(UUID.init(uuidString:)).flatMap(project) ?? projects[0]
+        sidebarSelection = .project(project.id)
+        let savedService = defaults.string(forKey: Self.serviceSelectionKey).flatMap(UUID.init(uuidString:))
+        if let savedService, savedService == Self.allServicesID || project.services.contains(where: { $0.id == savedService }) {
+            selectedServiceID = savedService
+        } else {
+            selectedServiceID = project.services.isEmpty ? nil : Self.allServicesID
+        }
+    }
+
+    private func saveSelection() {
+        guard !isRestoringSelection else { return }
+        let defaults = UserDefaults.standard
+        switch sidebarSelection {
+        case .ports: defaults.set("ports", forKey: Self.sidebarSelectionKey)
+        case .project(let id): defaults.set(id.uuidString, forKey: Self.sidebarSelectionKey)
+        case nil: defaults.removeObject(forKey: Self.sidebarSelectionKey)
+        }
+        defaults.set(selectedServiceID?.uuidString, forKey: Self.serviceSelectionKey)
     }
 
     private func report(origin: Origin = .mainWindow, _ action: () async throws(LocalhostError) -> Void) async {
