@@ -21,7 +21,6 @@ struct ProjectDetailView: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .windowBackgroundColor))
         .contextMenu(forSelectionType: UUID.self) { ids in
             if let id = ids.first, id != AppModel.allServicesID {
                 Button("Edit Service…") { model.presentedSheet = .editService(id) }
@@ -47,6 +46,7 @@ struct ProjectDetailView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             header
         }
+        .columnGlass()
         .navigationTitle(project.name)
         .toolbar {
             ToolbarItem {
@@ -106,7 +106,6 @@ struct ProjectDetailView: View {
         .buttonStyle(.borderless)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) { Divider() }
     }
 }

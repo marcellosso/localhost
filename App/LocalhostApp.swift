@@ -15,7 +15,7 @@ struct LocalhostApp: App {
                 .onAppear { NSApp.setActivationPolicy(.regular) }
                 .onDisappear { NSApp.setActivationPolicy(.accessory) }
         }
-        .defaultSize(width: 1100, height: 700)
+        .defaultSize(width: 1280, height: 800)
         .commands {
             AppCommands(model: delegate.model)
             NavigationCommands(model: delegate.model)

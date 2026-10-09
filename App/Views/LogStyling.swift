@@ -17,13 +17,6 @@ struct LogPrefix: Equatable {
 /// Service's prefix in the combined stream, then the line with its ANSI
 /// colours and attributes, local URLs as links and `highlight` matches marked.
 enum LogStyling {
-    /// Colours told apart in light and dark mode, assigned to a Project's
-    /// Services in order.
-    static let serviceColors: [NSColor] = [
-        .systemBlue, .systemGreen, .systemOrange, .systemPurple, .systemPink,
-        .systemTeal, .systemYellow, .systemIndigo, .systemBrown, .systemMint,
-    ]
-
     static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     private static let boldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
     private static let italicFont = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)

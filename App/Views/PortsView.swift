@@ -49,7 +49,7 @@ struct PortsView: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .columnGlass()
         .overlay {
             if model.listeners.isEmpty {
                 ContentUnavailableView("No Listeners", systemImage: "network",
@@ -173,6 +173,6 @@ struct ListenerDetailView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: Theme.logBackground))
     }
 }
