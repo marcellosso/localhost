@@ -33,8 +33,7 @@ struct ServiceForm: View {
                     .onChange(of: name) {
                         if !isKeyEdited { key = model.suggestedServiceKey(for: name, in: project, excluding: editing?.id) }
                     }
-                TextField("Key", text: keyBinding, prompt: Text("web"))
-                    .font(.body.monospaced())
+                MonospacedField("Key", text: keyBinding, prompt: "web")
             }
             Section {
                 LabeledContent("Working Directory") {
@@ -45,18 +44,15 @@ struct ServiceForm: View {
                         Button("Choose…") { isChoosingFolder = true }
                     }
                 }
-                TextField("Command Line", text: $commandLine, prompt: Text("pnpm dev"))
-                    .font(.body.monospaced())
+                MonospacedField("Command Line", text: $commandLine, prompt: "pnpm dev")
             } footer: {
                 Text("Relative to \(project.path). The command line runs in your login shell.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Section {
-                TextField("Port", text: $port, prompt: Text("3000"))
-                    .font(.body.monospaced())
-                TextField("URL", text: $url, prompt: Text(port.isEmpty ? "http://localhost:3000" : "http://localhost:\(port)"))
-                    .font(.body.monospaced())
+                MonospacedField("Port", text: $port, prompt: "3000")
+                MonospacedField("URL", text: $url, prompt: port.isEmpty ? "http://localhost:3000" : "http://localhost:\(port)")
                 if !port.isEmpty {
                     Toggle("Port can change", isOn: $portCanChange)
                 }
@@ -82,7 +78,10 @@ struct ServiceForm: View {
             }
         }
         .formStyle(.grouped)
+        .sheetTitle(editing == nil ? "Add Service" : "Edit Service")
+        // Scrolls rather than growing past a small window.
         .frame(width: 520)
+        .frame(minHeight: 320, idealHeight: 520, maxHeight: 620)
         .navigationTitle(editing == nil ? "Add Service" : "Edit Service")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

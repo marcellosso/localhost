@@ -36,7 +36,7 @@ struct PillButtonStyle: ButtonStyle {
             .padding(.horizontal, isCompact ? 9 : 11)
             .frame(height: isCompact ? 22 : 26)
             .background(fill.opacity(configuration.isPressed ? 1.6 : 1), in: .rect(cornerRadius: isCompact ? 6 : 7))
-            .opacity(isEnabled ? 1 : 0.45)
+            .opacity(isEnabled ? 1 : 0.35)
             .contentShape(.rect)
     }
 
@@ -139,10 +139,52 @@ extension AppModel {
         }
     }
 
+    /// The Service whose Run holds the Listener, if any.
+    func service(of listener: Listener) -> (project: Project, service: Service)? {
+        guard case .run(let serviceID, _) = listener.owner else { return nil }
+        return service(serviceID)
+    }
+
     /// The Service's colour: stable for its position in its Project.
     func color(of service: Service) -> NSColor {
         guard let (project, _) = self.service(service.id),
               let index = project.services.firstIndex(where: { $0.id == service.id }) else { return Theme.serviceColor(at: 0) }
         return Theme.serviceColor(at: index)
+    }
+}
+
+/// A form row whose value is monospaced (a Key, command, port or URL) while
+/// its label stays in the system font.
+struct MonospacedField: View {
+    let label: String
+    @Binding var text: String
+    let prompt: String
+
+    init(_ label: String, text: Binding<String>, prompt: String) {
+        self.label = label
+        self._text = text
+        self.prompt = prompt
+    }
+
+    var body: some View {
+        LabeledContent(label) {
+            TextField(label, text: $text, prompt: Text(prompt))
+                .labelsHidden()
+                .font(.body.monospaced())
+        }
+    }
+}
+
+extension View {
+    /// A sheet's title above its content: sheets don't show the window title.
+    func sheetTitle(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .accessibilityAddTraits(.isHeader)
+            self
+        }
     }
 }

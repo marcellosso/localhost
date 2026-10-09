@@ -76,7 +76,7 @@ struct MenuBarContent: View {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(Color(nsColor: Theme.transitioning))
                         Text(Self.description(of: warning, in: model))
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
@@ -186,12 +186,15 @@ private struct MenuBarServiceRow: View {
                 model.reveal(projectID: project.id, serviceID: service.id)
             } label: {
                 HStack(spacing: 6) {
+                    Capsule()
+                        .fill(Color(nsColor: model.color(of: service)))
+                        .frame(width: 3, height: 14)
                     StateIndicator(state: status.state)
                     Text(service.name)
                         .lineLimit(1)
                     Text(status.summary)
                         .font(.caption)
-                        .foregroundStyle(status.state == .failed ? .red : .secondary)
+                        .foregroundStyle(status.state == .failed ? AnyShapeStyle(Color(nsColor: Theme.failed)) : AnyShapeStyle(.secondary))
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Spacer(minLength: 0)

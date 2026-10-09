@@ -34,8 +34,7 @@ struct ProjectForm: View {
                 .onChange(of: name) {
                     if !isKeyEdited { key = model.suggestedProjectKey(for: name, excluding: editing?.id) }
                 }
-            TextField("Key", text: keyBinding, prompt: Text("my-app"))
-                .font(.body.monospaced())
+            MonospacedField("Key", text: keyBinding, prompt: "my-app")
             if let error {
                 Text(error.message)
                     .foregroundStyle(.red)
@@ -43,6 +42,7 @@ struct ProjectForm: View {
             }
         }
         .formStyle(.grouped)
+        .sheetTitle(editing == nil ? "Add Project" : "Edit Project")
         .frame(width: 480)
         .navigationTitle(editing == nil ? "Add Project" : "Edit Project")
         .toolbar {

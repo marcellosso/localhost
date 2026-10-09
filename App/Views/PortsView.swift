@@ -71,31 +71,90 @@ struct ListenerRow: View {
     let listener: Listener
 
     var body: some View {
+        let service = model.service(of: listener)
         HStack(spacing: 10) {
-            Text(listener.ports.map { ":\(String($0))" }.joined(separator: " "))
-                .font(.body.monospaced())
-                .lineLimit(1)
-                .frame(minWidth: 64, alignment: .leading)
+            HStack(spacing: 4) {
+                ForEach(listener.ports, id: \.self) { port in
+                    if let service {
+                        PortPill(port: port, color: model.color(of: service.service))
+                    } else {
+                        Text(":\(String(port))")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .lineLimit(1)
+            .frame(minWidth: 56, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
-                Text(listener.name)
-                    .lineLimit(1)
-                Text(listener.command)
-                    .font(.caption.monospaced())
+                // A Service's Listener is named by its Service; others by their process.
+                if let label = ownerLabel(service) {
+                    if service == nil {
+                        HStack(spacing: 6) {
+                            name
+                            label
+                        }
+                    } else {
+                        label
+                    }
+                } else {
+                    name
+                }
+                Text(Self.subtitle(of: listener))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             Spacer(minLength: 8)
-            Text(model.ownerDescription(listener))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             ListenerStopButton(listener: listener)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .frame(width: 24)
+                .buttonStyle(PillButtonStyle(isCompact: true))
         }
         .padding(.vertical, 3)
+    }
+
+    private var name: some View {
+        Text(listener.name)
+            .fontWeight(.medium)
+            .lineLimit(1)
+    }
+
+    /// Whose it is: a Service's coloured "Project › Service", a Project's
+    /// folder, or Docker. Unmanaged is the default and shows nothing.
+    private func ownerLabel(_ service: (project: Project, service: Service)?) -> AnyView? {
+        if let service {
+            let color = Color(nsColor: model.color(of: service.service))
+            return AnyView(
+                Text("\(service.project.name) › \(service.service.name)")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(color.opacity(0.12), in: .rect(cornerRadius: 4))
+                    .lineLimit(1)
+            )
+        }
+        switch (listener.owner, listener.kind) {
+        case (.project, _), (_, .docker):
+            return AnyView(Text(model.ownerDescription(listener)).font(.caption).foregroundStyle(.secondary).lineLimit(1))
+        default:
+            return nil
+        }
+    }
+
+    /// The command with its executable shortened to a name, e.g.
+    /// "Python -m http.server 5199", else the working directory.
+    static func subtitle(of listener: Listener) -> String {
+        let command = listener.command.trimmingCharacters(in: .whitespaces)
+        guard !command.isEmpty else {
+            return listener.workingDirectory.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? ""
+        }
+        if let executable = listener.executablePath, command.hasPrefix(executable) {
+            return (executable as NSString).lastPathComponent + command.dropFirst(executable.count)
+        }
+        let parts = command.split(separator: " ", maxSplits: 1)
+        guard let first = parts.first, first.hasPrefix("/") else { return command }
+        return (String(first) as NSString).lastPathComponent + (parts.count > 1 ? " " + parts[1] : "")
     }
 }
 
@@ -110,7 +169,7 @@ struct ListenerStopButton: View {
             ProgressView().controlSize(.small)
         } else {
             let reason = model.reasonNotStoppable(listener)
-            Button(isRun ? "Stop Service" : "Stop…", systemImage: "stop.fill") { model.requestStop(listener) }
+            Button(isRun ? "Stop" : "Stop…") { model.requestStop(listener) }
                 .disabled(reason != nil)
                 .help(reason ?? (isRun ? "Stop the service" : "Stop this process"))
         }
@@ -167,7 +226,7 @@ struct ListenerDetailView: View {
                 HStack {
                     Spacer()
                     ListenerStopButton(listener: listener)
-                        .labelStyle(.titleAndIcon)
+                        .buttonStyle(PillButtonStyle())
                 }
             }
         }
