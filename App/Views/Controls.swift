@@ -152,39 +152,3 @@ extension AppModel {
         return Theme.serviceColor(at: index)
     }
 }
-
-/// A form row whose value is monospaced (a Key, command, port or URL) while
-/// its label stays in the system font.
-struct MonospacedField: View {
-    let label: String
-    @Binding var text: String
-    let prompt: String
-
-    init(_ label: String, text: Binding<String>, prompt: String) {
-        self.label = label
-        self._text = text
-        self.prompt = prompt
-    }
-
-    var body: some View {
-        LabeledContent(label) {
-            TextField(label, text: $text, prompt: Text(prompt))
-                .labelsHidden()
-                .font(.body.monospaced())
-        }
-    }
-}
-
-extension View {
-    /// A sheet's title above its content: sheets don't show the window title.
-    func sheetTitle(_ title: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .accessibilityAddTraits(.isHeader)
-            self
-        }
-    }
-}

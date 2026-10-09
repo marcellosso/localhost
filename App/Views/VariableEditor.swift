@@ -38,38 +38,58 @@ struct VariableEditor: View {
     let layer: VariableLayer?
 
     var body: some View {
-        ForEach(variables) { draft in
-            let binding = $variables.element(draft)
-            let variable = binding.wrappedValue
-            HStack {
-                TextField("Name", text: binding.name, prompt: Text("NAME"))
-                    .labelsHidden()
-                    .font(.body.monospaced())
-                valueField(binding)
-                if variable.isSecret {
-                    Button(variable.isRevealed ? "Hide Value" : "Reveal Value",
-                           systemImage: variable.isRevealed ? "eye.slash" : "eye") {
-                        Task { await toggleReveal(binding) }
+        FormCard {
+            ForEach(variables) { draft in
+                let binding = $variables.element(draft)
+                let variable = binding.wrappedValue
+                HStack(spacing: 8) {
+                    TextField("Name", text: binding.name, prompt: Text("NAME"))
+                        .labelsHidden()
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5, design: .monospaced))
+                        .frame(width: 150)
+                    valueField(binding)
+                    if variable.isSecret {
+                        Button(variable.isRevealed ? "Hide Value" : "Reveal Value",
+                               systemImage: variable.isRevealed ? "eye.slash" : "eye") {
+                            Task { await toggleReveal(binding) }
+                        }
+                        .help(variable.isRevealed ? "Hide the value" : "Reveal the value")
                     }
-                    .help(variable.isRevealed ? "Hide the value" : "Reveal the value")
+                    Button(variable.isSecret ? "Make Plain" : "Make Secret",
+                           systemImage: variable.isSecret ? "lock.fill" : "lock.open") {
+                        Task { await toggleSecret(binding) }
+                    }
+                    .foregroundStyle(variable.isSecret ? AnyShapeStyle(Theme.accentText) : AnyShapeStyle(.secondary))
+                    .help(variable.isSecret
+                          ? "Secret: stored in your Keychain, never in the project file. Click to make it a plain variable."
+                          : "Make it a secret")
+                    Button("Remove Variable", systemImage: "minus.circle") {
+                        variables.removeAll { $0.id == variable.id }
+                    }
+                    .foregroundStyle(.secondary)
+                    .help("Remove")
                 }
-                Button(variable.isSecret ? "Make Plain" : "Make Secret",
-                       systemImage: variable.isSecret ? "lock.fill" : "lock.open") {
-                    Task { await toggleSecret(binding) }
-                }
-                .help(variable.isSecret
-                      ? "Secret: stored in your Keychain, never in the project file. Click to make it a plain variable."
-                      : "Make it a secret")
-                Button("Remove Variable", systemImage: "minus.circle") {
-                    variables.removeAll { $0.id == variable.id }
-                }
-                .help("Remove")
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .overlay(alignment: .bottom) { Divider().opacity(0.6) }
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
+            Button { variables.append(VariableDraft()) } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                    Text("Add variable")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
         }
-        Button("Add Variable", systemImage: "plus") { variables.append(VariableDraft()) }
-            .buttonStyle(.borderless)
     }
 
     @ViewBuilder
@@ -89,7 +109,9 @@ struct VariableEditor: View {
             }
         }
         .labelsHidden()
-        .font(.body.monospaced())
+        .textFieldStyle(.plain)
+        .font(.system(size: 12.5, design: .monospaced))
+        .foregroundStyle(.secondary)
     }
 
     private func toggleReveal(_ variable: Binding<VariableDraft>) async {

@@ -18,40 +18,51 @@ struct ProjectForm: View {
     @State private var isSaving = false
 
     var body: some View {
-        Form {
-            LabeledContent("Folder") {
-                HStack {
-                    Text(path.isEmpty ? "No folder chosen" : path)
-                        .font(.callout.monospaced())
-                        .foregroundStyle(path.isEmpty ? .secondary : .primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button("Choose…") { isChoosingFolder = true }
+        FormSheet(
+            systemImage: "folder",
+            title: editing == nil ? "New Project" : "Edit \(editing?.name ?? "Project")",
+            subtitle: Text("A folder whose services localhost runs."),
+            hint: "↩ to \(editing == nil ? "add" : "save")",
+            error: error?.message,
+            primaryTitle: editing == nil ? "Add Project" : "Save",
+            isPrimaryDisabled: path.isEmpty || name.isEmpty || key.isEmpty || isSaving,
+            width: 500,
+            cancel: { dismiss() },
+            primary: { Task { await save() } }
+        ) {
+            Field(title: "Folder") {
+                Button { isChoosingFolder = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder")
+                            .foregroundStyle(.secondary)
+                        Text(path.isEmpty ? "Choose a folder…" : (path as NSString).abbreviatingWithTildeInPath)
+                            .font(.system(size: 12.5, design: .monospaced))
+                            .foregroundStyle(path.isEmpty ? .secondary : .primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        Text("Choose…")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .fieldBox(isFocused: false)
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
             }
-            TextField("Name", text: $name, prompt: Text("My App"))
-                .onChange(of: name) {
-                    if !isKeyEdited { key = model.suggestedProjectKey(for: name, excluding: editing?.id) }
+            HStack(alignment: .top, spacing: 12) {
+                Field(title: "Name") {
+                    BoxedTextField(label: "Name", text: $name, prompt: "My App")
                 }
-            MonospacedField("Key", text: keyBinding, prompt: "my-app")
-            if let error {
-                Text(error.message)
-                    .foregroundStyle(.red)
-                    .font(.callout)
+                Field(title: "Key", note: "in logs & CLI") {
+                    BoxedTextField(label: "Key", text: keyBinding, prompt: "my-app", isMonospaced: true)
+                }
+                .frame(width: 160)
             }
-        }
-        .formStyle(.grouped)
-        .sheetTitle(editing == nil ? "Add Project" : "Edit Project")
-        .frame(width: 480)
-        .navigationTitle(editing == nil ? "Add Project" : "Edit Project")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(editing == nil ? "Add" : "Save") { Task { await save() } }
-                    .disabled(path.isEmpty || name.isEmpty || key.isEmpty || isSaving)
+            .onChange(of: name) {
+                if !isKeyEdited { key = model.suggestedProjectKey(for: name, excluding: editing?.id) }
             }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in

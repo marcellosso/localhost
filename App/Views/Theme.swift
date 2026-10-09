@@ -51,7 +51,9 @@ enum Theme {
     static let sidebarSolid = dynamic(light: 0xEDECF0, dark: 0x232329)
     static let sidebarTint = dynamic(light: 0xF6F5F8, dark: 0x202026, lightAlpha: 0.55, darkAlpha: 0.48)
 
-    private static func dynamic(
+    /// Nonisolated: AppKit resolves dynamic colours off the main thread too,
+    /// e.g. while SwiftUI renders an animation asynchronously.
+    nonisolated private static func dynamic(
         light: UInt32, dark: UInt32, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1
     ) -> NSColor {
         NSColor(name: nil) { appearance in
@@ -60,7 +62,7 @@ enum Theme {
         }
     }
 
-    private static func color(_ hex: UInt32, alpha: CGFloat) -> NSColor {
+    nonisolated private static func color(_ hex: UInt32, alpha: CGFloat) -> NSColor {
         NSColor(
             srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
             blue: CGFloat(hex & 0xFF) / 255, alpha: alpha
