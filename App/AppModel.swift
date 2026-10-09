@@ -84,6 +84,14 @@ final class AppModel {
     private(set) var stoppingListenerIDs: Set<pid_t> = []
     var blockedStart: BlockedStart?
 
+    /// Unmanaged Listeners holding a configured Port, as of the last refresh
+    /// (only while the menu bar window is open).
+    private(set) var portWarnings: [PortWarning] = []
+    /// Who asked to quit, for the Origin of the stops that follow.
+    @ObservationIgnored var quitOrigin: Origin = .mainWindow
+    /// Opens (or focuses) the main window; set by the scene that can open it.
+    @ObservationIgnored var showMainWindow: (() -> Void)?
+
     /// Whether a Service may move to a free port when its Port is taken.
     var isAutomaticPortMoveEnabled: Bool {
         didSet {
@@ -200,39 +208,39 @@ final class AppModel {
     // MARK: Lifecycle
 
     /// Starts the Service; if its port is taken, asks what to do (`blockedStart`).
-    func start(_ serviceID: UUID, onPort port: Int? = nil) {
+    func start(_ serviceID: UUID, onPort port: Int? = nil, origin: Origin = .mainWindow) {
         guard let services = core?.services else { return }
         Task {
-            await report { () throws(LocalhostError) in
-                let status = try await services.start(serviceID, onPort: port, origin: .mainWindow)
-                await presentIfBlocked(status)
+            await report(origin: origin) { () throws(LocalhostError) in
+                let status = try await services.start(serviceID, onPort: port, origin: origin)
+                await presentIfBlocked(status, origin: origin)
             }
         }
     }
 
-    func stop(_ serviceID: UUID) {
+    func stop(_ serviceID: UUID, origin: Origin = .mainWindow) {
         guard let services = core?.services else { return }
-        Task { await report { () throws(LocalhostError) in try await services.stop(serviceID, origin: .mainWindow) } }
+        Task { await report(origin: origin) { () throws(LocalhostError) in try await services.stop(serviceID, origin: origin) } }
     }
 
-    func restart(_ serviceID: UUID) {
+    func restart(_ serviceID: UUID, origin: Origin = .mainWindow) {
         guard let services = core?.services else { return }
         Task {
-            await report { () throws(LocalhostError) in
-                let status = try await services.restart(serviceID, origin: .mainWindow)
-                await presentIfBlocked(status)
+            await report(origin: origin) { () throws(LocalhostError) in
+                let status = try await services.restart(serviceID, origin: origin)
+                await presentIfBlocked(status, origin: origin)
             }
         }
     }
 
-    func startAll(inProject projectID: UUID) {
+    func startAll(inProject projectID: UUID, origin: Origin = .mainWindow) {
         guard let services = core?.services else { return }
-        Task { await report { () throws(LocalhostError) in try await services.startAll(inProject: projectID, origin: .mainWindow) } }
+        Task { await report(origin: origin) { () throws(LocalhostError) in try await services.startAll(inProject: projectID, origin: origin) } }
     }
 
-    func stopAll(inProject projectID: UUID) {
+    func stopAll(inProject projectID: UUID, origin: Origin = .mainWindow) {
         guard let services = core?.services else { return }
-        Task { await report { () throws(LocalhostError) in try await services.stopAll(inProject: projectID, origin: .mainWindow) } }
+        Task { await report(origin: origin) { () throws(LocalhostError) in try await services.stopAll(inProject: projectID, origin: origin) } }
     }
 
     /// The URL "Open" uses for a Service, or `nil` if there is none to open.
@@ -271,8 +279,8 @@ final class AppModel {
         }
     }
 
-    func stopAllServices() async {
-        await core?.services.stopAll(origin: .mainWindow)
+    func stopAllServices(origin: Origin = .mainWindow) async {
+        await core?.services.stopAll(origin: origin)
     }
 
     // MARK: Editing
@@ -413,6 +421,23 @@ final class AppModel {
         listeners = await services.listeners()
     }
 
+    /// Rescans Listeners for Unmanaged ones holding a configured Port. A
+    /// Service that is active is left out: its Run already says why it moved or failed.
+    func refreshPortWarnings() async {
+        guard let services = core?.services else { return }
+        let unmanaged = await services.listeners().filter(\.isUnmanaged)
+        var warnings: [PortWarning] = []
+        for project in projects {
+            for service in project.services {
+                guard let port = service.port, !status(of: service).state.isActive,
+                      let holder = unmanaged.first(where: { $0.ports.contains(port) })
+                else { continue }
+                warnings.append(PortWarning(port: port, serviceID: service.id, holder: holder))
+            }
+        }
+        if warnings != portWarnings { portWarnings = warnings }
+    }
+
     /// Why localhost won't stop the Listener, or `nil` if it can.
     func reasonNotStoppable(_ listener: Listener) -> String? {
         if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.listenerIsLocalhost.message }
@@ -465,12 +490,14 @@ final class AppModel {
         start(blocked.serviceID)
     }
 
-    private func presentIfBlocked(_ status: ServiceStatus) async {
+    private func presentIfBlocked(_ status: ServiceStatus, origin: Origin = .mainWindow) async {
         guard status.state == .failed, case .portConflict(let port, let holder) = status.run?.failure,
               let services = core?.services
         else { return }
         let nextFreePort = try? await services.nextFreePort(for: status.serviceID)
         blockedStart = BlockedStart(serviceID: status.serviceID, port: port, holder: holder, nextFreePort: nextFreePort)
+        // The question is asked in the main window.
+        if origin == .menuBar { showMainWindow?() }
     }
 
     // MARK: Orphans
@@ -526,11 +553,13 @@ final class AppModel {
         }
     }
 
-    private func report(_ action: () async throws(LocalhostError) -> Void) async {
+    private func report(origin: Origin = .mainWindow, _ action: () async throws(LocalhostError) -> Void) async {
         do {
             try await action()
         } catch {
             actionError = error
+            // Errors are reported in the main window.
+            if origin == .menuBar { showMainWindow?() }
         }
     }
 }
