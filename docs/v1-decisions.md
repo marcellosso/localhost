@@ -67,6 +67,17 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 
 No adapter in V1. A Compose service is just a command line run in the foreground (`docker compose up postgres`); Stop's SIGINT makes Compose shut down cleanly. Detection suggests the foreground form (the `-d` form would just end as Exited). Only extra: recognise "Docker daemon not running" and surface it as a typed error.
 
+## Project detection (M2)
+
+- `ProjectScanner` in the core runs small, independent `ServiceDetector`s (Compose, Node, Python, Cargo) over the Project root, every folder up to two levels deep (skipping dependency, build and hidden folders) and the folders detectors declare (Node workspace packages, Cargo workspace members). It only reads: no network, nothing written into the folder. Manifests are read by small built-in readers (JSON, a TOML subset, a YAML subset), with no third-party parser.
+- Output is a list of **Suggestions**: plain command lines with working directory, Port, Port can change, whether it is checked by default, and the file it came from. Keys are unique within a scan.
+- **Node**: every `package.json` script except lifecycle hooks is suggested, run as `<pm> run <script>`. The package manager comes from the nearest `packageManager` field, else the nearest lockfile (pnpm / Yarn / Bun / npm), else npm. One script per package is checked (`dev` › `develop` › `start` › `serve` › `watch` › first `dev:…`). In a workspace monorepo, the root's scripts (`turbo dev`) and packages outside the workspaces are listed unchecked.
+- **Ports**: a known dev server (Vite, Next, Nuxt, Astro, Angular, Storybook, Wrangler, Gatsby, webpack, Docusaurus, Expo, react-scripts) gets its default port. When the tool takes a port flag, `$PORT` is passed to it (`pnpm run dev --port $PORT`, npm adds `--`). Tools that read `PORT` themselves run as written. A literal port in the script is kept with Port can change off. This is knowledge in a detector shaping a visible suggestion, not runtime behaviour (ADR-0006 still holds).
+- **Compose**: only the file Docker would pick (`compose.yaml` › `compose.yml` › `docker-compose.yaml` › `docker-compose.yml`). One checked suggestion per Compose service, `docker compose up <svc>` in the foreground, Port = first published host port, Port can change off.
+- **Python**: a folder with `pyproject.toml`, `requirements.txt`, `setup.py`, `Pipfile` or `manage.py`. Runner: uv / Poetry / Pipenv (lockfile walking up to the root, or `pyproject.toml`), else `.venv`/`venv`, else `python3`. Django → `manage.py runserver $PORT` (8000). A module-level FastAPI app → `uvicorn <module>:<app> --reload --port $PORT` (8000, `--app-dir src` for src layouts). Flask → `flask --app … run --debug --port $PORT` (5000). `pyproject.toml` scripts are listed unchecked.
+- **Cargo**: `cargo run` for a package with `src/main.rs`; other binaries are listed unchecked as `cargo run --bin <name>`. Libraries and virtual workspace roots get nothing.
+- No suggested Dependencies in M2. **Detect Services…** rescans an existing Project; suggestions matching an existing Service (same working directory and command line) are hidden.
+
 ## UI (M1)
 
 - Sidebar: Projects, plus a **Ports** view listing every Listener. The Project's Service list starts with an **All services** row (merged stream, Key-prefixed lines, colour stable per Service); clear there clears every visible buffer, never log files.

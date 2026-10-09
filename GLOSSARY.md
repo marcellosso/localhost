@@ -42,6 +42,10 @@ _Avoid_: Credential, sensitive var
 The one TCP port a Service is expected to listen on, optionally configured. It decides when the Service counts as Running and what its URL points to. Other ports the Service happens to open are not its Port.
 _Avoid_: Listening port (for the configured one)
 
+**Suggestion**:
+A Service proposed by scanning a Project's folder (its `package.json` scripts, Compose services, Python app, Cargo binaries, …). Suggestions are shown in a review step where the user checks, unchecks and edits them; only the checked ones become Services, and nothing is ever applied silently.
+_Avoid_: Detected service, auto-configuration
+
 ### Execution
 
 **Run**:
