@@ -173,6 +173,6 @@ struct ListenerDetailView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: Theme.logBackground))
+        .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
     }
 }

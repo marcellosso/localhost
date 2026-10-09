@@ -10,6 +10,8 @@ enum Theme {
     static let accent = Color(nsColor: dynamic(light: 0xE0336A, dark: 0xFF5C8A))
     /// Text and icons on the accent.
     static let onAccent = Color(nsColor: dynamic(light: 0xFFFFFF, dark: 0x1A0B10))
+    /// The accent as text on a light accent tint.
+    static let accentText = Color(nsColor: dynamic(light: 0xC2185B, dark: 0xFF7FA3))
 
     // MARK: Service State
 
