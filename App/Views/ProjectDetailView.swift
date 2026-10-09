@@ -183,6 +183,7 @@ struct ServiceRow: View {
     let status: ServiceStatus
     let color: NSColor
     let isSelected: Bool
+    @AppStorage(Preferences.logFontSizeKey) private var logFontSize = Preferences.defaultLogFontSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -202,7 +203,7 @@ struct ServiceRow: View {
                     .help(summaryHelp)
             }
             Text(service.commandLine)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: logFontSize - 1, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)

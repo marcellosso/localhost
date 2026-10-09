@@ -17,10 +17,36 @@ struct LogPrefix: Equatable {
 /// Service's prefix in the combined stream, then the line with its ANSI
 /// colours and attributes, local URLs as links and `highlight` matches marked.
 enum LogStyling {
-    static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-    private static let boldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
-    private static let italicFont = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
-    private static let boldItalicFont = NSFontManager.shared.convert(boldFont, toHaveTrait: .italicFontMask)
+    /// The log's fonts at one size (Settings › Appearance › Log font size).
+    private struct Fonts {
+        let regular: NSFont
+        let bold: NSFont
+        let italic: NSFont
+        let boldItalic: NSFont
+        /// The advance of one character.
+        let columnWidth: CGFloat
+
+        init(size: CGFloat) {
+            regular = .monospacedSystemFont(ofSize: size, weight: .regular)
+            bold = .monospacedSystemFont(ofSize: size, weight: .bold)
+            italic = NSFontManager.shared.convert(regular, toHaveTrait: .italicFontMask)
+            boldItalic = NSFontManager.shared.convert(bold, toHaveTrait: .italicFontMask)
+            columnWidth = ("0" as NSString).size(withAttributes: [.font: regular]).width
+        }
+    }
+
+    private static var cachedFonts = Fonts(size: Preferences.defaultLogFontSize)
+
+    private static var fonts: Fonts {
+        let size = Preferences.logFontSize
+        if cachedFonts.regular.pointSize != size { cachedFonts = Fonts(size: size) }
+        return cachedFonts
+    }
+
+    static var font: NSFont { fonts.regular }
+    private static var boldFont: NSFont { fonts.bold }
+    private static var italicFont: NSFont { fonts.italic }
+    private static var boldItalicFont: NSFont { fonts.boldItalic }
 
     static func attributedLine(_ line: OutputLine, prefix: LogPrefix? = nil, highlight: String = "") -> NSAttributedString {
         let result = NSMutableAttributedString()
@@ -72,8 +98,7 @@ enum LogStyling {
         return style
     }
 
-    /// The advance of one character in the monospaced log font.
-    private static let columnWidth = ("0" as NSString).size(withAttributes: [.font: font]).width
+    private static var columnWidth: CGFloat { fonts.columnWidth }
 
     /// Whether a line matches the log filter (its text without ANSI
     /// sequences, or its Service's prefix).

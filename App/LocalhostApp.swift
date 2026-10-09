@@ -28,10 +28,14 @@ struct LocalhostApp: App {
                 .accessibilityLabel(delegate.model.hasFailedService ? "localhost, a service failed" : "localhost")
         }
         .menuBarExtraStyle(.window)
-        Settings {
+        Window("Settings", id: "settings") {
             SettingsView()
                 .environment(delegate.model)
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .commandsRemoved()
     }
 }
 
@@ -39,6 +43,10 @@ struct LocalhostApp: App {
 /// active Services asks first, then stops them all in parallel.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        Preferences.applyAppearance()
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
@@ -72,6 +80,10 @@ struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") { openWindow(id: "settings") }
+                .keyboardShortcut(",")
+        }
         CommandGroup(before: .windowList) {
             Button("Main Window") { openWindow(id: "main") }
             Button("Ports") {
