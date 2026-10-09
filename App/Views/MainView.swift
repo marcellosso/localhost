@@ -9,7 +9,7 @@ struct MainView: View {
         @Bindable var model = model
         NavigationSplitView {
             ProjectSidebar()
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 208, max: 320)
         } content: {
             Group {
                 if model.sidebarSelection == .ports {
@@ -26,9 +26,11 @@ struct MainView: View {
                             Button("Add Project…") { model.presentedSheet = .addProject }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .columnGlass()
                 }
             }
-            .navigationSplitViewColumnWidth(min: 320, ideal: 400)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 380)
         } detail: {
             if model.sidebarSelection == .ports {
                 if let listener = model.selectedListenerID.flatMap(model.listener) {
@@ -45,7 +47,7 @@ struct MainView: View {
                 ContentUnavailableView("No Service Selected", systemImage: "text.alignleft",
                                        description: Text("Select a service to see its output."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: .textBackgroundColor))
+                    .background(Color(nsColor: Theme.logBackground))
             }
         }
         .sheet(item: $model.presentedSheet) { sheet in

@@ -1,39 +1,58 @@
 import LocalhostCore
 import SwiftUI
 
-/// The state dot: ● Running, ◐ Starting/Stopping, ○ Stopped/Exited, ! Failed.
+/// The state glyph. Its shape carries the state without colour: a dot with a
+/// halo for Running, a pulsing ring for Starting/Stopping (still under Reduce
+/// Motion), a diamond for Failed, a hollow ring for Stopped/Exited.
 struct StateIndicator: View {
     /// `nil` means "nothing to show a state for" (a Project without Services).
     let state: ServiceState?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(color)
-            .frame(width: 14)
-            .contentTransition(.symbolEffect(.replace))
+        glyph
+            .frame(width: 14, height: 14)
             .animation(.easeOut(duration: 0.2), value: state)
+            .accessibilityElement()
             .accessibilityLabel(state.map(Self.label) ?? "No services")
             .help(state.map(Self.label) ?? "No services")
     }
 
-    private var symbol: String {
+    @ViewBuilder
+    private var glyph: some View {
         switch state {
-        case .running: "circle.fill"
-        case .starting, .stopping: "circle.lefthalf.filled"
-        case .failed: "exclamationmark.circle.fill"
-        case .stopped, .exited, nil: "circle"
+        case .running:
+            Circle()
+                .fill(Color(nsColor: Theme.running))
+                .frame(width: 8, height: 8)
+                .background { Circle().fill(Color(nsColor: Theme.running).opacity(0.22)).frame(width: 13, height: 13) }
+        case .starting, .stopping:
+            if reduceMotion {
+                ring(Theme.transitioning, width: 2)
+            } else {
+                PhaseAnimator([false, true]) { isDimmed in
+                    ring(Theme.transitioning, width: 2)
+                        .opacity(isDimmed ? 0.35 : 1)
+                        .scaleEffect(isDimmed ? 0.8 : 1)
+                } animation: { _ in .easeInOut(duration: 0.7) }
+            }
+        case .failed:
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(Color(nsColor: Theme.failed))
+                .frame(width: 7, height: 7)
+                .rotationEffect(.degrees(45))
+                .background { Circle().fill(Color(nsColor: Theme.failed).opacity(0.22)).frame(width: 13, height: 13) }
+        case .stopped, .exited:
+            ring(Theme.stopped, width: 1.5)
+        case nil:
+            ring(Theme.stopped.withAlphaComponent(0.5), width: 1.5)
         }
     }
 
-    private var color: Color {
-        switch state {
-        case .running: .green
-        case .starting, .stopping: .orange
-        case .failed: .red
-        case .stopped, .exited: .secondary
-        case nil: Color.secondary.opacity(0.5)
-        }
+    private func ring(_ color: NSColor, width: CGFloat) -> some View {
+        Circle()
+            .strokeBorder(Color(nsColor: color), lineWidth: width)
+            .frame(width: 9, height: 9)
     }
 
     static func label(_ state: ServiceState) -> String {

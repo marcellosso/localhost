@@ -76,7 +76,14 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 
 ## UI direction
 
-MonoCode-like: dense, calm, dark-friendly, restrained native materials (sidebar most translucent, logs fully opaque). **No Liquid Glass.**
+"Graded glass" (#26; mockups in `docs/design/ui-refresh/`): dense, calm, dark and light. **No Liquid Glass.**
+
+- **Glass steps down from left to right**: the sidebar is most translucent, the services column (and Ports) is lighter glass, the log is always opaque. Under Reduce Transparency every surface is opaque.
+- **Colour has a job**: one accent (pink) for the primary action and selection only; green / orange / red / grey only for Service State; each Service has a stable colour by its position in the Project, used wherever that Service appears (row, log prefix, menu bar, Ports).
+- **State glyphs carry state by shape**: a dot with a halo (Running), a pulsing ring (Starting/Stopping, still under Reduce Motion), a diamond (Failed), a hollow ring (Stopped/Exited).
+- **Monospace is a voice**: Keys, ports, commands and paths are always SF Mono; everything else SF Pro.
+- **Primary actions are labelled**; icon-only controls name their shortcut in the tooltip; rare actions live in `⋯` and context menus.
+- Colours and surfaces live in `Theme` (App target); views don't hard-code colours.
 
 ## Workflow
 

@@ -46,7 +46,7 @@ struct LogPane: View {
                     }
             }
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: Theme.logBackground))
     }
 }
 
@@ -74,7 +74,7 @@ struct CombinedLogPane: View {
                         clearCount: model.logClearCount, revealCount: 0)
             }
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: Theme.logBackground))
     }
 
     /// Each Service's Key, padded to the longest, in a colour stable for its
@@ -86,7 +86,7 @@ struct CombinedLogPane: View {
             let key = service.key.rawValue
             prefixes[service.id] = LogPrefix(
                 text: key.padding(toLength: width, withPad: " ", startingAt: 0),
-                color: LogStyling.serviceColors[index % LogStyling.serviceColors.count]
+                color: Theme.serviceColor(at: index)
             )
         }
         return prefixes
@@ -122,7 +122,7 @@ private struct LogHeader<Content: View>: View {
         .font(.callout)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: Theme.logBackground))
         .overlay(alignment: .bottom) { Divider() }
         .onChange(of: model.logFindCount) { isFilterFocused = true }
     }
@@ -275,7 +275,7 @@ final class LogViewController {
         textView.isRichText = true
         textView.allowsUndo = false
         textView.drawsBackground = true
-        textView.backgroundColor = .textBackgroundColor
+        textView.backgroundColor = Theme.logBackground
         textView.textContainerInset = NSSize(width: 6, height: 8)
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
@@ -288,7 +288,7 @@ final class LogViewController {
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = .textBackgroundColor
+        scrollView.backgroundColor = Theme.logBackground
         scrollView.borderType = .noBorder
     }
 
