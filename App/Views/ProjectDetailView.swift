@@ -44,7 +44,10 @@ struct ProjectDetailView: View {
                 } description: {
                     Text("A service is a command that runs in this project, like “pnpm dev”.")
                 } actions: {
+                    Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
+                        .buttonStyle(AccentButtonStyle())
                     Button("Add Service…") { model.presentedSheet = .addService(projectID: project.id) }
+                        .buttonStyle(PillButtonStyle())
                 }
             }
         }
@@ -114,6 +117,7 @@ struct ProjectToolbar: ToolbarContent {
             MoreMenu(help: "More actions for this project") {
                 Button("Edit Project…") { model.presentedSheet = .editProject(project.id) }
                 Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id) }
+                Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(project.id, !project.isFavorite) }
                 Divider()
                 FolderActionButtons(folder: AppModel.folder(of: project))

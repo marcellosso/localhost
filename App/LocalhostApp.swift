@@ -102,6 +102,10 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(model.selectedProject == nil)
+            Button("Detect Services…") {
+                if let project = model.selectedProject { model.presentedSheet = .detectServices(projectID: project.id) }
+            }
+            .disabled(model.selectedProject == nil)
         }
         CommandGroup(replacing: .textEditing) {
             Button("Find in Log") { model.findInLog() }

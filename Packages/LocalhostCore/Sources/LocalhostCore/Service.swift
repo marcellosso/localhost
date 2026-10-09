@@ -101,3 +101,43 @@ public struct Service: Identifiable, Hashable, Sendable, Codable {
         return run?.detectedURL
     }
 }
+
+/// A Service to add together with others in one save, e.g. a reviewed
+/// Suggestion. It has no variables or Dependencies yet.
+public struct NewService: Hashable, Sendable {
+    public var name: String
+    public var key: Key
+    public var workingDirectory: String
+    public var commandLine: String
+    public var port: Int?
+    public var url: String?
+    public var portCanChange: Bool
+    public var isExcludedFromStartAll: Bool
+
+    public init(
+        name: String,
+        key: Key,
+        workingDirectory: String = ".",
+        commandLine: String,
+        port: Int? = nil,
+        url: String? = nil,
+        portCanChange: Bool = true,
+        isExcludedFromStartAll: Bool = false
+    ) {
+        self.name = name
+        self.key = key
+        self.workingDirectory = workingDirectory
+        self.commandLine = commandLine
+        self.port = port
+        self.url = url
+        self.portCanChange = portCanChange
+        self.isExcludedFromStartAll = isExcludedFromStartAll
+    }
+
+    public init(_ suggestion: ServiceSuggestion) {
+        self.init(
+            name: suggestion.name, key: suggestion.key, workingDirectory: suggestion.workingDirectory,
+            commandLine: suggestion.commandLine, port: suggestion.port, portCanChange: suggestion.portCanChange
+        )
+    }
+}

@@ -17,6 +17,7 @@ final class AppModel {
         case addProject
         case editProject(UUID)
         case addService(projectID: UUID)
+        case detectServices(projectID: UUID)
         case editService(UUID)
         case projectEnvironment(UUID)
 
@@ -293,10 +294,20 @@ final class AppModel {
 
     // MARK: Editing
 
+    /// Suggestions for a folder being added as a Project.
+    func suggestions(forFolderAt path: String) async -> [ServiceSuggestion] {
+        await ProjectScanner().scan(projectAt: path)
+    }
+
+    /// Suggestions for an existing Project, without what its Services cover.
+    func suggestions(for project: Project) async -> [ServiceSuggestion] {
+        await ProjectScanner().scan(project)
+    }
+
     @discardableResult
-    func addProject(name: String, key: String, path: String) async throws(LocalhostError) -> Project {
+    func addProject(name: String, key: String, path: String, services: [NewService] = []) async throws(LocalhostError) -> Project {
         guard let library = core?.library else { throw .projectNotFound(UUID()) }
-        let project = try await library.addProject(name: name, key: Key(key), path: path, origin: .mainWindow)
+        let project = try await library.addProject(name: name, key: Key(key), path: path, services: services, origin: .mainWindow)
         projects = await library.projects()
         selectedProjectID = project.id
         return project
@@ -340,6 +351,13 @@ final class AppModel {
         projects = await library.projects()
         selectedServiceID = service.id
         return service
+    }
+
+    func addServices(_ services: [NewService], to projectID: UUID) async throws(LocalhostError) {
+        guard let library = core?.library else { throw .projectNotFound(projectID) }
+        let added = try await library.addServices(services, toProject: projectID, origin: .mainWindow)
+        projects = await library.projects()
+        if let first = added.first { selectedServiceID = first.id }
     }
 
     func editService(
