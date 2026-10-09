@@ -61,6 +61,11 @@ struct MainView: View {
                 }
             }
         }
+        .overlay {
+            if model.isShowingPalette {
+                CommandPaletteView()
+            }
+        }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .background(ToolbarStripSplitView())
         .sheet(item: $model.presentedSheet) { sheet in

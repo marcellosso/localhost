@@ -1,7 +1,7 @@
 import LocalhostCore
 import SwiftUI
 
-/// ⌘1–9 select Projects, ⌥⌘1–9 select the selected Project's Services,
+/// ⌘K opens the command palette, ⌘1–9 select Projects, ⌥⌘1–9 select the selected Project's Services,
 /// ⌘[ / ⌘] step through its rows ("All services", then its Services). (⌘0 Ports lives in the Window menu.)
 struct NavigationCommands: Commands {
     let model: AppModel
@@ -9,6 +9,13 @@ struct NavigationCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Go") {
+            Button("Command Palette…") {
+                openWindow(id: "main")
+                model.isShowingPalette.toggle()
+            }
+            .keyboardShortcut("k")
+            .disabled(model.presentedSheet != nil)
+            Divider()
             ForEach(Array(model.projects.prefix(9).enumerated()), id: \.element.id) { index, project in
                 Button(project.name) {
                     openWindow(id: "main")
