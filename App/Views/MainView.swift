@@ -44,6 +44,7 @@ struct MainView: View {
             } else {
                 ContentUnavailableView("No Service Selected", systemImage: "text.alignleft",
                                        description: Text("Select a service to see its output."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(nsColor: .textBackgroundColor))
             }
         }
