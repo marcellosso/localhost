@@ -1,0 +1,130 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+:root{--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Helvetica Neue",sans-serif;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0}
+.page{font-family:var(--font-sans,var(--sans));color:var(--foreground);display:flex;flex-direction:column;gap:22px;padding:4px 0 8px}
+.stage{position:relative;width:100%;border-radius:var(--radius,10px);overflow:hidden}
+.desk{position:absolute;left:0;top:0;width:1100px;height:690px;transform-origin:0 0;padding:24px 30px;background:
+  radial-gradient(600px 400px at 10% 25%,#f6c28b 0%,transparent 60%),radial-gradient(560px 420px at 88% 80%,#8fc7e8 0%,transparent 60%),
+  radial-gradient(500px 380px at 60% 0%,#e9a6c1 0%,transparent 60%),#e8e4dc}
+.win{--run:#1A7F37;--fail:#CF222E;--stop:#8C959F;--acc:#E0336A;--acc-ink:#C2185B;
+  --c-web:#0969DA;--c-api:#8250DF;--c-worker:#9A6700;--c-sb:#BC4C00;
+  position:relative;width:1040px;height:642px;border-radius:12px;overflow:hidden;display:flex;color:#1f2328;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 30px 70px rgba(60,40,20,.28);font:13px var(--sans);-webkit-font-smoothing:antialiased}
+.glass{backdrop-filter:blur(28px) saturate(1.6);-webkit-backdrop-filter:blur(28px) saturate(1.6)}
+.lights{display:flex;gap:8px;padding:18px 16px 0}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.g{width:9px;height:9px;flex:none;display:inline-block}
+.g.run{border-radius:50%;background:var(--run);box-shadow:0 0 0 3px color-mix(in srgb,var(--run) 18%,transparent)}
+.g.fail{width:8px;height:8px;background:var(--fail);transform:rotate(45deg);border-radius:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--fail) 18%,transparent)}
+.g.stop{border-radius:50%;border:1.5px solid var(--stop)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:7px;font:550 12px/1 var(--sans);white-space:nowrap}
+.btn svg{width:10px;height:10px}
+.ico{width:26px;height:26px;display:inline-grid;place-items:center;border-radius:7px;background:rgba(0,0,0,.05)}
+.kbd{font:500 10px/1 var(--sans);padding:2px 4px;border-radius:4px;background:rgba(0,0,0,.06);opacity:.75}
+.side{width:208px;background:rgba(246,245,248,.55);border-right:1px solid rgba(0,0,0,.08)}
+.navitem{display:flex;align-items:center;gap:9px;margin:0 10px;padding:6px 9px;border-radius:7px}
+.navitem.sel{background:rgba(0,0,0,.07)}
+.navitem .cnt{margin-left:auto;font:500 11px var(--mono);opacity:.5}
+.sect{margin:16px 19px 6px;font:600 10.5px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;opacity:.45}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.tb{height:52px;display:flex;align-items:center;gap:10px;padding:0 14px 0 18px;background:rgba(250,250,252,.74);border-bottom:1px solid rgba(0,0,0,.08)}
+.tb h1{margin:0;font-size:15px;font-weight:650;letter-spacing:-.01em}.tb .path{font:11.5px var(--mono);opacity:.5}.tb .sp{flex:1}
+.btn.pri{background:var(--acc);color:#fff}.btn.ghost{background:rgba(0,0,0,.06);color:#1f2328}
+.cols{flex:1;display:flex;min-height:0}
+.svc{width:280px;background:rgba(252,252,253,.86);border-right:1px solid rgba(0,0,0,.08);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.row{position:relative;display:grid;grid-template-columns:12px 1fr auto;column-gap:10px;align-items:center;padding:8px 10px 8px 14px;border-radius:8px}
+.row::before{content:"";position:absolute;left:4px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--c)}
+.row.sel{background:rgba(0,0,0,.05);box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+.row .nm{font-weight:600;display:flex;align-items:center;gap:7px}
+.row .port{font:600 10.5px/1 var(--mono);padding:3px 5px;border-radius:4px;color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+.row .cmd{grid-column:2/4;font:11px var(--mono);opacity:.55;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .st{font-size:11.5px;opacity:.65}.row .st.f{color:var(--fail);opacity:1}
+.row .acts{grid-column:2/4;display:flex;gap:6px;margin-top:8px}
+.row .acts .btn{height:22px;padding:0 9px;font-size:11px;background:rgba(0,0,0,.06)}
+.row .acts .btn.pri{background:color-mix(in srgb,var(--acc) 13%,transparent);color:var(--acc-ink)}
+.dots{display:flex;gap:2px;flex-wrap:wrap;width:12px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--c);display:block}
+.add{margin-top:auto;padding:8px 10px;font-size:12px;opacity:.6;display:flex;gap:7px;align-items:center}
+.logp{flex:1;background:#FCFCFD;display:flex;flex-direction:column;min-width:0}
+.lh{height:42px;display:flex;align-items:center;gap:9px;padding:0 12px 0 16px;border-bottom:1px solid rgba(0,0,0,.07)}
+.chip{width:8px;height:8px;border-radius:2px;background:var(--c)}
+.lh .t{font-weight:600}.lh .s{font-size:12px;color:var(--fail)}
+.filter{margin-left:auto;width:170px;height:24px;border-radius:6px;background:rgba(0,0,0,.05);display:flex;align-items:center;padding:0 8px;font-size:11.5px;color:#57606a;gap:6px}
+.filter .kbd{margin-left:auto}
+.banner{margin:10px 12px 0;border-radius:8px;background:#FFF5F5;border:1px solid rgba(207,34,46,.22);padding:10px 12px}
+.banner .hd{display:flex;align-items:center;gap:9px}.banner .hd b{font-weight:600;color:#a40e26}.banner .hd .m{font-size:11.5px;opacity:.55}
+.banner .ex{font:11.5px/1.55 var(--mono);margin:8px 0 0;padding-left:10px;border-left:2px solid rgba(207,34,46,.55);color:#82071e}
+.banner .bt{display:flex;gap:6px;margin-left:auto}.banner .btn{height:24px;font-size:11.5px;background:rgba(0,0,0,.06)}
+.banner .btn.pri{background:var(--acc);color:#fff}
+.log{font:12px/1.62 var(--mono);padding:10px 0;color:#24292f}
+.ln{display:grid;grid-template-columns:3px 1fr;column-gap:10px;padding-right:16px}
+.ln.err>span:first-child{background:rgba(207,34,46,.65)}
+.ln .tx{white-space:pre-wrap}.ln.sys .tx{font-style:italic;opacity:.55}
+/* tokens table */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-weight:600;color:var(--muted-foreground);padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+td code{font:11.5px var(--font-mono,var(--mono))}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:6px;box-shadow:0 0 0 1px rgba(127,127,127,.35) inset}
+h3{margin:0 0 6px;font-size:14px;font-weight:650}
+</style></head><body><div class="page">
+<div class="stage"><div class="desk"><div class="win">
+  <div class="side glass">
+    <div class="lights"><i></i><i></i><i></i></div><div style="height:18px"></div>
+    <div class="navitem"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c2 2 2 10.6 0 12.6M8 1.7c-2 2-2 10.6 0 12.6"/></svg>Ports<span class="cnt">14</span></div>
+    <div class="sect">Projects</div>
+    <div class="navitem sel"><span class="g fail"></span>Shop<span class="cnt">2/4</span></div>
+    <div class="navitem"><span class="g run"></span>Infra<span class="cnt">2/2</span></div>
+    <div class="navitem"><span class="g stop"></span>Blog</div>
+    <div class="navitem"><span class="g stop"></span>Docs</div>
+  </div>
+  <div class="main">
+    <div class="tb glass"><h1>Shop</h1><span class="path">~/code/shop</span><span class="sp"></span>
+      <span class="btn pri"><svg viewBox="0 0 10 10"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg>Start All</span>
+      <span class="btn ghost"><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1" fill="currentColor"/></svg>Stop All</span>
+      <span class="ico"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></span></div>
+    <div class="cols">
+      <div class="svc glass">
+        <div class="row" style="--c:transparent"><span class="dots"><i style="--c:var(--c-web)"></i><i style="--c:var(--c-api)"></i><i style="--c:var(--c-worker)"></i><i style="--c:var(--c-sb);opacity:.35"></i></span><span class="nm">All services</span><span class="st">2 of 4</span></div>
+        <div class="row" style="--c:var(--c-web)"><span class="g run"></span><span class="nm">Web <span class="port">:5199</span></span><span class="st">Running</span><span class="cmd">python3 -m http.server $PORT</span></div>
+        <div class="row" style="--c:var(--c-api)"><span class="g run"></span><span class="nm">API <span class="port">:8799</span></span><span class="st">Running · 2m</span><span class="cmd">uvicorn app:main --reload</span></div>
+        <div class="row sel" style="--c:var(--c-worker)"><span class="g fail"></span><span class="nm">Worker</span><span class="st f">Failed · exit 1</span><span class="cmd">node worker.js</span>
+          <div class="acts"><span class="btn pri">Start</span><span class="btn">Edit…</span></div></div>
+        <div class="row" style="--c:var(--c-sb);opacity:.75"><span class="g stop"></span><span class="nm">Storybook <span class="port">:6006</span></span><span class="st">Manual</span><span class="cmd">pnpm storybook -p $PORT</span></div>
+        <div class="add">＋ Add Service <span class="kbd" style="margin-left:auto">⇧⌘N</span></div>
+      </div>
+      <div class="logp">
+        <div class="lh" style="--c:var(--c-worker)"><span class="chip"></span><span class="t">Worker</span><span class="s">Failed · exit 1 · 23:28</span>
+          <span class="filter">⌕ Filter<span class="kbd">⌘F</span></span>
+          <span class="ico" style="background:transparent;opacity:.7"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></span></div>
+        <div class="banner"><div class="hd"><span class="g fail"></span><b>Worker exited with code 1</b><span class="m">after 1.2s</span>
+          <span class="bt"><span class="btn pri">Start</span><span class="btn">Edit Service…</span></span></div>
+          <div class="ex">Error: connect ECONNREFUSED 127.0.0.1:6379</div></div>
+        <div class="log">
+          <div class="ln sys"><span></span><span class="tx">$ node worker.js</span></div>
+          <div class="ln"><span></span><span class="tx">[worker] loading config from .env.local</span></div>
+          <div class="ln"><span></span><span class="tx">[worker] connecting to redis://localhost:6379</span></div>
+          <div class="ln err"><span></span><span class="tx">Error: connect ECONNREFUSED 127.0.0.1:6379</span></div>
+          <div class="ln err"><span></span><span class="tx">    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)</span></div>
+          <div class="ln sys"><span></span><span class="tx">Exited with code 1</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+<div>
+<h3>Tokens: dark / light</h3>
+<table><thead><tr><th>Role</th><th>Dark</th><th>Light</th></tr></thead><tbody>
+<tr><td>Accent (primary button, selection)</td><td><span class="sw" style="background:#FF5C8A"></span><code>#FF5C8A</code> · dark text</td><td><span class="sw" style="background:#E0336A"></span><code>#E0336A</code> · white text</td></tr>
+<tr><td>Sidebar glass</td><td><code>rgba(32,32,38,.48)</code></td><td><code>rgba(246,245,248,.55)</code></td></tr>
+<tr><td>Services column glass</td><td><code>rgba(26,26,31,.80)</code></td><td><code>rgba(252,252,253,.86)</code></td></tr>
+<tr><td>Log surface (opaque)</td><td><span class="sw" style="background:#141417"></span><code>#141417</code></td><td><span class="sw" style="background:#FCFCFD"></span><code>#FCFCFD</code></td></tr>
+<tr><td>Running / Failed / Stopped</td><td><span class="sw" style="background:#3FB950"></span><span class="sw" style="background:#FF5A4E"></span><span class="sw" style="background:#7D8590"></span></td><td><span class="sw" style="background:#1A7F37"></span><span class="sw" style="background:#CF222E"></span><span class="sw" style="background:#8C959F"></span></td></tr>
+<tr><td>Service palette (by position)</td><td><span class="sw" style="background:#79C0FF"></span><span class="sw" style="background:#B392F0"></span><span class="sw" style="background:#E5C07B"></span><span class="sw" style="background:#F78C6C"></span></td><td><span class="sw" style="background:#0969DA"></span><span class="sw" style="background:#8250DF"></span><span class="sw" style="background:#9A6700"></span><span class="sw" style="background:#BC4C00"></span></td></tr>
+</tbody></table></div>
+</div>
+<script>
+function fit(){document.querySelectorAll('.stage').forEach(s=>{const d=s.firstElementChild;const k=s.clientWidth/1100;d.style.transform=`scale(${k})`;s.style.height=(690*k)+'px'})}
+fit();addEventListener('resize',fit);
+</script></body></html>

@@ -155,14 +155,17 @@ private struct FailedBanner: View {
             if !lines.isEmpty {
                 VStack(alignment: .leading, spacing: 1) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .top, spacing: 4) {
-                            Rectangle()
-                                .fill(line.channel == .stderr ? Color.red.opacity(0.7) : .clear)
-                                .frame(width: 2)
-                            Text(ANSI.strip(line.text))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
+                        // The stderr mark is an overlay: as a sibling in an HStack
+                        // it would take all spare height and stretch every line.
+                        Text(ANSI.strip(line.text))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .padding(.leading, 6)
+                            .overlay(alignment: .leading) {
+                                if line.channel == .stderr {
+                                    Rectangle().fill(Color.red.opacity(0.7)).frame(width: 2)
+                                }
+                            }
                     }
                 }
                 .font(.system(size: 11, design: .monospaced))

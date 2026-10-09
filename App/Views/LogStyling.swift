@@ -66,8 +66,21 @@ enum LogStyling {
             }
         }
         result.append(NSAttributedString(string: "\n", attributes: [.font: font]))
+        result.addAttribute(.paragraphStyle, value: wrapStyle(indentingColumns: textStart),
+                            range: NSRange(location: 0, length: result.length))
         return result
     }
+
+    /// Wrapped continuation lines start under the line's text, past the
+    /// gutter and prefix, so the prefix column stays clear.
+    private static func wrapStyle(indentingColumns columns: Int) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.headIndent = CGFloat(columns) * columnWidth
+        return style
+    }
+
+    /// The advance of one character in the monospaced log font.
+    private static let columnWidth = ("0" as NSString).size(withAttributes: [.font: font]).width
 
     /// Whether a line matches the log filter (its text without ANSI
     /// sequences, or its Service's prefix).
