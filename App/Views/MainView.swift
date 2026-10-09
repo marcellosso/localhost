@@ -62,6 +62,7 @@ struct MainView: View {
             }
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(ToolbarStripSplitView())
         .sheet(item: $model.presentedSheet) { sheet in
             switch sheet {
             case .addProject:

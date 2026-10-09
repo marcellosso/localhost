@@ -44,7 +44,7 @@ enum Theme {
     /// The log: always opaque, for legible text and exact ANSI colours.
     static let logBackground = dynamic(light: 0xFCFCFD, dark: 0x141417)
     /// Laid over the blurred desktop in the services column and its header.
-    static let columnTint = dynamic(light: 0xFCFCFD, dark: 0x1A1A1F, lightAlpha: 0.86, darkAlpha: 0.80)
+    static let columnTint = dynamic(light: 0xFCFCFD, dark: 0x1A1A1F, lightAlpha: 0.72, darkAlpha: 0.66)
 
     private static func dynamic(
         light: UInt32, dark: UInt32, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1
@@ -90,4 +90,34 @@ private struct BehindWindowBlur: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+/// Makes the toolbar one strip across the services column and the log by
+/// hiding the divider between them, which would run up through the toolbar.
+/// The sidebar's divider (a different view) is untouched; the divider can
+/// still be dragged.
+struct ToolbarStripSplitView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { Self.hideDivider(from: view) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { Self.hideDivider(from: view) }
+    }
+
+    private static func hideDivider(from view: NSView) {
+        guard let root = view.window?.contentView?.superview, let splitView = splitView(in: root) else { return }
+        for divider in splitView.subviews where type(of: divider) == NSClassFromString("NSSplitDividerView") {
+            divider.isHidden = true
+        }
+    }
+
+    private static func splitView(in view: NSView) -> NSSplitView? {
+        if let splitView = view as? NSSplitView, splitView.isVertical, splitView.arrangedSubviews.count == 3 {
+            return splitView
+        }
+        return view.subviews.lazy.compactMap(splitView(in:)).first
+    }
 }
