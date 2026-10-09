@@ -11,12 +11,23 @@ struct LocalhostApp: App {
             MainView()
                 .environment(delegate.model)
                 .task { await delegate.model.checkForOrphans() }
+                // The Dock icon shows only while the main window is open.
+                .onAppear { NSApp.setActivationPolicy(.regular) }
+                .onDisappear { NSApp.setActivationPolicy(.accessory) }
         }
         .defaultSize(width: 1100, height: 700)
         .commands {
             AppCommands(model: delegate.model)
             NavigationCommands(model: delegate.model)
         }
+        MenuBarExtra {
+            MenuBarContent()
+                .environment(delegate.model)
+        } label: {
+            Image(nsImage: MenuBarIcon.image(hasFailure: delegate.model.hasFailedService))
+                .accessibilityLabel(delegate.model.hasFailedService ? "localhost, a service failed" : "localhost")
+        }
+        .menuBarExtraStyle(.window)
         Settings {
             SettingsView()
                 .environment(delegate.model)
@@ -34,9 +45,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let origin = model.quitOrigin
+        model.quitOrigin = .mainWindow
         let count = model.activeServiceCount
         guard count > 0 else { return .terminateNow }
 
+        // Without a main window the app may be in the background (no Dock icon).
+        NSApp.activate()
         let alert = NSAlert()
         alert.messageText = count == 1 ? "Stop 1 service and quit?" : "Stop \(count) services and quit?"
         alert.informativeText = "Running services are stopped before localhost quits."
@@ -45,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
 
         Task {
-            await model.stopAllServices()
+            await model.stopAllServices(origin: origin)
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -93,7 +108,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("r")
             .disabled(status == nil || status?.state == .stopping)
-            Button("Stop") { model.selectedServiceID.map(model.stop) }
+            Button("Stop") { model.selectedServiceID.map { model.stop($0) } }
                 .keyboardShortcut(".")
                 .disabled(!isLive)
             Divider()
