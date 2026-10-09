@@ -22,6 +22,7 @@ struct ProjectSidebar: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .shortcutBadge(model.projects.firstIndex { $0.id == project.id }.map { $0 + 1 }, shownIn: .projects)
                     .tag(AppModel.SidebarItem.project(project.id))
                 }
             }
@@ -32,6 +33,8 @@ struct ProjectSidebar: View {
                 Button("Edit Project…") { model.presentedSheet = .editProject(id) }
                 Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(id, !project.isFavorite) }
+                Divider()
+                FolderActionButtons(folder: AppModel.folder(of: project))
                 Divider()
                 Button("Remove Project…", role: .destructive) { model.pendingRemoval = .project(id) }
             }
