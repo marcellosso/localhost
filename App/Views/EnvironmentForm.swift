@@ -72,6 +72,7 @@ struct EnvironmentForm: View {
             }
         }
         .formStyle(.grouped)
+        .sheetTitle("\(project.name) Environment")
         .frame(width: 560)
         .frame(minHeight: 420)
         .navigationTitle("\(project.name) Environment")
