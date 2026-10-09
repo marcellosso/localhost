@@ -49,6 +49,23 @@ public struct ProjectScanner: Sendable {
     /// yields none.
     @concurrent
     public func scan(projectAt path: String) async -> [ServiceSuggestion] {
+        Self.makingKeysUnique(suggestions(forFolderAt: path))
+    }
+
+    /// Suggestions for an existing Project's folder, leaving out those its
+    /// Services already cover (same working directory and command line) and
+    /// avoiding the Keys they use.
+    @concurrent
+    public func scan(_ project: Project) async -> [ServiceSuggestion] {
+        let new = suggestions(forFolderAt: project.path).filter { suggestion in
+            !project.services.contains {
+                $0.workingDirectory == suggestion.workingDirectory && $0.commandLine == suggestion.commandLine
+            }
+        }
+        return Self.makingKeysUnique(new, taken: Set(project.services.map(\.key.rawValue)))
+    }
+
+    private func suggestions(forFolderAt path: String) -> [ServiceSuggestion] {
         let rootURL = URL(filePath: (path as NSString).expandingTildeInPath, directoryHint: .isDirectory)
             .standardizedFileURL
         let root = ScannedDirectory(root: rootURL, path: ".")
@@ -58,7 +75,7 @@ public struct ProjectScanner: Sendable {
                 suggestions += detector.suggestions(in: directory)
             }
         }
-        return Self.makingKeysUnique(suggestions)
+        return suggestions
     }
 
     func directories(under root: ScannedDirectory) -> [ScannedDirectory] {
@@ -80,8 +97,8 @@ public struct ProjectScanner: Sendable {
     }
 
     /// Later suggestions whose Key is already taken get `-2`, `-3`, ….
-    static func makingKeysUnique(_ suggestions: [ServiceSuggestion]) -> [ServiceSuggestion] {
-        var taken: Set<String> = []
+    static func makingKeysUnique(_ suggestions: [ServiceSuggestion], taken: Set<String> = []) -> [ServiceSuggestion] {
+        var taken = taken
         return suggestions.map { suggestion in
             var suggestion = suggestion
             var candidate = suggestion.key.rawValue

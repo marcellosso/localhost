@@ -71,6 +71,8 @@ struct MainView: View {
                 ProjectForm(editing: model.project(id))
             case .addService(let projectID):
                 if let project = model.project(projectID) { ServiceForm(project: project, editing: nil) }
+            case .detectServices(let projectID):
+                if let project = model.project(projectID) { DetectServicesForm(project: project) }
             case .editService(let id):
                 if let (project, service) = model.service(id) { ServiceForm(project: project, editing: service) }
             case .projectEnvironment(let id):

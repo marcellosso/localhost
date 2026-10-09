@@ -103,21 +103,25 @@ public actor ProjectLibrary {
 
     // MARK: Projects
 
+    /// Adds a Project, with `services` (e.g. reviewed Suggestions) in the
+    /// same save: either all of it is added or none of it.
     @discardableResult
     public func addProject(
         name: String,
         key: Key,
         path: String,
+        services: [NewService] = [],
         origin: Origin
     ) throws(LocalhostError) -> Project {
         try ensureProjectKeyIsFree(key)
         let nextSortOrder = (projectsByID.values.map(\.sortOrder).max() ?? -1) + 1
-        let project = Project(
+        var project = Project(
             name: try Validate.name(name),
             key: key,
             path: try Validate.projectPath(path),
             sortOrder: nextSortOrder
         )
+        try append(services, to: &project)
         try commit(project)
         broadcast(.projectAdded(project, origin: origin))
         return project
@@ -197,6 +201,22 @@ public actor ProjectLibrary {
         try commit(project)
         broadcast(.projectUpdated(project, origin: origin))
         return project.services[project.services.count - 1]
+    }
+
+    /// Adds several Services to a Project in one save (e.g. reviewed
+    /// Suggestions): either all of them are added or none.
+    @discardableResult
+    public func addServices(
+        _ services: [NewService],
+        toProject projectID: UUID,
+        origin: Origin
+    ) throws(LocalhostError) -> [Service] {
+        var project = try self.project(id: projectID)
+        let existingCount = project.services.count
+        try append(services, to: &project)
+        try commit(project)
+        broadcast(.projectUpdated(project, origin: origin))
+        return Array(project.services[existingCount...])
     }
 
     /// Changes the given fields of a Service; `nil` leaves a field as it is.
@@ -389,6 +409,22 @@ public actor ProjectLibrary {
 
     private func ensureProfileNameIsFree(_ name: String, in project: Project) throws(LocalhostError) {
         if project.profiles.contains(where: { $0.name == name }) { throw .duplicateProfileName(name) }
+    }
+
+    private func append(_ services: [NewService], to project: inout Project) throws(LocalhostError) {
+        for new in services {
+            try ensureServiceKeyIsFree(new.key, in: project)
+            project.services.append(Service(
+                name: try Validate.name(new.name),
+                key: new.key,
+                workingDirectory: try Validate.workingDirectory(new.workingDirectory),
+                commandLine: try Validate.commandLine(new.commandLine),
+                isExcludedFromStartAll: new.isExcludedFromStartAll,
+                port: try Validate.port(new.port),
+                url: try Validate.url(new.url),
+                portCanChange: new.portCanChange
+            ))
+        }
     }
 
     private func commit(_ project: Project) throws(LocalhostError) {

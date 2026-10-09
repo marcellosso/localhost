@@ -55,6 +55,26 @@ final class DetectionTests {
         #expect(suggestions.map(\.key.rawValue) == ["web", "web-2"])
     }
 
+    @Test func `rescanning a project hides what its services cover and avoids their keys`() async throws {
+        _ = try await scan([
+            "package.json": packageJSON(name: "web", scripts: [("dev", "vite"), ("build", "vite build")]),
+            "compose.yaml": "services:\n  postgres:\n    image: postgres\n",
+        ])
+        let library = try ProjectLibrary(storageRoot: root.appending(path: ".storage"))
+        let project = try await library.addProject(
+            name: "Web", key: Key("web"), path: root.path,
+            services: [
+                NewService(name: "Postgres", key: Key("postgres"), commandLine: "docker compose up postgres"),
+                NewService(name: "Web", key: Key("web"), commandLine: "npm start"),
+            ],
+            origin: .mainWindow
+        )
+
+        let suggestions = await ProjectScanner().scan(project)
+        #expect(suggestions.map(\.commandLine) == ["npm run dev -- --port $PORT", "npm run build"])
+        #expect(suggestions.map(\.key.rawValue) == ["web-2", "web-build"])
+    }
+
     // MARK: Node
 
     @Test func `package.json scripts use the lockfile's package manager and pass $PORT to Vite`() async throws {

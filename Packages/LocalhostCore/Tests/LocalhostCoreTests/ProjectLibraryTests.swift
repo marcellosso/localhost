@@ -52,6 +52,61 @@ final class ProjectLibraryTests {
         #expect(await reloaded.projects() == library.projects())
     }
 
+    @Test func `adds a project together with its reviewed services in one save`() async throws {
+        let library = try makeLibrary()
+        let project = try await library.addProject(
+            name: "Shop", key: Key("shop"), path: "/tmp/shop",
+            services: [
+                NewService(name: "Web", key: Key("web"), workingDirectory: "./apps/web/", commandLine: "pnpm run dev --port $PORT", port: 5173),
+                NewService(name: "Postgres", key: Key("postgres"), commandLine: "docker compose up postgres", port: 5432, portCanChange: false),
+            ],
+            origin: .mainWindow
+        )
+
+        #expect(project.services.map(\.key.rawValue) == ["web", "postgres"])
+        #expect(project.services[0].workingDirectory == "apps/web")
+        #expect(project.services[1].port == 5432)
+        #expect(!project.services[1].portCanChange)
+        #expect(try await makeLibrary().projects() == [project])
+    }
+
+    @Test func `a project whose services are invalid is not added at all`() async throws {
+        let library = try makeLibrary()
+        await #expect(throws: LocalhostError.self) {
+            try await library.addProject(
+                name: "Shop", key: Key("shop"), path: "/tmp/shop",
+                services: [
+                    NewService(name: "Web", key: Key("web"), commandLine: "pnpm dev"),
+                    NewService(name: "Web again", key: Key("web"), commandLine: "pnpm start"),
+                ],
+                origin: .mainWindow
+            )
+        }
+        #expect(await library.projects().isEmpty)
+        #expect(try await makeLibrary().projects().isEmpty)
+    }
+
+    @Test func `adds several services at once, all or none`() async throws {
+        let library = try makeLibrary()
+        let project = try await library.addProject(name: "App", key: Key("app"), path: "/tmp/app", origin: .mainWindow)
+        try await library.addService(toProject: project.id, name: "API", key: Key("api"), commandLine: "make api", origin: .mainWindow)
+
+        await #expect(throws: LocalhostError.duplicateServiceKey(try Key("api"), projectID: project.id)) {
+            try await library.addServices(
+                [NewService(name: "Web", key: Key("web"), commandLine: "pnpm dev"),
+                 NewService(name: "API", key: Key("api"), commandLine: "uv run api")],
+                toProject: project.id, origin: .mainWindow
+            )
+        }
+        #expect(try await library.project(id: project.id).services.count == 1)
+
+        let added = try await library.addServices(
+            [NewService(name: "Web", key: Key("web"), commandLine: "pnpm dev")], toProject: project.id, origin: .mainWindow
+        )
+        #expect(added.map(\.key.rawValue) == ["web"])
+        #expect(try await library.project(id: project.id).services.map(\.key.rawValue) == ["api", "web"])
+    }
+
     @Test func `assigns increasing sort orders and lists projects in that order`() async throws {
         let library = try makeLibrary()
         let b = try await library.addProject(name: "B", key: Key("b"), path: "/tmp/b", origin: .mainWindow)
