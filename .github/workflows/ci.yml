@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift --version
+      - name: Test LocalhostCore
+        working-directory: Packages/LocalhostCore
+        run: swift test
+
+  app:
+    name: App build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -version
+      - name: Build (unsigned)
+        run: >
+          xcodebuild -project localhost.xcodeproj -scheme localhost
+          -configuration Debug -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO build

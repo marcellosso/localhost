@@ -100,6 +100,12 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 - Sidebar search: ↓ moves into the list, ↩ opens the first match's Services. Log filter (⌘F): ↩ keeps the filter and moves into the log, esc clears it.
 - Done with an app-local key monitor on the main window rather than SwiftUI `onKeyPress`, because the lists (`NSTableView`) and the log (`NSTextView`) consume arrow keys before SwiftUI sees them.
 
+## Release (M3)
+
+- MIT license.
+- CI (GitHub Actions, `macos-26`): every PR and push to `main` runs the core's `swift test` and an unsigned app build.
+- Distribution is a notarized DMG on GitHub Releases, built by a workflow on `v*` tags (Developer ID, hardened runtime, `notarytool`, stapled). No Sparkle, no in-app update check.
+
 ## UI direction
 
 "Graded glass" (#26; mockups in `docs/design/ui-refresh/`): dense, calm, dark and light. **No Liquid Glass.**
