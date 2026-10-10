@@ -75,6 +75,8 @@ final class AppModel {
     /// Incremented once log buffers were cleared, so log views start over.
     private(set) var logClearCount = 0
     var presentedSheet: Sheet?
+    /// Whether the command palette (⌘K) is open over the main window.
+    var isShowingPalette = false
     var pendingRemoval: Removal?
     /// A failed action to report, e.g. a removal that could not be saved.
     var actionError: LocalhostError?
