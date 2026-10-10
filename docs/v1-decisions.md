@@ -84,14 +84,21 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 - Sidebar: Projects, plus a **Ports** view listing every Listener. The Project's Service list starts with an **All services** row (merged stream, Key-prefixed lines, colour stable per Service); clear there clears every visible buffer, never log files.
 - Menu bar: Projects with any active or Failed Service, plus favourites; a red dot on the icon while any Service is Failed; only warns about Unmanaged Listeners holding a configured Port.
 - "Open in editor": an app picked once (`NSWorkspace.open(_:withApplicationAt:)`), no default.
-- Shortcuts: ⌘R start/restart, ⌘. stop, ⇧⌘R Start All, ⇧⌘. Stop All, ⌘F find, ⌃L clear logs, ⇧⌘O open URL, ⌥⌘T Terminal, ⌥⌘E editor, ⌥⌘F Finder, ⌘1–9 Projects, ⌘0 Ports, ⌥⌘1–9 Services, ⌘[ / ⌘] previous/next Service. Holding ⌘ (or ⌥⌘) ~0.4s shows number badges. ⌘K command palette (M2, below).
+- Shortcuts: ⌘R start/restart, ⌘. stop, ⇧⌘R Start All, ⇧⌘. Stop All, ⌘F find, ⌃L clear logs, ⇧⌘O open URL, ⌥⌘T Terminal, ⌥⌘E editor, ⌥⌘F Finder, ⌘1–9 Projects, ⌘0 Ports, ⌥⌘1–9 Services, ⌘[ / ⌘] previous/next Service. Holding ⌘ (or ⌥⌘) ~0.4s shows number badges. ⌘K command palette and arrow-key column navigation (M2, below).
 
 ## Command palette (M2)
 
 - ⌘K (Go menu) opens a palette over the main window: one search field over jumps (Projects, Services, Ports), Service actions (Start / Restart / Stop / Open in Browser / Terminal / Editor) and Project actions (Start All / Stop All / Editor / Terminal / Finder), offered according to each Service's state.
 - Empty query: the selected Service's actions, the selected Project's Services and actions, the other Projects, Ports and New Project. Typing searches everything, including other Projects' Services and actions.
 - Matching is `FuzzyMatch` in the core (every query word as letters in order, word starts and runs score higher), so a future CLI can resolve names the same way. Equal matches rank jumps first, then the selection.
-- Rows show the shortcut that does the same outside the palette, so the palette teaches shortcuts. ↑/↓ or ⌃P/⌃N move, ↩ runs, esc closes.
+- Rows show the shortcut that does the same outside the palette, so the palette teaches shortcuts. ↑/↓ or ⌃P/⌃N move, ↩ runs, esc closes. Closing gives focus back to where it was (or to the Services list after a jump).
+
+## Keyboard navigation (M2)
+
+- Focus moves across the columns like Finder's column view: → (and ↩ in the sidebar) moves right, ← moves left, esc in the log goes back to the Services list. ↑/↓ move within a list, as usual; the selection follows. Keys typed into text fields, and keys while a sheet or alert is up, are left alone.
+- In the log, keys scroll instead of moving an invisible insertion point: ↑/↓ a line, space / ⇧space and page up/down a page, ⌘↑/⌘↓ and home/end to either end. Scrolling up pauses following, back at the bottom resumes it, as with the trackpad.
+- Sidebar search: ↓ moves into the list, ↩ opens the first match's Services. Log filter (⌘F): ↩ keeps the filter and moves into the log, esc clears it.
+- Done with an app-local key monitor on the main window rather than SwiftUI `onKeyPress`, because the lists (`NSTableView`) and the log (`NSTextView`) consume arrow keys before SwiftUI sees them.
 
 ## UI direction
 

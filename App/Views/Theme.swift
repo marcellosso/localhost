@@ -137,7 +137,7 @@ struct ToolbarStripSplitView: NSViewRepresentable {
     }
 
     private static func adopt(from view: NSView) {
-        guard let root = view.window?.contentView?.superview, let splitView = splitView(in: root) else { return }
+        guard let splitView = view.window?.mainSplitView else { return }
         if type(of: splitView) == NSSplitView.self {
             // No stored properties, so the swap keeps the instance's layout.
             object_setClass(splitView, StripSplitView.self)
@@ -145,12 +145,18 @@ struct ToolbarStripSplitView: NSViewRepresentable {
         splitView.needsLayout = true
         splitView.needsDisplay = true
     }
+}
 
-    private static func splitView(in view: NSView) -> NSSplitView? {
-        if let splitView = view as? NSSplitView, splitView.isVertical, splitView.arrangedSubviews.count == 3 {
-            return splitView
+extension NSWindow {
+    /// The main window's three columns: sidebar, Services (or Ports), log.
+    var mainSplitView: NSSplitView? {
+        func find(in view: NSView) -> NSSplitView? {
+            if let splitView = view as? NSSplitView, splitView.isVertical, splitView.arrangedSubviews.count == 3 {
+                return splitView
+            }
+            return view.subviews.lazy.compactMap(find(in:)).first
         }
-        return view.subviews.lazy.compactMap(splitView(in:)).first
+        return contentView?.superview.flatMap(find(in:))
     }
 }
 
