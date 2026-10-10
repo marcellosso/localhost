@@ -8,7 +8,7 @@ struct ProjectSidebar: View {
 
     var body: some View {
         @Bindable var model = model
-        let projects = filteredProjects
+        let projects = model.filteredProjects
         List(selection: $model.sidebarSelection) {
             Label("Ports", systemImage: "network")
                 .tag(AppModel.SidebarItem.ports)
@@ -52,14 +52,6 @@ struct ProjectSidebar: View {
             }
         }
     }
-
-    private var filteredProjects: [Project] {
-        let query = model.projectSearch.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return model.projects }
-        return model.projects.filter {
-            $0.name.localizedStandardContains(query) || $0.key.rawValue.localizedStandardContains(query)
-        }
-    }
 }
 
 /// The `localhost:` wordmark, then project search with Add Project beside it.
@@ -84,6 +76,16 @@ private struct SidebarHeader: View {
                         .textFieldStyle(.plain)
                         .focused($isSearchFocused)
                         .onExitCommand { model.projectSearch = "" }
+                        // ↩ opens the first match's Services, ↓ moves into the list.
+                        .onSubmit {
+                            guard let project = model.filteredProjects.first else { return }
+                            model.selectedProjectID = project.id
+                            model.focusColumn(.list)
+                        }
+                        .onKeyPress(.downArrow) {
+                            model.focusColumn(.sidebar)
+                            return .handled
+                        }
                     if !model.projectSearch.isEmpty {
                         Button("Clear Search", systemImage: "xmark.circle.fill") { model.projectSearch = "" }
                             .labelStyle(.iconOnly)

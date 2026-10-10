@@ -68,6 +68,14 @@ final class AppModel {
     }
     /// Text the sidebar's Projects are filtered by.
     var projectSearch = ""
+    /// The Projects whose name or Key contains `projectSearch`.
+    var filteredProjects: [Project] {
+        let query = projectSearch.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return projects }
+        return projects.filter {
+            $0.name.localizedStandardContains(query) || $0.key.rawValue.localizedStandardContains(query)
+        }
+    }
     /// Text the log views are filtered by (⌘F focuses it).
     var logFilter = ""
     /// Incremented to ask the visible log view to focus its filter.
@@ -77,6 +85,8 @@ final class AppModel {
     var presentedSheet: Sheet?
     /// Whether the command palette (⌘K) is open over the main window.
     var isShowingPalette = false
+    /// The latest request to move keyboard focus to a column of the main window.
+    private(set) var columnFocusRequest: ColumnFocusRequest?
     var pendingRemoval: Removal?
     /// A failed action to report, e.g. a removal that could not be saved.
     var actionError: LocalhostError?
@@ -268,6 +278,11 @@ final class AppModel {
 
     func findInLog() {
         logFindCount += 1
+    }
+
+    /// Moves keyboard focus to a column of the main window (see `ColumnNavigation`).
+    func focusColumn(_ column: MainColumn) {
+        columnFocusRequest = ColumnFocusRequest(column: column)
     }
 
     /// Whether a log is shown that ⌃L can clear.

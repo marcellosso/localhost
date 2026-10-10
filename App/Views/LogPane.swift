@@ -147,6 +147,8 @@ private struct LogHeader<Content: View>: View {
                     .textFieldStyle(.plain)
                     .focused($isFilterFocused)
                     .onExitCommand { model.logFilter = "" }
+                    // ↩ keeps the filter and moves into the log to read it.
+                    .onSubmit { model.focusColumn(.detail) }
                 if model.logFilter.isEmpty, !isFilterFocused {
                     KeyHint("⌘F")
                 } else if !model.logFilter.isEmpty {
@@ -397,6 +399,7 @@ final class LogViewController {
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
         textView.setAccessibilityLabel("Log output")
+        textView.didScrollFromKeyboard = { [weak self] in self?.updateFollowing() }
 
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
@@ -602,10 +605,44 @@ nonisolated final class LineBatcher<Element: Sendable>: Sendable {
     }
 }
 
-/// A log text view whose copy leaves out the stream gutter.
+/// A log text view whose copy leaves out the stream gutter. From the
+/// keyboard it scrolls rather than moving an (invisible) insertion point:
+/// ↑/↓ by line, space / ⇧space and page up/down by page, ⌘↑/⌘↓ and
+/// home/end to either end.
 final class LogTextView: NSTextView {
-    override func copy(_ sender: Any?) {
-        copyText(in: selectedRanges.map(\.rangeValue))
+    /// Called after the keyboard scrolled the log, so following can pause or resume.
+    var didScrollFromKeyboard: (() -> Void)?
+
+    override func doCommand(by selector: Selector) {
+        switch selector {
+        case #selector(moveUp(_:)): scrollLines(by: -1)
+        case #selector(moveDown(_:)): scrollLines(by: 1)
+        case #selector(moveToBeginningOfDocument(_:)), #selector(scrollToBeginningOfDocument(_:)):
+            scrollToBeginningOfDocument(nil)
+        case #selector(moveToEndOfDocument(_:)), #selector(scrollToEndOfDocument(_:)):
+            scrollToEndOfDocument(nil)
+        case #selector(scrollPageUp(_:)), #selector(pageUp(_:)): scrollPageUp(nil)
+        case #selector(scrollPageDown(_:)), #selector(pageDown(_:)): scrollPageDown(nil)
+        default: return super.doCommand(by: selector)
+        }
+        didScrollFromKeyboard?()
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        guard !isEditable, string as? String == " " else { return super.insertText(string, replacementRange: replacementRange) }
+        NSApp.currentEvent?.modifierFlags.contains(.shift) == true ? scrollPageUp(nil) : scrollPageDown(nil)
+        didScrollFromKeyboard?()
+    }
+
+    private func scrollLines(by count: CGFloat) {
+        guard let scrollView = enclosingScrollView else { return }
+        let font = font ?? .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        let clipView = scrollView.contentView
+        let lineHeight = layoutManager?.defaultLineHeight(for: font) ?? font.pointSize
+        let maxY = max(frame.height - clipView.bounds.height, 0)
+        let y = min(max(clipView.bounds.origin.y + count * lineHeight, 0), maxY)
+        clipView.scroll(to: NSPoint(x: clipView.bounds.origin.x, y: y))
+        scrollView.reflectScrolledClipView(clipView)
     }
 
     /// Copies every line shown (what the filter lets through).

@@ -68,6 +68,7 @@ struct MainView: View {
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .background(ToolbarStripSplitView())
+        .background(ColumnNavigation(focusRequest: model.columnFocusRequest, isShowingPalette: model.isShowingPalette))
         .sheet(item: $model.presentedSheet) { sheet in
             switch sheet {
             case .addProject:
