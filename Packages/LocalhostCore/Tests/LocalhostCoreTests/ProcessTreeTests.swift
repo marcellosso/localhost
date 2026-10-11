@@ -7,12 +7,16 @@ import Testing
 struct ProcessTreeTests {
     /// Short timeouts so escalation tests stay fast; the escalation order is what matters.
     let quickStop = StopPolicy(interruptTimeout: .milliseconds(500), terminateTimeout: .milliseconds(500))
+    /// For tests expecting a stop to end before escalating: the timeouts only bound a failure, and a
+    /// busy machine (CI, the whole suite in parallel) can take longer than `quickStop` allows.
+    let patientStop = StopPolicy(interruptTimeout: .seconds(30), terminateTimeout: .seconds(30))
 
     func launch(
         _ commandLine: String,
         in directory: String = NSTemporaryDirectory(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        shell: String = "/bin/sh"
+        shell: String = "/bin/sh",
+        stopPolicy: StopPolicy? = nil
     ) throws -> ProcessTree {
         try ProcessTree.launch(
             LaunchConfiguration(
@@ -21,7 +25,7 @@ struct ProcessTreeTests {
                 environment: environment,
                 shell: shell
             ),
-            stopPolicy: quickStop
+            stopPolicy: stopPolicy ?? quickStop
         )
     }
 
@@ -185,7 +189,9 @@ struct ProcessTreeTests {
     }
 
     @Test func `a command that handles SIGINT stops gracefully without escalation`() async throws {
-        let tree = try launch("trap 'echo bye; exit 0' INT; echo ready; while :; do sleep 0.05; done")
+        let tree = try launch(
+            "trap 'echo bye; exit 0' INT; echo ready; while :; do sleep 0.05; done", stopPolicy: patientStop
+        )
         _ = await firstLines(1, of: tree)
 
         let exit = await tree.stop()
@@ -236,7 +242,7 @@ struct ProcessTreeTests {
     }
 
     @Test func `processes left behind when the shell exits are cleaned up, starting with SIGTERM`() async throws {
-        let tree = try launch("sleep 1000 & echo $!; exit 0")
+        let tree = try launch("sleep 1000 & echo $!; exit 0", stopPolicy: patientStop)
         let leftover = try #require(await firstLines(1, of: tree).first.flatMap { pid_t($0.text) })
 
         let exit = await tree.waitForExit()

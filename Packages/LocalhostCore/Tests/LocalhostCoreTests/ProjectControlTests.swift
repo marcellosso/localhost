@@ -13,17 +13,26 @@ final class ProjectControlTests: Sendable {
 
     init() async throws {
         library = try ProjectLibrary(storageRoot: root)
-        manager = ServiceManager(
+        manager = Self.makeManager(library: library, root: root)
+        let projectFolder = root.appending(path: "project")
+        try FileManager.default.createDirectory(at: projectFolder, withIntermediateDirectories: true)
+        project = try await library.addProject(name: "App", key: Key("app"), path: projectFolder.path, origin: .mainWindow)
+    }
+
+    /// `gracePeriod` is short so Services reach Running quickly. Tests whose command must end
+    /// during Starting pass a long one: it only bounds a failure, and a busy machine (CI, the
+    /// whole suite in parallel) can take longer than 300ms to run even `exit 0`.
+    static func makeManager(
+        library: ProjectLibrary, root: URL, gracePeriod: Duration = .milliseconds(300)
+    ) -> ServiceManager {
+        ServiceManager(
             library: library,
             logs: LogStore(root: root),
             runRegistry: RunRegistry(root: root),
             baseEnvironment: ["PATH": "/usr/bin:/bin", "HOME": NSHomeDirectory(), "SHELL": "/bin/sh"],
-            gracePeriod: .milliseconds(300),
+            gracePeriod: gracePeriod,
             stopPolicy: StopPolicy(interruptTimeout: .milliseconds(500), terminateTimeout: .milliseconds(500))
         )
-        let projectFolder = root.appending(path: "project")
-        try FileManager.default.createDirectory(at: projectFolder, withIntermediateDirectories: true)
-        project = try await library.addProject(name: "App", key: Key("app"), path: projectFolder.path, origin: .mainWindow)
     }
 
     deinit {
@@ -97,6 +106,7 @@ final class ProjectControlTests: Sendable {
     }
 
     @Test func `a Dependency that Exits satisfies its dependents`() async throws {
+        let manager = Self.makeManager(library: library, root: root, gracePeriod: .seconds(30))
         let migrate = try await service("migrate", "exit 0")
         let api = try await service("api", dependsOn: [migrate])
 
@@ -105,10 +115,11 @@ final class ProjectControlTests: Sendable {
         #expect(status.state == .starting)
         #expect(status.run != nil)
         #expect(await manager.status(of: migrate.id).state == .exited)
-        await stopEverything()
+        await manager.stopAll(origin: .mainWindow)
     }
 
     @Test func `a Failed Dependency leaves its dependents Failed with dependencyFailed`() async throws {
+        let manager = Self.makeManager(library: library, root: root, gracePeriod: .seconds(30))
         let database = try await service("database", "exit 1")
         let api = try await service("api", dependsOn: [database])
         let web = try await service("web", dependsOn: [api])
@@ -202,6 +213,7 @@ final class ProjectControlTests: Sendable {
     }
 
     @Test func `Start All runs an Exited Service again before its dependents`() async throws {
+        let manager = Self.makeManager(library: library, root: root, gracePeriod: .seconds(30))
         let migrate = try await service("migrate", "exit 0")
         let api = try await service("api", dependsOn: [migrate])
         try await manager.startAll(inProject: project.id, origin: .mainWindow)
@@ -213,7 +225,7 @@ final class ProjectControlTests: Sendable {
 
         let seen = await events(stream, until: runStarted(api))
         #expect(index(in: seen, runStarted(migrate)) != nil)
-        await stopEverything()
+        await manager.stopAll(origin: .mainWindow)
     }
 
     @Test func `Stop All stops dependents before their Dependencies`() async throws {
