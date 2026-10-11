@@ -104,7 +104,8 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 
 - MIT license.
 - CI (GitHub Actions, `macos-26`): every PR and push to `main` runs the core's `swift test` and an unsigned app build.
-- Distribution is a notarized DMG on GitHub Releases, built by a workflow on `v*` tags (Developer ID, hardened runtime, `notarytool`, stapled). No Sparkle, no in-app update check.
+- Distribution is a DMG on GitHub Releases, built by a workflow on `v*` tags into a draft release the maintainer publishes. Ad-hoc signed by default (no Apple Developer Program yet); Developer ID signing, hardened runtime and notarization switch on when the Apple secrets exist. No Sparkle, no in-app update check.
+- Public releases will come from a fresh repo under the sixpetals organisation (#40).
 
 ## UI direction
 
