@@ -1,4 +1,13 @@
-# localhost
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/wordmark-dark.png">
+    <img src=".github/assets/wordmark-light.png" alt="localhost" width="280">
+  </picture>
+</h1>
+
+<p align="center">Every local project, one place to run it. A native macOS app.</p>
+
+![The localhost window: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
 A native macOS app that remembers how each of your local development projects runs, and lets you start, stop and watch all of its Services from one place.
 
@@ -93,11 +102,15 @@ Stopping sends Ctrl-C (SIGINT) to the Service's whole process group, then SIGTER
 
 Closing the window doesn't stop anything: Services keep running and the **menu bar** icon shows them (a red dot while one has Failed). Quitting asks first, then stops everything.
 
+<p align="center"><img src=".github/assets/menu-bar-light.png" alt="The menu bar panel: Acme Shop's Services with their states and Start, Restart, Stop and Open in Browser buttons" width="340"></p>
+
 If localhost itself crashes, the next launch finds the Services still running from that session and asks whether to stop them.
 
 ### 4. Read the logs
 
 Select a Service to see its output, with colours. **All services** shows every Service of the Project in one stream, each line prefixed with its Key. **⌘F** filters, **⌃L** clears the view (log files are kept). URLs in the output are clickable.
+
+![One Service selected in light mode: Web is Running on port 5173, with Open, Restart and Stop buttons and its Vite output](.github/assets/service-light.png)
 
 Each Run's output is also written to `~/Library/Application Support/localhost/logs/`; the last 5 Runs of each Service are kept, up to 10 MB each.
 
@@ -125,6 +138,8 @@ The **Ports** view (**⌘0**) lists every process listening on a TCP port and wh
 **File → Export Project…** saves the selected Project as a YAML Project file. **File → Import Project…** reads one back and shows what it contains before adding anything; choose the folder if it is somewhere else on this Mac. Secret values are never exported: the file lists Secret names, and the import shows which ones to fill in. The format is documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Keyboard shortcuts
+
+![The ⌘K command palette searching “web”: jump to the Web Service, or restart, stop or open it](.github/assets/command-palette-dark.png)
 
 | | |
 |---|---|
