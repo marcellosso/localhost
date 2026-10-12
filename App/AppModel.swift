@@ -20,6 +20,8 @@ final class AppModel {
         case detectServices(projectID: UUID)
         case editService(UUID)
         case projectEnvironment(UUID)
+        /// The review step of an import, before anything is saved.
+        case importProject(ProjectDocument, fileName: String)
 
         var id: Self { self }
     }
@@ -88,6 +90,12 @@ final class AppModel {
     /// The latest request to move keyboard focus to a column of the main window.
     private(set) var columnFocusRequest: ColumnFocusRequest?
     var pendingRemoval: Removal?
+    /// A Project file waiting for the save panel to write it.
+    var exportingFile: ProjectFile?
+    /// Whether the open panel for Import Project… is up.
+    var isChoosingImportFile = false
+    /// A Project file that couldn't be read, and why.
+    var importFailure: ImportFailure?
     /// A failed action to report, e.g. a removal that could not be saved.
     var actionError: LocalhostError?
 
@@ -375,6 +383,21 @@ final class AppModel {
         let added = try await library.addServices(services, toProject: projectID, origin: .mainWindow)
         projects = await library.projects()
         if let first = added.first { selectedServiceID = first.id }
+    }
+
+    /// Saves a reviewed import. On Replace, Services the file no longer has
+    /// are stopped first, as when removing them.
+    func importProject(_ document: ProjectDocument, onKeyClash: ProjectLibrary.KeyClash?) async throws(LocalhostError) {
+        guard let core else { throw .projectNotFound(UUID()) }
+        if onKeyClash == .replace, let existing = projectClashing(with: document) {
+            let keptKeys = Set(document.services.map(\.key))
+            for service in existing.services where !keptKeys.contains(service.key) {
+                try await core.services.stop(service.id, origin: .mainWindow)
+            }
+        }
+        let project = try await core.library.importProject(document, onKeyClash: onKeyClash, origin: .mainWindow)
+        projects = await core.library.projects()
+        selectedProjectID = project.id
     }
 
     func editService(

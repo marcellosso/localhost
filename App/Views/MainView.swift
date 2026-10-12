@@ -1,5 +1,6 @@
 import LocalhostCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Sidebar of Projects → the selected Project's Services → the selected Service's log.
 struct MainView: View {
@@ -83,7 +84,29 @@ struct MainView: View {
                 if let (project, service) = model.service(id) { ServiceForm(project: project, editing: service) }
             case .projectEnvironment(let id):
                 if let project = model.project(id) { EnvironmentForm(project: project) }
+            case .importProject(let document, let fileName):
+                ImportProjectForm(document: document, fileName: fileName)
             }
+        }
+        .fileImporter(isPresented: $model.isChoosingImportFile, allowedContentTypes: [.yaml]) { result in
+            if case .success(let url) = result { model.openProjectFile(at: url) }
+        }
+        .fileExporter(
+            isPresented: Binding { model.exportingFile != nil } set: { if !$0 { model.exportingFile = nil } },
+            document: model.exportingFile, contentType: .yaml,
+            defaultFilename: model.exportingFile?.defaultFileName
+        ) { result in
+            if case .failure(let error) = result, (error as? CocoaError)?.code != .userCancelled {
+                model.actionError = .persistenceFailed(path: "the project file", reason: error.localizedDescription)
+            }
+        }
+        .alert(
+            importFailureTitle, isPresented: Binding { model.importFailure != nil } set: { if !$0 { model.importFailure = nil } },
+            presenting: model.importFailure
+        ) { _ in
+            Button("OK") {}
+        } message: { failure in
+            Text(failure.error.message)
         }
         .confirmationDialog(removalTitle, isPresented: isConfirmingRemoval, presenting: model.pendingRemoval) { removal in
             Button("Remove", role: .destructive) {
@@ -141,6 +164,10 @@ struct MainView: View {
                     .padding()
             }
         }
+    }
+
+    private var importFailureTitle: String {
+        "“\(model.importFailure?.fileName ?? "The file")” can’t be imported"
     }
 
     private var removalTitle: String {

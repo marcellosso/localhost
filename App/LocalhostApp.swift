@@ -106,6 +106,17 @@ struct AppCommands: Commands {
                 if let project = model.selectedProject { model.presentedSheet = .detectServices(projectID: project.id) }
             }
             .disabled(model.selectedProject == nil)
+            Divider()
+            Button("Import Project…") {
+                openWindow(id: "main")
+                model.isChoosingImportFile = true
+            }
+            .disabled(model.core == nil)
+            Button("Export Project…") {
+                openWindow(id: "main")
+                if let project = model.selectedProject { model.exportProject(project.id) }
+            }
+            .disabled(model.selectedProject == nil)
         }
         CommandGroup(replacing: .textEditing) {
             Button("Find in Log") { model.findInLog() }

@@ -111,8 +111,11 @@ func quotedStrings(in text: String) -> [String] {
 /// Just enough YAML for workspace files and Compose files: block mappings by
 /// indentation, block and flow sequences of scalars. Anchors, multi-line
 /// scalars and other features are skipped rather than failing the scan.
+/// `YAMLValue` reads the same lines strictly, for Project files.
 struct YAMLLines {
     struct Line {
+        /// 1-based, in the original text.
+        var number: Int
         var indent: Int
         /// Without indentation, comment and trailing spaces.
         var text: String
@@ -133,12 +136,12 @@ struct YAMLLines {
     var lines: [Line]
 
     init(_ text: String) {
-        lines = text.split(separator: "\n", omittingEmptySubsequences: false).compactMap { raw in
-            let raw = raw.replacingOccurrences(of: "\t", with: "  ")
-            let indent = raw.prefix { $0 == " " }.count
-            let text = Self.strippingComment(String(raw.dropFirst(indent))).trimmingCharacters(in: .whitespaces)
+        lines = text.split(separator: "\n", omittingEmptySubsequences: false).enumerated().compactMap { offset, raw in
+            let leading = raw.prefix { $0 == " " || $0 == "\t" }
+            let indent = leading.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) }
+            let text = Self.strippingComment(String(raw.dropFirst(leading.count))).trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty, text != "---" else { return nil }
-            return Line(indent: indent, text: text)
+            return Line(number: offset + 1, indent: indent, text: text)
         }
     }
 
@@ -169,15 +172,24 @@ struct YAMLLines {
         return String(text.dropFirst().dropLast())
     }
 
+    /// A quote only opens a scalar (`key: "a # b"`, `[a, 'b']`), not inside
+    /// one (`echo it's # comment`); `\"` doesn't close a double-quoted one.
     private static func strippingComment(_ text: String) -> String {
         if text.hasPrefix("#") { return "" }
         var quote: Character?
+        var isEscaped = false
         var previous: Character = " "
         for index in text.indices {
             let character = text[index]
             if let open = quote {
-                if character == open { quote = nil }
-            } else if character == "\"" || character == "'" {
+                if isEscaped {
+                    isEscaped = false
+                } else if open == "\"" && character == "\\" {
+                    isEscaped = true
+                } else if character == open {
+                    quote = nil
+                }
+            } else if character == "\"" || character == "'", " [{,".contains(previous) {
                 quote = character
             } else if character == "#", previous == " " {
                 return String(text[..<index])

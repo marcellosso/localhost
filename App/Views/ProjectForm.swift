@@ -38,26 +38,7 @@ struct ProjectForm: View {
             primary: { Task { await save() } }
         ) {
             Field(title: "Folder") {
-                Button { isChoosingFolder = true } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "folder")
-                            .foregroundStyle(.secondary)
-                        Text(path.isEmpty ? "Choose a folder…" : (path as NSString).abbreviatingWithTildeInPath)
-                            .font(.system(size: 12.5, design: .monospaced))
-                            .foregroundStyle(path.isEmpty ? .secondary : .primary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer(minLength: 8)
-                        Text("Choose…")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(height: 32)
-                    .fieldBox(isFocused: false)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
+                FolderButton(path: path) { isChoosingFolder = true }
             }
             HStack(alignment: .top, spacing: 12) {
                 Field(title: "Name") {

@@ -26,6 +26,10 @@ _Avoid_: Slug, name (the name is the free-form display label)
 Everything localhost remembers about a Project and its Services. Owned and stored by localhost, never written into the Project's folder.
 _Avoid_: Config file, manifest
 
+**Project file**:
+A YAML file describing one Project's Configuration (its Services, variables and Environment Profiles, with Secrets by name only), written by Export and read by Import so the Project can move to another Mac. localhost writes it only where the user saves it.
+_Avoid_: Config file, manifest, export (for the file)
+
 **Dependency**:
 A Service that another Service in the same Project needs to be Running, or to have Exited, before it can start.
 _Avoid_: Requirement, prerequisite

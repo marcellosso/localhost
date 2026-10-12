@@ -85,6 +85,35 @@ struct FormSheet<Content: View>: View {
     }
 }
 
+/// A folder's path in a field box; choosing opens the folder picker.
+struct FolderButton: View {
+    let path: String
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 8) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                Text(path.isEmpty ? "Choose a folder…" : (path as NSString).abbreviatingWithTildeInPath)
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundStyle(path.isEmpty ? .secondary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text("Choose…")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .fieldBox(isFocused: false)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// A field's label, with a quiet note on the right ("optional", "in logs & CLI").
 struct FieldLabel: View {
     let title: String

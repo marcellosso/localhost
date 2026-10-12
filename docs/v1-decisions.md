@@ -113,9 +113,10 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 
 - One YAML file per Project, close to `localhost-v1.md` §19, with a top-level `localhost: 1` format version. A small built-in emitter writes it; the built-in YAML-subset reader is extended for this schema (no dependency). Encode/decode lives in the core (`ProjectDocument`), reusable by a future CLI or in-repo file (ADR-0004).
 - Contains: name, Key, `path` (home folder as `~`), Services (name, Key, working directory relative to the Project, command line, Port, URL, Port can change, Not in Start All, `depends_on` by Service Key), variables on every layer, Environment Profiles by name, the active Profile.
+- Fields: `localhost`, `name`, `key`, `path`, `variables` (name → value), `secrets` (names), `services` keyed by Service Key with `name`, `command`, `cwd`, `port`, `url`, `port_can_change`, `start_all`, `depends_on`, `variables`, `secrets`, then `profiles` keyed by name (`variables`, `secrets`) and `active_profile`. Fields at their default are left out and variables are sorted, so the same Configuration always gives the same file. Unknown fields are errors, so a typo isn't silently dropped.
 - Not exported: UUIDs, sort order, favourite, any Secret value. Secrets are listed by name without a value, so the import shows what still needs filling in.
 - Import opens a review sheet: path prefilled; if the folder is missing the user must pick one. Keys, working directories, Dependencies (unknown Keys, cycles) and ports are validated with the editors' rules; errors name the line/field.
-- Key clash: ask once, **Replace** (keeps the existing Project's UUID and log history, swaps in the imported configuration) or **Keep both** (the import gets a free Key, e.g. `my-saas-2`). Nothing is overwritten without Replace.
+- Key clash: ask once, **Replace** (keeps the existing Project's UUID and log history, swaps in the imported configuration) or **Keep both** (the import gets a free Key, e.g. `my-saas-2`). Nothing is overwritten without Replace. Replace keeps the identity of Services matching by Key and Profiles matching by name, so their logs and the stored values of Secrets they still name survive; Services the file drops are stopped first.
 - Round trip: export → import → export yields an identical file.
 
 ## UI direction
