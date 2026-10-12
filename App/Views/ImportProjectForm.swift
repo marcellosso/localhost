@@ -26,7 +26,7 @@ struct ImportProjectForm: View {
             systemImage: "square.and.arrow.down",
             title: "Import \(document.name)",
             subtitle: Text("from ") + Text(fileName).monospaced(),
-            hint: isReplacing ? "Replaces “\(clash?.name ?? "")”" : "↩ to import",
+            hint: !folderExists ? nil : isReplacing ? "Replaces “\(clash?.name ?? "")”" : "↩ to import",
             error: error,
             primaryTitle: isReplacing ? "Replace" : "Import",
             isPrimaryDisabled: !folderExists || isSaving,
@@ -38,14 +38,16 @@ struct ImportProjectForm: View {
                 FolderButton(path: path) { isChoosingFolder = true }
             }
             if let clash {
-                Field(title: "Key", note: document.key.rawValue) {
-                    Picker("Another project already uses the key “\(document.key)”", selection: $choice) {
+                Field(title: "Key", note: "“\(document.key)” is already used by \(clash.name)",
+                      hint: isReplacing ? replacementHint(clash) : nil) {
+                    Picker("Key “\(document.key)” is already used by \(clash.name)", selection: $choice) {
                         Text("Keep both: import as \(freeKey?.rawValue ?? "a new key")")
                             .tag(ProjectLibrary.KeyClash.keepBoth)
                         Text("Replace “\(clash.name)”: keep its logs, use this file’s configuration")
                             .tag(ProjectLibrary.KeyClash.replace)
                     }
                     .pickerStyle(.radioGroup)
+                    .labelsHidden()
                 }
             }
             Field(title: "Services", note: document.services.isEmpty ? nil : "\(document.services.count)") {
@@ -101,6 +103,15 @@ struct ImportProjectForm: View {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: (path as NSString).expandingTildeInPath, isDirectory: &isDirectory)
             && isDirectory.boolValue
+    }
+
+    /// What Replace removes from the existing Project, e.g. "Removes Web (running, stopped first)."
+    private func replacementHint(_ existing: Project) -> String? {
+        let keptKeys = Set(document.services.map(\.key))
+        let removed = existing.services.filter { !keptKeys.contains($0.key) }
+        guard !removed.isEmpty else { return nil }
+        let names = removed.map { model.status(of: $0).state.isActive ? "\($0.name) (running, stopped first)" : $0.name }
+        return "Removes " + names.joined(separator: ", ") + ", which the file doesn’t have."
     }
 
     /// e.g. "2 variables · profiles Development (active), Testing".
