@@ -50,19 +50,26 @@ final class PortTests: Sendable {
 
     init() async throws {
         library = try ProjectLibrary(storageRoot: root)
-        manager = ServiceManager(
+        manager = Self.makeManager(library: library, root: root)
+        let projectFolder = root.appending(path: "project")
+        try FileManager.default.createDirectory(at: projectFolder, withIntermediateDirectories: true)
+        project = try await library.addProject(name: "App", key: Key("app"), path: projectFolder.path, origin: .mainWindow)
+    }
+
+    /// The Port timeout is long, so it only bounds a failure: a busy machine
+    /// (CI, the whole suite in parallel) can be slow to open a Port. Tests of
+    /// the timeout itself pass a short one.
+    static func makeManager(library: ProjectLibrary, root: URL, portTimeout: Duration = .seconds(30)) -> ServiceManager {
+        ServiceManager(
             library: library,
             logs: LogStore(root: root),
             runRegistry: RunRegistry(root: root),
             baseEnvironment: ["PATH": "/usr/bin:/bin", "HOME": NSHomeDirectory(), "SHELL": "/bin/sh"],
             gracePeriod: .milliseconds(300),
-            portTimeout: .milliseconds(800),
+            portTimeout: portTimeout,
             portProbeInterval: .milliseconds(50),
             stopPolicy: StopPolicy(interruptTimeout: .milliseconds(500), terminateTimeout: .milliseconds(500))
         )
-        let projectFolder = root.appending(path: "project")
-        try FileManager.default.createDirectory(at: projectFolder, withIntermediateDirectories: true)
-        project = try await library.addProject(name: "App", key: Key("app"), path: projectFolder.path, origin: .mainWindow)
     }
 
     deinit {
@@ -105,7 +112,9 @@ final class PortTests: Sendable {
 
     @Test func `a Port that never opens times out to Running with a warning, cleared once it opens`() async throws {
         let port = freePort()
-        let service = try await service("sleep 1.2; exec nc -lk $PORT", port: port)
+        // Opens well after the timeout, however slow the machine is.
+        let service = try await service("sleep 3; exec nc -lk $PORT", port: port)
+        let manager = Self.makeManager(library: library, root: root, portTimeout: .milliseconds(800))
         let (_, events) = await manager.subscribe()
         try await manager.start(service.id, origin: .mainWindow)
 
