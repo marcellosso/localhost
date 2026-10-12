@@ -1,10 +1,29 @@
 import Darwin
 import Foundation
+import Synchronization
 import Testing
 @testable import LocalhostCore
 
-/// A port nothing listens on right now: bound once by the kernel's choice, then released.
+/// Ports `freePort()` has handed out in this test run.
+private let handedOutPorts = Mutex<Set<Int>>([])
+
+/// A port nothing listens on right now (bound once by the kernel's choice,
+/// then released), at least 100 away from any port another test of this run
+/// was given. Tests run in parallel, the kernel picks nearby ports, and a
+/// Service whose Port is taken moves up to 100 ports above it.
 func freePort() -> Int {
+    while true {
+        let port = kernelChosenPort()
+        let isClear = handedOutPorts.withLock { ports in
+            guard !ports.contains(where: { abs($0 - port) <= 100 }) else { return false }
+            ports.insert(port)
+            return true
+        }
+        if isClear { return port }
+    }
+}
+
+private func kernelChosenPort() -> Int {
     let socket = Darwin.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
     defer { close(socket) }
     var address = sockaddr_in()

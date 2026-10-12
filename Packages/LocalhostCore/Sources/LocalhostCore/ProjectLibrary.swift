@@ -25,16 +25,21 @@ public actor ProjectLibrary {
     private let secrets: any SecretStore
     private var projectsByID: [UUID: Project]
     private var subscribers: [UUID: AsyncStream<ProjectLibraryEvent>.Continuation] = [:]
+    /// The Project files that couldn't be loaded, to tell the user once.
+    public nonisolated let unreadableFiles: [UnreadableProjectFile]
 
-    /// Loads every stored Project from `storageRoot`.
+    /// Loads every stored Project from `storageRoot`. Files that can't be
+    /// loaded are listed in `unreadableFiles` rather than failing the rest;
+    /// only an unreadable folder throws.
     public init(
         storageRoot: URL = ProjectLibrary.defaultStorageRoot,
         secrets: any SecretStore = KeychainSecretStore()
     ) throws(LocalhostError) {
         storage = ProjectStorage(root: storageRoot)
         self.secrets = secrets
-        let projects = try storage.loadAll()
+        let (projects, unreadable) = try storage.loadAll()
         projectsByID = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0) })
+        unreadableFiles = unreadable
     }
 
     // MARK: Reading

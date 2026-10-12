@@ -10,7 +10,7 @@ struct LocalhostApp: App {
         Window("localhost", id: "main") {
             MainView()
                 .environment(delegate.model)
-                .task { await delegate.model.checkForOrphans() }
+                .task { await delegate.model.runLaunchChecks() }
                 // The Dock icon shows only while the main window is open.
                 .onAppear { NSApp.setActivationPolicy(.regular) }
                 .onDisappear { NSApp.setActivationPolicy(.accessory) }

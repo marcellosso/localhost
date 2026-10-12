@@ -20,6 +20,8 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 - Project Configuration is stored by localhost, never in the project folder (ADR-0004): `~/Library/Application Support/localhost/projects/<project-uuid>.json`, one Codable JSON file per Project, atomic writes, `schemaVersion` field.
 - Service working directories are stored **relative to the Project path**.
 - Secret values live in the Keychain, not in JSON, and are never exported (M1).
+- **Unreadable Project files** never stop the others from loading, and are never silently dropped. A damaged file (or a second copy of a Project or of its Key; the `<id>.json` file wins) is moved aside as `<name>.unreadable`, so it is kept but never loaded or overwritten. A file from a newer schema version is left in place for that version. Both are listed in an alert at launch, before the Orphans question. Only an unreadable `projects` folder fails the core.
+- Removing a Service or Project (or dropping it on Replace) deletes its log files.
 
 ## Running Services
 
@@ -31,6 +33,8 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 - **Starting → Running**: no Port configured → alive after a ~1.5s grace period; Port configured (M1) → the Port accepts connections (global 30s timeout → Running with a warning that clears once the Port opens). Dying during Starting → **Failed** with output visible; exiting with code 0 during Starting → **Exited** (one-shot commands such as migrations).
 - **Configuration changes** (variables, active Profile, command line, …) apply on the next start. A Run whose launch configuration differs from what would be built now shows "Restart to apply" (computed in the core). Nothing restarts automatically.
 - **Failed** shows the typed reason (or exit code/signal) plus the last 20 lines of both streams. A Failed Run whose output contains `Cannot connect to the Docker daemon` (or, from current Docker CLIs, `failed to connect to the docker API`) reports `dockerDaemonUnavailable` instead (diagnosed after the fact, never a pre-check).
+- **Timeouts** (stop escalation, the Port timeout, the grace period) count only time the Mac is awake (`SuspendingClock`), so a Run frozen by sleep isn't escalated or timed out on wake.
+- **Output lines** longer than 64 KB are delivered in pieces of at most 64 KB, cut at a UTF-8 character boundary; bytes that aren't UTF-8 show as U+FFFD.
 - **Stop escalation**: SIGINT to the process group → wait ~5s → SIGTERM → wait ~3s → SIGKILL. State stays **Stopping** until the whole tree is gone; log a line if force-killed. Global defaults for now.
 - **Orphans**: each active Run's (pid, pgid, process start time) is recorded on disk. On launch, survivors are detected (start time guards against PID reuse) and the user is asked "N services from the last session are still running — Stop them / Leave them" (default Stop). Never re-adopt them as Running.
 - **App lifetime**: closing the main window does not quit; Services keep running. ⌘Q / menu-bar Quit asks for confirmation if anything is running, then stops everything in parallel. Dock icon only while the main window is open (`.regular` ↔ `.accessory`), once the menu bar exists.

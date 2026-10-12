@@ -131,7 +131,7 @@ final class EnvironmentTests: Sendable {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try Data(json.utf8).write(to: folder.appending(path: "6F9A2C1E-0000-4000-8000-000000000009.json"))
 
-        let project = try #require(try ProjectStorage(root: root.appending(path: "old")).loadAll().first)
+        let project = try #require(try ProjectStorage(root: root.appending(path: "old")).loadAll().projects.first)
         #expect(project.variables == .empty)
         #expect(project.profiles.isEmpty)
         #expect(project.activeProfileID == nil)

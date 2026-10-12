@@ -138,6 +138,13 @@ struct MainView: View {
         } message: { blocked in
             Text(blockedStartMessage(blocked))
         }
+        .alert(model.unreadableFilesTitle, isPresented: $model.isShowingUnreadableFiles) {
+            Button("Show in Finder") { model.dismissUnreadableFiles(revealing: true) }
+            Button("OK", role: .cancel) { model.dismissUnreadableFiles(revealing: false) }
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text(model.unreadableFilesMessage)
+        }
         .alert(model.orphanAlertTitle, isPresented: $model.isShowingOrphanAlert) {
             Button("Stop Them") { Task { await model.stopOrphans() } }
                 .keyboardShortcut(.defaultAction)

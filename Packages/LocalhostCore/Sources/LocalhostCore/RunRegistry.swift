@@ -135,8 +135,8 @@ public final class RunRegistry: Sendable {
         for (signal, timeout) in steps {
             guard isAlive(orphan) else { return }
             kill(-orphan.processGroupID, signal)
-            let deadline = ContinuousClock.now + timeout
-            while isAlive(orphan), ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + timeout
+            while isAlive(orphan), SuspendingClock.now < deadline {
                 try? await Task.sleep(for: .milliseconds(20))
             }
         }
