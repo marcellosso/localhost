@@ -11,7 +11,7 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
   - all core types `Sendable`/`Codable`-friendly.
 - **Identity**: Projects and Services have a UUID identity plus a **Key** (slug). Project Keys unique app-wide, Service Keys unique per Project; editable but validated. Internal references (Dependencies, log files) use UUIDs.
 - **Layout**: `localhost.xcodeproj` + `App/` (SwiftUI target) + `Packages/LocalhostCore/{Sources,Tests}`. No Tuist/XcodeGen.
-- **Toolchain**: Swift 6 language mode, strict concurrency, macOS 15 minimum, bundle id `com.marcellosso.localhost`. Non-sandboxed, Developer ID (ADR-0002).
+- **Toolchain**: Swift 6 language mode, strict concurrency, macOS 15 minimum, bundle id `com.sixpetals.localhost` (Keychain service for Secrets: `com.sixpetals.localhost.secret`). Non-sandboxed, distributed outside the Mac App Store (ADR-0002).
 - **Dependencies**: none by default; each third-party package must be justified (an MCP SDK in V2 is expected).
 - **Tests**: Swift Testing (`@Test`). The core is test-driven against **real processes** (fixture scripts that fork grandchildren, trap signals, exit with codes). No UI tests in V1.
 
@@ -99,6 +99,24 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 - In the log, keys scroll instead of moving an invisible insertion point: ↑/↓ a line, space / ⇧space and page up/down a page, ⌘↑/⌘↓ and home/end to either end. Scrolling up pauses following, back at the bottom resumes it, as with the trackpad.
 - Sidebar search: ↓ moves into the list, ↩ opens the first match's Services. Log filter (⌘F): ↩ keeps the filter and moves into the log, esc clears it.
 - Done with an app-local key monitor on the main window rather than SwiftUI `onKeyPress`, because the lists (`NSTableView`) and the log (`NSTextView`) consume arrow keys before SwiftUI sees them.
+
+## Release (M3)
+
+- MIT license.
+- CI (GitHub Actions, `macos-26`): every PR and push to `main` runs the core's `swift test` and an unsigned app build.
+- Distribution is a DMG on GitHub Releases, built by a workflow on `v*` tags into a **draft** release (notes generated from merged PRs) that the maintainer publishes. Version comes from the tag (SemVer, `0.x` for now). Fixes: branch → PR → merge → patch tag. No Sparkle, no in-app update check.
+- **Signing**: no Apple Developer Program yet. Releases are signed with a long-lived (20-year) **self-signed certificate** kept in a repo secret (and backed up by the maintainer), so the Keychain keeps trusting the app across updates. Without that secret the workflow falls back to ad-hoc signing. When the Apple secrets exist it signs with Developer ID (hardened runtime), notarizes with `notarytool` and staples, with no other workflow change.
+- Consequences for users, documented in the README: a non-notarized build needs System Settings → Privacy & Security → **Open Anyway** on first launch (or `xattr -dr com.apple.quarantine`); an ad-hoc build asks again for Keychain access to each Secret after every update; switching signing identity (self-signed → Developer ID) asks once more, on that one update.
+- **Public repo**: public releases come from a fresh repo under the sixpetals organisation, starting from a single initial commit (#40). `docs/` stays private, so user-facing docs (README, configuration reference, `CONTRIBUTING.md`) live outside it. Nothing is made public in M3.
+
+## Export and import (M3)
+
+- One YAML file per Project, close to `localhost-v1.md` §19, with a top-level `localhost: 1` format version. A small built-in emitter writes it; the built-in YAML-subset reader is extended for this schema (no dependency). Encode/decode lives in the core (`ProjectDocument`), reusable by a future CLI or in-repo file (ADR-0004).
+- Contains: name, Key, `path` (home folder as `~`), Services (name, Key, working directory relative to the Project, command line, Port, URL, Port can change, Not in Start All, `depends_on` by Service Key), variables on every layer, Environment Profiles by name, the active Profile.
+- Not exported: UUIDs, sort order, favourite, any Secret value. Secrets are listed by name without a value, so the import shows what still needs filling in.
+- Import opens a review sheet: path prefilled; if the folder is missing the user must pick one. Keys, working directories, Dependencies (unknown Keys, cycles) and ports are validated with the editors' rules; errors name the line/field.
+- Key clash: ask once, **Replace** (keeps the existing Project's UUID and log history, swaps in the imported configuration) or **Keep both** (the import gets a free Key, e.g. `my-saas-2`). Nothing is overwritten without Replace.
+- Round trip: export → import → export yields an identical file.
 
 ## UI direction
 
