@@ -1,0 +1,142 @@
+name: Release
+
+# A v* tag builds the DMG and drafts a GitHub Release for it; publishing the
+# draft is the maintainer's step. See RELEASING.md.
+#
+# Signing follows the secrets that exist:
+#   Developer ID   DEVELOPER_ID_CERTIFICATE_P12, DEVELOPER_ID_CERTIFICATE_PASSWORD,
+#                  NOTARY_KEY_P8, NOTARY_KEY_ID, NOTARY_ISSUER_ID → signed, notarized, stapled
+#   self-signed    SIGNING_CERTIFICATE_P12, SIGNING_CERTIFICATE_PASSWORD
+#   ad hoc         neither
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release:
+    name: Build and draft the release
+    runs-on: macos-26
+    env:
+      DEVELOPER_ID_CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+      DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+      NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+      NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+      SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -version
+
+      - name: Read the version from the tag
+        id: version
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags look like v1.2.3, got $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Choose the signing mode
+        id: signing
+        run: |
+          if [[ -n $DEVELOPER_ID_CERTIFICATE_P12 && -n $DEVELOPER_ID_CERTIFICATE_PASSWORD &&
+                -n $NOTARY_KEY_P8 && -n $NOTARY_KEY_ID && -n $NOTARY_ISSUER_ID ]]; then
+            mode=developer-id
+          elif [[ -n $SIGNING_CERTIFICATE_P12 && -n $SIGNING_CERTIFICATE_PASSWORD ]]; then
+            mode=self-signed
+          else
+            mode=ad-hoc
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Signing: $mode"
+
+      # A throwaway keychain on the search list, where codesign finds the identity.
+      - name: Import the signing certificate
+        id: identity
+        if: steps.signing.outputs.mode != 'ad-hoc'
+        run: |
+          if [[ ${{ steps.signing.outputs.mode }} == developer-id ]]; then
+            p12=$DEVELOPER_ID_CERTIFICATE_P12 password=$DEVELOPER_ID_CERTIFICATE_PASSWORD
+          else
+            p12=$SIGNING_CERTIFICATE_P12 password=$SIGNING_CERTIFICATE_PASSWORD
+          fi
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          keychain_password=$(openssl rand -base64 24)
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$p12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$password" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+          # shellcheck disable=SC2046 # one keychain path per word; the runner's paths have no spaces
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # By SHA-1, so the choice is unambiguous. A self-signed certificate isn't
+          # trusted ("CSSMERR_TP_NOT_TRUSTED"), which codesign accepts.
+          identity=$(security find-identity -p codesigning "$keychain" | awk '/^ *1\)/ {print $2; exit}')
+          if [[ -z $identity ]]; then
+            echo "::error::No code signing identity in the certificate secret"
+            security find-identity -p codesigning "$keychain"
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Build, sign and pack the DMG
+        id: build
+        env:
+          SIGNING_IDENTITY: ${{ steps.identity.outputs.identity || '-' }}
+          DEVELOPER_ID: ${{ steps.signing.outputs.mode == 'developer-id' && '1' || '' }}
+        run: |
+          dmg=$(scripts/build-release.sh "${{ steps.version.outputs.version }}" "$GITHUB_RUN_NUMBER" | tail -1)
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize and staple
+        if: steps.signing.outputs.mode == 'developer-id'
+        env:
+          DMG: ${{ steps.build.outputs.dmg }}
+        run: |
+          key=$RUNNER_TEMP/notary-key.p8
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$key"
+          xcrun notarytool submit "$DMG" --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --timeout 30m --output-format json > "$RUNNER_TEMP/notary.json"
+          cat "$RUNNER_TEMP/notary.json"
+          status=$(plutil -extract status raw "$RUNNER_TEMP/notary.json")
+          if [[ $status != Accepted ]]; then
+            xcrun notarytool log "$(plutil -extract id raw "$RUNNER_TEMP/notary.json")" \
+              --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID"
+            echo "::error::Notarization ended as $status"
+            exit 1
+          fi
+          rm "$key"
+          xcrun stapler staple "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+
+      - name: Draft the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DMG: ${{ steps.build.outputs.dmg }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MODE: ${{ steps.signing.outputs.mode }}
+        run: |
+          (cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
+          case $MODE in
+            developer-id) install="Signed with Developer ID and notarized by Apple." ;;
+            self-signed) install="Not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, see [First launch](${{ github.server_url }}/${{ github.repository }}#first-launch-of-a-build-that-isnt-notarized) in the README." ;;
+            ad-hoc) install="Signed ad hoc and not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, and macOS asks again for Keychain access to each Secret after every update, see [the README](${{ github.server_url }}/${{ github.repository }}#install)." ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" \
+            --draft --verify-tag --title "localhost $VERSION" \
+            --notes "Requires macOS 15 or later. $install" --generate-notes
+
+      - name: Remove the signing keychain
+        if: always() && steps.identity.outcome != 'skipped'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
