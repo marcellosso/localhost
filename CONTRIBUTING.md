@@ -85,6 +85,7 @@ A SwiftUI app and only a client of the core. `AppModel` owns the core (`ProjectL
 
 - `Views/`: the main window (sidebar, Services column, log), the forms, Ports, Settings, the menu bar companion and the ⌘K palette.
 - `Views/Theme.swift`: every colour and surface. Views don't hard-code colours.
+- `AppIcon.icon`: the app icon, an Icon Composer document (open it with Icon Composer, in Xcode's Developer Tools) with its light, dark, tinted and clear looks. Xcode also builds the icon for macOS 15 from it.
 - `LocalhostApp.swift`, `NavigationCommands.swift`: the scenes and the menu bar menus. Every action has a menu item (so it works from the keyboard and menu search), and its shortcut.
 - The app isn't sandboxed: it runs arbitrary commands, reads process information and opens folders anywhere, which the App Sandbox doesn't allow. It is distributed outside the Mac App Store.
 
