@@ -102,6 +102,16 @@ public actor LogStore {
         fileURLs[runID]
     }
 
+    /// Deletes a removed Service's log files and buffer. Its Run must have
+    /// ended (removing a Service stops it first).
+    public func removeLogs(ofService serviceID: UUID) {
+        if let runID = latestRunOfService.removeValue(forKey: serviceID) {
+            buffers[runID] = nil
+            fileURLs[runID] = nil
+        }
+        try? FileManager.default.removeItem(at: logsDirectory.appending(path: serviceID.uuidString, directoryHint: .isDirectory))
+    }
+
     // MARK: Writing (by ServiceManager)
 
     func beginRun(_ run: Run) {

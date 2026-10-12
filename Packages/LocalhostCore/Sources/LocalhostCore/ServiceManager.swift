@@ -527,7 +527,7 @@ public actor ServiceManager {
             Task { [runID = run.id] in await self.watchPort(port, serviceID: serviceID, runID: runID) }
         } else {
             Task { [gracePeriod, runID = run.id] in
-                try? await Task.sleep(for: gracePeriod)
+                try? await Task.sleep(for: gracePeriod, clock: .suspending)
                 self.gracePeriodElapsed(serviceID, runID: runID)
             }
         }
@@ -623,14 +623,14 @@ public actor ServiceManager {
     /// timeout it is Running with `isPortUnresponsive`, and the Port is still
     /// watched so the warning clears once it opens.
     private func watchPort(_ port: Int, serviceID: UUID, runID: UUID) async {
-        let deadline = ContinuousClock.now + portTimeout
+        let deadline = SuspendingClock.now + portTimeout
         while let status = statuses[serviceID], status.run?.id == runID,
               status.state == .starting || status.state == .running {
             if await PortProbe.isAccepting(port) {
                 portAccepted(serviceID, runID: runID)
                 return
             }
-            if ContinuousClock.now >= deadline {
+            if SuspendingClock.now >= deadline {
                 portTimedOut(serviceID, runID: runID)
             }
             try? await Task.sleep(for: portProbeInterval)

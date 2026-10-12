@@ -128,6 +128,24 @@ final class LogStoreTests: Sendable {
         #expect(remaining == runs.suffix(5).map { "\($0.id.uuidString).log" }.sorted())
     }
 
+    @Test func `removing a Service's logs deletes its files and buffer, and no other Service's`() async throws {
+        let store = LogStore(root: root)
+        let (removed, kept) = (makeRun(), makeRun())
+        for run in [removed, kept] {
+            await store.beginRun(run)
+            await store.append(line("output"), toRun: run.id)
+            await store.endRun(run.id)
+        }
+
+        await store.removeLogs(ofService: removed.serviceID)
+
+        #expect(!FileManager.default.fileExists(atPath: logDirectory(removed.serviceID).path))
+        #expect(await store.lines(forRun: removed.id).isEmpty)
+        #expect(await store.latestRunID(ofService: removed.serviceID) == nil)
+        #expect(FileManager.default.fileExists(atPath: logDirectory(kept.serviceID).path))
+        #expect(await store.lines(forRun: kept.id).map(\.text) == ["output"])
+    }
+
     @Test func `rotates a Run's file so it stays within the size cap`() async throws {
         let store = LogStore(root: root, maxFileSize: 1_000)
         let run = makeRun()

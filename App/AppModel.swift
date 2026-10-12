@@ -105,6 +105,10 @@ final class AppModel {
     private(set) var isStoppingOrphans = false
     var isShowingOrphanAlert = false
 
+    /// Project files that couldn't be loaded at launch, told once per session.
+    var isShowingUnreadableFiles = false
+    @ObservationIgnored private var hasReportedUnreadableFiles = false
+
     /// Every Listener, as of the last refresh (only while a Listener view is visible).
     private(set) var listeners: [Listener] = []
     var selectedListenerID: pid_t?
@@ -356,6 +360,7 @@ final class AppModel {
                 try await core.services.stop(service.id, origin: .mainWindow)
             }
             try await core.library.removeProject(id: id, origin: .mainWindow)
+            for service in project.services { await core.logs.removeLogs(ofService: service.id) }
         }
         if selectedProjectID == id { selectedProjectID = projects.first?.id }
     }
@@ -395,7 +400,11 @@ final class AppModel {
                 try await core.services.stop(service.id, origin: .mainWindow)
             }
         }
+        let replaced = onKeyClash == .replace ? projectClashing(with: document) : nil
         let project = try await core.library.importProject(document, onKeyClash: onKeyClash, origin: .mainWindow)
+        for service in replaced?.services ?? [] where !project.services.contains(where: { $0.id == service.id }) {
+            await core.logs.removeLogs(ofService: service.id)
+        }
         projects = await core.library.projects()
         selectedProjectID = project.id
     }
@@ -472,6 +481,7 @@ final class AppModel {
         await report { () throws(LocalhostError) in
             try await core.services.stop(id, origin: .mainWindow)
             try await core.library.removeService(id: id, origin: .mainWindow)
+            await core.logs.removeLogs(ofService: id)
         }
         if selectedServiceID == id { selectedServiceID = nil }
     }
@@ -564,6 +574,48 @@ final class AppModel {
         blockedStart = BlockedStart(serviceID: status.serviceID, port: port, holder: holder, nextFreePort: nextFreePort)
         // The question is asked in the main window.
         if origin == .menuBar { showMainWindow?() }
+    }
+
+    // MARK: Launch
+
+    /// What the user must hear about at launch: Project files that couldn't
+    /// be loaded, then Orphans (one alert at a time).
+    func runLaunchChecks() async {
+        if !hasReportedUnreadableFiles, !(core?.library.unreadableFiles.isEmpty ?? true) {
+            isShowingUnreadableFiles = true
+            return
+        }
+        await checkForOrphans()
+    }
+
+    var unreadableFilesTitle: String {
+        let count = core?.library.unreadableFiles.count ?? 0
+        return count == 1 ? "1 project couldn’t be loaded" : "\(count) projects couldn’t be loaded"
+    }
+
+    /// One line per file: its name, why, and where it is now.
+    var unreadableFilesMessage: String {
+        (core?.library.unreadableFiles ?? []).map { file in
+            let name = (file.path as NSString).lastPathComponent
+            let reason = switch file.error {
+            case .persistenceFailed(_, let reason): reason
+            case .unsupportedSchemaVersion(let version, _): "It was saved by a newer version of localhost (schema \(version))."
+            default: file.error.message
+            }
+            let outcome = file.movedTo.map { "Kept as \(($0 as NSString).lastPathComponent)." }
+                ?? "Left in place for that version."
+            return "\(name): \(reason) \(outcome)"
+        }
+        .joined(separator: "\n\n")
+    }
+
+    /// Closes the report (optionally showing the files), then checks for Orphans.
+    func dismissUnreadableFiles(revealing: Bool) {
+        hasReportedUnreadableFiles = true
+        if revealing, let file = core?.library.unreadableFiles.first {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: file.movedTo ?? file.path)])
+        }
+        Task { await checkForOrphans() }
     }
 
     // MARK: Orphans

@@ -97,16 +97,38 @@ final class PipeReader: @unchecked Sendable {
         buffer.append(contentsOf: chunk[..<count])
         var lines: [OutputLine] = []
         var start = buffer.startIndex
-        while let newline = buffer[start...].firstIndex(of: UInt8(ascii: "\n")) {
-            lines.append(makeLine(buffer[start..<newline]))
-            start = newline + 1
+        while true {
+            // A newline within the limit ends a line; past the limit, a piece is cut.
+            let window = buffer[start..<min(buffer.endIndex, start + Self.maxLineLength + 1)]
+            if let newline = window.firstIndex(of: UInt8(ascii: "\n")) {
+                lines.append(makeLine(buffer[start..<newline]))
+                start = newline + 1
+            } else if buffer.endIndex - start > Self.maxLineLength {
+                let end = start + Self.pieceLength(of: buffer[start...])
+                lines.append(makeLine(buffer[start..<end]))
+                start = end
+            } else {
+                break
+            }
         }
         buffer.removeSubrange(..<start)
-        while buffer.count >= Self.maxLineLength {
-            lines.append(makeLine(buffer[..<Self.maxLineLength]))
-            buffer.removeSubrange(..<Self.maxLineLength)
-        }
         return lines
+    }
+
+    /// How much of a line longer than `maxLineLength` to deliver as a piece:
+    /// at most that many bytes, backing off so a UTF-8 character isn't split
+    /// between pieces (which would show as two U+FFFD). Invalid UTF-8 is cut
+    /// at the limit.
+    static func pieceLength(of bytes: ArraySlice<UInt8>) -> Int {
+        func isContinuation(_ offset: Int) -> Bool {
+            bytes[bytes.startIndex + offset] & 0b1100_0000 == 0b1000_0000
+        }
+        var length = maxLineLength
+        // A continuation byte (10xxxxxx) can't start a character; a character is at most 4 bytes.
+        while length > maxLineLength - 3, isContinuation(length) {
+            length -= 1
+        }
+        return isContinuation(length) ? maxLineLength : length
     }
 
     private func makeLine(_ bytes: some Collection<UInt8>) -> OutputLine {

@@ -166,6 +166,35 @@ struct ProcessTreeTests {
         #expect(await allLines(of: tree).map(\.text) == ["caf\u{FFFD}"])
     }
 
+    @Test func `a line longer than the limit is split without breaking a character`() async throws {
+        // 3-byte characters, so the 64 KB limit falls inside one of them.
+        let tree = try launch(#"awk 'BEGIN { s = ""; for (i = 0; i < 50000; i++) s = s "€"; print s }'"#)
+        let pieces = await allLines(of: tree).map(\.text)
+
+        #expect(pieces.count > 1)
+        #expect(!pieces.joined().contains("\u{FFFD}"))
+        #expect(pieces.joined() == String(repeating: "€", count: 50_000))
+    }
+
+    @Test func `a line is cut at the limit even when its end arrives in a later read`() async throws {
+        // Exactly the limit, then (in another read) the rest of the line.
+        let tree = try launch(#"head -c 65536 /dev/zero | tr '\0' x; sleep 0.2; printf 'yyyy\n'"#)
+        let lines = await allLines(of: tree).map(\.text)
+
+        #expect(lines == [String(repeating: "x", count: PipeReader.maxLineLength), "yyyy"])
+    }
+
+    @Test(arguments: [
+        ([UInt8](repeating: 0x78, count: PipeReader.maxLineLength + 1), PipeReader.maxLineLength),
+        // "€" is E2 82 AC: the limit falls after its first byte, so the piece ends before it.
+        ([UInt8](repeating: 0x78, count: PipeReader.maxLineLength - 1) + [0xE2, 0x82, 0xAC], PipeReader.maxLineLength - 1),
+        // Only continuation bytes: not UTF-8, cut at the limit.
+        ([UInt8](repeating: 0x80, count: PipeReader.maxLineLength + 1), PipeReader.maxLineLength),
+    ])
+    func `long lines are cut at a character boundary`(bytes: [UInt8], end: Int) {
+        #expect(PipeReader.pieceLength(of: bytes[...]) == end)
+    }
+
     @Test func `timestamps each line`() async throws {
         let before = Date()
         let lines = await allLines(of: try launch("echo hi"))

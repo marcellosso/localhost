@@ -299,29 +299,80 @@ final class ProjectLibraryTests {
         #expect(try await library.project(id: project.id).name == "App")
     }
 
-    @Test func `refuses to load a file from an unknown schema version`() throws {
+    /// Writes a file into the projects folder, as a crash or another tool might.
+    func writeProjectFile(_ name: String, _ contents: String) throws -> URL {
         let projectsDirectory = root.appending(path: "projects")
         try FileManager.default.createDirectory(at: projectsDirectory, withIntermediateDirectories: true)
-        let file = projectsDirectory.appending(path: "\(UUID().uuidString).json")
-        try Data(#"{"schemaVersion": 99, "project": {}}"#.utf8).write(to: file)
-
-        #expect(throws: LocalhostError.unsupportedSchemaVersion(99, path: file.path)) {
-            try makeLibrary()
-        }
+        let file = projectsDirectory.appending(path: name)
+        try Data(contents.utf8).write(to: file)
+        return file
     }
 
-    @Test func `reports a corrupt file by path`() throws {
-        let projectsDirectory = root.appending(path: "projects")
-        try FileManager.default.createDirectory(at: projectsDirectory, withIntermediateDirectories: true)
-        let file = projectsDirectory.appending(path: "\(UUID().uuidString).json")
-        try Data("not json".utf8).write(to: file)
+    @Test func `a file from a newer schema version is reported and left in place`() async throws {
+        let file = try writeProjectFile("\(UUID().uuidString).json", #"{"schemaVersion": 99, "project": {}}"#)
 
-        #expect {
-            try makeLibrary()
-        } throws: { error in
-            guard case LocalhostError.persistenceFailed(let path, _) = error else { return false }
-            return path == file.path
-        }
+        let library = try makeLibrary()
+
+        #expect(library.unreadableFiles == [
+            UnreadableProjectFile(path: file.path, movedTo: nil, error: .unsupportedSchemaVersion(99, path: file.path)),
+        ])
+        #expect(await library.projects().isEmpty)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test(arguments: [
+        ("not json", "It is damaged: it isn’t valid JSON."),
+        (#"{"schemaVersion": 1, "project": {"name": "A"}}"#, "It is damaged: “project.id” is missing."),
+        (#"{"schemaVersion": 1, "project": {"id": 7}}"#, "It is damaged: “project.id” has the wrong type."),
+        ("", "It is damaged: it isn’t valid JSON."),
+    ])
+    func `a damaged file is moved aside and reported, and the other projects still load`(contents: String, reason: String) async throws {
+        let good = try await makeLibrary().addProject(name: "Good", key: Key("good"), path: "/tmp/good", origin: .mainWindow)
+        let damaged = try writeProjectFile("\(UUID().uuidString).json", contents)
+
+        let library = try makeLibrary()
+
+        #expect(await library.projects().map(\.id) == [good.id])
+        #expect(library.unreadableFiles == [
+            UnreadableProjectFile(
+                path: damaged.path, movedTo: damaged.path + ".unreadable",
+                error: .persistenceFailed(path: damaged.path, reason: reason)
+            ),
+        ])
+        #expect(!FileManager.default.fileExists(atPath: damaged.path))
+        #expect(try String(contentsOfFile: damaged.path + ".unreadable", encoding: .utf8) == contents)
+        // Reported once: the next launch doesn't see it again.
+        #expect(try makeLibrary().unreadableFiles.isEmpty)
+    }
+
+    @Test func `a damaged file never overwrites one moved aside before`() async throws {
+        let name = "\(UUID().uuidString).json"
+        _ = try writeProjectFile(name, "first")
+        _ = try makeLibrary()
+        let second = try writeProjectFile(name, "second")
+
+        let library = try makeLibrary()
+
+        #expect(library.unreadableFiles.map(\.movedTo) == [second.path + ".unreadable-2"])
+        #expect(try String(contentsOfFile: second.path + ".unreadable", encoding: .utf8) == "first")
+    }
+
+    @Test func `a second copy of a project, or of its key, is moved aside instead of loaded twice`() async throws {
+        let library = try makeLibrary()
+        let original = try await library.addProject(name: "App", key: Key("app"), path: "/tmp/app", origin: .mainWindow)
+        let json = try String(contentsOf: projectFile(original.id), encoding: .utf8)
+        // A copy made in Finder, and a different project that took the same key.
+        let copy = try writeProjectFile("\(original.id.uuidString) copy.json", json)
+        let sameKey = try writeProjectFile(
+            "\(UUID().uuidString).json", json.replacingOccurrences(of: original.id.uuidString, with: UUID().uuidString)
+        )
+
+        let reloaded = try makeLibrary()
+
+        #expect(await reloaded.projects().map(\.id) == [original.id])
+        #expect(Set(reloaded.unreadableFiles.map(\.path)) == [copy.path, sameKey.path])
+        #expect(reloaded.unreadableFiles.contains { $0.error == .duplicateProjectKey(try! Key("app")) })
+        #expect(reloaded.unreadableFiles.allSatisfy { $0.movedTo != nil })
     }
 
     // MARK: Events

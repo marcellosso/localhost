@@ -240,8 +240,8 @@ enum ListenerStopper {
             target.includeDescendants()
             guard target.isAlive else { return }
             target.send(signal)
-            let deadline = ContinuousClock.now + timeout
-            while target.isAlive, ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + timeout
+            while target.isAlive, SuspendingClock.now < deadline {
                 try? await Task.sleep(for: .milliseconds(20))
             }
         }

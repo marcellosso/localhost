@@ -155,10 +155,13 @@ public actor ProcessTree {
     }
 
     /// Returns whether the group ended within `timeout` (`nil` waits forever).
+    /// Timeouts here and elsewhere in the core use `SuspendingClock`, which
+    /// stops while the Mac sleeps: a process frozen by sleep gets its full
+    /// time once it can run again, instead of being escalated on wake.
     private func waitForProcessGroupToEnd(timeout: Duration?) async -> Bool {
-        let deadline = timeout.map { ContinuousClock.now + $0 }
+        let deadline = timeout.map { SuspendingClock.now + $0 }
         while processGroupExists() {
-            if let deadline, ContinuousClock.now >= deadline { return false }
+            if let deadline, SuspendingClock.now >= deadline { return false }
             try? await Task.sleep(for: Self.pollInterval)
         }
         return true
@@ -171,7 +174,7 @@ public actor ProcessTree {
     /// Waits for both pipes to end, cancelling the readers after `timeout`.
     private func waitForOutputToEnd(timeout: Duration) async {
         let timer = Task { [readers] in
-            try await Task.sleep(for: timeout)
+            try await Task.sleep(for: timeout, clock: .suspending)
             for reader in readers { reader.cancel() }
         }
         await outputEnded.wait()
