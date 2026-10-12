@@ -57,6 +57,8 @@ private struct ShortcutBadge: ViewModifier {
                     .background(.regularMaterial, in: .rect(cornerRadius: 4))
                     .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.separator))
                     .transition(.opacity)
+                    // Visual only: menus and help name the same shortcuts.
+                    .accessibilityHidden(true)
             }
         }
         .animation(.easeOut(duration: 0.1), value: shownMode == mode)

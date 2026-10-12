@@ -176,7 +176,9 @@ struct AllServicesRow: View {
         }
         .padding(.leading, 9)
         .padding(.vertical, 5)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("All services")
+        .accessibilityValue("\(states.filter(\.isActive).count) of \(states.count) running" + (failed > 0 ? ", \(failed) failed" : ""))
     }
 }
 
@@ -229,7 +231,23 @@ struct ServiceRow: View {
         }
         .opacity(isManual ? 0.75 : 1)
         .animation(.easeOut(duration: 0.15), value: status.state)
-        .animation(.easeOut(duration: 0.15), value: isSelected)
+        .animation(.motion(.easeOut(duration: 0.15)), value: isSelected)
+        // One element: name, then state, Port and command; the buttons are its actions.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(service.name)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityActions { ServiceAccessibilityActions(service: service, status: status) }
+    }
+
+    /// The state, then the summary when it says more, the Port and the
+    /// command, e.g. "Starting, Waiting for API, port 3000, pnpm dev".
+    private var accessibilityValue: String {
+        let state = StateIndicator.label(status.state)
+        let summary = summary.spoken
+        var parts = [summary.hasPrefix(state) ? summary : "\(state), \(summary)"]
+        if let port, !summary.contains("port \(port)") { parts.append("port \(port)") }
+        parts.append(service.commandLine)
+        return parts.joined(separator: ", ")
     }
 
     /// The active Run's port, which may have moved, else the Service's Port.
@@ -266,6 +284,30 @@ struct ServiceRow: View {
     }
 }
 
+/// What a Service row offers VoiceOver, like its buttons: Open, Restart and
+/// Stop while live, Start and Edit otherwise.
+struct ServiceAccessibilityActions: View {
+    @Environment(AppModel.self) private var model
+    let service: Service
+    let status: ServiceStatus
+
+    var body: some View {
+        switch status.state {
+        case .starting, .running:
+            if model.urlToOpen(service) != nil {
+                Button("Open in Browser") { model.openURL(of: service.id) }
+            }
+            Button("Restart") { model.restart(service.id) }
+            Button("Stop") { model.stop(service.id) }
+        case .stopping:
+            EmptyView()
+        case .stopped, .exited, .failed:
+            Button("Start") { model.start(service.id) }
+        }
+        Button("Edit Service") { model.presentedSheet = .editService(service.id) }
+    }
+}
+
 /// The selected Service's labelled actions, its main one tinted: Open (or
 /// Restart) and Stop while live, Start and Edit otherwise.
 struct ServiceActions: View {
@@ -287,6 +329,7 @@ struct ServiceActions: View {
                     }
                     .buttonStyle(PillButtonStyle(isProminent: true, isCompact: true))
                     .help("Open \(url.absoluteString) (⇧⌘O)")
+                    .accessibilityLabel("Open in Browser")
                 }
                 Button("Restart") { model.restart(service.id) }
                     .buttonStyle(PillButtonStyle(isProminent: url == nil, isCompact: true))

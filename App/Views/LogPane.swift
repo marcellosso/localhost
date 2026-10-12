@@ -22,6 +22,7 @@ struct LogPane: View {
                     .lineLimit(1)
                     .layoutPriority(1)
                 Text(status.summary)
+                    .accessibilityLabel(status.spokenSummary)
                     .foregroundStyle(status.state == .failed ? AnyShapeStyle(Color(nsColor: Theme.failed))
                         : status.hasPortWarning ? AnyShapeStyle(Color(nsColor: Theme.transitioning)) : AnyShapeStyle(.secondary))
                     .lineLimit(1)
@@ -84,6 +85,7 @@ struct LogPane: View {
             .buttonStyle(.plain)
             .fixedSize()
             .help("Open \(url.absoluteString) (⇧⌘O)")
+            .accessibilityLabel("Open \(url.absoluteString) in Browser")
         }
     }
 }
@@ -143,6 +145,7 @@ private struct LogHeader<Content: View>: View {
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 TextField("Filter", text: $model.logFilter)
                     .textFieldStyle(.plain)
                     .focused($isFilterFocused)

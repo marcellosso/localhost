@@ -4,10 +4,14 @@ import SwiftUI
 /// The app's colours and surfaces ("Graded glass", #26), each resolved for the
 /// light or dark appearance. Green, orange and red are kept for Service State;
 /// the accent marks only primary actions.
+///
+/// Contrast (WCAG AA) on the log, column and sidebar surfaces: colours used
+/// as text (State, Service colours, also in their tinted Port pills) reach
+/// 4.5:1, the Stopped ring and other glyphs 3:1, and the accent's text 4.5:1.
 enum Theme {
     // MARK: Accent
 
-    static let accent = Color(nsColor: dynamic(light: 0xE0336A, dark: 0xFF5C8A))
+    static let accent = Color(nsColor: dynamic(light: 0xD73065, dark: 0xFF5C8A))
     /// Text and icons on the accent.
     static let onAccent = Color(nsColor: dynamic(light: 0xFFFFFF, dark: 0x1A0B10))
     /// The accent as text on a light accent tint.
@@ -16,23 +20,23 @@ enum Theme {
     // MARK: Service State
 
     static let running = dynamic(light: 0x1A7F37, dark: 0x3FB950)
-    static let transitioning = dynamic(light: 0xBF8700, dark: 0xF0A030)
+    static let transitioning = dynamic(light: 0x896100, dark: 0xF0A030)
     static let failed = dynamic(light: 0xCF222E, dark: 0xFF5A4E)
-    static let stopped = dynamic(light: 0x8C959F, dark: 0x7D8590)
+    static let stopped = dynamic(light: 0x737B84, dark: 0x7D8590)
 
     // MARK: Service colours
 
     /// Assigned to a Project's Services by position, so a Service keeps its
     /// colour everywhere: its row, its log prefix, the menu bar, Ports.
     static let serviceColors: [NSColor] = [
-        dynamic(light: 0x0969DA, dark: 0x79C0FF),
-        dynamic(light: 0x8250DF, dark: 0xB392F0),
-        dynamic(light: 0x9A6700, dark: 0xE5C07B),
-        dynamic(light: 0xBC4C00, dark: 0xF78C6C),
-        dynamic(light: 0x1B7C83, dark: 0x56D4DD),
-        dynamic(light: 0xBF3989, dark: 0xF2A8D0),
-        dynamic(light: 0x4C5FD5, dark: 0xA8B4FF),
-        dynamic(light: 0x6B7A12, dark: 0xC9D18A),
+        dynamic(light: 0x075CBF, dark: 0x79C0FF),
+        dynamic(light: 0x6F44BF, dark: 0xB392F0),
+        dynamic(light: 0x815600, dark: 0xE5C07B),
+        dynamic(light: 0xA14100, dark: 0xF78C6C),
+        dynamic(light: 0x176A70, dark: 0x56D4DD),
+        dynamic(light: 0xA43175, dark: 0xF2A8D0),
+        dynamic(light: 0x4455BF, dark: 0xA8B4FF),
+        dynamic(light: 0x59660F, dark: 0xC9D18A),
     ]
 
     static func serviceColor(at index: Int) -> NSColor {
@@ -86,13 +90,14 @@ extension View {
 
 private struct Glass: ViewModifier {
     @AppStorage(Preferences.translucencyKey) private var isTranslucent = true
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let tint: NSColor
     let solid: NSColor
 
     func body(content: Content) -> some View {
         content.background {
             Group {
-                if isTranslucent {
+                if isTranslucent && !reduceTransparency {
                     ZStack {
                         BehindWindowBlur()
                         Color(nsColor: tint)

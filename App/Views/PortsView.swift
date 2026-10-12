@@ -33,7 +33,7 @@ struct PortsView: View {
                     }
                 } header: {
                     Button {
-                        withAnimation(.easeOut(duration: 0.15)) { showsAppListeners.toggle() }
+                        withAnimation(.motion(.easeOut(duration: 0.15))) { showsAppListeners.toggle() }
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.right")
@@ -44,6 +44,8 @@ struct PortsView: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Apps & macOS, \(others.count) listeners")
+                    .accessibilityValue(showsAppListeners ? "Shown" : "Hidden")
                 }
             }
         }
@@ -111,6 +113,24 @@ struct ListenerRow: View {
                 .buttonStyle(PillButtonStyle(isCompact: true))
         }
         .padding(.vertical, 3)
+        // One element: whose it is, its ports and command; Stop is its action.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(service.map { "\($0.project.name) › \($0.service.name)" } ?? listener.name)
+        .accessibilityValue(accessibilityValue(service))
+        .accessibilityActions {
+            if model.reasonNotStoppable(listener) == nil, !model.stoppingListenerIDs.contains(listener.id) {
+                Button("Stop") { model.requestStop(listener) }
+            }
+        }
+    }
+
+    /// e.g. "port 3000, Python -m http.server 3000, In My SaaS".
+    private func accessibilityValue(_ service: (project: Project, service: Service)?) -> String {
+        let ports = listener.ports.map(String.init).joined(separator: ", ")
+        var parts = [(listener.ports.count == 1 ? "port " : "ports ") + ports, Self.subtitle(of: listener)]
+        if service == nil { parts.append(model.ownerDescription(listener)) }
+        if model.stoppingListenerIDs.contains(listener.id) { parts.append("stopping") }
+        return parts.joined(separator: ", ")
     }
 
     private var name: some View {

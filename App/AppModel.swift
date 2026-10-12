@@ -1,6 +1,7 @@
 import AppKit
 import LocalhostCore
 import Observation
+import SwiftUI
 
 /// The app's single owner of the core. Views read it and call its actions;
 /// they never own Runs or processes.
@@ -138,6 +139,7 @@ final class AppModel {
 
     @ObservationIgnored private let runRegistry: RunRegistry
     @ObservationIgnored private var projectObservation: Task<Void, Never>?
+    @ObservationIgnored private var stateAnnouncements: Task<Void, Never>?
 
     /// Where Projects, logs and Run records live. `LOCALHOST_STORAGE_ROOT`
     /// overrides it, e.g. to try a build without touching real data.
@@ -168,6 +170,7 @@ final class AppModel {
             startupError = error
         }
         observeProjects()
+        announceStates()
     }
 
     // MARK: Reading
@@ -668,6 +671,28 @@ final class AppModel {
                 case .projectAdded, .projectUpdated, .projectRemoved:
                     self.projects = await library.projects()
                 }
+            }
+        }
+    }
+
+    /// Has VoiceOver say when a Service settles (Running, Exited, Failed or
+    /// Stopped), wherever it is, since only its row shows it otherwise. The
+    /// states in between are in the rows' values, and would be noise here.
+    private func announceStates() {
+        guard let services = core?.services else { return }
+        stateAnnouncements = Task { [weak self] in
+            var lastStates: [UUID: ServiceState] = [:]
+            for await event in await services.subscribe().events {
+                guard let self, case .serviceStateChanged(let status) = event else { continue }
+                defer { lastStates[status.serviceID] = status.state }
+                guard status.state != lastStates[status.serviceID], !status.state.isActive || status.state == .running,
+                      NSWorkspace.shared.isVoiceOverEnabled,
+                      let (project, service) = self.service(status.serviceID)
+                else { continue }
+                let subject = project.id == self.selectedProjectID ? service.name : "\(project.name), \(service.name)"
+                var announcement = AttributedString("\(subject), \(status.spokenSummary)")
+                announcement.accessibilitySpeechAnnouncementPriority = status.state == .failed ? .high : .default
+                AccessibilityNotification.Announcement(announcement).post()
             }
         }
     }
