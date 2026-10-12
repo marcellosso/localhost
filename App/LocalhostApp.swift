@@ -135,13 +135,22 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("r")
             .disabled(status == nil || status?.state == .stopping)
-            Button("Stop") { model.selectedServiceID.map { model.stop($0) } }
-                .keyboardShortcut(".")
-                .disabled(!isLive)
+            // In Ports, Stop applies to the selected Listener.
+            let listener = model.sidebarSelection == .ports ? model.selectedListenerID.flatMap(model.listener) : nil
+            Button(listener.map { "Stop \($0.name)" + (model.service(of: $0) == nil ? "…" : "") } ?? "Stop") {
+                if let listener { model.requestStop(listener) } else { model.selectedServiceID.map { model.stop($0) } }
+            }
+            .keyboardShortcut(".")
+            .disabled(listener.map { model.reasonNotStoppable($0) != nil } ?? !isLive)
             Divider()
             Button("Open URL") { model.selectedServiceID.map { model.openURL(of: $0) } }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(!isLive || model.selectedService.flatMap(model.urlToOpen) == nil)
+            Divider()
+            Button("Edit Service…") { model.selectedService.map { model.presentedSheet = .editService($0.id) } }
+                .disabled(model.selectedService == nil)
+            Button("Remove Service…") { model.selectedService.map { model.pendingRemoval = .service($0.id) } }
+                .disabled(model.selectedService == nil)
         }
         CommandMenu("Project") {
             let project = model.selectedProject
@@ -152,7 +161,19 @@ struct AppCommands: Commands {
                 .keyboardShortcut(".", modifiers: [.command, .shift])
                 .disabled(!(project.map { $0.services.contains { model.status(of: $0).state.isActive } } ?? false))
             Divider()
+            Button("Edit Project…") { project.map { model.presentedSheet = .editProject($0.id) } }
+                .disabled(project == nil)
+            Button("Edit Environment…") { project.map { model.presentedSheet = .projectEnvironment($0.id) } }
+                .disabled(project == nil)
+            Button(project?.isFavorite == true ? "Unfavorite" : "Favorite") {
+                project.map { model.setFavorite($0.id, !$0.isFavorite) }
+            }
+            .disabled(project == nil)
+            Divider()
             FolderActionCommands(model: model)
+            Divider()
+            Button("Remove Project…") { project.map { model.pendingRemoval = .project($0.id) } }
+                .disabled(project == nil)
         }
     }
 }

@@ -45,6 +45,7 @@ struct CommandPaletteView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             TextField("Search", text: $query, prompt: Text("Jump to a project or service, or run an action…"))
                 .labelsHidden()
                 .textFieldStyle(.plain)
@@ -81,6 +82,7 @@ struct CommandPaletteView: View {
                         PaletteRow(item: item, isSelected: item.id == selectedID)
                             .id(item.id)
                             .onTapGesture { run(item) }
+                            .accessibilityAction { run(item) }
                             .onHover { if $0 { selectedID = item.id } }
                     }
                 }

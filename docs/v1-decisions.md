@@ -134,6 +134,14 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 - **Primary actions are labelled**; icon-only controls name their shortcut in the tooltip; rare actions live in `⋯` and context menus.
 - Colours and surfaces live in `Theme` (App target); views don't hard-code colours.
 
+## Accessibility (M3)
+
+- **VoiceOver**: a Service row, a Project row, a Listener row and a menu bar Service are each one element: the name as label, then state, summary, Port and command as value. Their buttons are its actions (Start / Stop / Restart / Open in Browser / Edit Service; Stop for a Listener). Summaries are spoken without "·". Icon buttons name what they act on ("Stop Web").
+- **Announcements**: while VoiceOver runs, a Service settling (Running, Exited, Failed, Stopped) is announced, prefixed with its Project when that isn't the selected one; Failed at high priority with its reason. Starting/Stopping are only in the rows, so a Start All isn't a stream of speech.
+- **Keyboard**: every action has a menu item, so it works from the keyboard (and menu search): Edit / Remove Service in the Service menu; Edit Project, Edit Environment, Favorite, Remove Project in the Project menu. In Ports, ⌘. stops the selected Listener. Disclosure and inline editors are buttons, not tap gestures.
+- **Contrast**: WCAG AA in both appearances on the log, column and sidebar surfaces: text colours (State, Service colours, also in their tinted Port pills) 4.5:1, the Stopped ring and other glyphs 3:1, text on the accent 4.5:1. The light variants were darkened for this; dark ones already passed.
+- **Reduce Motion**: movement (chevrons turning, rows growing, the pulsing ring) is off; fades stay. **Reduce Transparency**: every surface is solid, as with translucency off.
+
 ## Workflow
 
 - One GitHub issue per milestone (M0–M3). Read the issue, `GLOSSARY.md`, this file, and the ADRs before starting.

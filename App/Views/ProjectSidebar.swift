@@ -26,6 +26,9 @@ struct ProjectSidebar: View {
                         }
                     }
                     .shortcutBadge(model.projects.firstIndex { $0.id == project.id }.map { $0 + 1 }, shownIn: .projects)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(project.name + (project.isFavorite ? ", favourite" : ""))
+                    .accessibilityValue(model.accessibilityState(of: project))
                     .tag(AppModel.SidebarItem.project(project.id))
                 }
                 if projects.isEmpty, !model.projectSearch.isEmpty {
@@ -160,12 +163,14 @@ struct SquareIconButtonStyle: ButtonStyle {
     }
 }
 
-/// The sidebar without its glass, when translucency is off in Settings.
+/// The sidebar without its glass, when translucency is off in Settings or
+/// under Reduce Transparency.
 private struct SolidSidebar: ViewModifier {
     @AppStorage(Preferences.translucencyKey) private var isTranslucent = true
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        if isTranslucent {
+        if isTranslucent && !reduceTransparency {
             content
         } else {
             content

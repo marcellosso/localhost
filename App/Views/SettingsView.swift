@@ -67,6 +67,7 @@ struct SettingsView: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(section == item ? .isSelected : [])
             }
             Spacer()
         }

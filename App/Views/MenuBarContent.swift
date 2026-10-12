@@ -77,6 +77,7 @@ struct MenuBarContent: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color(nsColor: Theme.transitioning))
+                            .accessibilityLabel("Warning")
                         Text(Self.description(of: warning, in: model))
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
@@ -153,11 +154,14 @@ private struct MenuBarProjectSection: View {
                 }
                 .buttonStyle(.plain)
                 .help("Show in localhost")
-                MenuBarIconButton("Start All", systemImage: "play.fill") {
+                .accessibilityLabel(project.name)
+                .accessibilityValue(model.accessibilityState(of: project))
+                .accessibilityHint("Shows it in localhost")
+                MenuBarIconButton("Start All", systemImage: "play.fill", in: project.name) {
                     model.startAll(inProject: project.id, origin: .menuBar)
                 }
                 .disabled(project.services.isEmpty)
-                MenuBarIconButton("Stop All", systemImage: "stop.fill") {
+                MenuBarIconButton("Stop All", systemImage: "stop.fill", in: project.name) {
                     model.stopAll(inProject: project.id, origin: .menuBar)
                 }
                 .disabled(!isAnyActive)
@@ -203,18 +207,22 @@ private struct MenuBarServiceRow: View {
             }
             .buttonStyle(.plain)
             .help("Show in localhost")
+            .accessibilityLabel("\(service.name), \(project.name)")
+            .accessibilityValue(status.spokenSummary)
+            .accessibilityHint("Shows it in localhost")
             if isLive, model.urlToOpen(service) != nil {
-                MenuBarIconButton("Open URL", systemImage: "safari") { model.openURL(of: service.id) }
+                MenuBarIconButton("Open URL", systemImage: "safari", in: service.name) { model.openURL(of: service.id) }
             }
             if isLive {
-                MenuBarIconButton("Restart", systemImage: "arrow.clockwise") { model.restart(service.id, origin: .menuBar) }
-                MenuBarIconButton("Stop", systemImage: "stop.fill") { model.stop(service.id, origin: .menuBar) }
+                MenuBarIconButton("Restart", systemImage: "arrow.clockwise", in: service.name) { model.restart(service.id, origin: .menuBar) }
+                MenuBarIconButton("Stop", systemImage: "stop.fill", in: service.name) { model.stop(service.id, origin: .menuBar) }
             } else if status.state == .stopping {
                 ProgressView()
                     .controlSize(.mini)
                     .frame(width: 22)
+                    .accessibilityLabel("Stopping \(service.name)")
             } else {
-                MenuBarIconButton("Start", systemImage: "play.fill") { model.start(service.id, origin: .menuBar) }
+                MenuBarIconButton("Start", systemImage: "play.fill", in: service.name) { model.start(service.id, origin: .menuBar) }
             }
         }
         .font(.callout)
@@ -224,15 +232,18 @@ private struct MenuBarServiceRow: View {
     }
 }
 
-/// A small borderless icon button with a tooltip.
+/// A small borderless icon button with a tooltip. VoiceOver also hears what
+/// it acts on, e.g. "Start Web", since the rows around it aren't read with it.
 private struct MenuBarIconButton: View {
     let title: String
     let systemImage: String
+    let subject: String
     let action: () -> Void
 
-    init(_ title: String, systemImage: String, action: @escaping () -> Void) {
+    init(_ title: String, systemImage: String, in subject: String, action: @escaping () -> Void) {
         self.title = title
         self.systemImage = systemImage
+        self.subject = subject
         self.action = action
     }
 
@@ -243,6 +254,7 @@ private struct MenuBarIconButton: View {
             .font(.system(size: 11))
             .frame(width: 22)
             .help(title)
+            .accessibilityLabel("\(title) \(subject)")
     }
 }
 

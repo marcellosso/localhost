@@ -112,6 +112,7 @@ struct VariableEditor: View {
         .textFieldStyle(.plain)
         .font(.system(size: 12.5, design: .monospaced))
         .foregroundStyle(.secondary)
+        .accessibilityLabel(variable.wrappedValue.name.isEmpty ? "Value" : "Value of \(variable.wrappedValue.name)")
     }
 
     private func toggleReveal(_ variable: Binding<VariableDraft>) async {

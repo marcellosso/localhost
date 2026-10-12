@@ -92,7 +92,7 @@ struct SuggestionReview: View {
                     }
                     if !others.isEmpty {
                         Button {
-                            withAnimation(.easeOut(duration: 0.15)) { isShowingOthers.toggle() }
+                            withAnimation(.motion(.easeOut(duration: 0.15))) { isShowingOthers.toggle() }
                         } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "chevron.right")
@@ -190,7 +190,10 @@ private struct SuggestionRow: View {
                 if let port = Int(draft.port) {
                     PortPill(port: port, color: color)
                 }
-                Image(systemName: "chevron.down")
+                // A button, so the keyboard can open the editor too.
+                Button(isExpanded ? "Close Editor" : "Edit \(draft.name)", systemImage: "chevron.down") { toggleEditor() }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.plain)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
@@ -198,12 +201,9 @@ private struct SuggestionRow: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .contentShape(.rect)
-            .onTapGesture {
-                withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
-            }
+            .onTapGesture(perform: toggleEditor)
             .help("From \(draft.suggestion.foundIn) · \(draft.suggestion.detail)")
             .accessibilityElement(children: .contain)
-            .accessibilityAction(named: isExpanded ? "Close editor" : "Edit") { isExpanded.toggle() }
 
             if isExpanded {
                 editor
@@ -214,6 +214,10 @@ private struct SuggestionRow: View {
             }
         }
         .opacity(draft.isChecked ? 1 : 0.65)
+    }
+
+    private func toggleEditor() {
+        withAnimation(.motion(.easeOut(duration: 0.15))) { isExpanded.toggle() }
     }
 
     private var commandSummary: String {
