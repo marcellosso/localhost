@@ -122,4 +122,6 @@ The code and the UI use the same words. When you name things, use these:
 
 CI runs the core tests and an unsigned app build on every PR; both must pass. Commits are kept as written (merge commits, no squash), so make each commit message say what it does in one line.
 
+Releases are cut by tagging `main`; see [RELEASING.md](RELEASING.md).
+
 By contributing, you agree your contributions are licensed under the MIT license in [LICENSE](LICENSE).

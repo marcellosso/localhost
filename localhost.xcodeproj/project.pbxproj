@@ -15,9 +15,22 @@
 		A10000000000000000000012 /* LocalhostCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = LocalhostCore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A10000000000000000000022 /* Exceptions for "App" folder in "localhost" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A10000000000000000000041 /* localhost */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A10000000000000000000021 /* App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A10000000000000000000022 /* Exceptions for "App" folder in "localhost" target */,
+			);
 			path = App;
 			sourceTree = "<group>";
 		};
