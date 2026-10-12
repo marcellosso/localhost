@@ -56,6 +56,11 @@ public enum LocalhostError: Error, Sendable, Hashable, Codable {
     case keychainFailed(status: Int32)
     case unsupportedSchemaVersion(Int, path: String)
     case persistenceFailed(path: String, reason: String)
+
+    // Project files
+    /// A Project file can't be imported: what is wrong, in which field (e.g.
+    /// `["services", "api", "port"]`, empty for the file's syntax) and on which line.
+    indirect case invalidProjectFile(ProjectFileProblem, field: [String], line: Int?)
 }
 
 extension LocalhostError {
@@ -126,6 +131,12 @@ extension LocalhostError {
             "The Keychain refused: \((SecCopyErrorMessageString(status, nil) as String?) ?? "error \(status)")."
         case .persistenceFailed(let path, let reason):
             "Could not read or write \(path): \(reason)"
+        case .invalidProjectFile(let problem, let field, let line):
+            {
+                let place = [line.map { "Line \($0)" }, field.isEmpty ? nil : field.joined(separator: " › ")]
+                    .compactMap(\.self).joined(separator: ", ")
+                return place.isEmpty ? problem.message : "\(place): \(problem.message)"
+            }()
         }
     }
 }

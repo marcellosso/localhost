@@ -119,6 +119,7 @@ struct ProjectToolbar: ToolbarContent {
                 Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id) }
                 Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(project.id, !project.isFavorite) }
+                Button("Export Project…") { model.exportProject(project.id) }
                 Divider()
                 FolderActionButtons(folder: AppModel.folder(of: project))
                 Divider()

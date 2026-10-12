@@ -114,12 +114,11 @@ public actor ProjectLibrary {
         origin: Origin
     ) throws(LocalhostError) -> Project {
         try ensureProjectKeyIsFree(key)
-        let nextSortOrder = (projectsByID.values.map(\.sortOrder).max() ?? -1) + 1
         var project = Project(
             name: try Validate.name(name),
             key: key,
             path: try Validate.projectPath(path),
-            sortOrder: nextSortOrder
+            sortOrder: nextSortOrder()
         )
         try append(services, to: &project)
         try commit(project)
@@ -160,10 +159,97 @@ public actor ProjectLibrary {
         guard let project = projectsByID[id] else { throw .projectNotFound(id) }
         try storage.delete(id)
         projectsByID[id] = nil
-        removeSecrets(Self.secretAccounts(.project(id), project.variables)
-            + project.services.flatMap { Self.secretAccounts(.service($0.id), $0.variables) }
-            + project.profiles.flatMap { Self.secretAccounts(.profile($0.id), $0.variables) })
+        removeSecrets(Self.allSecretAccounts(of: project))
         broadcast(.projectRemoved(id: id, origin: origin))
+    }
+
+    // MARK: Import
+
+    /// What to do when an imported Project's Key is already used.
+    public enum KeyClash: Sendable, Hashable {
+        /// Swap the imported Configuration into the Project with that Key,
+        /// keeping its identity (and so its logs), sort order and favourite.
+        case replace
+        /// Add the import under a free Key (`freeProjectKey(basedOn:)`).
+        case keepBoth
+    }
+
+    /// Adds the Project a Project file describes, in one save. Its Secrets
+    /// are named but have no value until they are set.
+    ///
+    /// If another Project has the document's Key, nothing is changed unless
+    /// `onKeyClash` says what to do. On `.replace`, Services and Profiles
+    /// matching the old ones by Key and name keep their identity, and with it
+    /// their logs and the stored values of Secrets they still name.
+    @discardableResult
+    public func importProject(
+        _ document: ProjectDocument,
+        onKeyClash: KeyClash? = nil,
+        origin: Origin
+    ) throws(LocalhostError) -> Project {
+        let existing = projectsByID.values.first { $0.key == document.key }
+        var project: Project
+        switch (existing, onKeyClash) {
+        case (nil, _):
+            project = Project(name: document.name, key: document.key, path: "", sortOrder: nextSortOrder())
+        case (_?, nil):
+            throw .duplicateProjectKey(document.key)
+        case (_?, .keepBoth):
+            project = Project(
+                name: document.name, key: freeProjectKey(basedOn: document.key), path: "", sortOrder: nextSortOrder()
+            )
+        case (let existing?, .replace):
+            project = Project(
+                id: existing.id, name: document.name, key: existing.key, path: "",
+                sortOrder: existing.sortOrder, isFavorite: existing.isFavorite
+            )
+        }
+        let replaced = onKeyClash == .replace ? existing : nil
+        project.path = try Validate.projectPath(document.path)
+        project.variables = document.variables
+        project.services = document.services.map { imported in
+            Service(
+                id: replaced?.services.first { $0.key == imported.key }?.id ?? UUID(),
+                name: imported.name, key: imported.key, workingDirectory: imported.workingDirectory,
+                commandLine: imported.commandLine, environment: imported.variables.values,
+                secretNames: imported.variables.secretNames,
+                isExcludedFromStartAll: imported.isExcludedFromStartAll,
+                port: imported.port, url: imported.url, portCanChange: imported.portCanChange
+            )
+        }
+        let idsByKey = Dictionary(uniqueKeysWithValues: project.services.map { ($0.key, $0.id) })
+        for (index, imported) in document.services.enumerated() {
+            project.services[index].dependencies = imported.dependencies.compactMap { idsByKey[$0] }
+        }
+        project.profiles = document.profiles.map { imported in
+            EnvironmentProfile(
+                id: replaced?.profiles.first { $0.name == imported.name }?.id ?? UUID(),
+                name: imported.name, variables: imported.variables
+            )
+        }
+        project.activeProfileID = project.profiles.first { $0.name == document.activeProfile }?.id
+        try commit(project)
+        if let replaced {
+            let kept = Set(Self.allSecretAccounts(of: project))
+            removeSecrets(Self.allSecretAccounts(of: replaced).filter { !kept.contains($0) })
+            broadcast(.projectUpdated(project, origin: origin))
+        } else {
+            broadcast(.projectAdded(project, origin: origin))
+        }
+        return project
+    }
+
+    /// `key` if no Project uses it, else the first free `key-2`, `key-3`, ….
+    public func freeProjectKey(basedOn key: Key) -> Key {
+        let taken = Set(projectsByID.values.map(\.key.rawValue))
+        var candidate = key.rawValue
+        var suffix = 2
+        while taken.contains(candidate) {
+            candidate = "\(key.rawValue.prefix(Key.maxLength - 4))-\(suffix)"
+            suffix += 1
+        }
+        // Valid: a valid Key, cut short of the limit, plus `-<digits>`.
+        return (try? Key(candidate)) ?? key
     }
 
     // MARK: Services
@@ -383,6 +469,17 @@ public actor ProjectLibrary {
         variables.secretNames.map { layer.secretAccount($0) }
     }
 
+    /// The accounts of every Secret of the Project, on every layer.
+    private static func allSecretAccounts(of project: Project) -> [String] {
+        secretAccounts(.project(project.id), project.variables)
+            + project.services.flatMap { secretAccounts(.service($0.id), $0.variables) }
+            + project.profiles.flatMap { secretAccounts(.profile($0.id), $0.variables) }
+    }
+
+    private func nextSortOrder() -> Int {
+        (projectsByID.values.map(\.sortOrder).max() ?? -1) + 1
+    }
+
     /// Best effort: a leftover item is harmless, the configuration no longer names it.
     private func removeSecrets(_ accounts: [String]) {
         for account in accounts { try? secrets.removeValue(for: account) }
@@ -482,8 +579,9 @@ public actor ProjectLibrary {
     }
 }
 
-/// Field validation and normalization shared by Project and Service edits.
-private enum Validate {
+/// Field validation and normalization shared by Project and Service edits
+/// and Project files.
+enum Validate {
     static func name(_ raw: String) throws(LocalhostError) -> String {
         let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw .invalidName }

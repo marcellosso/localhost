@@ -45,6 +45,7 @@ struct ProjectSidebar: View {
                 Button("Edit Project…") { model.presentedSheet = .editProject(id) }
                 Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(id) }
                 Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(id, !project.isFavorite) }
+                Button("Export Project…") { model.exportProject(id) }
                 Divider()
                 FolderActionButtons(folder: AppModel.folder(of: project))
                 Divider()
