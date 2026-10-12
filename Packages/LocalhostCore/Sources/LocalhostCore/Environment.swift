@@ -98,7 +98,7 @@ public protocol SecretStore: Sendable {
 
 /// Stores each Secret as one generic-password item in the login Keychain.
 public struct KeychainSecretStore: SecretStore {
-    public static let service = "com.marcellosso.localhost.secret"
+    public static let service = "com.sixpetals.localhost.secret"
 
     public init() {}
 
