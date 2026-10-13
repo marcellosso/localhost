@@ -10,7 +10,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Build the Rust core"
-               scriptText = "&quot;$SRCROOT/scripts/build-core.sh&quot; --xcode&#10;">
+               scriptText = "&quot;$SRCROOT/../../scripts/build-core.sh&quot; --xcode&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"

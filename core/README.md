@@ -34,7 +34,7 @@ Projects and Services are named by Key, name, or letters of either in order
 built with its `ffi` feature, which adds UniFFI bindings next to the types
 they describe (`localhost-core/src/ffi/`, `localhost-core/uniffi.toml`).
 `scripts/build-core.sh` builds it and generates the Swift bindings into
-`Packages/LocalhostCoreFFI`:
+`apps/macos/LocalhostCoreFFI`:
 
 ```sh
 scripts/build-core.sh            # universal (arm64 + x86_64) release build, as shipped
