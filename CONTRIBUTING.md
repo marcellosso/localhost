@@ -152,7 +152,7 @@ The code and the UI use the same words. When you name things, use these:
 2. Run `cargo test` in `core/` (and `swift test` in `Packages/LocalhostCoreFFI` if you touched the bridge), then build the app.
 3. Open a PR describing what changed and why, how you checked it, and anything you left out. Link the issue it addresses.
 
-CI runs the core's tests on macOS and Linux, the Swift layer's tests on a universal build, and an unsigned app build on every PR; all must pass. Commits are kept as written (merge commits, no squash), so make each commit message say what it does in one line.
+CI runs the core's tests on Linux and macOS, the Swift layer's tests and an unsigned app build on every PR; all must pass. The macOS job skips draft PRs (macOS minutes cost the most), so mark yours ready for review when you want the full run. Changes to Markdown or `docs/` alone run no CI. Commits are kept as written (merge commits, no squash), so make each commit message say what it does in one line.
 
 Releases are cut by tagging `main`; see [RELEASING.md](RELEASING.md).
 
