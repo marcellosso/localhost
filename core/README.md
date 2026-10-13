@@ -28,5 +28,19 @@ cargo run -p localhost-cli -- up acme [web …]     # run in the foreground; Ctr
 Projects and Services are named by Key, name, or letters of either in order
 (`FuzzyMatch`).
 
+## The macOS app's library
+
+`localhost-ffi` is the static library the macOS app links. It is the core
+built with its `ffi` feature, which adds UniFFI bindings next to the types
+they describe (`localhost-core/src/ffi/`, `localhost-core/uniffi.toml`).
+`scripts/build-core.sh` builds it and generates the Swift bindings into
+`Packages/LocalhostCoreFFI`:
+
+```sh
+scripts/build-core.sh            # universal (arm64 + x86_64) release build, as shipped
+scripts/build-core.sh debug      # this Mac's architecture only, faster
+scripts/build-core.sh --check    # fails if the output is older than core/
+```
+
 `localhost-core/tests/fixtures/swift-schema-1/` holds files written by the
 Swift core; the Rust core must keep reading them.

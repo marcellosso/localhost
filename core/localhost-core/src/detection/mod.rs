@@ -34,6 +34,7 @@ use crate::{Key, NewService, Project};
 /// them, so a suggested Service is never inherently "a Node service".
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceSuggestion {
     pub name: String,
     pub key: Key,

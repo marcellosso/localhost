@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 /// can tell who changed what.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum Origin {
     MainWindow,
     MenuBar,

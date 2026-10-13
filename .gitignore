@@ -18,3 +18,7 @@ Packages/*/Package.resolved
 
 # Cargo
 core/target/
+
+# Rust core built for the app (scripts/build-core.sh)
+Packages/LocalhostCoreFFI/Generated/
+Packages/LocalhostCoreFFI/Sources/LocalhostCore/Generated/

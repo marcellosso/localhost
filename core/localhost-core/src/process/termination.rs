@@ -7,6 +7,7 @@ use crate::LocalhostError;
 /// How the command's shell ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum Termination {
     Exited { code: i32 },
     Signaled { signal: i32 },

@@ -75,6 +75,7 @@ impl LogBuffer {
 /// Keeps Run output. The last `retained_runs_per_service` files are kept per
 /// Service; a file rotates into a `.log.1` backup so the pair stays within
 /// `max_file_size`.
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct LogStore {
     logs_directory: PathBuf,
     max_lines_per_run: usize,

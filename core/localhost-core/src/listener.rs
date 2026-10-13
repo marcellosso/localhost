@@ -12,6 +12,7 @@ use crate::process::{StopPolicy, process_group_exists};
 /// started it (see `GLOSSARY.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Listener {
     pub pid: i32,
     pub process_group_id: i32,
@@ -43,6 +44,7 @@ impl Listener {
 /// Who a Listener is attributed to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ListenerOwner {
     /// A process of a Run localhost started.
     #[serde(rename_all = "camelCase")]
@@ -61,6 +63,7 @@ pub enum ListenerOwner {
 /// apart from the apps and system services that also listen on ports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ListenerKind {
     /// A development server or tool: anything not recognised as below, and
     /// always a Listener of a Run or inside a Project.

@@ -5,10 +5,15 @@
 //! [`Origin`], failures are a [`LocalhostError`], and changes are broadcast as
 //! events, so the core can later be hosted behind IPC without a rewrite.
 
+#[cfg(feature = "ffi")]
+uniffi::setup_scaffolding!("localhost_core");
+
 mod ansi;
 mod dependencies;
 mod detection;
 mod error;
+#[cfg(feature = "ffi")]
+mod ffi;
 mod fold;
 mod fuzzy;
 mod id;

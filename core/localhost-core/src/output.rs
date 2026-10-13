@@ -7,6 +7,7 @@ use crate::Id;
 /// Where a line of a Run's output came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum OutputChannel {
     Stdout,
     Stderr,
@@ -27,6 +28,7 @@ impl OutputChannel {
 
 /// One line of a Run's output.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct OutputLine {
     pub channel: OutputChannel,
     /// The line without its terminator. Invalid UTF-8 is replaced with U+FFFD.
@@ -43,6 +45,7 @@ impl OutputLine {
 /// A line of one Service's output, in a stream that combines several Services.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceOutputLine {
     pub service_id: Id,
     pub line: OutputLine,

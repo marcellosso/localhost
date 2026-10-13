@@ -14,6 +14,7 @@ use crate::{
 
 /// A change to the Project Configuration, tagged with the Origin that caused it.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ProjectLibraryEvent {
     ProjectAdded {
         project: Project,
@@ -32,6 +33,7 @@ pub enum ProjectLibraryEvent {
 
 /// What to do when an imported Project's Key is already used.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum KeyClash {
     /// Swap the imported Configuration into the Project with that Key,
     /// keeping its identity (and so its logs), sort order and favourite.
@@ -42,6 +44,7 @@ pub enum KeyClash {
 
 /// The fields of a Project to change; `None` leaves a field as it is.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ProjectChanges {
     pub name: Option<String>,
     pub key: Option<Key>,
@@ -53,6 +56,7 @@ pub struct ProjectChanges {
 /// The fields of a Service to change; `None` leaves a field as it is. For
 /// `port` and `url`, `Some(None)` removes the value.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceChanges {
     pub name: Option<String>,
     pub key: Option<Key>,
@@ -68,6 +72,7 @@ pub struct ServiceChanges {
 
 /// The fields of an Environment Profile to change; `None` leaves a field as it is.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ProfileChanges {
     pub name: Option<String>,
     pub variables: Option<Vec<VariableInput>>,
@@ -83,6 +88,7 @@ pub struct ProfileChanges {
 /// Secret values go to the [`SecretStore`], never into the Project files:
 /// clients learn a Secret's name and whether it is set, and read its value
 /// only to reveal it.
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct ProjectLibrary {
     storage: ProjectStorage,
     secrets: Arc<dyn SecretStore>,

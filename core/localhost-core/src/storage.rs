@@ -15,6 +15,7 @@ pub(crate) const SCHEMA_VERSION: i64 = 1;
 /// A Project file that couldn't be loaded at launch, and why.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct UnreadableProjectFile {
     pub path: String,
     /// Where the file was moved aside to; `None` if it was left in place

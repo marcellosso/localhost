@@ -8,6 +8,7 @@ use crate::{Id, Listener, LocalhostError, Origin, Service};
 /// The single, unambiguous status of a Service (see `GLOSSARY.md`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ServiceState {
     /// Never started, or deliberately stopped, whatever exit code the stop produced.
     Stopped,
@@ -33,6 +34,7 @@ impl ServiceState {
 /// One execution of a Service, from launch until its process tree has fully ended.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Run {
     pub id: Id,
     pub service_id: Id,
@@ -84,6 +86,7 @@ impl Run {
 /// Configuration keeps the Port; the change lasts for that Run (ADR-0006).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct PortChange {
     pub configured_port: u16,
     pub reason: PortChangeReason,
@@ -91,6 +94,7 @@ pub struct PortChange {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum PortChangeReason {
     /// Moved automatically because the Port was taken, by `holder` if
     /// localhost could see who.
@@ -102,6 +106,7 @@ pub enum PortChangeReason {
 /// A Service's state together with its active Run, or its most recent one.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceStatus {
     pub service_id: Id,
     pub state: ServiceState,
@@ -130,6 +135,7 @@ impl ServiceStatus {
 /// A change in a Service's lifecycle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ServiceEvent {
     ServiceStateChanged(ServiceStatus),
     RunStarted(Run),
