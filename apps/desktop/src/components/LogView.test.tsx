@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { LogLine } from "../bindings";
 import { LogBuffer } from "../log/buffer";
 import { LogView } from "./LogView";
+
+const commands = vi.hoisted(() => ({ openUrl: vi.fn() }));
+vi.mock("../bindings", () => ({ commands }));
 
 const plain = {
   foreground: null,
@@ -22,9 +25,10 @@ describe("LogView", () => {
       serviceId: null,
       channel: i % 2 ? "stderr" : "stdout",
       spans: [{ text: `line ${i}`, style: plain }],
+      links: [],
     }));
     buffer.append({ lines, skipped: 0, isFinished: false });
-    const { container } = render(<LogView buffer={buffer} label="Web output" emptyText="" />);
+    const { container } = render(<LogView buffer={buffer} label="Web output" rowHeight={18} />);
     const rows = container.querySelectorAll("[role=log] > div > div");
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.length).toBeLessThanOrEqual(60);
@@ -33,17 +37,33 @@ describe("LogView", () => {
   it("prefixes combined lines with their Service", () => {
     const buffer = new LogBuffer();
     buffer.append({
-      lines: [{ serviceId: "a", channel: "stdout", spans: [{ text: "ready", style: plain }] }],
+      lines: [{ serviceId: "a", channel: "stdout", spans: [{ text: "ready", style: plain }], links: [] }],
       skipped: 0,
       isFinished: false,
     });
-    render(<LogView buffer={buffer} prefixes={new Map([["a", { text: "api", color: "red" }]])} label="All" emptyText="" />);
+    render(<LogView buffer={buffer} prefixes={new Map([["a", { text: "api", color: "red" }]])} label="All" rowHeight={18} />);
     expect(screen.getByText("api")).toBeTruthy();
     expect(screen.getByText("ready")).toBeTruthy();
   });
 
-  it("says when there is no output", () => {
-    render(<LogView buffer={new LogBuffer()} label="Web output" emptyText="Web has no output yet." />);
-    expect(screen.getByRole("log").textContent).toBe("Web has no output yet.");
+  it("shows only lines matching the filter, and opens the local URLs they print", () => {
+    const buffer = new LogBuffer();
+    const line = (text: string, links: LogLine["links"] = []): LogLine => ({
+      serviceId: null,
+      channel: "stdout",
+      spans: [{ text, style: plain }],
+      links,
+    });
+    buffer.append({
+      lines: [line("compiling"), line("Local: http://localhost:5173/", [{ start: 7, end: 29, url: "http://localhost:5173/" }])],
+      skipped: 0,
+      isFinished: false,
+    });
+    const { container } = render(<LogView buffer={buffer} label="Web" filter="LOCAL" rowHeight={18} />);
+    expect(screen.queryByText("compiling")).toBeNull();
+    expect([...container.querySelectorAll("[class*=match]")].map((match) => match.textContent)).toEqual(["Local", "local"]);
+
+    fireEvent.click(screen.getByRole("link", { name: "host:5173/" }));
+    expect(commands.openUrl).toHaveBeenCalledWith("http://localhost:5173/");
   });
 });

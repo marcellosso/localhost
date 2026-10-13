@@ -14,18 +14,40 @@ describe("Sidebar", () => {
       projectStates: [{ projectId: shop.id, state: "failed" }],
     });
     const onSelect = vi.fn();
-    render(<Sidebar view={view} selectedId={shop.id} onSelect={onSelect} />);
+    render(<Sidebar view={view} selection={{ kind: "project", projectId: shop.id }} onSelect={onSelect} />);
 
     const rows = screen.getAllByRole("option");
-    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual(["Shop, Failed", "Blog, No services"]);
-    expect(rows[0].getAttribute("aria-selected")).toBe("true");
+    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Ports",
+      "Shop, Failed",
+      "Blog, No services",
+    ]);
+    expect(rows[1].getAttribute("aria-selected")).toBe("true");
 
-    fireEvent.click(rows[1]);
-    expect(onSelect).toHaveBeenCalledWith(blog.id);
+    fireEvent.click(rows[2]);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "project", projectId: blog.id });
+    fireEvent.click(rows[0]);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "ports" });
   });
 
-  it("says when there are no projects", () => {
-    render(<Sidebar view={viewFromSnapshot({ projects: [], statuses: [], projectStates: [] })} selectedId={null} onSelect={() => {}} />);
-    expect(screen.getByText("No projects yet.")).toBeTruthy();
+  it("filters projects by name or Key, and opens the first match with Return", () => {
+    const shop = project("Acme Shop", 0);
+    const blog = project("Blog", 1);
+    const onSelect = vi.fn();
+    render(
+      <Sidebar view={viewFromSnapshot({ projects: [shop, blog], statuses: [], projectStates: [] })} selection={null} onSelect={onSelect} />,
+    );
+    const search = screen.getByRole("searchbox", { name: "Search projects" });
+
+    fireEvent.change(search, { target: { value: "shop" } });
+    expect(screen.getAllByRole("option").map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Ports",
+      "Acme Shop, No services",
+    ]);
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith({ kind: "project", projectId: shop.id });
+
+    fireEvent.change(search, { target: { value: "zzz" } });
+    expect(screen.getByText("No projects match “zzz”.")).toBeTruthy();
   });
 });

@@ -10,3 +10,7 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 };
+
+// jsdom has no media queries: the light appearance.
+window.matchMedia ??= (query: string) =>
+  ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList;

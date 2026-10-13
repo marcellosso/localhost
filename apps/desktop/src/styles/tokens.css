@@ -1,15 +1,19 @@
 /* "Graded glass" tokens (docs/v1-decisions.md, UI direction), the same
  * values as the macOS app's Theme (apps/macos/App/Views/Theme.swift): keep them in step.
  * Green, orange and red are for Service State only; the accent marks primary
- * actions and selection. Text colours reach WCAG AA (4.5:1) on the surfaces
- * below, glyphs 3:1. */
+ * actions. Text colours reach WCAG AA (4.5:1) on the surfaces below, glyphs 3:1.
+ *
+ * The theme comes from Settings: `data-theme` on the root is "light" or
+ * "dark", resolved from the desktop's style when Settings say System. */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
   /* Keys, ports, commands and paths are always monospace. */
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  /* Settings › Appearance › Log font size (settings.ts sets it). */
+  --log-font-size: 12px;
 
   --accent: #d73065;
   --on-accent: #ffffff;
@@ -35,6 +39,7 @@
   --surface-sidebar: #edecf0;
   --surface-column: #f7f7f9;
   --surface-log: #fcfcfd;
+  --surface-raised: #ffffff;
 
   /* ANSI colours 0–7 (8–15 reuse them), readable on the log surface. */
   --ansi-0: #59636e;
@@ -47,47 +52,69 @@
   --ansi-7: #1f2328;
 
   --text: #1f2328;
+  /* The same, for raised surfaces inside a selected row, where --text turns white. */
+  --text-base: #1f2328;
   --text-secondary: #59636e;
+  --text-tertiary: #8c959f;
   --separator: rgb(0 0 0 / 0.1);
-  --selection: rgb(215 48 101 / 0.12);
+  /* Quiet fills: fields, pills, hovered icon buttons (the primary colour at 6–7 %, as on macOS). */
+  --fill: rgb(0 0 0 / 0.06);
+  --fill-strong: rgb(0 0 0 / 0.11);
+  /* A selected row: filled while its list has focus, with white on it; quiet otherwise. */
+  --selection: #0064e1;
+  --on-selection: #ffffff;
+  --selection-quiet: rgb(0 0 0 / 0.08);
+  --find-highlight: #ffe066;
+  --link: #0969da;
+  --shadow: 0 16px 48px rgb(0 0 0 / 0.22), 0 0 0 0.5px rgb(0 0 0 / 0.12);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #ff5c8a;
-    --on-accent: #1a0b10;
-    --accent-text: #ff7fa3;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-    --state-running: #3fb950;
-    --state-transitioning: #f0a030;
-    --state-failed: #ff5a4e;
-    --state-stopped: #7d8590;
+  --accent: #ff5c8a;
+  --on-accent: #1a0b10;
+  --accent-text: #ff7fa3;
 
-    --service-0: #79c0ff;
-    --service-1: #b392f0;
-    --service-2: #e5c07b;
-    --service-3: #f78c6c;
-    --service-4: #56d4dd;
-    --service-5: #f2a8d0;
-    --service-6: #a8b4ff;
-    --service-7: #c9d18a;
+  --state-running: #3fb950;
+  --state-transitioning: #f0a030;
+  --state-failed: #ff5a4e;
+  --state-stopped: #7d8590;
 
-    --surface-sidebar: #232329;
-    --surface-column: #1c1c21;
-    --surface-log: #141417;
+  --service-0: #79c0ff;
+  --service-1: #b392f0;
+  --service-2: #e5c07b;
+  --service-3: #f78c6c;
+  --service-4: #56d4dd;
+  --service-5: #f2a8d0;
+  --service-6: #a8b4ff;
+  --service-7: #c9d18a;
 
-    --ansi-0: #9198a1;
-    --ansi-1: #ff7b72;
-    --ansi-2: #3fb950;
-    --ansi-3: #d29922;
-    --ansi-4: #58a6ff;
-    --ansi-5: #bc8cff;
-    --ansi-6: #39c5cf;
-    --ansi-7: #e6edf3;
+  --surface-sidebar: #232329;
+  --surface-column: #1c1c21;
+  --surface-log: #141417;
+  --surface-raised: #2a2a30;
 
-    --text: #e6edf3;
-    --text-secondary: #9198a1;
-    --separator: rgb(255 255 255 / 0.1);
-    --selection: rgb(255 92 138 / 0.16);
-  }
+  --ansi-0: #9198a1;
+  --ansi-1: #ff7b72;
+  --ansi-2: #3fb950;
+  --ansi-3: #d29922;
+  --ansi-4: #58a6ff;
+  --ansi-5: #bc8cff;
+  --ansi-6: #39c5cf;
+  --ansi-7: #e6edf3;
+
+  --text: #e6edf3;
+  --text-base: #e6edf3;
+  --text-secondary: #9198a1;
+  --text-tertiary: #6e7681;
+  --separator: rgb(255 255 255 / 0.1);
+  --fill: rgb(255 255 255 / 0.07);
+  --fill-strong: rgb(255 255 255 / 0.12);
+  --selection: #0058d0;
+  --on-selection: #ffffff;
+  --selection-quiet: rgb(255 255 255 / 0.1);
+  --find-highlight: #ffd33d;
+  --link: #58a6ff;
+  --shadow: 0 16px 48px rgb(0 0 0 / 0.5), 0 0 0 0.5px rgb(255 255 255 / 0.12);
 }

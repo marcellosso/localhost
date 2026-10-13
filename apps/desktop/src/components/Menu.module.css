@@ -1,0 +1,51 @@
+.root {
+  position: relative;
+  flex: none;
+}
+
+.menu {
+  z-index: 30;
+  min-width: 200px;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 5px;
+  font-size: 13px;
+  background: transparent;
+  color: var(--text-base);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  outline: none;
+  background: var(--selection);
+  color: var(--on-selection);
+}
+
+.separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--separator);
+}
+
+.below {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+}
+
+.atPointer {
+  position: fixed;
+}

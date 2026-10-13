@@ -16,9 +16,13 @@ async subscribe(events: TAURI_CHANNEL<CoreEvent>) : Promise<Result<Snapshot, Com
     else return { status: "error", error: e  as any };
 }
 },
-async startService(serviceId: Id) : Promise<Result<null, CommandError>> {
+/**
+ * Starts the Service, on `port` instead of its Port if given (for this Run
+ * only). Returns the question to ask if its port is taken.
+ */
+async startService(serviceId: Id, port: number | null) : Promise<Result<BlockedStart | null, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_service", { serviceId }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_service", { serviceId, port }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -32,7 +36,7 @@ async stopService(serviceId: Id) : Promise<Result<null, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async restartService(serviceId: Id) : Promise<Result<null, CommandError>> {
+async restartService(serviceId: Id) : Promise<Result<BlockedStart | null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("restart_service", { serviceId }) };
 } catch (e) {
@@ -41,7 +45,19 @@ async restartService(serviceId: Id) : Promise<Result<null, CommandError>> {
 }
 },
 /**
- * Starts the Project's Services, Dependencies first.
+ * "Stop it and start": stops whatever holds the port, then starts the Service.
+ */
+async stopHolderAndStart(serviceId: Id, holder: Listener) : Promise<Result<BlockedStart | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_holder_and_start", { serviceId, holder }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Starts the Project's Services, Dependencies first. A blocked Service
+ * Fails with its port conflict; nothing is asked.
  */
 async startAll(projectId: Id) : Promise<Result<null, CommandError>> {
     try {
@@ -54,6 +70,117 @@ async startAll(projectId: Id) : Promise<Result<null, CommandError>> {
 async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("stop_all", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every Listener on this machine, scanned now. The Ports view polls this
+ * while it is visible.
+ */
+async listeners() : Promise<Result<ListenerDetails[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("listeners") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops a Listener: its Service for a Run's, otherwise its processes (the
+ * UI confirms first). Returns once it has ended.
+ */
+async stopListener(listener: Listener) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_listener", { listener }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launchChecks() : Promise<Result<LaunchChecks, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launch_checks") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Closes the unreadable files report, optionally showing the folder that
+ * holds them.
+ */
+async dismissUnreadableFiles(reveal: boolean) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("dismiss_unreadable_files", { reveal }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops the Orphans' process groups and returns once they have ended.
+ */
+async stopOrphans() : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_orphans") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Forgets the Orphans, leaving their processes running.
+ */
+async leaveOrphans() : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("leave_orphans") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Opens the Service's URL (see `Service::url_to_open`) in the browser.
+ */
+async openServiceUrl(serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_service_url", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Opens a URL printed in a log. Only web addresses: anything else could
+ * open a file or an app.
+ */
+async openUrl(url: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_url", { url }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async openFolder(folder: Folder, app: FolderApp) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_folder", { folder, app }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async settings() : Promise<Settings> {
+    return await TAURI_INVOKE("settings");
+},
+/**
+ * Saves the settings and applies them.
+ */
+async saveSettings(settings: Settings) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_settings", { settings }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -73,6 +200,18 @@ async openLog(source: LogSource, batches: TAURI_CHANNEL<LogBatch>) : Promise<Res
 },
 async closeLog(id: number) : Promise<void> {
     await TAURI_INVOKE("close_log", { id });
+},
+/**
+ * Clears the Services' buffers (the log files are kept). Open logs of them
+ * show only what comes next once reopened.
+ */
+async clearLogs(serviceIds: Id[]) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_logs", { serviceIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 /**
  * The run to measure, if this is a measurement.
@@ -106,11 +245,38 @@ export type AnsiColor =
  * 0–7 standard, 8–15 bright, 16–255 the xterm 256-colour palette.
  */
 { kind: "indexed"; index: number } | { kind: "rgb"; red: number; green: number; blue: number }
+export type Appearance = 
+/**
+ * Follows the desktop's light or dark style.
+ */
+"system" | "light" | "dark"
+/**
+ * A start that Failed because its port is taken, waiting for the user to
+ * stop the holder, start on another port, or cancel.
+ */
+export type BlockedStart = { serviceId: Id; port: number; 
+/**
+ * Who holds the port; `None` if localhost can't see it.
+ */
+holder: ListenerDetails | null; 
+/**
+ * The port a start could use instead; `None` if none within 100 above is free.
+ */
+nextFreePort: number | null; 
+/**
+ * The names of the Services that depend on it, which may still expect its Port.
+ */
+dependents: string[] }
 /**
  * A command's failure: the core's typed error, and its message for the user.
  */
 export type CommandError = { error: LocalhostError; message: string }
-export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } | { kind: "service"; event: ServiceEvent } | 
+export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } | 
+/**
+ * A Service's state changed (Runs starting and ending show up here too),
+ * or its Service was edited, which may change its URL.
+ */
+{ kind: "status"; event: StatusView } | 
 /**
  * Sent after the event that changed it.
  */
@@ -120,6 +286,19 @@ export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } | { kind
  * Testing) applying to all its Services; at most one is active at a time.
  */
 export type EnvironmentProfile = { id: Id; name: string; variables: Variables }
+/**
+ * A folder an action opens.
+ */
+export type Folder = 
+/**
+ * The Project's root folder.
+ */
+{ kind: "project"; projectId: Id } | 
+/**
+ * The Service's working directory.
+ */
+{ kind: "service"; serviceId: Id }
+export type FolderApp = "fileManager" | "terminal" | "editor"
 /**
  * The identity of a Project, Service, Profile or Run.
  * 
@@ -135,6 +314,19 @@ export type Id = string
  * single hyphens, at most 64 characters. A `Key` value is always valid.
  */
 export type Key = string
+/**
+ * The launch questions still to ask, in order.
+ */
+export type LaunchChecks = { 
+/**
+ * One line per Project file that couldn't be loaded: its name, why, and
+ * where it is now.
+ */
+unreadableFiles: string[]; 
+/**
+ * One line per Orphan, e.g. "My SaaS › API".
+ */
+orphans: string[] }
 /**
  * A process listening on one or more TCP ports on this machine, whoever
  * started it (see `GLOSSARY.md`).
@@ -165,6 +357,18 @@ workingDirectory: string | null; owner: ListenerOwner;
  * service or an app). localhost never stops those.
  */
 launchdLabel: string | null; kind: ListenerKind; startTime: ProcessStartTime }
+/**
+ * A Listener with what the UI says about it.
+ */
+export type ListenerDetails = { listener: Listener; 
+/**
+ * Who it belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
+ */
+owner: string; 
+/**
+ * Why localhost won't stop it; `None` if it can.
+ */
+reasonNotStoppable: string | null }
 /**
  * What kind of program a Listener is, so development servers can be told
  * apart from the apps and system services that also listen on ports.
@@ -198,7 +402,7 @@ export type ListenerOwner =
 /**
  * Not started by localhost, but its working directory is inside the Project's folder.
  */
-{ kind: "project"; project_id: Id } | { kind: "unmanaged" }
+{ kind: "project"; projectId: Id } | { kind: "unmanaged" }
 /**
  * Every failure the core reports. Clients match on these cases; they are
  * never flattened into strings inside the core.
@@ -271,7 +475,16 @@ export type LogLine = {
 /**
  * Which Service it came from, in a combined stream.
  */
-serviceId: Id | null; channel: OutputChannel; spans: Span[] }
+serviceId: Id | null; channel: OutputChannel; spans: Span[]; 
+/**
+ * The local URLs in the line's text, to open on click.
+ */
+links: LogLink[] }
+/**
+ * A local URL in a line: UTF-16 offsets into its text (the spans joined),
+ * as JavaScript counts, and the URL to open (`0.0.0.0` as `localhost`).
+ */
+export type LogLink = { start: number; end: number; url: string }
 /**
  * What a log shows.
  */
@@ -476,10 +689,6 @@ url?: string | null;
  */
 portCanChange?: boolean }
 /**
- * A change in a Service's lifecycle.
- */
-export type ServiceEvent = { kind: "serviceStateChanged"; value: ServiceStatus } | { kind: "runStarted"; value: Run } | { kind: "runEnded"; value: Run }
-/**
  * The single, unambiguous status of a Service (see `GLOSSARY.md`).
  */
 export type ServiceState = 
@@ -507,10 +716,37 @@ export type ServiceState =
  * The Run ended on its own unsuccessfully, or could not be launched at all.
  */
 "failed"
+export type Settings = { 
 /**
- * A Service's state together with its active Run, or its most recent one.
+ * The command that opens a folder in the user's editor, e.g. `code`.
+ * Picked once; there is no default.
  */
-export type ServiceStatus = { serviceId: Id; state: ServiceState; run: Run | null; 
+editorCommand: string | null; 
+/**
+ * Whether a Service may move to a free port when its Port is taken.
+ */
+automaticPortMove: boolean; appearance: Appearance; 
+/**
+ * Points, for the log and the commands in Service rows.
+ */
+logFontSize: number }
+/**
+ * Everything the UI shows, at the moment it subscribed.
+ */
+export type Snapshot = { projects: Project[]; 
+/**
+ * Services that never ran have no status: they are Stopped.
+ */
+statuses: StatusView[]; projectStates: ProjectState[] }
+/**
+ * A run of identically styled text.
+ */
+export type Span = { text: string; style: TextStyle }
+/**
+ * A Service's status with the message of its Run's failure, if any, and
+ * where Open in Browser goes (`Service::url_to_open`).
+ */
+export type StatusView = ({ serviceId: Id; state: ServiceState; run: Run | null; 
 /**
  * While Starting: the Dependencies the Service is still waiting for
  * before its Run is launched. `run` is then the previous Run, if any.
@@ -521,19 +757,7 @@ awaitedDependencies: Id[];
  * (command line, working directory, variables, Port) differs from what
  * a start would use now. Nothing restarts on its own.
  */
-isRestartNeeded: boolean }
-/**
- * Everything the UI shows, at the moment it subscribed.
- */
-export type Snapshot = { projects: Project[]; 
-/**
- * Services that never ran have no status: they are Stopped.
- */
-statuses: ServiceStatus[]; projectStates: ProjectState[] }
-/**
- * A run of identically styled text.
- */
-export type Span = { text: string; style: TextStyle }
+isRestartNeeded: boolean }) & { failureMessage: string | null; urlToOpen: string | null }
 /**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.

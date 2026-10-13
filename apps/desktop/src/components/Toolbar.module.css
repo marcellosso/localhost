@@ -1,0 +1,41 @@
+/* Glass like the Services column; no divider between the two halves. */
+.title,
+.actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--surface-column);
+  border-bottom: 1px solid var(--separator);
+}
+
+.title {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 16px;
+}
+
+.title h1 {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title span {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px;
+}
