@@ -217,6 +217,20 @@ impl LogStore {
         }
         let _ = fs::remove_dir_all(self.logs_directory.join(service_id.to_string()));
     }
+
+    /// The lines of the Service's latest Run file, oldest first, read back
+    /// from disk with its rotated backup: what any session, this one or
+    /// another (the app, the CLI), last logged for it. Lines that don't parse,
+    /// such as one cut by the size cap, are skipped.
+    pub fn stored_lines(&self, service_id: Id) -> Vec<OutputLine> {
+        let directory = self.logs_directory.join(service_id.to_string());
+        let Some(latest) = run_files_newest_first(&directory).into_iter().next() else { return Vec::new() };
+        [backup_path(&latest), latest]
+            .iter()
+            .filter_map(|path| fs::read(path).ok())
+            .flat_map(|data| String::from_utf8_lossy(&data).lines().filter_map(parse_line).collect::<Vec<_>>())
+            .collect()
+    }
 }
 
 // Writing, by the ServiceManager.
@@ -269,24 +283,29 @@ impl LogStore {
 
     /// Deletes all but the newest `retained_runs_per_service` Run files.
     fn remove_old_runs(&self, directory: &Path) {
-        let Ok(entries) = fs::read_dir(directory) else { return };
-        let mut runs: Vec<(PathBuf, SystemTime)> = entries
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|extension| extension == "log"))
-            .map(|path| {
-                let metadata = fs::metadata(&path).ok();
-                // Not every file system records creation; the first write is close enough.
-                let created = metadata.and_then(|m| m.created().or_else(|_| m.modified()).ok()).unwrap_or(UNIX_EPOCH);
-                (path, created)
-            })
-            .collect();
-        runs.sort_by(|a, b| b.1.cmp(&a.1));
-        for (path, _) in runs.into_iter().skip(self.retained_runs_per_service) {
+        for path in run_files_newest_first(directory).into_iter().skip(self.retained_runs_per_service) {
             let _ = fs::remove_file(&path);
             let _ = fs::remove_file(backup_path(&path));
         }
     }
+}
+
+/// A Service's Run files (not their backups), the newest first.
+fn run_files_newest_first(directory: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(directory) else { return Vec::new() };
+    let mut runs: Vec<(PathBuf, SystemTime)> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "log"))
+        .map(|path| {
+            let metadata = fs::metadata(&path).ok();
+            // Not every file system records creation; the first write is close enough.
+            let created = metadata.and_then(|m| m.created().or_else(|_| m.modified()).ok()).unwrap_or(UNIX_EPOCH);
+            (path, created)
+        })
+        .collect();
+    runs.sort_by(|a, b| b.1.cmp(&a.1));
+    runs.into_iter().map(|(path, _)| path).collect()
 }
 
 fn backup_path(path: &Path) -> PathBuf {
@@ -370,6 +389,50 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let month = if month_index < 10 { month_index + 3 } else { month_index - 9 } as u32;
     let year = year_of_era + era * 400 + i64::from(month <= 2);
     (year, month, day)
+}
+
+/// The day count since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant's algorithm).
+fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
+    let year = year - i64::from(month <= 2);
+    let era = year.div_euclid(400);
+    let year_of_era = year.rem_euclid(400);
+    let month_index = i64::from(if month > 2 { month - 3 } else { month + 9 });
+    let day_of_year = (153 * month_index + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+/// Reads back what `iso8601` writes, and nothing else.
+fn parse_iso8601(text: &str) -> Option<SystemTime> {
+    let bytes = text.as_bytes();
+    let shape = "0000-00-00T00:00:00.000Z".as_bytes();
+    let matches_shape = bytes.len() == shape.len()
+        && bytes.iter().zip(shape).all(|(byte, expected)| match expected {
+            b'0' => byte.is_ascii_digit(),
+            _ => byte == expected,
+        });
+    if !matches_shape {
+        return None;
+    }
+    let number = |range: std::ops::Range<usize>| text[range].parse::<u32>().ok();
+    let (year, month, day) = (i64::from(number(0..4)?), number(5..7)?, number(8..10)?);
+    let (hour, minute, second, millis) = (number(11..13)?, number(14..16)?, number(17..19)?, number(20..23)?);
+    let days = days_from_civil(year, month, day);
+    if civil_from_days(days) != (year, month, day) || hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    let seconds = u64::try_from(days * 86_400).ok()? + u64::from(hour * 3600 + minute * 60 + second);
+    Some(UNIX_EPOCH + std::time::Duration::from_secs(seconds) + std::time::Duration::from_millis(millis.into()))
+}
+
+/// A log file line, `<timestamp> <channel> <text>`, as `LogFile` writes it.
+fn parse_line(line: &str) -> Option<OutputLine> {
+    let (timestamp, rest) = line.split_once(' ')?;
+    let (channel, text) = rest.split_once(' ')?;
+    let channel = [OutputChannel::Stdout, OutputChannel::Stderr, OutputChannel::Localhost]
+        .into_iter()
+        .find(|candidate| candidate.as_str() == channel)?;
+    Some(OutputLine { channel, text: text.into(), timestamp: parse_iso8601(timestamp)? })
 }
 
 #[cfg(test)]
@@ -667,6 +730,77 @@ mod tests {
         drop(store.subscribe_to_services(HashSet::from([service])));
         store.append(&[line("a")], run);
         assert!(store.state().service_subscribers.is_empty());
+    }
+
+    #[test]
+    fn stored_lines_read_back_the_latest_run_from_disk() {
+        let setup = Setup::new();
+        let store = setup.store();
+        let (first, service) = begin(&store, None);
+        store.append(&[line("first run")], first);
+        store.end_run(first);
+        std::thread::sleep(Duration::from_millis(10));
+        let (second, _) = begin(&store, Some(service));
+        let written = [
+            at(1, OutputChannel::Stdout, "with  two spaces"),
+            at(2, OutputChannel::Stderr, ""),
+            on(OutputChannel::Localhost, "Exited with code 0"),
+        ];
+        store.append(&written, second);
+
+        // Another session, which never ran the Service, reads what this one wrote.
+        assert_eq!(setup.store().stored_lines(service), written);
+    }
+
+    #[test]
+    fn stored_lines_include_the_rotated_backup_first() {
+        let setup = Setup::new();
+        let store = LogStore::with_limits(setup.root.path(), 10_000, 1_000, 5);
+        let (run, service) = begin(&store, None);
+        for index in 0..100 {
+            store.append(&[line(&format!("line {index} {}", "x".repeat(20)))], run);
+        }
+        store.end_run(run);
+
+        let in_file = fs::read_to_string(store.log_file_path(run).unwrap()).unwrap().lines().count();
+        let stored = setup.store().stored_lines(service);
+        let indexes: Vec<usize> =
+            stored.iter().map(|line| line.text.split(' ').nth(1).unwrap().parse().unwrap()).collect();
+        assert!(indexes.len() > in_file, "the backup's lines are read too");
+        assert_eq!(indexes.last(), Some(&99));
+        assert!(indexes.windows(2).all(|pair| pair[1] == pair[0] + 1), "in order: {indexes:?}");
+    }
+
+    #[test]
+    fn stored_lines_skip_what_does_not_parse() {
+        let setup = Setup::new();
+        let service = Id::new();
+        fs::create_dir_all(setup.log_directory(service)).unwrap();
+        fs::write(
+            setup.log_directory(service).join(format!("{}.log", Id::new())),
+            "x truncated by the size cap\n\
+             2027-01-15T08:00:00.250Z stdout kept\n\
+             2027-01-15T08:00:00.250Z elsewhere unknown channel\n\
+             2027-13-15T08:00:00.250Z stdout bad month\n",
+        )
+        .unwrap();
+
+        assert_eq!(setup.store().stored_lines(service), [line("kept")]);
+    }
+
+    #[test]
+    fn a_service_that_never_ran_has_no_stored_lines() {
+        assert!(Setup::new().store().stored_lines(Id::new()).is_empty());
+    }
+
+    #[test]
+    fn parses_the_timestamps_it_writes() {
+        for millis in [0, 951_782_400_999, 1_800_000_000_250, 4_102_444_799_000] {
+            let time = UNIX_EPOCH + Duration::from_millis(millis);
+            assert_eq!(parse_iso8601(&iso8601(time)), Some(time));
+        }
+        assert_eq!(parse_iso8601("2027-01-15T08:00:00Z"), None);
+        assert_eq!(parse_iso8601("2027-02-30T08:00:00.000Z"), None);
     }
 
     #[test]
