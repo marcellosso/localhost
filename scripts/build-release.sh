@@ -39,7 +39,7 @@ scripts/build-core.sh release >&2
 
 echo "==> Building localhost $version ($build_number)" >&2
 rm -rf "$output"
-xcodebuild -project localhost.xcodeproj -scheme localhost -configuration Release \
+xcodebuild -project apps/macos/localhost.xcodeproj -scheme localhost -configuration Release \
     -destination 'generic/platform=macOS' -derivedDataPath "$derived" \
     CODE_SIGNING_ALLOWED=NO \
     MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number" \
@@ -56,7 +56,7 @@ done
 echo "==> Signing with ${identity/#-/an ad hoc signature}" >&2
 # Hardened runtime as in the Xcode project; the app has no nested code to sign first.
 codesign --force --sign "$identity" "${timestamp[@]}" \
-    --options runtime --entitlements App/Localhost.entitlements "$app" >&2
+    --options runtime --entitlements apps/macos/App/Localhost.entitlements "$app" >&2
 codesign --verify --strict --verbose=2 "$app" >&2
 
 echo "==> Packing $dmg" >&2

@@ -10,7 +10,7 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
   - failures are a typed error enum (`portConflict(port:owner:)`, `commandNotFound`, `workingDirectoryMissing`, `dependencyFailed(…)`, `dockerDaemonUnavailable`, …), never bare strings;
   - all core types `Sendable`/`Codable`-friendly.
 - **Identity**: Projects and Services have a UUID identity plus a **Key** (slug). Project Keys unique app-wide, Service Keys unique per Project; editable but validated. Internal references (Dependencies, log files) use UUIDs.
-- **Layout**: `localhost.xcodeproj` + `App/` (SwiftUI target) + `core/` (Cargo workspace) + `Packages/LocalhostCoreFFI` (the core as the Swift module `LocalhostCore`). No Tuist/XcodeGen.
+- **Layout**: `apps/macos/` holds the macOS app: `localhost.xcodeproj`, `App/` (SwiftUI target) and `LocalhostCoreFFI/` (the core as the Swift module `LocalhostCore`). `core/` is the Cargo workspace, `apps/desktop/` the Tauri app. No Tuist/XcodeGen.
 - **Toolchain**: Swift 6 language mode, strict concurrency, macOS 15 minimum, bundle id `com.sixpetals.localhost` (Keychain service for Secrets: `com.sixpetals.localhost.secret`). Non-sandboxed, distributed outside the Mac App Store (ADR-0002).
 - **Dependencies**: none by default; each third-party package must be justified (an MCP SDK in V2 is expected).
 - **Tests**: Swift Testing (`@Test`). The core is test-driven against **real processes** (fixture scripts that fork grandchildren, trap signals, exit with codes). No UI tests in V1.

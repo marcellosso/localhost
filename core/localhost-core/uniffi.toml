@@ -12,7 +12,7 @@ imports = ["Foundation"]
 lift = "UUID(uuidString: {})!"
 lower = "{}.uuidString"
 
-# A Swift struct with the old `rawValue` API (Packages/LocalhostCoreFFI). The
+# A Swift struct with the old `rawValue` API (apps/macos/LocalhostCoreFFI). The
 # core only ever hands out valid Keys.
 [bindings.swift.custom_types.CoreKey]
 type_name = "Key"

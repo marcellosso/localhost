@@ -19,7 +19,7 @@ A **Project** is a folder on your Mac. A **Service** is one long-running command
 - **Set up in seconds**: point it at a folder and it suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. You review every suggestion; nothing is applied silently.
 - **Native**: SwiftUI, keyboard first (⌘K command palette), a menu bar companion, VoiceOver, light and dark.
 
-localhost stores its configuration in `~/Library/Application Support/localhost`, never in your project folders. To move a Project to another Mac or share it, export it as a YAML Project file (see [CONFIGURATION.md](CONFIGURATION.md)).
+localhost stores its configuration in `~/Library/Application Support/localhost`, never in your project folders. To move a Project to another Mac or share it, export it as a YAML Project file (see [docs/configuration.md](docs/configuration.md)).
 
 Requires macOS 15 or later.
 
@@ -135,7 +135,7 @@ The **Ports** view (**⌘0**) lists every process listening on a TCP port and wh
 
 ### 7. Move a Project to another Mac
 
-**File → Export Project…** saves the selected Project as a YAML Project file. **File → Import Project…** reads one back and shows what it contains before adding anything; choose the folder if it is somewhere else on this Mac. Secret values are never exported: the file lists Secret names, and the import shows which ones to fill in. The format is documented in [CONFIGURATION.md](CONFIGURATION.md).
+**File → Export Project…** saves the selected Project as a YAML Project file. **File → Import Project…** reads one back and shows what it contains before adding anything; choose the folder if it is somewhere else on this Mac. Secret values are never exported: the file lists Secret names, and the import shows which ones to fill in. The format is documented in [docs/configuration.md](docs/configuration.md).
 
 ## Keyboard shortcuts
 

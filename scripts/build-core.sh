@@ -13,15 +13,15 @@
 # release builds a universal (arm64 + x86_64) library, as shipped.
 #
 # Output, inside the Swift package that wraps it (git-ignored):
-#   Packages/LocalhostCoreFFI/Generated/LocalhostCoreFFI.xcframework
-#   Packages/LocalhostCoreFFI/Sources/LocalhostCore/Generated/LocalhostCore+FFI.swift
+#   apps/macos/LocalhostCoreFFI/Generated/LocalhostCoreFFI.xcframework
+#   apps/macos/LocalhostCoreFFI/Sources/LocalhostCore/Generated/LocalhostCore+FFI.swift
 #
 # Needs a Rust toolchain (rustup); see CONTRIBUTING.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE="$ROOT/core"
-PACKAGE="$ROOT/Packages/LocalhostCoreFFI"
+PACKAGE="$ROOT/apps/macos/LocalhostCoreFFI"
 GENERATED="$PACKAGE/Generated"
 SWIFT_OUT="$PACKAGE/Sources/LocalhostCore/Generated"
 STAMP="$GENERATED/stamp"

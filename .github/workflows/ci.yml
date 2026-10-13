@@ -56,11 +56,11 @@ jobs:
         run: scripts/build-core.sh debug
       - run: scripts/build-core.sh --check
       - name: Test the Swift layer
-        working-directory: Packages/LocalhostCoreFFI
+        working-directory: apps/macos/LocalhostCoreFFI
         run: swift test
       - name: Build the app (unsigned)
         run: >
-          xcodebuild -project localhost.xcodeproj -scheme localhost
+          xcodebuild -project apps/macos/localhost.xcodeproj -scheme localhost
           -configuration Debug -derivedDataPath build
           CODE_SIGNING_ALLOWED=NO build
 
