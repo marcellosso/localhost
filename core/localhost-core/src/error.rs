@@ -8,6 +8,7 @@ use crate::{Id, Key, Listener, ProjectFileProblem};
 /// never flattened into strings inside the core.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "detail", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 pub enum LocalhostError {
     // Validation
     InvalidKey(String),

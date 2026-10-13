@@ -25,6 +25,7 @@ const REFERENCE_DATE_OFFSET: f64 = 978_307_200.0;
 /// unexpectedly (crash, force-quit). Orphans are never re-adopted as
 /// Running: they can only be stopped or left alone.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Orphan {
     pub run_id: Id,
     pub service_id: Id,
@@ -49,6 +50,7 @@ struct Record {
 }
 
 /// Call `orphans()` at launch: Runs recorded by this session are never reported.
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct RunRegistry {
     directory: PathBuf,
     session_run_ids: Mutex<HashSet<Id>>,

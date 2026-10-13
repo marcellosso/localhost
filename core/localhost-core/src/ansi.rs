@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 /// A colour from an ANSI SGR sequence. Clients map indexed colours to their theme.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum AnsiColor {
     /// 0–7 standard, 8–15 bright, 16–255 the xterm 256-colour palette.
     Indexed {
@@ -21,6 +22,7 @@ pub enum AnsiColor {
 /// The text attributes set by ANSI SGR sequences.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct TextStyle {
     pub foreground: Option<AnsiColor>,
     pub background: Option<AnsiColor>,
@@ -34,6 +36,7 @@ pub struct TextStyle {
 
 /// A run of identically styled text.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Span {
     pub text: String,
     pub style: TextStyle,
@@ -41,6 +44,7 @@ pub struct Span {
 
 /// One line of output split into runs of identically styled text.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct StyledLine {
     pub spans: Vec<Span>,
 }

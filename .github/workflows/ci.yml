@@ -32,6 +32,26 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
+  rust-core-for-app:
+    name: Rust core for the app
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Build the universal library and the Swift bindings
+        run: scripts/build-core.sh release
+      - run: scripts/build-core.sh --check
+      - name: Type-check the Swift bindings
+        run: >
+          swiftc -typecheck -module-name LocalhostCore
+          -I Packages/LocalhostCoreFFI/Generated/LocalhostCoreFFI.xcframework/macos-arm64_x86_64/Headers
+          Packages/LocalhostCoreFFI/Sources/LocalhostCore/Generated/LocalhostCore+FFI.swift
+
   core:
     name: Core tests
     runs-on: macos-26

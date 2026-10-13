@@ -18,6 +18,7 @@ use crate::{Id, Key};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Project {
     pub id: Id,
     pub name: String,
@@ -78,6 +79,7 @@ impl Project {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Service {
     pub id: Id,
     pub name: String,
@@ -133,6 +135,7 @@ impl Service {
 /// A Service to add together with others in one save, e.g. a reviewed
 /// Suggestion. It has no variables or Dependencies yet.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct NewService {
     pub name: String,
     pub key: Key,
@@ -166,6 +169,7 @@ impl NewService {
 /// whose values never leave the `SecretStore`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Variables {
     pub values: BTreeMap<String, String>,
     /// Sorted.
@@ -188,12 +192,14 @@ impl Variables {
 /// One variable as set from an editor. A Secret's value is written to the
 /// `SecretStore`; it is never kept in the Project Configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct VariableInput {
     pub name: String,
     pub value: VariableValue,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum VariableValue {
     Plain(String),
     Secret(String),
@@ -237,6 +243,7 @@ impl VariableInput {
 /// Which layer of a Run's environment variables belong to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "id", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum VariableLayer {
     Project(Id),
     Service(Id),
@@ -260,6 +267,7 @@ impl VariableLayer {
 /// Testing) applying to all its Services; at most one is active at a time.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct EnvironmentProfile {
     pub id: Id,
     pub name: String,

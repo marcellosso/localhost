@@ -19,6 +19,7 @@ use crate::{Id, Key, LocalhostError, Project, Service, Variables, validate};
 /// only fails on what changed since: the path the user picked, or a Key that
 /// became taken.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct ProjectDocument {
     name: String,
     key: Key,
@@ -32,6 +33,7 @@ pub struct ProjectDocument {
 /// A Service of a [`ProjectDocument`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct DocumentService {
     pub name: String,
     pub key: Key,
@@ -50,6 +52,7 @@ pub struct DocumentService {
 /// An Environment Profile of a [`ProjectDocument`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct DocumentProfile {
     pub name: String,
     pub variables: Variables,
@@ -514,6 +517,7 @@ impl<'a> Fields<'a> {
 /// What is wrong in a Project file; see [`LocalhostError::InvalidProjectFile`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "detail", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ProjectFileProblem {
     /// The file has no `localhost:` version line.
     NotAProjectFile,
@@ -540,6 +544,7 @@ pub enum ProjectFileProblem {
 /// The kind of value a Project file field takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum ValueKind {
     Text,
     Number,

@@ -1,5 +1,5 @@
 [workspace]
-members = ["localhost-core", "localhost-cli"]
+members = ["localhost-core", "localhost-cli", "localhost-ffi"]
 resolver = "3"
 
 [workspace.package]

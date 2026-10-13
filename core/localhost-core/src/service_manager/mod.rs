@@ -74,6 +74,7 @@ impl Default for ServiceManagerOptions {
 /// Runs Services. Cheap to clone; every clone is the same manager. Must be
 /// created inside a multi-threaded tokio runtime.
 #[derive(Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct ServiceManager {
     inner: Arc<Inner>,
 }
