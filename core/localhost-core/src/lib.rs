@@ -5,6 +5,7 @@
 //! [`Origin`], failures are a [`LocalhostError`], and changes are broadcast as
 //! events, so the core can later be hosted behind IPC without a rewrite.
 
+mod ansi;
 mod dependencies;
 mod error;
 mod fold;
@@ -12,6 +13,8 @@ mod fuzzy;
 mod id;
 mod key;
 mod library;
+mod local_url;
+mod logs;
 mod model;
 mod origin;
 mod output;
@@ -24,11 +27,14 @@ mod secrets;
 mod storage;
 mod validate;
 
+pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;
 pub use id::Id;
 pub use key::Key;
 pub use library::{KeyClash, ProfileChanges, ProjectChanges, ProjectLibrary, ProjectLibraryEvent, ServiceChanges};
+pub use local_url::LocalUrl;
+pub use logs::{LogBuffer, LogStore};
 pub use model::{
     EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
 };
