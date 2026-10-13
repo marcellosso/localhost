@@ -63,3 +63,44 @@ jobs:
           xcodebuild -project localhost.xcodeproj -scheme localhost
           -configuration Debug -derivedDataPath build
           CODE_SIGNING_ALLOWED=NO build
+
+  desktop:
+    name: Desktop app (Linux)
+    # The oldest Ubuntu the packages target (#48).
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the webview and tray libraries
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@1.90
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      # The Rust build embeds dist/.
+      - run: pnpm build
+      - name: Rust
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+      - name: Check the TypeScript bindings are up to date
+        run: git diff --exit-code src/bindings.ts

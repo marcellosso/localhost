@@ -1,0 +1,81 @@
+.glyph {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.glyph::before,
+.glyph::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+/* A dot with a halo. */
+.running::before {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--state-running) 22%, transparent);
+}
+
+.running::after {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-running);
+}
+
+/* A pulsing ring. */
+.transitioning::after {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--state-transitioning);
+  border-radius: 50%;
+  animation: pulse 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transitioning::after {
+    animation: none;
+  }
+}
+
+/* A diamond with a halo. */
+.failed::before {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--state-failed) 22%, transparent);
+}
+
+.failed::after {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: var(--state-failed);
+  transform: rotate(45deg);
+}
+
+/* A hollow ring. */
+.stopped::after,
+.none::after {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--state-stopped);
+  border-radius: 50%;
+}
+
+.none::after {
+  opacity: 0.5;
+}

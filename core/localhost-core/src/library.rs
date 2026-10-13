@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use serde::Serialize;
 use tokio::sync::mpsc;
 
 use crate::model::VariableValue;
@@ -13,8 +14,10 @@ use crate::{
 };
 
 /// A change to the Project Configuration, tagged with the Origin that caused it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ProjectLibraryEvent {
     ProjectAdded {
         project: Project,

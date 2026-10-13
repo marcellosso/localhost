@@ -9,6 +9,7 @@ use crate::{Id, Key, Listener, ProjectFileProblem};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "detail", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum LocalhostError {
     // Validation
     InvalidKey(String),

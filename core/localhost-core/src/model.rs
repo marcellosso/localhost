@@ -19,6 +19,7 @@ use crate::{Id, Key};
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Project {
     pub id: Id,
     pub name: String,
@@ -131,6 +132,7 @@ pub fn service_label(projects: &[Project], service_id: Id) -> Option<String> {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Service {
     pub id: Id,
     pub name: String,
@@ -221,6 +223,7 @@ impl NewService {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Variables {
     pub values: BTreeMap<String, String>,
     /// Sorted.
@@ -295,6 +298,7 @@ impl VariableInput {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "id", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum VariableLayer {
     Project(Id),
     Service(Id),
@@ -319,6 +323,7 @@ impl VariableLayer {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct EnvironmentProfile {
     pub id: Id,
     pub name: String,

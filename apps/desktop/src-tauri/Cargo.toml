@@ -1,0 +1,34 @@
+[package]
+name = "localhost-desktop"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.90"
+publish = false
+
+# Its own workspace: Tauri's dependencies stay out of core/'s lockfile.
+[workspace]
+
+[lib]
+name = "localhost_desktop"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "localhost-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+localhost-core = { path = "../../../core/localhost-core", features = ["specta"] }
+serde = { version = "1", features = ["derive"] }
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+specta-typescript = "=0.0.9"
+tauri = { version = "2.12", features = [] }
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+tokio = { version = "1", features = ["sync", "macros"] }
+
+[profile.release]
+lto = true
+codegen-units = 1

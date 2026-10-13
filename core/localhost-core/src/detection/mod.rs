@@ -35,6 +35,7 @@ use crate::{Key, NewService, Project};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServiceSuggestion {
     pub name: String,
     pub key: Key,

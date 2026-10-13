@@ -8,6 +8,7 @@ use crate::Id;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum OutputChannel {
     Stdout,
     Stderr,
@@ -29,10 +30,12 @@ impl OutputChannel {
 /// One line of a Run's output.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct OutputLine {
     pub channel: OutputChannel,
     /// The line without its terminator. Invalid UTF-8 is replaced with U+FFFD.
     pub text: String,
+    #[cfg_attr(feature = "specta", specta(type = crate::SerdeSystemTime))]
     pub timestamp: SystemTime,
 }
 
@@ -46,6 +49,7 @@ impl OutputLine {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServiceOutputLine {
     pub service_id: Id,
     pub line: OutputLine,

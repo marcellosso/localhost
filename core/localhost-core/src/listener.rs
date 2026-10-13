@@ -13,6 +13,7 @@ use crate::{Id, LocalhostError, Project, ServiceStatus, service_label};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Listener {
     pub pid: i32,
     pub process_group_id: i32,
@@ -80,6 +81,7 @@ impl Listener {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct PortWarning {
     pub port: u16,
     pub service_id: Id,
@@ -109,6 +111,7 @@ pub fn port_warnings(projects: &[Project], statuses: &[ServiceStatus], listeners
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ListenerOwner {
     /// A process of a Run localhost started.
     #[serde(rename_all = "camelCase")]
@@ -128,6 +131,7 @@ pub enum ListenerOwner {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ListenerKind {
     /// A development server or tool: anything not recognised as below, and
     /// always a Listener of a Run or inside a Project.

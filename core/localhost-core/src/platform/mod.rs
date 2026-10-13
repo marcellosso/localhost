@@ -23,6 +23,7 @@ use macos as imp;
 /// on Linux, the time since boot. Only equality matters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ProcessStartTime {
     pub seconds: u64,
     pub microseconds: u64,

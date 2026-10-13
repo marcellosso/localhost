@@ -518,6 +518,7 @@ impl<'a> Fields<'a> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "detail", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ProjectFileProblem {
     /// The file has no `localhost:` version line.
     NotAProjectFile,
@@ -545,6 +546,7 @@ pub enum ProjectFileProblem {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ValueKind {
     Text,
     Number,
