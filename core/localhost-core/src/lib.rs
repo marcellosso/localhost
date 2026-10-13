@@ -14,7 +14,11 @@ mod key;
 mod library;
 mod model;
 mod origin;
+mod output;
 mod paths;
+#[allow(dead_code)] // Used by the ServiceManager, ported next.
+mod port_probe;
+mod process;
 mod run_environment;
 mod secrets;
 mod storage;
@@ -29,7 +33,11 @@ pub use model::{
     EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
 };
 pub use origin::Origin;
+pub use output::{OutputChannel, OutputLine, ServiceOutputLine};
 pub use paths::default_storage_root;
+pub use process::{
+    LaunchConfiguration, MAX_LINE_LENGTH, ProcessTree, ProcessTreeExit, StopPolicy, Termination, signal_name,
+};
 pub use run_environment::RunEnvironment;
 pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
 pub use storage::UnreadableProjectFile;
