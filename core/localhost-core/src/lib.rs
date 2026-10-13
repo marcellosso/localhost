@@ -7,6 +7,7 @@
 
 mod ansi;
 mod dependencies;
+mod detection;
 mod error;
 mod fold;
 mod fuzzy;
@@ -31,6 +32,10 @@ mod storage;
 mod validate;
 
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
+pub use detection::{
+    CargoDetector, ComposeDetector, NodeDetector, ProjectScanner, PythonDetector, ScannedDirectory, ServiceDetector,
+    ServiceSuggestion,
+};
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;
 pub use id::Id;
