@@ -40,6 +40,16 @@ extension Project: Identifiable {
     public func dependencyOrder(of serviceIDs: [UUID]) -> [UUID] {
         projectDependencyOrder(project: self, serviceIds: serviceIDs)
     }
+
+    /// A Key derived from `name` that no other Service of the Project uses.
+    public func suggestedServiceKey(for name: String, excluding serviceID: UUID? = nil) -> Key {
+        projectSuggestedServiceKey(project: self, name: name, excluding: serviceID)
+    }
+
+    /// A Key derived from `name` that none of `projects` uses but the one being edited.
+    public static func suggestedKey(for name: String, among projects: [Project], excluding projectID: UUID? = nil) -> Key {
+        suggestedProjectKey(projects: projects, name: name, excluding: projectID)
+    }
 }
 
 extension EnvironmentProfile: Identifiable {}
@@ -140,6 +150,12 @@ extension VariableInput {
 extension ServiceState {
     /// Starting, Running or Stopping: a process may be alive.
     public var isActive: Bool { serviceStateIsActive(state: self) }
+
+    /// The state that says most about a group of Services (Failed first), or
+    /// `nil` for none.
+    public static func mostSignificant(of states: [ServiceState]) -> ServiceState? {
+        serviceStateMostSignificant(states: states)
+    }
 }
 
 extension Run: Identifiable {
@@ -199,6 +215,25 @@ extension Listener: Identifiable {
 
     /// Not started by localhost.
     public var isUnmanaged: Bool { listenerIsUnmanaged(listener: self) }
+
+    /// Why localhost won't stop it, or `nil` if it can.
+    public var reasonNotStoppable: LocalhostError? { listenerReasonNotStoppable(listener: self) }
+
+    /// Who it belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
+    public func ownerDescription(in projects: [Project]) -> String {
+        listenerOwnerDescription(listener: self, projects: projects)
+    }
+}
+
+extension PortWarning: Identifiable {
+    public var id: String { "\(serviceId)-\(corePort)" }
+    public var serviceID: UUID { serviceId }
+
+    /// The configured Ports of `projects` held by Unmanaged Listeners, leaving
+    /// out active Services.
+    public static func warnings(for projects: [Project], statuses: [ServiceStatus], listeners: [Listener]) -> [PortWarning] {
+        portWarnings(projects: projects, statuses: statuses, listeners: listeners)
+    }
 }
 
 extension Orphan: Identifiable {
@@ -206,6 +241,16 @@ extension Orphan: Identifiable {
     public var runID: UUID { runId }
     public var serviceID: UUID { serviceId }
     public var processGroupID: Int32 { processGroupId }
+
+    /// "My SaaS › API", or which process group, if its Service is gone.
+    public func description(in projects: [Project]) -> String {
+        orphanDescription(orphan: self, projects: projects)
+    }
+}
+
+extension UnreadableProjectFile {
+    /// The file's name, why it couldn't be loaded, and where it is now.
+    public var description: String { unreadableProjectFileDescription(file: self) }
 }
 
 // MARK: Ports
@@ -235,4 +280,8 @@ extension ServiceSuggestion {
 
 extension DocumentService {
     public var port: Int? { corePort.map(Int.init) }
+}
+
+extension PortWarning {
+    public var port: Int { Int(corePort) }
 }

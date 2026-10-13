@@ -333,14 +333,8 @@ impl ServiceManager {
             }
             return Ok(());
         }
-        if listener.pid == std::process::id() as i32 {
-            return Err(LocalhostError::ListenerIsLocalhost);
-        }
-        if let Some(label) = &listener.launchd_label {
-            return Err(LocalhostError::ListenerIsLaunchdJob { label: label.clone() });
-        }
-        if listener.kind == ListenerKind::Docker {
-            return Err(LocalhostError::ListenerIsDocker);
+        if let Some(reason) = listener.reason_not_stoppable() {
+            return Err(reason);
         }
         listener::stop_listener(listener, self.inner.options.stop_policy).await;
         Ok(())

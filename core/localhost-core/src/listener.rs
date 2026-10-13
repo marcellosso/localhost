@@ -4,9 +4,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use crate::Id;
 use crate::platform::{self, ProcessStartTime};
 use crate::process::{StopPolicy, process_group_exists};
+use crate::{Id, LocalhostError, Project, ServiceStatus, service_label};
 
 /// A process listening on one or more TCP ports on this machine, whoever
 /// started it (see `GLOSSARY.md`).
@@ -39,6 +39,70 @@ impl Listener {
     pub fn is_unmanaged(&self) -> bool {
         self.owner == ListenerOwner::Unmanaged
     }
+
+    /// Why localhost refuses to stop this Listener, or `None` if it can:
+    /// localhost itself, launchd jobs and Docker's backend.
+    pub fn reason_not_stoppable(&self) -> Option<LocalhostError> {
+        if self.pid == std::process::id() as i32 {
+            Some(LocalhostError::ListenerIsLocalhost)
+        } else if let Some(label) = &self.launchd_label {
+            Some(LocalhostError::ListenerIsLaunchdJob { label: label.clone() })
+        } else if self.kind == ListenerKind::Docker {
+            Some(LocalhostError::ListenerIsDocker)
+        } else {
+            None
+        }
+    }
+
+    /// Who it belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
+    pub fn owner_description(&self, projects: &[Project]) -> String {
+        match self.owner {
+            ListenerOwner::Run { service_id, .. } => {
+                service_label(projects, service_id).unwrap_or_else(|| "A removed service".into())
+            }
+            ListenerOwner::Project { project_id } => {
+                let project = projects.iter().find(|project| project.id == project_id);
+                format!("In {}", project.map_or("a removed project", |project| project.name.as_str()))
+            }
+            ListenerOwner::Unmanaged => match self.kind {
+                ListenerKind::Docker => "Docker".into(),
+                ListenerKind::App => "App".into(),
+                ListenerKind::System if cfg!(target_os = "macos") => "macOS".into(),
+                ListenerKind::System => "System".into(),
+                ListenerKind::Development => "Unmanaged".into(),
+            },
+        }
+    }
+}
+
+/// A configured Port held by an Unmanaged Listener, so its Service can't
+/// start on it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+pub struct PortWarning {
+    pub port: u16,
+    pub service_id: Id,
+    pub holder: Listener,
+}
+
+/// The Port warnings for `listeners`, in Project and Service order. An active
+/// Service is left out: its Run already says why it moved or failed.
+pub fn port_warnings(projects: &[Project], statuses: &[ServiceStatus], listeners: &[Listener]) -> Vec<PortWarning> {
+    let is_active =
+        |service_id: Id| statuses.iter().any(|status| status.service_id == service_id && status.state.is_active());
+    projects
+        .iter()
+        .flat_map(|project| &project.services)
+        .filter_map(|service| {
+            let port = service.port?;
+            if is_active(service.id) {
+                return None;
+            }
+            let holder = listeners.iter().find(|listener| listener.is_unmanaged() && listener.ports.contains(&port))?;
+            Some(PortWarning { port, service_id: service.id, holder: holder.clone() })
+        })
+        .collect()
 }
 
 /// Who a Listener is attributed to.
@@ -366,5 +430,80 @@ mod tests {
         let run = ListenerOwner::Run { service_id: Id::new(), run_id: Id::new() };
         assert_eq!(ListenerKind::of(app, None, project), ListenerKind::Development);
         assert_eq!(ListenerKind::of(app, None, run), ListenerKind::Development);
+    }
+
+    fn listener(owner: ListenerOwner, kind: ListenerKind, ports: &[u16]) -> Listener {
+        Listener {
+            pid: 999_999,
+            process_group_id: 999_999,
+            name: "node".into(),
+            command: "node server.js".into(),
+            executable_path: None,
+            ports: ports.to_vec(),
+            working_directory: None,
+            owner,
+            launchd_label: None,
+            kind,
+            start_time: ProcessStartTime { seconds: 0, microseconds: 0 },
+        }
+    }
+
+    #[test]
+    fn says_why_a_listener_cant_be_stopped() {
+        let mut ours = listener(ListenerOwner::Unmanaged, ListenerKind::App, &[1]);
+        ours.pid = std::process::id() as i32;
+        assert_eq!(ours.reason_not_stoppable(), Some(LocalhostError::ListenerIsLocalhost));
+
+        let mut job = listener(ListenerOwner::Unmanaged, ListenerKind::App, &[1]);
+        job.launchd_label = Some("homebrew.mxcl.postgresql".into());
+        assert!(matches!(job.reason_not_stoppable(), Some(LocalhostError::ListenerIsLaunchdJob { .. })));
+
+        let docker = listener(ListenerOwner::Unmanaged, ListenerKind::Docker, &[1]);
+        assert_eq!(docker.reason_not_stoppable(), Some(LocalhostError::ListenerIsDocker));
+
+        let server = listener(ListenerOwner::Unmanaged, ListenerKind::Development, &[1]);
+        assert_eq!(server.reason_not_stoppable(), None);
+    }
+
+    #[test]
+    fn describes_who_a_listener_belongs_to() {
+        let projects = [Project::with_services("My SaaS", &[("API", None)])];
+        let (project_id, service_id) = (projects[0].id, projects[0].services[0].id);
+        let describe = |owner, kind| listener(owner, kind, &[1]).owner_description(&projects);
+        use ListenerKind::*;
+
+        assert_eq!(describe(ListenerOwner::Run { service_id, run_id: Id::new() }, Development), "My SaaS › API");
+        assert_eq!(
+            describe(ListenerOwner::Run { service_id: Id::new(), run_id: Id::new() }, Development),
+            "A removed service"
+        );
+        assert_eq!(describe(ListenerOwner::Project { project_id }, Development), "In My SaaS");
+        assert_eq!(describe(ListenerOwner::Project { project_id: Id::new() }, Development), "In a removed project");
+        assert_eq!(describe(ListenerOwner::Unmanaged, Docker), "Docker");
+        assert_eq!(describe(ListenerOwner::Unmanaged, Development), "Unmanaged");
+        let system = if cfg!(target_os = "macos") { "macOS" } else { "System" };
+        assert_eq!(describe(ListenerOwner::Unmanaged, System), system);
+    }
+
+    #[test]
+    fn warns_about_ports_unmanaged_listeners_hold() {
+        let projects =
+            [Project::with_services("My SaaS", &[("API", Some(4000)), ("Web", Some(3000)), ("Worker", None)])];
+        let (api, web) = (projects[0].services[0].id, projects[0].services[1].id);
+        let held = listener(ListenerOwner::Unmanaged, ListenerKind::Development, &[3000, 4000]);
+        let ours =
+            listener(ListenerOwner::Run { service_id: api, run_id: Id::new() }, ListenerKind::Development, &[4000]);
+
+        let warnings = port_warnings(&projects, &[], &[ours.clone(), held.clone()]);
+        let found: Vec<_> = warnings.iter().map(|warning| (warning.service_id, warning.port)).collect();
+        assert_eq!(found, [(api, 4000), (web, 3000)]);
+        assert!(warnings.iter().all(|warning| warning.holder == held));
+
+        // An active Service's own Run explains it.
+        let mut running = ServiceStatus::never_run(web);
+        running.state = crate::ServiceState::Running;
+        let warnings = port_warnings(&projects, &[running], &[held]);
+        assert_eq!(warnings.iter().map(|warning| warning.service_id).collect::<Vec<_>>(), [api]);
+        assert!(port_warnings(&projects, &[], &[ours]).is_empty());
     }
 }

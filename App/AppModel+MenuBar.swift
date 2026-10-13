@@ -4,15 +4,6 @@ import LocalhostCore
 /// What the menu bar companion reads and does. It shares the model (and so
 /// the core) with the main window; its state-changing calls use `.menuBar`.
 extension AppModel {
-    /// An Unmanaged Listener holding the Port of a Service that isn't running.
-    struct PortWarning: Identifiable, Hashable {
-        let port: Int
-        let serviceID: UUID
-        let holder: Listener
-
-        var id: String { "\(serviceID)-\(port)" }
-    }
-
     /// Projects with any active or Failed Service, plus favourites, in sidebar order.
     var menuBarProjects: [Project] {
         projects.filter { project in

@@ -12,9 +12,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use crate::Id;
 use crate::platform::ProcessStartTime;
 use crate::process::{StopPolicy, process_group_exists};
+use crate::{Id, Project, service_label};
 
 const SCHEMA_VERSION: i64 = 1;
 /// Seconds from the Unix epoch to 2001-01-01, the reference date the Swift
@@ -33,6 +33,14 @@ pub struct Orphan {
     pub process_group_id: i32,
     pub started_at: SystemTime,
     pub(crate) start_time: ProcessStartTime,
+}
+
+impl Orphan {
+    /// What the Orphans alert lists, e.g. "My SaaS › API".
+    pub fn description(&self, projects: &[Project]) -> String {
+        service_label(projects, self.service_id)
+            .unwrap_or_else(|| format!("A removed service (process group {})", self.process_group_id))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -372,5 +380,19 @@ mod tests {
         fs::write(root.path().join("runs/garbage.json"), "{").unwrap();
         assert!(RunRegistry::new(root.path()).orphans().is_empty());
         assert_eq!(fs::read_dir(root.path().join("runs")).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn describes_an_orphan_by_its_service() {
+        let projects = [Project::with_services("My SaaS", &[("API", None)])];
+        let orphan = |service_id| Orphan {
+            run_id: Id::new(),
+            service_id,
+            process_group_id: 4242,
+            started_at: SystemTime::now(),
+            start_time: ProcessStartTime { seconds: 0, microseconds: 0 },
+        };
+        assert_eq!(orphan(projects[0].services[0].id).description(&projects), "My SaaS › API");
+        assert_eq!(orphan(Id::new()).description(&projects), "A removed service (process group 4242)");
     }
 }

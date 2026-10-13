@@ -24,6 +24,27 @@ pub struct UnreadableProjectFile {
     pub error: LocalhostError,
 }
 
+impl UnreadableProjectFile {
+    /// One line for the launch report: the file's name, why, and where it is now.
+    pub fn description(&self) -> String {
+        let name = |path: &str| {
+            Path::new(path).file_name().map_or(path.to_string(), |name| name.to_string_lossy().into_owned())
+        };
+        let reason = match &self.error {
+            LocalhostError::PersistenceFailed { reason, .. } => reason.clone(),
+            LocalhostError::UnsupportedSchemaVersion { version, .. } => {
+                format!("It was saved by a newer version of localhost (schema {version}).")
+            }
+            error => error.message(),
+        };
+        let outcome = match &self.moved_to {
+            Some(moved_to) => format!("Kept as {}.", name(moved_to)),
+            None => "Left in place for that version.".into(),
+        };
+        format!("{}: {reason} {outcome}", name(&self.path))
+    }
+}
+
 pub(crate) struct ProjectStorage {
     projects_directory: PathBuf,
 }
@@ -220,4 +241,32 @@ fn move_aside(path: &Path) -> Option<String> {
         return fs::rename(path, &destination).ok().map(|_| display(&destination));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn describes_an_unreadable_file_and_where_it_is() {
+        let corrupt = UnreadableProjectFile {
+            path: "/data/projects/a.json".into(),
+            moved_to: Some("/data/projects/a.json.corrupt".into()),
+            error: LocalhostError::PersistenceFailed {
+                path: "/data/projects/a.json".into(),
+                reason: "Bad JSON.".into(),
+            },
+        };
+        assert_eq!(corrupt.description(), "a.json: Bad JSON. Kept as a.json.corrupt.");
+
+        let newer = UnreadableProjectFile {
+            path: "/data/projects/b.json".into(),
+            moved_to: None,
+            error: LocalhostError::UnsupportedSchemaVersion { version: 9, path: "/data/projects/b.json".into() },
+        };
+        assert_eq!(
+            newer.description(),
+            "b.json: It was saved by a newer version of localhost (schema 9). Left in place for that version."
+        );
+    }
 }
