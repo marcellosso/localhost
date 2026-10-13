@@ -273,8 +273,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn stops_a_listeners_own_process_group() {
         let port = free_port();
-        // With job control, nc gets a process group of its own, led by nc.
-        let (tree, listener) = listen(port, &format!("set -m; nc -lk {port} & wait")).await;
+        // nc leads a process group of its own, inside the tree's session. (Not
+        // `set -m`: dash, Linux's sh, turns job control off without a terminal.)
+        let (tree, listener) = listen(port, &format!("perl -e 'setpgrp(0, 0); exec @ARGV' nc -lk {port} & wait")).await;
         assert_eq!(listener.process_group_id, listener.pid);
         assert_ne!(listener.pid, tree.pid());
 
