@@ -15,3 +15,6 @@ build/
 .build/
 .swiftpm/
 Packages/*/Package.resolved
+
+# Cargo
+core/target/
