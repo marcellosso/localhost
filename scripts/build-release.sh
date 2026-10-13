@@ -1,5 +1,6 @@
 #!/bin/bash
-# Builds localhost.app in Release, signs it and packs it into a DMG.
+# Builds localhost.app in Release, signs it and packs it into a DMG. Needs
+# Rust with both macOS targets (CONTRIBUTING.md).
 #
 #   scripts/build-release.sh <version> [build number]
 #
@@ -32,6 +33,10 @@ dmg="$output/localhost-$version.dmg"
 timestamp=(--timestamp=none)
 [[ ${DEVELOPER_ID:-} == 1 ]] && timestamp=(--timestamp)
 
+echo "==> Building the Rust core (universal)" >&2
+# The scheme's pre-action would build it too, but hides the output.
+scripts/build-core.sh release >&2
+
 echo "==> Building localhost $version ($build_number)" >&2
 rm -rf "$output"
 xcodebuild -project localhost.xcodeproj -scheme localhost -configuration Release \
@@ -39,6 +44,14 @@ xcodebuild -project localhost.xcodeproj -scheme localhost -configuration Release
     CODE_SIGNING_ALLOWED=NO \
     MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number" \
     -quiet clean build >&2
+
+# The Rust core is linked in statically, so the app binary carries both.
+for arch in arm64 x86_64; do
+    if ! lipo "$app/Contents/MacOS/localhost" -verify_arch "$arch"; then
+        echo "error: the app has no $arch slice" >&2
+        exit 1
+    fi
+done
 
 echo "==> Signing with ${identity/#-/an ad hoc signature}" >&2
 # Hardened runtime as in the Xcode project; the app has no nested code to sign first.

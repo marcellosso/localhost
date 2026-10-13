@@ -7,3 +7,9 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.90"
+
+# The macOS app links the core statically: whole-program optimisation keeps
+# only what the bindings reach.
+[profile.release]
+lto = true
+codegen-units = 1
