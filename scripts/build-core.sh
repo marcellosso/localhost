@@ -5,6 +5,9 @@
 #   scripts/build-core.sh [debug|release]   build (default: release)
 #   scripts/build-core.sh --check           fail if the output is missing or
 #                                           older than core/'s sources
+#   scripts/build-core.sh --xcode           the scheme's build pre-action: the
+#                                           profile from $CONFIGURATION, output
+#                                           in Generated/build.log
 #
 # debug builds this Mac's architecture only, for quick local builds.
 # release builds a universal (arm64 + x86_64) library, as shipped.
@@ -48,6 +51,32 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 PROFILE="${1:-release}"
+if [ "$PROFILE" = "--xcode" ]; then
+    # Xcode doesn't show what a pre-action prints, so it goes to a log; the
+    # "Check the Rust core" build phase reads the status written below and
+    # points there.
+    mkdir -p "$GENERATED"
+    exec >"$GENERATED/build.log" 2>&1
+    if [ "${CONFIGURATION:-Debug}" = Release ]; then PROFILE=release; else PROFILE=debug; fi
+fi
+
+# What the "Check the Rust core" build phase reads: `ok`, or why not.
+STATUS="$GENERATED/status"
+mkdir -p "$GENERATED"
+rm -f "$STATUS"
+WORK=""
+finish() {
+    local code=$?
+    if [ "$code" -eq 0 ]; then
+        echo ok >"$STATUS"
+    else
+        echo "scripts/build-core.sh $PROFILE failed (exit $code)" >"$STATUS"
+    fi
+    if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
+    return "$code"
+}
+trap finish EXIT
+
 case "$PROFILE" in
     release) TARGETS=(aarch64-apple-darwin x86_64-apple-darwin) ;;
     debug)
@@ -57,7 +86,7 @@ case "$PROFILE" in
         esac
         ;;
     *)
-        echo "usage: $0 [debug|release] | --check" >&2
+        echo "usage: $0 [debug|release] | --check | --xcode" >&2
         exit 2
         ;;
 esac
@@ -92,7 +121,6 @@ for target in "${TARGETS[@]}"; do
 done
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
 
 lipo -create "${LIBRARIES[@]}" -output "$WORK/liblocalhost_ffi.a"
 

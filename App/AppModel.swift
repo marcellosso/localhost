@@ -131,7 +131,7 @@ final class AppModel {
         didSet {
             UserDefaults.standard.set(isAutomaticPortMoveEnabled, forKey: Self.automaticPortMoveKey)
             guard let services = core?.services else { return }
-            Task { [isAutomaticPortMoveEnabled] in await services.setAutomaticPortMove(isAutomaticPortMoveEnabled) }
+            services.setAutomaticPortMove(isAutomaticPortMoveEnabled)
         }
     }
 
@@ -314,7 +314,7 @@ final class AppModel {
             : selectedService.map { [$0.id] } ?? []
         Task {
             for serviceID in serviceIDs {
-                await logs.clearBuffer(ofService: serviceID)
+                logs.clearBuffer(ofService: serviceID)
             }
             logClearCount += 1
         }
@@ -338,15 +338,15 @@ final class AppModel {
 
     @discardableResult
     func addProject(name: String, key: String, path: String, services: [NewService] = []) async throws(LocalhostError) -> Project {
-        guard let library = core?.library else { throw .projectNotFound(UUID()) }
+        guard let library = core?.library else { throw .ProjectNotFound(UUID()) }
         let project = try await library.addProject(name: name, key: Key(key), path: path, services: services, origin: .mainWindow)
-        projects = await library.projects()
+        projects = library.projects()
         selectedProjectID = project.id
         return project
     }
 
     func editProject(_ id: UUID, name: String, key: String, path: String) async throws(LocalhostError) {
-        guard let library = core?.library else { throw .projectNotFound(id) }
+        guard let library = core?.library else { throw .ProjectNotFound(id) }
         try await library.editProject(id: id, name: name, key: Key(key), path: path, origin: .mainWindow)
     }
 
@@ -374,29 +374,29 @@ final class AppModel {
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
         port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) -> Service {
-        guard let library = core?.library else { throw .projectNotFound(projectID) }
+        guard let library = core?.library else { throw .ProjectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, variables: variables, dependencies: dependencies,
             isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, portCanChange: portCanChange,
             origin: .mainWindow
         )
-        projects = await library.projects()
+        projects = library.projects()
         selectedServiceID = service.id
         return service
     }
 
     func addServices(_ services: [NewService], to projectID: UUID) async throws(LocalhostError) {
-        guard let library = core?.library else { throw .projectNotFound(projectID) }
+        guard let library = core?.library else { throw .ProjectNotFound(projectID) }
         let added = try await library.addServices(services, toProject: projectID, origin: .mainWindow)
-        projects = await library.projects()
+        projects = library.projects()
         if let first = added.first { selectedServiceID = first.id }
     }
 
     /// Saves a reviewed import. On Replace, Services the file no longer has
     /// are stopped first, as when removing them.
     func importProject(_ document: ProjectDocument, onKeyClash: ProjectLibrary.KeyClash?) async throws(LocalhostError) {
-        guard let core else { throw .projectNotFound(UUID()) }
+        guard let core else { throw .ProjectNotFound(UUID()) }
         if onKeyClash == .replace, let existing = projectClashing(with: document) {
             let keptKeys = Set(document.services.map(\.key))
             for service in existing.services where !keptKeys.contains(service.key) {
@@ -408,7 +408,7 @@ final class AppModel {
         for service in replaced?.services ?? [] where !project.services.contains(where: { $0.id == service.id }) {
             await core.logs.removeLogs(ofService: service.id)
         }
-        projects = await core.library.projects()
+        projects = core.library.projects()
         selectedProjectID = project.id
     }
 
@@ -417,7 +417,7 @@ final class AppModel {
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
         port: Int?, url: String?, portCanChange: Bool
     ) async throws(LocalhostError) {
-        guard let library = core?.library else { throw .serviceNotFound(id) }
+        guard let library = core?.library else { throw .ServiceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, variables: variables, dependencies: dependencies,
@@ -447,7 +447,7 @@ final class AppModel {
     func saveEnvironment(
         of projectID: UUID, variables: [VariableInput], profiles: [ProfileDraft], activeDraftID: UUID?
     ) async throws(LocalhostError) {
-        guard let library = core?.library, let project = project(projectID) else { throw .projectNotFound(projectID) }
+        guard let library = core?.library, let project = project(projectID) else { throw .ProjectNotFound(projectID) }
         try await library.editProject(id: projectID, variables: variables, origin: .mainWindow)
         let kept = Set(profiles.compactMap(\.profileID))
         for profile in project.profiles where !kept.contains(profile.id) {
@@ -519,9 +519,9 @@ final class AppModel {
 
     /// Why localhost won't stop the Listener, or `nil` if it can.
     func reasonNotStoppable(_ listener: Listener) -> String? {
-        if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.listenerIsLocalhost.message }
-        if let label = listener.launchdLabel { return LocalhostError.listenerIsLaunchdJob(label: label).message }
-        if listener.kind == .docker { return LocalhostError.listenerIsDocker.message }
+        if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.ListenerIsLocalhost.message }
+        if let label = listener.launchdLabel { return LocalhostError.ListenerIsLaunchdJob(label: label).message }
+        if listener.kind == .docker { return LocalhostError.ListenerIsDocker.message }
         return nil
     }
 
@@ -570,11 +570,11 @@ final class AppModel {
     }
 
     private func presentIfBlocked(_ status: ServiceStatus, origin: Origin = .mainWindow) async {
-        guard status.state == .failed, case .portConflict(let port, let holder) = status.run?.failure,
+        guard status.state == .failed, case .PortConflict(let port, let holder) = status.run?.failure,
               let services = core?.services
         else { return }
         let nextFreePort = try? await services.nextFreePort(for: status.serviceID)
-        blockedStart = BlockedStart(serviceID: status.serviceID, port: port, holder: holder, nextFreePort: nextFreePort)
+        blockedStart = BlockedStart(serviceID: status.serviceID, port: Int(port), holder: holder, nextFreePort: nextFreePort)
         // The question is asked in the main window.
         if origin == .menuBar { showMainWindow?() }
     }
@@ -601,8 +601,8 @@ final class AppModel {
         (core?.library.unreadableFiles ?? []).map { file in
             let name = (file.path as NSString).lastPathComponent
             let reason = switch file.error {
-            case .persistenceFailed(_, let reason): reason
-            case .unsupportedSchemaVersion(let version, _): "It was saved by a newer version of localhost (schema \(version))."
+            case .PersistenceFailed(_, let reason): reason
+            case .UnsupportedSchemaVersion(let version, _): "It was saved by a newer version of localhost (schema \(version))."
             default: file.error.message
             }
             let outcome = file.movedTo.map { "Kept as \(($0 as NSString).lastPathComponent)." }
@@ -662,14 +662,14 @@ final class AppModel {
     private func observeProjects() {
         guard let library = core?.library else { return }
         projectObservation = Task { [weak self] in
-            let (projects, events) = await library.subscribe()
+            let (projects, events) = library.subscribe()
             self?.projects = projects
             self?.restoreSelection()
             for await event in events {
                 guard let self else { return }
                 switch event {
                 case .projectAdded, .projectUpdated, .projectRemoved:
-                    self.projects = await library.projects()
+                    self.projects = library.projects()
                 }
             }
         }
@@ -682,7 +682,7 @@ final class AppModel {
         guard let services = core?.services else { return }
         stateAnnouncements = Task { [weak self] in
             var lastStates: [UUID: ServiceState] = [:]
-            for await event in await services.subscribe().events {
+            for await event in services.subscribe().events {
                 guard let self, case .serviceStateChanged(let status) = event else { continue }
                 defer { lastStates[status.serviceID] = status.state }
                 guard status.state != lastStates[status.serviceID], !status.state.isActive || status.state == .running,
