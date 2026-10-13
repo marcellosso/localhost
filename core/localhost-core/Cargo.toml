@@ -1,0 +1,25 @@
+[package]
+name = "localhost-core"
+description = "The UI-free core of localhost: Projects, Services, Runs, logs, environment (ADR-0001, ADR-0007)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+tokio = { version = "1.53.2", features = ["sync", "rt", "macros", "time"] }
+unicode-normalization = "0.1.25"
+url = "2.5.8"
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = { version = "5.2.0", features = ["rt-async-io-crypto-rust"] }

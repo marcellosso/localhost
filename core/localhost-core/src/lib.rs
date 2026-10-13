@@ -1,0 +1,38 @@
+//! localhost-core: the UI-free core of localhost (ADR-0001, ADR-0007).
+//!
+//! Every client (the macOS app, the Windows/Linux app, the CLI) is a client of
+//! this crate. It never depends on a UI toolkit. State-changing calls take an
+//! [`Origin`], failures are a [`LocalhostError`], and changes are broadcast as
+//! events, so the core can later be hosted behind IPC without a rewrite.
+
+mod dependencies;
+mod error;
+mod fold;
+mod fuzzy;
+mod id;
+mod key;
+mod library;
+mod model;
+mod origin;
+mod paths;
+mod run_environment;
+mod secrets;
+mod storage;
+mod validate;
+
+pub use error::LocalhostError;
+pub use fuzzy::FuzzyMatch;
+pub use id::Id;
+pub use key::Key;
+pub use library::{KeyClash, ProfileChanges, ProjectChanges, ProjectLibrary, ProjectLibraryEvent, ServiceChanges};
+pub use model::{
+    EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
+};
+pub use origin::Origin;
+pub use paths::default_storage_root;
+pub use run_environment::RunEnvironment;
+pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
+pub use storage::UnreadableProjectFile;
+
+/// Version of the core, surfaced by clients (and later the CLI/MCP).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

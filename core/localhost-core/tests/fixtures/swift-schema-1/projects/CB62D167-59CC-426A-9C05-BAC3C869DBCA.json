@@ -1,0 +1,105 @@
+{
+  "project" : {
+    "activeProfileID" : "295BE8B5-ADC0-4BF8-8A44-97BA2CC1DBE8",
+    "id" : "CB62D167-59CC-426A-9C05-BAC3C869DBCA",
+    "isFavorite" : true,
+    "key" : "acme-shop",
+    "name" : "Acme Shop",
+    "path" : "/Users/dev/Code/acme-shop",
+    "profiles" : [
+      {
+        "id" : "295BE8B5-ADC0-4BF8-8A44-97BA2CC1DBE8",
+        "name" : "Testing",
+        "variables" : {
+          "secretNames" : [
+            "TOKEN"
+          ],
+          "values" : {
+            "NODE_ENV" : "test"
+          }
+        }
+      },
+      {
+        "id" : "1236ABD4-0A8F-4473-BB41-9F19ED1B2495",
+        "name" : "Development",
+        "variables" : {
+          "secretNames" : [
+
+          ],
+          "values" : {
+
+          }
+        }
+      }
+    ],
+    "services" : [
+      {
+        "commandLine" : "docker compose up postgres",
+        "dependencies" : [
+
+        ],
+        "environment" : {
+
+        },
+        "id" : "8FFA5F47-7751-48CA-8D79-9C351DD48018",
+        "isExcludedFromStartAll" : false,
+        "key" : "postgres",
+        "name" : "Postgres",
+        "port" : 5432,
+        "portCanChange" : false,
+        "secretNames" : [
+
+        ],
+        "workingDirectory" : "."
+      },
+      {
+        "commandLine" : "uv run fastapi dev --port $PORT",
+        "dependencies" : [
+          "8FFA5F47-7751-48CA-8D79-9C351DD48018"
+        ],
+        "environment" : {
+          "DEBUG" : "1"
+        },
+        "id" : "E852EF9F-3371-4B3F-8BA3-61DC7ADF142C",
+        "isExcludedFromStartAll" : false,
+        "key" : "api",
+        "name" : "API",
+        "port" : 8000,
+        "portCanChange" : true,
+        "secretNames" : [
+          "STRIPE_KEY"
+        ],
+        "url" : "http://localhost:8000/docs",
+        "workingDirectory" : "api"
+      },
+      {
+        "commandLine" : "pnpm run storybook",
+        "dependencies" : [
+          "E852EF9F-3371-4B3F-8BA3-61DC7ADF142C"
+        ],
+        "environment" : {
+
+        },
+        "id" : "23F647BD-FE77-4588-B4BA-3878184624A8",
+        "isExcludedFromStartAll" : true,
+        "key" : "storybook",
+        "name" : "Storybook",
+        "portCanChange" : true,
+        "secretNames" : [
+
+        ],
+        "workingDirectory" : "apps/web"
+      }
+    ],
+    "sortOrder" : 0,
+    "variables" : {
+      "secretNames" : [
+        "DB_PASSWORD"
+      ],
+      "values" : {
+        "NODE_ENV" : "development"
+      }
+    }
+  },
+  "schemaVersion" : 1
+}

@@ -1,0 +1,25 @@
+{
+  "project" : {
+    "id" : "9F3CFC25-646B-4CD8-B1DA-F06DD3CE2C28",
+    "isFavorite" : false,
+    "key" : "empty",
+    "name" : "Empty",
+    "path" : "/tmp/empty",
+    "profiles" : [
+
+    ],
+    "services" : [
+
+    ],
+    "sortOrder" : 1,
+    "variables" : {
+      "secretNames" : [
+
+      ],
+      "values" : {
+
+      }
+    }
+  },
+  "schemaVersion" : 1
+}
