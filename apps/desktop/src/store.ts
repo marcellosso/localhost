@@ -45,6 +45,10 @@ export async function startCore() {
   early = null;
 }
 
+export function currentCore(): CoreStore {
+  return current;
+}
+
 export function useCore(): CoreStore {
   return useSyncExternalStore(
     (listener) => {

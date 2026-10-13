@@ -36,6 +36,16 @@
   --surface-column: #f7f7f9;
   --surface-log: #fcfcfd;
 
+  /* ANSI colours 0–7 (8–15 reuse them), readable on the log surface. */
+  --ansi-0: #59636e;
+  --ansi-1: #cf222e;
+  --ansi-2: #1a7f37;
+  --ansi-3: #9a6700;
+  --ansi-4: #0969da;
+  --ansi-5: #8250df;
+  --ansi-6: #1b7c83;
+  --ansi-7: #1f2328;
+
   --text: #1f2328;
   --text-secondary: #59636e;
   --separator: rgb(0 0 0 / 0.1);
@@ -65,6 +75,15 @@
     --surface-sidebar: #232329;
     --surface-column: #1c1c21;
     --surface-log: #141417;
+
+    --ansi-0: #9198a1;
+    --ansi-1: #ff7b72;
+    --ansi-2: #3fb950;
+    --ansi-3: #d29922;
+    --ansi-4: #58a6ff;
+    --ansi-5: #bc8cff;
+    --ansi-6: #39c5cf;
+    --ansi-7: #e6edf3;
 
     --text: #e6edf3;
     --text-secondary: #9198a1;

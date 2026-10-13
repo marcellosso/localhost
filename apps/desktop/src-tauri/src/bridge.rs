@@ -32,9 +32,11 @@ pub struct ProjectState {
 /// A command's failure: the core's typed error, and its message for the user.
 #[derive(Debug, Serialize, Type)]
 pub struct CommandError {
-    error: LocalhostError,
-    message: String,
+    pub error: LocalhostError,
+    pub message: String,
 }
+
+pub type CommandResult<T = ()> = Result<T, CommandError>;
 
 impl From<LocalhostError> for CommandError {
     fn from(error: LocalhostError) -> CommandError {
@@ -55,7 +57,7 @@ pub enum CoreEvent {
 #[tauri::command]
 #[specta::specta]
 pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) -> Result<Snapshot, CommandError> {
-    let core = state.0.as_ref().map_err(|error| error.clone())?;
+    let core = state.core()?;
     let (projects, mut library_events) = core.library.subscribe();
     let (statuses, mut service_events) = core.services.subscribe();
     let mut view = View { projects, statuses, states: HashMap::new() };

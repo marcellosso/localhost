@@ -31,8 +31,12 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 220px minmax(300px, 380px) 1fr;
   height: 100%;
+}
+
+.app > .message {
+  grid-column: span 2;
 }
 
 .message {

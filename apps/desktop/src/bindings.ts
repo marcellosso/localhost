@@ -15,6 +15,76 @@ async subscribe(events: TAURI_CHANNEL<CoreEvent>) : Promise<Result<Snapshot, Com
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async startService(serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_service", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stopService(serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_service", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async restartService(serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("restart_service", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Starts the Project's Services, Dependencies first.
+ */
+async startAll(projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_all", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_all", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Streams `source` over `batches`: what is buffered first, then new
+ * lines. Returns the id to close it with.
+ */
+async openLog(source: LogSource, batches: TAURI_CHANNEL<LogBatch>) : Promise<Result<number, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_log", { source, batches }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async closeLog(id: number) : Promise<void> {
+    await TAURI_INVOKE("close_log", { id });
+},
+/**
+ * The run to measure, if this is a measurement.
+ */
+async perfSettings() : Promise<PerfSettings | null> {
+    return await TAURI_INVOKE("perf_settings");
+},
+/**
+ * Prints the report as one JSON line and quits, which stops the Services.
+ */
+async finishPerfRun(report: PerfReport) : Promise<void> {
+    await TAURI_INVOKE("finish_perf_run", { report });
 }
 }
 
@@ -28,6 +98,14 @@ async subscribe(events: TAURI_CHANNEL<CoreEvent>) : Promise<Result<Snapshot, Com
 
 /** user-defined types **/
 
+/**
+ * A colour from an ANSI SGR sequence. Clients map indexed colours to their theme.
+ */
+export type AnsiColor = 
+/**
+ * 0–7 standard, 8–15 bright, 16–255 the xterm 256-colour palette.
+ */
+{ kind: "indexed"; index: number } | { kind: "rgb"; red: number; green: number; blue: number }
 /**
  * A command's failure: the core's typed error, and its message for the user.
  */
@@ -176,6 +254,36 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  * `["services", "web", "port"]`) on `line`, when known.
  */
 { kind: "invalidProjectFile"; detail: { problem: ProjectFileProblem; field: string[]; line: number | null } }
+export type LogBatch = { lines: LogLine[]; 
+/**
+ * Lines that arrived but were left out because the batch kept only its
+ * newest `MAX_LINES`.
+ */
+skipped: number; 
+/**
+ * No more lines will come: the Run's output ended.
+ */
+isFinished: boolean }
+/**
+ * A line ready to draw.
+ */
+export type LogLine = { 
+/**
+ * Which Service it came from, in a combined stream.
+ */
+serviceId: Id | null; channel: OutputChannel; spans: Span[] }
+/**
+ * What a log shows.
+ */
+export type LogSource = 
+/**
+ * One Run's output: a Service's log.
+ */
+{ kind: "run"; runId: Id } | 
+/**
+ * The latest Runs of these Services, and any they start later, in one stream.
+ */
+{ kind: "services"; serviceIds: Id[] }
 /**
  * Who or what requested a state-changing action.
  * 
@@ -183,6 +291,23 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  * can tell who changed what.
  */
 export type Origin = "mainWindow" | "menuBar" | "cli"
+/**
+ * Where a line of a Run's output came from.
+ */
+export type OutputChannel = "stdout" | "stderr" | 
+/**
+ * Written by localhost itself, e.g. how the Run ended.
+ */
+"localhost"
+/**
+ * What the UI measured.
+ */
+export type PerfReport = { seconds: number; linesReceived: number; frames: number; frameMsP50: number; frameMsP95: number; frameMsMax: number; 
+/**
+ * Frames that took longer than two at 60 Hz (33 ms).
+ */
+longFrames: number }
+export type PerfSettings = { services: number; linesPerSecond: number; seconds: number }
 /**
  * A Run started on another port than its Service's Port. The Project
  * Configuration keeps the Port; the change lasts for that Run (ADR-0006).
@@ -406,6 +531,10 @@ export type Snapshot = { projects: Project[];
  */
 statuses: ServiceStatus[]; projectStates: ProjectState[] }
 /**
+ * A run of identically styled text.
+ */
+export type Span = { text: string; style: TextStyle }
+/**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.
  */
@@ -414,6 +543,10 @@ export type SystemTime = { secs_since_epoch: number; nanos_since_epoch: number }
  * How the command's shell ended.
  */
 export type Termination = { kind: "exited"; code: number } | { kind: "signaled"; signal: number }
+/**
+ * The text attributes set by ANSI SGR sequences.
+ */
+export type TextStyle = { foreground: AnsiColor | null; background: AnsiColor | null; isBold: boolean; isDim: boolean; isItalic: boolean; isUnderlined: boolean; isInverse: boolean; isStrikethrough: boolean }
 /**
  * The kind of value a Project file field takes.
  */
