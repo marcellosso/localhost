@@ -56,6 +56,10 @@ _Avoid_: Detected service, auto-configuration
 One execution of a Service, from launch until its process tree has fully ended. Carries its own logs, start time, and exit outcome. A Service has at most one active Run.
 _Avoid_: Process, session, instance
 
+**Execution Target**:
+Where a Project's Services run: this machine, or (on Windows) a WSL distro. A Project has exactly one; its folder path, Listeners and Orphans belong to that target.
+_Avoid_: Host, runtime, environment (taken by Environment Profile), agent (reserved for AI agents)
+
 **Orphan**:
 A process tree left over from a Run whose owning localhost session ended unexpectedly (crash, force-quit).
 _Avoid_: Zombie, leftover
