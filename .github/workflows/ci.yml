@@ -1,13 +1,5 @@
 name: CI
 
-# macOS minutes are the expensive ones, so:
-# - Linux does fmt and runs on every push, drafts included.
-# - One macOS job does the rest, and skips draft pull requests. Marking a
-#   pull request ready for review runs it.
-# - The universal release library is left to the release workflow; CI builds
-#   the core for this Mac only.
-# - Changes to Markdown and docs/ alone run nothing.
-
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
