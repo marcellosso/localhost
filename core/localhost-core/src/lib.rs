@@ -71,5 +71,16 @@ pub use service_manager::{
 };
 pub use storage::UnreadableProjectFile;
 
+/// How serde writes a `SystemTime`, for the TypeScript types: specta's own
+/// description of it doesn't match.
+#[cfg(feature = "specta")]
+#[derive(specta::Type)]
+#[specta(rename = "SystemTime")]
+#[allow(dead_code)]
+pub(crate) struct SerdeSystemTime {
+    secs_since_epoch: u64,
+    nanos_since_epoch: u32,
+}
+
 /// Version of the core, surfaced by clients (and later the CLI/MCP).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

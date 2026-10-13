@@ -9,6 +9,7 @@ use crate::{Id, Listener, LocalhostError, Origin, Service};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ServiceState {
     /// Never started, or deliberately stopped, whatever exit code the stop produced.
     Stopped,
@@ -46,13 +47,16 @@ impl ServiceState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Run {
     pub id: Id,
     pub service_id: Id,
     /// Who started the Run.
     pub origin: Origin,
+    #[cfg_attr(feature = "specta", specta(type = crate::SerdeSystemTime))]
     pub started_at: SystemTime,
     /// When the process tree fully ended; `None` while it is still alive.
+    #[cfg_attr(feature = "specta", specta(type = Option<crate::SerdeSystemTime>))]
     pub ended_at: Option<SystemTime>,
     /// How the command's shell ended; `None` until it has, or if it never launched.
     pub termination: Option<Termination>,
@@ -98,6 +102,7 @@ impl Run {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct PortChange {
     pub configured_port: u16,
     pub reason: PortChangeReason,
@@ -106,6 +111,7 @@ pub struct PortChange {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum PortChangeReason {
     /// Moved automatically because the Port was taken, by `holder` if
     /// localhost could see who.
@@ -118,6 +124,7 @@ pub enum PortChangeReason {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServiceStatus {
     pub service_id: Id,
     pub state: ServiceState,
@@ -147,6 +154,7 @@ impl ServiceStatus {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum ServiceEvent {
     ServiceStateChanged(ServiceStatus),
     RunStarted(Run),

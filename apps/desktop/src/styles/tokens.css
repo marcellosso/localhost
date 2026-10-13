@@ -1,0 +1,74 @@
+/* "Graded glass" tokens (docs/v1-decisions.md, UI direction), the same
+ * values as the macOS app's Theme (App/Views/Theme.swift): keep them in step.
+ * Green, orange and red are for Service State only; the accent marks primary
+ * actions and selection. Text colours reach WCAG AA (4.5:1) on the surfaces
+ * below, glyphs 3:1. */
+
+:root {
+  color-scheme: light dark;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  /* Keys, ports, commands and paths are always monospace. */
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+
+  --accent: #d73065;
+  --on-accent: #ffffff;
+  --accent-text: #c2185b;
+
+  --state-running: #1a7f37;
+  --state-transitioning: #896100;
+  --state-failed: #cf222e;
+  --state-stopped: #737b84;
+
+  /* By position in the Project, so a Service keeps its colour everywhere. */
+  --service-0: #075cbf;
+  --service-1: #6f44bf;
+  --service-2: #815600;
+  --service-3: #a14100;
+  --service-4: #176a70;
+  --service-5: #a43175;
+  --service-6: #4455bf;
+  --service-7: #59660f;
+
+  /* Glass steps down from left to right: sidebar, column, opaque log.
+   * Translucency is off in the webview, so these are the solid variants. */
+  --surface-sidebar: #edecf0;
+  --surface-column: #f7f7f9;
+  --surface-log: #fcfcfd;
+
+  --text: #1f2328;
+  --text-secondary: #59636e;
+  --separator: rgb(0 0 0 / 0.1);
+  --selection: rgb(215 48 101 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #ff5c8a;
+    --on-accent: #1a0b10;
+    --accent-text: #ff7fa3;
+
+    --state-running: #3fb950;
+    --state-transitioning: #f0a030;
+    --state-failed: #ff5a4e;
+    --state-stopped: #7d8590;
+
+    --service-0: #79c0ff;
+    --service-1: #b392f0;
+    --service-2: #e5c07b;
+    --service-3: #f78c6c;
+    --service-4: #56d4dd;
+    --service-5: #f2a8d0;
+    --service-6: #a8b4ff;
+    --service-7: #c9d18a;
+
+    --surface-sidebar: #232329;
+    --surface-column: #1c1c21;
+    --surface-log: #141417;
+
+    --text: #e6edf3;
+    --text-secondary: #9198a1;
+    --separator: rgb(255 255 255 / 0.1);
+    --selection: rgb(255 92 138 / 0.16);
+  }
+}

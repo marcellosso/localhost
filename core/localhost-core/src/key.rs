@@ -11,6 +11,7 @@ use crate::fold::fold;
 /// A Key is a slug: lowercase ASCII letters and digits in groups separated by
 /// single hyphens, at most 64 characters. A `Key` value is always valid.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Key(String);
 
 impl Key {

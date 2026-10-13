@@ -9,6 +9,7 @@ use uuid::Uuid;
 /// Written uppercase, as the Swift core wrote UUIDs: in file names, in JSON
 /// and in the Secret accounts (`<ID>/<NAME>`), so existing data keeps working.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Id(Uuid);
 
 impl Id {

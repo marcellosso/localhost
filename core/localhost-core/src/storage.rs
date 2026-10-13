@@ -16,6 +16,7 @@ pub(crate) const SCHEMA_VERSION: i64 = 1;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UnreadableProjectFile {
     pub path: String,
     /// Where the file was moved aside to; `None` if it was left in place
