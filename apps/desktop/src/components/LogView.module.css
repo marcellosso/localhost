@@ -1,0 +1,65 @@
+/* The log is always opaque, for legible text and exact ANSI colours. */
+.log {
+  position: relative;
+  overflow: auto;
+  height: 100%;
+  background: var(--surface-log);
+  font: 12px/18px var(--font-mono);
+  user-select: text;
+  cursor: text;
+  outline: none;
+}
+
+.log:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.empty {
+  margin: 0;
+  padding: 16px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.content {
+  position: relative;
+  min-width: max-content;
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  height: 18px;
+  padding-right: 16px;
+  white-space: pre;
+}
+
+/* The stream gutter, which isn't part of the output (or of a copy). */
+.stdout,
+.stderr,
+.localhost {
+  display: inline-block;
+  width: 2ch;
+  user-select: none;
+}
+
+.stderr::before {
+  content: "▍";
+  color: color-mix(in srgb, var(--state-failed) 70%, transparent);
+}
+
+.localhost::before {
+  content: "›";
+  color: var(--text-secondary);
+}
+
+.localhost ~ span {
+  color: var(--text-secondary);
+}
+
+.prefix {
+  margin-right: 1ch;
+  user-select: none;
+}
