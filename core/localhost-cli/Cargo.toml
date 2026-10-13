@@ -1,0 +1,19 @@
+[package]
+name = "localhost-cli"
+description = "The localhost command: list Projects, show their status and logs, run them in the foreground."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "localhost"
+path = "src/main.rs"
+
+[dependencies]
+localhost-core = { path = "../localhost-core" }
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
+
+[dev-dependencies]
+libc = "0.2.190"
+tempfile = "3.27.0"
