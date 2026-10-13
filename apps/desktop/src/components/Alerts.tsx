@@ -12,7 +12,7 @@ import { processDescription } from "../listeners";
 import { formatList } from "../status";
 import { type Alert, alertKey, dismissAlert, useUi } from "../ui";
 import { Dialog } from "./Dialog";
-import { SettingsDialog } from "./SettingsDialog";
+import { ChooseEditorDialog, SettingsDialog } from "./SettingsDialog";
 
 /** The alert on top of the queue, and the progress note while something slow runs. */
 export function Alerts({ view }: { view: CoreView }) {
@@ -45,7 +45,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
           title="Something went wrong"
           onCancel={close}
           actions={
-            <button className="button primary" onClick={close} data-autofocus>
+            <button className="button accent" onClick={close} data-autofocus>
               OK
             </button>
           }
@@ -75,7 +75,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
                 </button>
               )}
               {canStopHolder && (
-                <button className="button primary" onClick={then(() => stopHolderAndStart(blocked))}>
+                <button className="button accent" onClick={then(() => stopHolderAndStart(blocked))}>
                   Stop It and Start
                 </button>
               )}
@@ -101,7 +101,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
               <button className="button" onClick={close} data-autofocus>
                 Cancel
               </button>
-              <button className="button primary destructive" onClick={then(() => stopListener(listener))}>
+              <button className="button destructive" onClick={then(() => stopListener(listener))}>
                 Stop
               </button>
             </>
@@ -123,7 +123,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
               <button className="button" onClick={then(() => dismissUnreadableFiles(true))}>
                 Show in File Manager
               </button>
-              <button className="button primary" onClick={then(() => dismissUnreadableFiles(false))} data-autofocus>
+              <button className="button accent" onClick={then(() => dismissUnreadableFiles(false))} data-autofocus>
                 OK
               </button>
             </>
@@ -151,7 +151,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
               <button className="button" onClick={then(leaveOrphans)}>
                 Leave Them
               </button>
-              <button className="button primary" onClick={then(stopOrphans)} data-autofocus>
+              <button className="button accent" onClick={then(stopOrphans)} data-autofocus>
                 Stop Them
               </button>
             </>
@@ -163,7 +163,11 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
     }
 
     case "settings":
-      return <SettingsDialog forEditor={alert.forEditor} onClose={close} />;
+      return alert.forEditor ? (
+        <ChooseEditorDialog onChosen={alert.forEditor} onClose={close} />
+      ) : (
+        <SettingsDialog onClose={close} />
+      );
   }
 }
 

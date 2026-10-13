@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LogLine } from "../bindings";
 import { LogBuffer, MAX_LINES } from "./buffer";
 
-const line = (text: string): LogLine => ({ serviceId: null, channel: "stdout", spans: [{ text, style: plain }] });
+const line = (text: string): LogLine => ({ serviceId: null, channel: "stdout", spans: [{ text, style: plain }], links: [] });
 const plain = {
   foreground: null,
   background: null,

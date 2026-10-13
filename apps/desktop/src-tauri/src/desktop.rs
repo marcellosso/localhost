@@ -55,6 +55,17 @@ pub fn open_service_url(state: tauri::State<'_, AppState>, service_id: Id) -> Co
     spawn(opener(), &[url.as_str()], None)
 }
 
+/// Opens a URL printed in a log. Only web addresses: anything else could
+/// open a file or an app.
+#[tauri::command]
+#[specta::specta]
+pub fn open_url(url: String) -> CommandResult {
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return Err(LocalhostError::InvalidUrl(url).into());
+    }
+    spawn(opener(), &[url.as_str()], None)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn open_folder(state: tauri::State<'_, AppState>, folder: Folder, app: FolderApp) -> CommandResult {

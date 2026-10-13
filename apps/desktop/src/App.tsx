@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
 import { runLaunchChecks } from "./actions";
 import { Alerts } from "./components/Alerts";
+import { EmptyState } from "./components/EmptyState";
+import { FolderIcon, LinesIcon } from "./components/Icons";
 import { LogPane } from "./components/LogPane";
 import { PortsView } from "./components/PortsView";
-import { ServicesColumn } from "./components/ServicesColumn";
+import { ProjectActions, ServicesColumn } from "./components/ServicesColumn";
 import { Sidebar } from "./components/Sidebar";
+import { Toolbar } from "./components/Toolbar";
+import { loadHome, tildePath } from "./paths";
 import { runPerfMeasurement } from "./perf";
 import { allServices, type ServiceSelection, type SidebarSelection } from "./selection";
+import { loadSettings } from "./settings";
 import { startCore, useCore } from "./store";
 
 let started: Promise<void> | null = null;
 
 /** Subscribes to the core, then asks the launch questions: once per window, though effects may run twice. */
 function start(): Promise<void> {
-  started ??= startCore().then(async () => {
+  started ??= Promise.all([loadSettings(), loadHome(), startCore()]).then(async () => {
     await runLaunchChecks();
     await runPerfMeasurement();
   });
@@ -32,9 +37,8 @@ export function App() {
   if (core.phase === "loading") return null;
   if (core.phase === "failed") {
     return (
-      <main className="message" role="alert">
-        <h1>localhost couldn't open its data</h1>
-        <p>{core.message}</p>
+      <main className="failed" role="alert">
+        <EmptyState icon={<FolderIcon size={40} />} title="localhost couldn’t open its data" description={core.message} />
       </main>
     );
   }
@@ -55,17 +59,38 @@ export function App() {
         onSelect={select}
       />
       {isPorts ? (
-        <PortsView view={view} />
+        <>
+          <Toolbar title="Ports" />
+          <PortsView view={view} />
+        </>
       ) : selected ? (
         <>
+          <Toolbar
+            title={selected.name}
+            subtitle={tildePath(selected.path)}
+            actions={<ProjectActions project={selected} view={view} />}
+          />
           <ServicesColumn project={selected} view={view} selection={selection} onSelect={setSelection} />
           <LogPane project={selected} view={view} selection={selection} />
         </>
       ) : (
-        <main className="message">
-          <h1>No projects</h1>
-          <p>Projects you add appear here.</p>
-        </main>
+        <>
+          <Toolbar title="localhost" />
+          <section className="emptyColumn">
+            <EmptyState
+              icon={<FolderIcon size={40} />}
+              title="No Projects"
+              description="Add a project folder to get started."
+            />
+          </section>
+          <section className="emptyLog">
+            <EmptyState
+              icon={<LinesIcon size={40} />}
+              title="No Service Selected"
+              description="Select a service to see its output."
+            />
+          </section>
+        </>
       )}
       <Alerts view={view} />
     </div>

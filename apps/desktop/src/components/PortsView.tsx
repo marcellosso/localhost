@@ -4,6 +4,8 @@ import { commands, type ListenerDetails } from "../bindings";
 import { type CoreView, findService } from "../core";
 import { listenerSubtitle, portsText } from "../listeners";
 import { useUi } from "../ui";
+import { EmptyState } from "./EmptyState";
+import { ChevronIcon, NetworkIcon } from "./Icons";
 import { serviceColor } from "./ServicesColumn";
 import styles from "./PortsView.module.css";
 
@@ -56,16 +58,14 @@ export function PortsView({ view }: { view: CoreView }) {
   return (
     <>
       <section className={styles.column} aria-label="Ports">
-        <header className={styles.header}>
-          <h1>Ports</h1>
-        </header>
         {listeners !== null && listeners.length === 0 ? (
-          <div className={styles.empty}>
-            <p>No listeners</p>
-            <p className="secondary">Nothing of yours is listening on a TCP port.</p>
-          </div>
+          <EmptyState
+            icon={<NetworkIcon size={40} />}
+            title="No Listeners"
+            description="Nothing of yours is listening on a TCP port."
+          />
         ) : (
-          <ul className={styles.list} role="listbox" aria-label="Listeners">
+          <ul className={styles.list} role="listbox" aria-label="Listeners" tabIndex={0}>
             <li className={styles.section} role="presentation">
               Development
             </li>
@@ -82,9 +82,7 @@ export function PortsView({ view }: { view: CoreView }) {
                   aria-expanded={showsOthers}
                   onClick={() => setShowsOthers(!showsOthers)}
                 >
-                  <span className={styles.chevron} aria-hidden="true">
-                    ▸
-                  </span>
+                  <ChevronIcon className={styles.chevron} size={9} />
                   Apps &amp; System ({others.length})
                 </button>
               </li>
@@ -96,10 +94,13 @@ export function PortsView({ view }: { view: CoreView }) {
       {selected ? (
         <ListenerDetail details={selected} isStopping={stoppingListeners.has(selected.listener.pid)} />
       ) : (
-        <main className="message">
-          <h1>No listener selected</h1>
-          <p>Select a listener to see its process.</p>
-        </main>
+        <section className={styles.detail} aria-label="Listener">
+          <EmptyState
+            icon={<NetworkIcon size={40} />}
+            title="No Listener Selected"
+            description="Select a listener to see its process."
+          />
+        </section>
       )}
     </>
   );
@@ -121,7 +122,7 @@ function ListenerRow({ details, view, isSelected, isStopping, onSelect }: RowPro
   const showsOwner = listener.owner.kind === "project" || listener.kind === "docker";
   return (
     <li
-      className={styles.row}
+      className={`${styles.row} selectable`}
       role="option"
       aria-selected={isSelected}
       aria-label={[service ? owner : listener.name, portsText(listener), listenerSubtitle(listener)].join(", ")}
@@ -181,14 +182,14 @@ function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isS
     ["Command", listener.command, true],
     ["Executable", listener.executablePath, true],
     ["PID", String(listener.pid), true],
-    ["Process group", String(listener.processGroupId), true],
-    ["Working directory", listener.workingDirectory ?? "Unknown", true],
-    ["Belongs to", owner, false],
-    ["launchd job", listener.launchdLabel, true],
+    ["Process Group", String(listener.processGroupId), true],
+    ["Working Directory", listener.workingDirectory ?? "Unknown", true],
+    ["Belongs To", owner, false],
+    ["launchd Job", listener.launchdLabel, true],
   ];
   return (
     <section className={styles.detail} aria-label={`${listener.name} process`}>
-      <dl>
+      <dl className={styles.form}>
         {fields.map(([label, value, isMono]) =>
           value === null ? null : (
             <div key={label} className={styles.field}>
@@ -199,9 +200,9 @@ function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isS
         )}
       </dl>
       {listener.owner.kind === "unmanaged" && listener.kind === "development" && (
-        <p className="secondary">localhost didn’t start this process and it isn’t inside a project folder.</p>
+        <p className={styles.footnote}>localhost didn’t start this process and it isn’t inside a project folder.</p>
       )}
-      <div className={styles.detailActions}>
+      <div className={`${styles.form} ${styles.detailActions}`}>
         <StopButton details={details} isStopping={isStopping} />
       </div>
     </section>

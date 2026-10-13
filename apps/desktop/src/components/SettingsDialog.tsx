@@ -1,100 +1,270 @@
-import { useEffect, useId, useState } from "react";
-import { commands, type Settings } from "../bindings";
-import { showAlert } from "../ui";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import type { Appearance } from "../bindings";
+import { saveSettings, useSettings } from "../settings";
 import { Dialog } from "./Dialog";
+import { CircleHalfIcon, GearIcon, GlobeIcon } from "./Icons";
 import styles from "./SettingsDialog.module.css";
 
-type Props = {
-  /** Set when Open in Editor needs an editor first: saving then opens it. */
-  forEditor?: () => void;
-  onClose: () => void;
-};
+type Section = "general" | "appearance" | "ports";
 
-/** The editor command and automatic port moves. */
-export function SettingsDialog({ forEditor, onClose }: Props) {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const editorId = useId();
-  const editorHintId = useId();
-  const moveHintId = useId();
+const sections: { id: Section; title: string; icon: ReactNode }[] = [
+  { id: "general", title: "General", icon: <GearIcon size={13} /> },
+  { id: "appearance", title: "Appearance", icon: <CircleHalfIcon size={13} /> },
+  { id: "ports", title: "Ports", icon: <GlobeIcon size={13} /> },
+];
+
+/** The log font sizes offered, as on macOS (settings.rs keeps the same list). */
+const LOG_FONT_SIZES = [10, 11, 12, 13, 14, 16];
+
+/**
+ * Settings, after the macOS Settings window: a rail of sections and the
+ * selected one beside it. Changes apply at once.
+ */
+export function SettingsDialog({ onClose }: { onClose: () => void }) {
+  const [section, setSection] = useState<Section>("appearance");
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
-    void commands.settings().then(setSettings);
+    const previous = document.activeElement as HTMLElement | null;
+    panel.current?.querySelector<HTMLElement>("[aria-current=true]")?.focus();
+    return () => previous?.focus();
   }, []);
 
-  const save = async () => {
-    if (!settings) return;
-    const result = await commands.saveSettings(settings);
-    onClose();
-    if (result.status === "error") showAlert({ kind: "error", message: result.error.message });
-    else if (forEditor && settings.editorCommand?.trim()) forEditor();
-  };
+  return (
+    <div className={styles.backdrop}>
+      <div
+        ref={panel}
+        className={styles.window}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+      >
+        <h2 id={titleId} className={styles.hidden}>
+          Settings
+        </h2>
+        <nav className={styles.rail} aria-label="Settings sections">
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              className={styles.railItem}
+              aria-current={section === item.id}
+              onClick={() => setSection(item.id)}
+            >
+              {item.icon}
+              {item.title}
+            </button>
+          ))}
+        </nav>
+        <div className={styles.content}>
+          {section === "general" && <GeneralSettings />}
+          {section === "appearance" && <AppearanceSettings />}
+          {section === "ports" && <PortsSettings />}
+        </div>
+        <button className={`button ${styles.done}`} onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
 
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <header className={styles.sectionHeader}>
+      <h3>{title}</h3>
+      <p>{subtitle}</p>
+    </header>
+  );
+}
+
+/** A setting: its name and a line of explanation, the control on the right. */
+function SettingsRow({ title, detail, children }: { title: string; detail?: string; children: ReactNode }) {
+  return (
+    <div className={styles.row}>
+      <div className={styles.rowText}>
+        <span>{title}</span>
+        {detail && <span className={styles.detail}>{detail}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  const settings = useSettings();
+  const [editor, setEditor] = useState(settings.editorCommand ?? "");
+  const save = () => {
+    if (editor.trim() !== (settings.editorCommand ?? "")) void saveSettings({ editorCommand: editor.trim() || null });
+  };
+  return (
+    <>
+      <SectionHeader title="General" subtitle="How localhost works with the rest of your desktop." />
+      <SettingsRow
+        title="Editor"
+        detail="“Open in Editor” runs this command with the folder, in your login shell."
+      >
+        <input
+          className={`${styles.field} mono`}
+          aria-label="Editor command"
+          placeholder="None"
+          value={editor}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(event) => setEditor(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => event.key === "Enter" && save()}
+        />
+      </SettingsRow>
+    </>
+  );
+}
+
+function AppearanceSettings() {
+  const settings = useSettings();
+  return (
+    <>
+      <SectionHeader
+        title="Appearance"
+        subtitle="How localhost looks. Service colours and state glyphs adapt to both themes."
+      />
+      <p className={styles.caption}>THEME</p>
+      <div className={styles.tiles} role="radiogroup" aria-label="Theme">
+        {(["system", "light", "dark"] as Appearance[]).map((appearance) => (
+          <ThemeTile
+            key={appearance}
+            appearance={appearance}
+            isSelected={settings.appearance === appearance}
+            onSelect={() => void saveSettings({ appearance })}
+          />
+        ))}
+      </div>
+      <SettingsRow title="Log font size" detail="The log and the commands in service rows.">
+        <select
+          className={styles.select}
+          aria-label="Log font size"
+          value={settings.logFontSize}
+          onChange={(event) => void saveSettings({ logFontSize: Number(event.target.value) })}
+        >
+          {LOG_FONT_SIZES.map((size) => (
+            <option key={size} value={size}>
+              {size} pt
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
+    </>
+  );
+}
+
+/** A small picture of the window in a theme; System is half light, half dark. */
+function ThemeTile({ appearance, isSelected, onSelect }: { appearance: Appearance; isSelected: boolean; onSelect: () => void }) {
+  const title = { system: "System", light: "Light", dark: "Dark" }[appearance];
+  return (
+    <button
+      className={styles.tile}
+      role="radio"
+      aria-checked={isSelected}
+      aria-label={`${title} theme`}
+      onClick={onSelect}
+    >
+      <span className={styles.preview} aria-hidden="true">
+        <WindowSketch dark={appearance === "dark"} />
+        {appearance === "system" && (
+          <span className={styles.darkHalf}>
+            <WindowSketch dark />
+          </span>
+        )}
+      </span>
+      <span>{title}</span>
+    </button>
+  );
+}
+
+function WindowSketch({ dark }: { dark: boolean }) {
+  return (
+    <span className={`${styles.sketch} ${dark ? styles.sketchDark : ""}`}>
+      <span />
+      <span />
+      <span>
+        <i className={styles.accentLine} />
+        <i />
+        <i />
+      </span>
+    </span>
+  );
+}
+
+function PortsSettings() {
+  const settings = useSettings();
+  return (
+    <>
+      <SectionHeader title="Ports" subtitle="What happens when a service’s port is already taken." />
+      <SettingsRow
+        title="Start on a free port when a service’s port is in use"
+        detail="The service gets the next free port as $PORT for that run; its configured port is kept. Services others depend on, or whose port can’t change, are never moved."
+      >
+        <Switch
+          label="Start on a free port"
+          isOn={settings.automaticPortMove}
+          onChange={(automaticPortMove) => void saveSettings({ automaticPortMove })}
+        />
+      </SettingsRow>
+    </>
+  );
+}
+
+function Switch({ label, isOn, onChange }: { label: string; isOn: boolean; onChange: (isOn: boolean) => void }) {
+  return (
+    <button className={styles.switch} role="switch" aria-checked={isOn} aria-label={label} onClick={() => onChange(!isOn)}>
+      <span />
+    </button>
+  );
+}
+
+/** Asked the first time Open in Editor has no editor: saving opens the folder. */
+export function ChooseEditorDialog({ onChosen, onClose }: { onChosen: () => void; onClose: () => void }) {
+  const [editor, setEditor] = useState("");
+  const fieldId = useId();
+  const choose = async () => {
+    if (!editor.trim()) return;
+    onClose();
+    if (await saveSettings({ editorCommand: editor.trim() })) onChosen();
+  };
   return (
     <Dialog
-      role="dialog"
-      title={forEditor ? "Choose Editor" : "Settings"}
+      title="Choose Editor"
       onCancel={onClose}
       actions={
         <>
           <button className="button" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="button primary"
-            onClick={() => void save()}
-            disabled={!settings || (forEditor !== undefined && !settings.editorCommand?.trim())}
-          >
-            {forEditor ? "Open" : "Save"}
+          <button className="button accent" disabled={!editor.trim()} onClick={() => void choose()}>
+            Open
           </button>
         </>
       }
     >
-      {settings && (
-        <form
-          className={styles.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save();
-          }}
-        >
-          <label htmlFor={editorId}>Editor command</label>
-          <input
-            id={editorId}
-            className="mono"
-            value={settings.editorCommand ?? ""}
-            placeholder="code"
-            spellCheck={false}
-            autoComplete="off"
-            aria-describedby={editorHintId}
-            // The settings load after the dialog opens, so its own focus can't reach this.
-            autoFocus
-            onChange={(event) => setSettings({ ...settings, editorCommand: event.target.value })}
-          />
-          <p id={editorHintId} className={styles.hint}>
-            Open in Editor runs it with the folder, in your login shell, e.g. <span className="mono">code</span>,{" "}
-            <span className="mono">zed</span> or <span className="mono">subl</span>.
-          </p>
-          {!forEditor && (
-            <>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={settings.automaticPortMove}
-                  aria-describedby={moveHintId}
-                  onChange={(event) => setSettings({ ...settings, automaticPortMove: event.target.checked })}
-                />
-                Move a service to a free port when its port is taken
-              </label>
-              <p id={moveHintId} className={styles.hint}>
-                Only for services whose port can change and that no other service depends on. The move lasts for that
-                run; the configured port is kept.
-              </p>
-            </>
-          )}
-          {/* Enter in the field submits. */}
-          <button type="submit" hidden />
-        </form>
-      )}
+      <p>localhost opens projects with this command, in your login shell.</p>
+      <input
+        id={fieldId}
+        className={`${styles.field} ${styles.wide} mono`}
+        aria-label="Editor command"
+        placeholder="code"
+        value={editor}
+        spellCheck={false}
+        autoComplete="off"
+        data-autofocus
+        onChange={(event) => setEditor(event.target.value)}
+        onKeyDown={(event) => event.key === "Enter" && void choose()}
+      />
     </Dialog>
   );
 }

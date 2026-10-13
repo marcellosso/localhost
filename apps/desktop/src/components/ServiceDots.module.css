@@ -1,0 +1,16 @@
+.dots {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, 5px);
+  align-content: center;
+  gap: 2px;
+  width: 14px;
+  height: 14px;
+  padding-left: 1px;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}

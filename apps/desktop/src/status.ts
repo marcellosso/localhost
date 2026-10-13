@@ -91,16 +91,6 @@ export function isWarning(status: StatusView): boolean {
   return hasPortWarning(status) || portChangeExplanation(status) !== null || status.isRestartNeeded;
 }
 
-/**
- * Whether Open in Browser has somewhere to go: the same cases as the core's
- * `Service::url_to_open` (a URL, a port, or a URL the Run printed), which
- * builds the address when it is opened.
- */
-export function hasUrlToOpen(service: Service, status: StatusView): boolean {
-  if (status.state !== "starting" && status.state !== "running") return false;
-  return service.url != null || service.port != null || status.run?.port != null || status.run?.detectedUrl != null;
-}
-
 /** "Exited with code 1", "Terminated by signal SIGTERM". */
 export function terminationSummary(termination: Termination): string {
   return termination.kind === "exited"

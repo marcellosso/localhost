@@ -2,6 +2,7 @@ import { start } from "../actions";
 import type { Run, Service } from "../bindings";
 import type { LogBuffer } from "../log/buffer";
 import { failureExcerpt, failureTitle, runDuration } from "../status";
+import { ClearIcon } from "./Icons";
 import { StateGlyph } from "./StateGlyph";
 import styles from "./FailedBanner.module.css";
 
@@ -29,11 +30,11 @@ export function FailedBanner({ service, run, failureMessage, buffer, onHide }: P
         <span className={styles.title}>{failureTitle(service, run, failureMessage)}</span>
         {duration && <span className={`${styles.duration} secondary`}>{duration}</span>}
         <span className={styles.spacer} />
-        <button className="button compact primary" onClick={() => void start(service.id)}>
+        <button className="button compact accent" onClick={() => void start(service.id)}>
           Start
         </button>
         <button className={styles.hide} aria-label="Hide" title="Hide" onClick={onHide}>
-          ×
+          <ClearIcon size={13} />
         </button>
       </div>
       {excerpt.length > 0 && (

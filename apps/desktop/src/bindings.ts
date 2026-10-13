@@ -152,6 +152,18 @@ async openServiceUrl(serviceId: Id) : Promise<Result<null, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Opens a URL printed in a log. Only web addresses: anything else could
+ * open a file or an app.
+ */
+async openUrl(url: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_url", { url }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async openFolder(folder: Folder, app: FolderApp) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("open_folder", { folder, app }) };
@@ -190,6 +202,18 @@ async closeLog(id: number) : Promise<void> {
     await TAURI_INVOKE("close_log", { id });
 },
 /**
+ * Clears the Services' buffers (the log files are kept). Open logs of them
+ * show only what comes next once reopened.
+ */
+async clearLogs(serviceIds: Id[]) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_logs", { serviceIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The run to measure, if this is a measurement.
  */
 async perfSettings() : Promise<PerfSettings | null> {
@@ -221,6 +245,11 @@ export type AnsiColor =
  * 0–7 standard, 8–15 bright, 16–255 the xterm 256-colour palette.
  */
 { kind: "indexed"; index: number } | { kind: "rgb"; red: number; green: number; blue: number }
+export type Appearance = 
+/**
+ * Follows the desktop's light or dark style.
+ */
+"system" | "light" | "dark"
 /**
  * A start that Failed because its port is taken, waiting for the user to
  * stop the holder, start on another port, or cancel.
@@ -244,7 +273,8 @@ dependents: string[] }
 export type CommandError = { error: LocalhostError; message: string }
 export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } | 
 /**
- * A Service's state changed. (Runs starting and ending show up here too.)
+ * A Service's state changed (Runs starting and ending show up here too),
+ * or its Service was edited, which may change its URL.
  */
 { kind: "status"; event: StatusView } | 
 /**
@@ -445,7 +475,16 @@ export type LogLine = {
 /**
  * Which Service it came from, in a combined stream.
  */
-serviceId: Id | null; channel: OutputChannel; spans: Span[] }
+serviceId: Id | null; channel: OutputChannel; spans: Span[]; 
+/**
+ * The local URLs in the line's text, to open on click.
+ */
+links: LogLink[] }
+/**
+ * A local URL in a line: UTF-16 offsets into its text (the spans joined),
+ * as JavaScript counts, and the URL to open (`0.0.0.0` as `localhost`).
+ */
+export type LogLink = { start: number; end: number; url: string }
 /**
  * What a log shows.
  */
@@ -686,7 +725,11 @@ editorCommand: string | null;
 /**
  * Whether a Service may move to a free port when its Port is taken.
  */
-automaticPortMove: boolean }
+automaticPortMove: boolean; appearance: Appearance; 
+/**
+ * Points, for the log and the commands in Service rows.
+ */
+logFontSize: number }
 /**
  * Everything the UI shows, at the moment it subscribed.
  */
@@ -700,7 +743,8 @@ statuses: StatusView[]; projectStates: ProjectState[] }
  */
 export type Span = { text: string; style: TextStyle }
 /**
- * A Service's status with the message of its Run's failure, if any.
+ * A Service's status with the message of its Run's failure, if any, and
+ * where Open in Browser goes (`Service::url_to_open`).
  */
 export type StatusView = ({ serviceId: Id; state: ServiceState; run: Run | null; 
 /**
@@ -713,7 +757,7 @@ awaitedDependencies: Id[];
  * (command line, working directory, variables, Port) differs from what
  * a start would use now. Nothing restarts on its own.
  */
-isRestartNeeded: boolean }) & { failureMessage: string | null }
+isRestartNeeded: boolean }) & { failureMessage: string | null; urlToOpen: string | null }
 /**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.

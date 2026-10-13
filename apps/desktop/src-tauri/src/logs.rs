@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use localhost_core::{Ansi, Id, OutputChannel, OutputLine, Span};
+use localhost_core::{Ansi, Id, LocalUrl, OutputChannel, OutputLine, Span};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::async_runtime::JoinHandle;
@@ -44,12 +44,37 @@ pub struct LogLine {
     service_id: Option<Id>,
     channel: OutputChannel,
     spans: Vec<Span>,
+    /// The local URLs in the line's text, to open on click.
+    links: Vec<LogLink>,
+}
+
+/// A local URL in a line: UTF-16 offsets into its text (the spans joined),
+/// as JavaScript counts, and the URL to open (`0.0.0.0` as `localhost`).
+#[derive(Clone, Debug, PartialEq, Serialize, Type)]
+pub struct LogLink {
+    start: u32,
+    end: u32,
+    url: String,
 }
 
 impl LogLine {
     fn new(line: &OutputLine, service_id: Option<Id>) -> LogLine {
-        LogLine { service_id, channel: line.channel, spans: Ansi::parse(&line.text).spans }
+        let spans = Ansi::parse(&line.text).spans;
+        let links = if line.channel == OutputChannel::Localhost { Vec::new() } else { links(&spans) };
+        LogLine { service_id, channel: line.channel, spans, links }
     }
+}
+
+fn links(spans: &[Span]) -> Vec<LogLink> {
+    let text: String = spans.iter().map(|span| span.text.as_str()).collect();
+    if !text.contains("http") {
+        return Vec::new();
+    }
+    let utf16 = |byte: usize| text[..byte].encode_utf16().count() as u32;
+    LocalUrl::matches(&text)
+        .into_iter()
+        .map(|(range, url)| LogLink { start: utf16(range.start), end: utf16(range.end), url })
+        .collect()
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -101,6 +126,18 @@ pub fn open_log(
     let task = tauri::async_runtime::spawn(stream(buffered, receiver, batches));
     state.logs.tasks.lock().unwrap().insert(id, task);
     Ok(id)
+}
+
+/// Clears the Services' buffers (the log files are kept). Open logs of them
+/// show only what comes next once reopened.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_logs(state: tauri::State<'_, AppState>, service_ids: Vec<Id>) -> CommandResult {
+    let logs = &state.core()?.logs;
+    for service_id in service_ids {
+        logs.clear_buffer(service_id);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -192,6 +229,14 @@ mod tests {
         let texts: Vec<&str> = line.spans.iter().map(|span| span.text.as_str()).collect();
         assert_eq!(texts, ["ready", " in 3ms"]);
         assert!(line.spans[0].style.foreground.is_some());
+    }
+
+    #[test]
+    fn finds_local_urls_by_their_utf16_offsets() {
+        let line = line("→ Local: \u{1b}[36mhttp://0.0.0.0:5173/\u{1b}[0m, docs https://example.com");
+        assert_eq!(line.links, [LogLink { start: 9, end: 29, url: "http://localhost:5173/".into() }]);
+        let note = LogLine::new(&OutputLine::new(OutputChannel::Localhost, "Open http://localhost:1"), None);
+        assert!(note.links.is_empty());
     }
 
     #[test]

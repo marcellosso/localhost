@@ -12,102 +12,186 @@ body,
 }
 
 body {
-  font: 13px/1.4 var(--font-sans);
+  font: 13px/1.35 var(--font-sans);
   color: var(--text);
   background: var(--surface-log);
   -webkit-font-smoothing: antialiased;
   user-select: none;
   cursor: default;
+  overflow: hidden;
 }
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 12px;
 }
 
 .secondary {
   color: var(--text-secondary);
 }
 
+/* Sidebar → Services (or Ports) → log, as on macOS. The toolbar is one strip
+ * across the last two: its title over the Services column, its actions over the log. */
 .app {
+  --sidebar-width: 220px;
+  --column-width: 345px;
   display: grid;
-  grid-template-columns: 220px minmax(300px, 380px) 1fr;
+  grid-template-columns: var(--sidebar-width) var(--column-width) minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
   height: 100%;
 }
 
-.app > .message {
-  grid-column: span 2;
+.app > nav {
+  grid-row: span 2;
 }
 
-.message {
-  display: grid;
-  place-content: center;
-  gap: 4px;
-  height: 100%;
-  padding: 24px;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.message h1 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* Buttons. The accent is for the primary action only. */
+/* Buttons, after AccentButtonStyle, PillButtonStyle and SquareIconButtonStyle. */
 button {
   font: inherit;
+  color: inherit;
   cursor: default;
 }
 
-button:focus-visible,
-[role="option"]:focus-visible {
+:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .button {
+  display: inline-flex;
   flex: none;
-  padding: 3px 10px;
-  border: 1px solid var(--separator);
-  border-radius: 6px;
-  background: transparent;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 7px;
+  background: var(--fill);
   color: var(--text);
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
 
-.button.primary {
-  border-color: transparent;
+.button:active:not(:disabled) {
+  background: var(--fill-strong);
+}
+
+/* The primary action, once per surface. */
+.button.accent {
   background: var(--accent);
   color: var(--on-accent);
+  font-weight: 600;
+}
+
+.button.accent:active:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+/* The main one among several labelled actions. */
+.button.prominent {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-text);
+  font-weight: 600;
 }
 
 .button.destructive {
   background: var(--state-failed);
   color: #fff;
+  font-weight: 600;
 }
 
 .button.compact {
-  padding: 1px 8px;
-  font-size: 12px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 11px;
 }
 
 .button:disabled {
+  opacity: 0.4;
+}
+
+.button.accent:disabled {
   opacity: 0.45;
 }
 
-/* A port in its Service's colour (`--service`). */
+/* A 28 px square icon button that fills on hover. */
+.iconButton {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--fill);
+}
+
+.iconButton:active:not(:disabled) {
+  background: var(--fill-strong);
+}
+
+.iconButton:disabled {
+  opacity: 0.4;
+}
+
+/* A Service's Port in its colour (`--service`), e.g. ":3000". */
 .portPill {
-  padding: 0 5px;
+  flex: none;
+  padding: 1px 5px;
   border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
+  font: 600 10.5px/1.3 var(--font-mono);
   color: var(--service, var(--text-secondary));
   background: color-mix(in srgb, var(--service, var(--text-secondary)) 12%, transparent);
+}
+
+/* A shortcut next to the control it triggers. */
+.keyHint {
+  flex: none;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--fill);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* A selected row of a focused list: filled, everything on it white. */
+.selectable[aria-selected="true"] {
+  background: var(--selection-quiet);
+}
+
+[role="listbox"]:focus-within .selectable[aria-selected="true"] {
+  background: var(--selection);
+  color: var(--on-selection);
+  --text: var(--on-selection);
+  --text-secondary: rgb(255 255 255 / 0.78);
+  --service: var(--on-selection);
+}
+
+[role="listbox"]:focus-within .selectable[aria-selected="true"] .button {
+  background: rgb(255 255 255 / 0.18);
+  color: #fff;
+}
+
+[role="listbox"]:focus-within .selectable[aria-selected="true"] .button.prominent {
+  background: rgb(255 255 255 / 0.92);
+  color: rgb(0 0 0 / 0.85);
+}
+
+[role="listbox"]:focus-within .selectable[aria-selected="true"] .portPill {
+  background: rgb(255 255 255 / 0.2);
+}
+
+[role="listbox"] {
+  outline: none;
 }
 
 .progress {
@@ -116,9 +200,22 @@ button:focus-visible,
   left: 50%;
   z-index: 20;
   translate: -50% 0;
-  padding: 6px 12px;
-  border: 1px solid var(--separator);
+  padding: 7px 12px;
   border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+
+.emptyColumn {
   background: var(--surface-column);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  border-right: 1px solid var(--separator);
+}
+
+.emptyLog {
+  background: var(--surface-log);
+}
+
+.failed {
+  height: 100%;
 }

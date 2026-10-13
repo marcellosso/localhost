@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import appIcon from "../../src-tauri/icons/128x128.png";
 import styles from "./Dialog.module.css";
 
 type Props = {
@@ -13,7 +14,11 @@ type Props = {
   role?: "alertdialog" | "dialog";
 };
 
-/** A modal over the main window. Focus stays inside it until it closes, then goes back. */
+/**
+ * A modal over the main window; focus stays inside until it closes, then goes
+ * back. Questions and reports look like macOS's alerts: the app's icon, the
+ * title and message centred, the buttons below.
+ */
 export function Dialog({ title, children, actions, onCancel, role = "alertdialog" }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -45,13 +50,14 @@ export function Dialog({ title, children, actions, onCancel, role = "alertdialog
     <div className={styles.backdrop}>
       <div
         ref={panel}
-        className={styles.panel}
+        className={`${styles.panel} ${role === "alertdialog" ? styles.alert : ""}`}
         role={role}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={children ? bodyId : undefined}
         onKeyDown={onKeyDown}
       >
+        {role === "alertdialog" && <img className={styles.icon} src={appIcon} alt="" />}
         <h2 id={titleId} className={styles.title}>
           {title}
         </h2>

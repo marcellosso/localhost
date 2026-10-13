@@ -6,41 +6,100 @@
   border-right: 1px solid var(--separator);
 }
 
+.header {
+  display: grid;
+  gap: 12px;
+  padding: 14px 10px 8px;
+}
+
+.wordmark {
+  padding-left: 6px;
+  font: 600 17px/1 var(--font-mono);
+  letter-spacing: -0.3px;
+}
+
+.colon {
+  color: var(--accent);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--fill);
+  color: var(--text-secondary);
+}
+
+.search:focus-within {
+  background: var(--fill-strong);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.search input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: grid;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
 .list {
   flex: 1;
   margin: 0;
-  padding: 12px 8px;
+  padding: 0 10px 10px;
   overflow-y: auto;
   list-style: none;
 }
 
 .heading {
-  margin: 14px 8px 6px;
+  margin: 12px 8px 4px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-.empty {
-  margin: 0 16px;
+.note {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  height: 28px;
+  padding: 0 8px;
   border-radius: 6px;
 }
 
-.row[aria-selected="true"] {
-  background: var(--selection);
+.portsIcon {
+  color: var(--selection);
 }
 
-.icon {
-  width: 14px;
-  text-align: center;
-  color: var(--text-secondary);
+:global([role="listbox"]:focus-within) [aria-selected="true"] > .portsIcon {
+  color: currentColor;
 }
 
 .name {
@@ -50,16 +109,19 @@
   white-space: nowrap;
 }
 
-.key {
-  flex: none;
+.star {
+  font-size: 10px;
+  color: var(--text-secondary);
 }
 
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-top: 1px solid var(--separator);
-  font-size: 12px;
+}
+
+.running {
+  font-size: 11px;
 }

@@ -87,11 +87,13 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         launch::stop_orphans,
         launch::leave_orphans,
         desktop::open_service_url,
+        desktop::open_url,
         desktop::open_folder,
         settings::settings,
         settings::save_settings,
         logs::open_log,
         logs::close_log,
+        logs::clear_logs,
         perf::perf_settings,
         perf::finish_perf_run,
     ])

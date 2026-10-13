@@ -30,8 +30,24 @@ describe("Sidebar", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "ports" });
   });
 
-  it("says when there are no projects", () => {
-    render(<Sidebar view={viewFromSnapshot({ projects: [], statuses: [], projectStates: [] })} selection={null} onSelect={() => {}} />);
-    expect(screen.getByText("No projects yet.")).toBeTruthy();
+  it("filters projects by name or Key, and opens the first match with Return", () => {
+    const shop = project("Acme Shop", 0);
+    const blog = project("Blog", 1);
+    const onSelect = vi.fn();
+    render(
+      <Sidebar view={viewFromSnapshot({ projects: [shop, blog], statuses: [], projectStates: [] })} selection={null} onSelect={onSelect} />,
+    );
+    const search = screen.getByRole("searchbox", { name: "Search projects" });
+
+    fireEvent.change(search, { target: { value: "shop" } });
+    expect(screen.getAllByRole("option").map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Ports",
+      "Acme Shop, No services",
+    ]);
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith({ kind: "project", projectId: shop.id });
+
+    fireEvent.change(search, { target: { value: "zzz" } });
+    expect(screen.getByText("No projects match “zzz”.")).toBeTruthy();
   });
 });

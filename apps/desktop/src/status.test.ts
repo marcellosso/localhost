@@ -3,7 +3,6 @@ import type { LogLine } from "./bindings";
 import {
   failureExcerpt,
   failureTitle,
-  hasUrlToOpen,
   portChangeExplanation,
   rowSummary,
   runDuration,
@@ -77,16 +76,6 @@ describe("status summaries", () => {
       "Running · restart to apply",
     );
   });
-
-  it("offers Open in Browser only while live with somewhere to go", () => {
-    const web = service("Web", 3000);
-    const worker = service("Worker");
-    expect(hasUrlToOpen(web, status(web.id, "running"))).toBe(true);
-    expect(hasUrlToOpen(web, status(web.id, "stopped"))).toBe(false);
-    expect(hasUrlToOpen(worker, status(worker.id, "running"))).toBe(false);
-    const printed = status(worker.id, "running", { run: run(worker.id, { detectedUrl: "http://localhost:5173" }) });
-    expect(hasUrlToOpen(worker, printed)).toBe(true);
-  });
 });
 
 describe("the failure banner", () => {
@@ -94,6 +83,7 @@ describe("the failure banner", () => {
     serviceId: null,
     channel,
     spans: [{ text, style: { foreground: null, background: null, isBold: false, isDim: false, isItalic: false, isUnderlined: false, isInverse: false, isStrikethrough: false } }],
+    links: [],
   });
   const lines = (count: number) => Array.from({ length: count }, (_, i) => line(`line ${i}`));
 

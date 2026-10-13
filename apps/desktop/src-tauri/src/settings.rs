@@ -20,11 +20,27 @@ pub struct Settings {
     pub editor_command: Option<String>,
     /// Whether a Service may move to a free port when its Port is taken.
     pub automatic_port_move: bool,
+    pub appearance: Appearance,
+    /// Points, for the log and the commands in Service rows.
+    pub log_font_size: u8,
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    /// Follows the desktop's light or dark style.
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+/// The log font sizes Settings offers, as on macOS.
+pub const LOG_FONT_SIZES: [u8; 6] = [10, 11, 12, 13, 14, 16];
 
 impl Default for Settings {
     fn default() -> Settings {
-        Settings { editor_command: None, automatic_port_move: true }
+        Settings { editor_command: None, automatic_port_move: true, appearance: Appearance::System, log_font_size: 12 }
     }
 }
 
@@ -79,7 +95,12 @@ pub fn settings(state: tauri::State<'_, AppState>) -> Settings {
 #[specta::specta]
 pub fn save_settings(state: tauri::State<'_, AppState>, settings: Settings) -> CommandResult {
     let editor_command = settings.editor_command.as_deref().map(str::trim).filter(|command| !command.is_empty());
-    let settings = Settings { editor_command: editor_command.map(String::from), ..settings };
+    let log_font_size = if LOG_FONT_SIZES.contains(&settings.log_font_size) {
+        settings.log_font_size
+    } else {
+        Settings::default().log_font_size
+    };
+    let settings = Settings { editor_command: editor_command.map(String::from), log_font_size, ..settings };
     state.settings.save(settings.clone())?;
     if let Ok(core) = state.core() {
         core.services.set_automatic_port_move(settings.automatic_port_move);
@@ -98,7 +119,12 @@ mod tests {
         let store = SettingsStore::open(Some(path.clone()));
         assert_eq!(store.get(), Settings::default());
 
-        let changed = Settings { editor_command: Some("code".into()), automatic_port_move: false };
+        let changed = Settings {
+            editor_command: Some("code".into()),
+            automatic_port_move: false,
+            appearance: Appearance::Dark,
+            log_font_size: 14,
+        };
         store.save(changed.clone()).unwrap();
         assert_eq!(SettingsStore::open(Some(path)).get(), changed);
         let _ = std::fs::remove_dir_all(folder);
@@ -107,6 +133,6 @@ mod tests {
     #[test]
     fn missing_fields_take_their_defaults() {
         let settings: Settings = serde_json::from_str(r#"{"editorCommand":"zed"}"#).unwrap();
-        assert_eq!(settings, Settings { editor_command: Some("zed".into()), automatic_port_move: true });
+        assert_eq!(settings, Settings { editor_command: Some("zed".into()), ..Settings::default() });
     }
 }

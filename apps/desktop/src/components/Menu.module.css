@@ -3,34 +3,26 @@
   flex: none;
 }
 
-.button {
-  min-width: 26px;
-  padding-inline: 6px;
-}
-
 .menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 5;
-  min-width: 190px;
+  z-index: 30;
+  min-width: 200px;
   margin: 0;
-  padding: 4px;
+  padding: 5px;
   list-style: none;
-  border: 1px solid var(--separator);
-  border-radius: 8px;
-  background: var(--surface-column);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
 }
 
 .menu button {
   display: block;
   width: 100%;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border: none;
   border-radius: 5px;
+  font-size: 13px;
   background: transparent;
-  color: var(--text);
+  color: var(--text-base);
   text-align: left;
   white-space: nowrap;
 }
@@ -38,12 +30,22 @@
 .menu button:hover,
 .menu button:focus-visible {
   outline: none;
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--selection);
+  color: var(--on-selection);
 }
 
 .separator {
   height: 1px;
   margin: 4px 6px;
   background: var(--separator);
+}
+
+.below {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+}
+
+.atPointer {
+  position: fixed;
 }

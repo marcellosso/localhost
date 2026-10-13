@@ -65,6 +65,7 @@ export function serviceStatus(view: CoreView, serviceId: Id): StatusView {
       awaitedDependencies: [],
       isRestartNeeded: false,
       failureMessage: null,
+      urlToOpen: null,
     }
   );
 }

@@ -17,7 +17,7 @@ vi.mock("../bindings", () => ({
 }));
 
 const batch = (count: number): LogBatch => ({
-  lines: Array.from({ length: count }, () => ({ serviceId: null, channel: "stdout", spans: [] })),
+  lines: Array.from({ length: count }, () => ({ serviceId: null, channel: "stdout", spans: [], links: [] })),
   skipped: 0,
   isFinished: false,
 });

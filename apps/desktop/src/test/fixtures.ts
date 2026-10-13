@@ -20,7 +20,7 @@ export function project(name: string, sortOrder: number, services: Service[] = [
 }
 
 export function status(serviceId: string, state: ServiceState, changes: Partial<StatusView> = {}): StatusView {
-  return { serviceId, state, run: null, awaitedDependencies: [], isRestartNeeded: false, failureMessage: null, ...changes };
+  return { serviceId, state, run: null, awaitedDependencies: [], isRestartNeeded: false, failureMessage: null, urlToOpen: null, ...changes };
 }
 
 export function run(serviceId: string, changes: Partial<Run> = {}): Run {
