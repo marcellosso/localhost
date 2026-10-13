@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Id, Key};
+use crate::{Id, Key, Listener};
 
 /// Every failure the core reports. Clients match on these cases; they are
 /// never flattened into strings inside the core.
@@ -49,6 +49,22 @@ pub enum LocalhostError {
     SecretMissing(String),
     /// The Run failed after printing `Cannot connect to the Docker daemon`.
     DockerDaemonUnavailable,
+
+    // Ports and Listeners
+    /// Something already listens on the port; `owner` is that Listener, if
+    /// localhost can see it (processes of other users can't be inspected).
+    PortConflict {
+        port: u16,
+        owner: Option<Box<Listener>>,
+    },
+    /// localhost does not stop itself.
+    ListenerIsLocalhost,
+    /// launchd would restart it (a Homebrew service, an app): stop it there instead.
+    ListenerIsLaunchdJob {
+        label: String,
+    },
+    /// Docker's backend holds the ports of every running container.
+    ListenerIsDocker,
 
     // Persistence
     /// The system's secret store (the Keychain, the Secret Service) refused.
@@ -100,6 +116,15 @@ impl LocalhostError {
                 "Docker isn’t running. Start Docker Desktop (or your Docker engine), then start the service again."
                     .into()
             }
+            PortConflict { port, owner: Some(owner) } => {
+                format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
+            }
+            PortConflict { port, owner: None } => format!("Port {port} is in use by another process."),
+            ListenerIsLocalhost => "localhost can't stop itself.".into(),
+            ListenerIsLaunchdJob { label } => format!(
+                "It is managed by launchd ({label}), which would start it again. Stop it with the tool that started it."
+            ),
+            ListenerIsDocker => "This is Docker listening for a container. Stop the container instead.".into(),
             SecretStoreFailed(reason) => format!("{} refused: {reason}.", crate::secrets::STORE_NAME),
             UnsupportedSchemaVersion { version, path } => {
                 format!("{path} was saved by a newer version of localhost (schema {version}).")
