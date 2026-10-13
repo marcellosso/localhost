@@ -1,5 +1,6 @@
 //! What crosses to the UI: a snapshot of the Projects and Service statuses,
-//! then the core's own events as diffs over a channel.
+//! then the core's own events as diffs over a channel. Statuses carry their
+//! failure in the core's words, so the UI never words errors itself.
 
 use std::collections::HashMap;
 
@@ -16,8 +17,24 @@ use crate::AppState;
 pub struct Snapshot {
     projects: Vec<Project>,
     /// Services that never ran have no status: they are Stopped.
-    statuses: Vec<ServiceStatus>,
+    statuses: Vec<StatusView>,
     project_states: Vec<ProjectState>,
+}
+
+/// A Service's status with the message of its Run's failure, if any.
+#[derive(Clone, Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusView {
+    #[serde(flatten)]
+    status: ServiceStatus,
+    failure_message: Option<String>,
+}
+
+impl StatusView {
+    fn new(status: ServiceStatus) -> StatusView {
+        let failure_message = status.run.as_ref().and_then(|run| run.failure.as_ref()).map(LocalhostError::message);
+        StatusView { status, failure_message }
+    }
 }
 
 /// A Project's most significant Service state (the sidebar glyph); `None`
@@ -38,6 +55,13 @@ pub struct CommandError {
 
 pub type CommandResult<T = ()> = Result<T, CommandError>;
 
+impl CommandError {
+    /// A failure the app itself words, e.g. about the editor it couldn't open.
+    pub fn new(error: LocalhostError, message: impl Into<String>) -> CommandError {
+        CommandError { error, message: message.into() }
+    }
+}
+
 impl From<LocalhostError> for CommandError {
     fn from(error: LocalhostError) -> CommandError {
         CommandError { message: error.message(), error }
@@ -48,7 +72,8 @@ impl From<LocalhostError> for CommandError {
 #[serde(tag = "kind", content = "event", rename_all = "camelCase")]
 pub enum CoreEvent {
     Library(ProjectLibraryEvent),
-    Service(ServiceEvent),
+    /// A Service's state changed. (Runs starting and ending show up here too.)
+    Status(StatusView),
     /// Sent after the event that changed it.
     ProjectState(ProjectState),
 }
@@ -65,7 +90,7 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
     view.states = project_states.iter().map(|state| (state.project_id, state.state)).collect();
     let snapshot = Snapshot {
         projects: view.projects.clone(),
-        statuses: view.statuses.values().cloned().collect(),
+        statuses: view.statuses.values().cloned().map(StatusView::new).collect(),
         project_states,
     };
 
@@ -77,8 +102,9 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
                     (CoreEvent::Library(event), project_id)
                 }
                 Some(event) = service_events.recv() => {
-                    let project_id = view.apply_service(&event);
-                    (CoreEvent::Service(event), project_id)
+                    let ServiceEvent::ServiceStateChanged(status) = event else { continue };
+                    let project_id = view.apply_status(&status);
+                    (CoreEvent::Status(StatusView::new(status)), project_id)
                 }
                 else => return,
             };
@@ -125,10 +151,7 @@ impl View {
         }
     }
 
-    fn apply_service(&mut self, event: &ServiceEvent) -> Option<Id> {
-        let ServiceEvent::ServiceStateChanged(status) = event else {
-            return None;
-        };
+    fn apply_status(&mut self, status: &ServiceStatus) -> Option<Id> {
         self.statuses.insert(status.service_id, status.clone());
         self.projects.iter().find(|project| project.service(status.service_id).is_some()).map(|project| project.id)
     }

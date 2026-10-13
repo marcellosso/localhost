@@ -55,3 +55,70 @@ body {
   font-weight: 600;
   color: var(--text);
 }
+
+/* Buttons. The accent is for the primary action only. */
+button {
+  font: inherit;
+  cursor: default;
+}
+
+button:focus-visible,
+[role="option"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.button {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button.destructive {
+  background: var(--state-failed);
+  color: #fff;
+}
+
+.button.compact {
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+}
+
+/* A port in its Service's colour (`--service`). */
+.portPill {
+  padding: 0 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--service, var(--text-secondary));
+  background: color-mix(in srgb, var(--service, var(--text-secondary)) 12%, transparent);
+}
+
+.progress {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 20;
+  translate: -50% 0;
+  padding: 6px 12px;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--surface-column);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}

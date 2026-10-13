@@ -120,6 +120,7 @@ pub enum ListenerOwner {
         run_id: Id,
     },
     /// Not started by localhost, but its working directory is inside the Project's folder.
+    #[serde(rename_all = "camelCase")]
     Project {
         project_id: Id,
     },

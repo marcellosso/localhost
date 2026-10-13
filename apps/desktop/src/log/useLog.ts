@@ -1,5 +1,5 @@
 import { Channel } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { commands, type LogBatch, type LogSource } from "../bindings";
 import { LogBuffer } from "./buffer";
 
@@ -17,7 +17,9 @@ export function linesReceived(): number {
  */
 export function useLog(key: string, source: LogSource | null): LogBuffer {
   const [buffer, setBuffer] = useState(() => new LogBuffer());
-  const [, setVersion] = useState(0);
+  // A counter, not the buffer's version: each stream's buffer counts from 0,
+  // and setting the same number twice wouldn't re-render.
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
 
   useEffect(() => {
     const next = new LogBuffer();
@@ -33,7 +35,7 @@ export function useLog(key: string, source: LogSource | null): LogBuffer {
       next.append(batch);
       frame ??= requestAnimationFrame(() => {
         frame = null;
-        setVersion(next.version);
+        rerender();
       });
     };
     void commands.openLog(source, batches).then((result) => {

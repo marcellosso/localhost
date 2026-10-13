@@ -36,29 +36,9 @@ describe("the core view", () => {
     let view = viewFromSnapshot({ projects: [shop], statuses: [], projectStates: [{ projectId: shop.id, state: "stopped" }] });
     expect(serviceState(view, web.id)).toBe("stopped");
 
-    view = applyEvent(view, { kind: "service", event: { kind: "serviceStateChanged", value: status(web.id, "running") } });
+    view = applyEvent(view, { kind: "status", event: status(web.id, "running") });
     view = applyEvent(view, { kind: "projectState", event: { projectId: shop.id, state: "running" } });
     expect(serviceState(view, web.id)).toBe("running");
     expect(view.projectStates.get(shop.id)).toBe("running");
-  });
-
-  it("leaves the view alone for run events", () => {
-    const view = viewFromSnapshot({ projects: [], statuses: [], projectStates: [] });
-    const run = {
-      id: "r",
-      serviceId: "s",
-      origin: "mainWindow" as const,
-      startedAt: { secs_since_epoch: 0, nanos_since_epoch: 0 },
-      endedAt: null,
-      termination: null,
-      failure: null,
-      stopOrigin: null,
-      wasForceKilled: false,
-      port: null,
-      portChange: null,
-      isPortUnresponsive: false,
-      detectedUrl: null,
-    };
-    expect(applyEvent(view, { kind: "service", event: { kind: "runStarted", value: run } })).toBe(view);
   });
 });

@@ -1,25 +1,28 @@
 .sidebar {
-  overflow-y: auto;
-  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--surface-sidebar);
   border-right: 1px solid var(--separator);
 }
 
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 12px 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+
 .heading {
-  margin: 0 8px 6px;
+  margin: 14px 8px 6px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
 .empty {
-  margin: 8px;
-}
-
-.list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  margin: 0 16px;
 }
 
 .row {
@@ -34,6 +37,12 @@
   background: var(--selection);
 }
 
+.icon {
+  width: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
 .name {
   flex: 1;
   overflow: hidden;
@@ -43,4 +52,14 @@
 
 .key {
   flex: none;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--separator);
+  font-size: 12px;
 }

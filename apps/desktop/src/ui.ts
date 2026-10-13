@@ -1,0 +1,83 @@
+import { useSyncExternalStore } from "react";
+import type { BlockedStart, ListenerDetails } from "./bindings";
+
+/** A question or report over the main window. They are asked one at a time, in order. */
+export type Alert =
+  /** A failed action, e.g. a folder that no longer exists. */
+  | { kind: "error"; message: string }
+  /** A start blocked by a taken port: stop the holder, start elsewhere, or cancel. */
+  | { kind: "blockedStart"; blocked: BlockedStart }
+  /** Stopping a Listener localhost didn't start. */
+  | { kind: "stopListener"; details: ListenerDetails }
+  /** At launch: Project files that couldn't be loaded. */
+  | { kind: "unreadableFiles"; files: string[] }
+  /** At launch: Services of an earlier session still running. */
+  | { kind: "orphans"; orphans: string[] }
+  /** Settings; `forEditor` when Open in Editor needs one picked first, then retried. */
+  | { kind: "settings"; forEditor?: () => void };
+
+/** The UI's own state, outside the core. */
+export type UiState = {
+  alerts: readonly Alert[];
+  /** Something slow the window waits for, e.g. "Stopping services from the last session…". */
+  progress: string | null;
+  /** The pids of Listeners being stopped. */
+  stoppingListeners: ReadonlySet<number>;
+};
+
+let state: UiState = { alerts: [], progress: null, stoppingListeners: new Set() };
+const listeners = new Set<() => void>();
+
+function update(change: Partial<UiState>) {
+  state = { ...state, ...change };
+  listeners.forEach((listener) => listener());
+}
+
+export function useUi(): UiState {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => state,
+  );
+}
+
+export function currentUi(): UiState {
+  return state;
+}
+
+export function showAlert(alert: Alert) {
+  update({ alerts: [...state.alerts, alert] });
+}
+
+const keys = new WeakMap<Alert, number>();
+let nextKey = 0;
+
+/** A key that tells alerts apart, for React. */
+export function alertKey(alert: Alert): number {
+  let key = keys.get(alert);
+  if (key === undefined) keys.set(alert, (key = nextKey++));
+  return key;
+}
+
+/** Closes the alert on screen, showing the next one. */
+export function dismissAlert(alert: Alert) {
+  update({ alerts: state.alerts.filter((shown) => shown !== alert) });
+}
+
+export function setProgress(progress: string | null) {
+  update({ progress });
+}
+
+export function setStoppingListener(pid: number, isStopping: boolean) {
+  const stoppingListeners = new Set(state.stoppingListeners);
+  if (isStopping) stoppingListeners.add(pid);
+  else stoppingListeners.delete(pid);
+  update({ stoppingListeners });
+}
+
+/** For tests. */
+export function resetUi() {
+  state = { alerts: [], progress: null, stoppingListeners: new Set() };
+}

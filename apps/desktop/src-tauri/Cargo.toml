@@ -28,7 +28,10 @@ specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 specta-typescript = "=0.0.9"
 tauri = { version = "2.12", features = [] }
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
-tokio = { version = "1", features = ["sync", "macros", "time"] }
+tokio = { version = "1", features = ["sync", "macros", "time", "process", "rt"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [profile.release]
 lto = true

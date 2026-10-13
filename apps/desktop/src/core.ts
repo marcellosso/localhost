@@ -1,11 +1,11 @@
-import type { CoreEvent, Id, Project, ServiceState, ServiceStatus, Snapshot } from "./bindings";
+import type { CoreEvent, Id, Project, ServiceState, Snapshot, StatusView } from "./bindings";
 
 /** What the UI shows: the core's state as of the last event. */
 export type CoreView = {
   /** In sidebar order. */
   projects: Project[];
   /** Services that never ran have no status: they are Stopped. */
-  statuses: ReadonlyMap<Id, ServiceStatus>;
+  statuses: ReadonlyMap<Id, StatusView>;
   /** Each Project's most significant Service state; `null` without Services. */
   projectStates: ReadonlyMap<Id, ServiceState | null>;
 };
@@ -39,9 +39,8 @@ export function applyEvent(view: CoreView, event: CoreEvent): CoreView {
       }
       break;
     }
-    case "service": {
-      if (event.event.kind !== "serviceStateChanged") return view;
-      const status = event.event.value;
+    case "status": {
+      const status = event.event;
       return { ...view, statuses: new Map(view.statuses).set(status.serviceId, status) };
     }
     case "projectState": {
@@ -54,6 +53,29 @@ export function applyEvent(view: CoreView, event: CoreEvent): CoreView {
 
 export function serviceState(view: CoreView, serviceId: Id): ServiceState {
   return view.statuses.get(serviceId)?.state ?? "stopped";
+}
+
+/** The Service's status; Stopped with no Run if it never ran. */
+export function serviceStatus(view: CoreView, serviceId: Id): StatusView {
+  return (
+    view.statuses.get(serviceId) ?? {
+      serviceId,
+      state: "stopped",
+      run: null,
+      awaitedDependencies: [],
+      isRestartNeeded: false,
+      failureMessage: null,
+    }
+  );
+}
+
+/** The Project holding the Service, and the Service's position in it (its colour). */
+export function findService(view: CoreView, serviceId: Id): { project: Project; index: number } | null {
+  for (const project of view.projects) {
+    const index = project.services.findIndex((service) => service.id === serviceId);
+    if (index >= 0) return { project, index };
+  }
+  return null;
 }
 
 /** The core's order: by sort order, then name. */

@@ -6,8 +6,52 @@
 }
 
 .header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   padding: 8px 12px;
-  font-weight: 600;
   border-bottom: 1px solid var(--separator);
   background: var(--surface-log);
+}
+
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--service);
+}
+
+.title {
+  flex: none;
+  font-weight: 600;
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failed {
+  color: var(--state-failed);
+}
+
+.warning {
+  color: var(--state-transitioning);
+}
+
+/* The banner, then the log taking the rest. */
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.body > :last-child {
+  flex: 1;
+  min-height: 0;
 }

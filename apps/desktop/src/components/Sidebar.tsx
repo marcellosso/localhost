@@ -1,33 +1,55 @@
-import type { Id, Project } from "../bindings";
+import type { Project } from "../bindings";
 import type { CoreView } from "../core";
+import type { SidebarSelection } from "../selection";
+import { isActive } from "../status";
+import { showAlert } from "../ui";
 import { StateGlyph, stateLabel } from "./StateGlyph";
 import styles from "./Sidebar.module.css";
 
 type Props = {
   view: CoreView;
-  selectedId: Id | null;
-  onSelect: (id: Id) => void;
+  selection: SidebarSelection | null;
+  onSelect: (selection: SidebarSelection) => void;
 };
 
-export function Sidebar({ view, selectedId, onSelect }: Props) {
+/** Ports, the Projects, and a footer with Settings and how many Services are running. */
+export function Sidebar({ view, selection, onSelect }: Props) {
+  const running = [...view.statuses.values()].filter((status) => isActive(status.state)).length;
   return (
-    <nav className={styles.sidebar} aria-label="Projects">
-      <h2 className={styles.heading}>Projects</h2>
-      {view.projects.length === 0 ? (
-        <p className={`${styles.empty} secondary`}>No projects yet.</p>
-      ) : (
-        <ul className={styles.list} role="listbox" aria-label="Projects">
-          {view.projects.map((project) => (
-            <ProjectRow
-              key={project.id}
-              project={project}
-              view={view}
-              isSelected={project.id === selectedId}
-              onSelect={() => onSelect(project.id)}
-            />
-          ))}
-        </ul>
-      )}
+    <nav className={styles.sidebar} aria-label="Sidebar">
+      <ul className={styles.list} role="listbox" aria-label="Projects and Ports">
+        <li
+          className={styles.row}
+          role="option"
+          aria-selected={selection?.kind === "ports"}
+          aria-label="Ports"
+          onClick={() => onSelect({ kind: "ports" })}
+        >
+          <span className={styles.icon} aria-hidden="true">
+            ⇄
+          </span>
+          <span className={styles.name}>Ports</span>
+        </li>
+        <li className={styles.heading} role="presentation">
+          Projects
+        </li>
+        {view.projects.map((project) => (
+          <ProjectRow
+            key={project.id}
+            project={project}
+            view={view}
+            isSelected={selection?.kind === "project" && selection.projectId === project.id}
+            onSelect={() => onSelect({ kind: "project", projectId: project.id })}
+          />
+        ))}
+      </ul>
+      {view.projects.length === 0 && <p className={`${styles.empty} secondary`}>No projects yet.</p>}
+      <footer className={styles.footer}>
+        <span className="secondary">{running === 0 ? "Nothing running" : `${running} running`}</span>
+        <button className="button compact" onClick={() => showAlert({ kind: "settings" })}>
+          Settings…
+        </button>
+      </footer>
     </nav>
   );
 }

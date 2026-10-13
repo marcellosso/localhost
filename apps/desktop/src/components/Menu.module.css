@@ -1,0 +1,49 @@
+.root {
+  position: relative;
+  flex: none;
+}
+
+.button {
+  min-width: 26px;
+  padding-inline: 6px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  min-width: 190px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--surface-column);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  outline: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--separator);
+}
