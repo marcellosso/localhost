@@ -1,9 +1,9 @@
 # localhost core (Rust)
 
-The core every localhost client will share: Projects, Services, Runs, logs,
-environment and Secrets (ADR-0007, `docs/cross-platform.md`). It is being
-ported from the Swift package in `Packages/LocalhostCore`, which the macOS app
-still uses until XP2 (#47). The Swift sources and tests are the specification.
+The core every localhost client shares: Projects, Services, Runs, logs,
+environment and Secrets (ADR-0007, `docs/cross-platform.md`). It replaced the
+Swift package the macOS app was first built on; the macOS app now runs on it
+(below), as does the `localhost` command.
 
 ```sh
 cd core

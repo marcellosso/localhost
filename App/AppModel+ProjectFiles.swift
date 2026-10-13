@@ -51,7 +51,7 @@ extension AppModel {
             do {
                 text = try String(contentsOf: url, encoding: .utf8)
             } catch {
-                throw .persistenceFailed(path: url.path, reason: error.localizedDescription)
+                throw .PersistenceFailed(path: url.path, reason: error.localizedDescription)
             }
             presentedSheet = .importProject(try ProjectDocument(yaml: text), fileName: fileName)
         } catch {
@@ -66,6 +66,6 @@ extension AppModel {
 
     /// The Key "Keep both" would give the import.
     func freeProjectKey(basedOn key: Key) async -> Key {
-        await core?.library.freeProjectKey(basedOn: key) ?? key
+        core?.library.freeProjectKey(basedOn: key) ?? key
     }
 }

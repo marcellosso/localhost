@@ -12,7 +12,7 @@
 
 /* Begin PBXFileReference section */
 		A10000000000000000000011 /* localhost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = localhost.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000012 /* LocalhostCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = LocalhostCore; sourceTree = "<group>"; };
+		A10000000000000000000012 /* LocalhostCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = LocalhostCoreFFI; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -80,6 +80,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A10000000000000000000102 /* Build configuration list for PBXNativeTarget "localhost" */;
 			buildPhases = (
+				A10000000000000000000081 /* Check the Rust core */,
 				A10000000000000000000051 /* Sources */,
 				A10000000000000000000031 /* Frameworks */,
 				A10000000000000000000061 /* Resources */,
@@ -124,7 +125,7 @@
 			mainGroup = A10000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A10000000000000000000211 /* XCLocalSwiftPackageReference "Packages/LocalhostCore" */,
+				A10000000000000000000211 /* XCLocalSwiftPackageReference "Packages/LocalhostCoreFFI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000002 /* Products */;
@@ -145,6 +146,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A10000000000000000000081 /* Check the Rust core */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Packages/LocalhostCoreFFI/Generated/status",
+			);
+			name = "Check the Rust core";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/rust-core-checked",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The scheme's build pre-action runs scripts/build-core.sh --xcode, which\n# writes this status. Xcode doesn't show the pre-action's output.\nif [ \"$(cat \"$SCRIPT_INPUT_FILE_0\")\" != ok ]; then\n    echo \"error: The Rust core didn't build: $(cat \"$SCRIPT_INPUT_FILE_0\"). See Packages/LocalhostCoreFFI/Generated/build.log, or run scripts/build-core.sh in a terminal.\"\n    exit 1\nfi\ntouch \"$SCRIPT_OUTPUT_FILE_0\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A10000000000000000000051 /* Sources */ = {
@@ -295,9 +320,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A10000000000000000000211 /* XCLocalSwiftPackageReference "Packages/LocalhostCore" */ = {
+		A10000000000000000000211 /* XCLocalSwiftPackageReference "Packages/LocalhostCoreFFI" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/LocalhostCore;
+			relativePath = Packages/LocalhostCoreFFI;
 		};
 /* End XCLocalSwiftPackageReference section */
 

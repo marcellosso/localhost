@@ -134,8 +134,7 @@ struct ImportProjectForm: View {
     }
 
     private func save(onKeyClash: ProjectLibrary.KeyClash?) async {
-        var document = document
-        document.path = path
+        let document = document.withPath(path)
         isSaving = true
         defer { isSaving = false }
         do {

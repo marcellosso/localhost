@@ -97,7 +97,7 @@ struct MainView: View {
             defaultFilename: model.exportingFile?.defaultFileName
         ) { result in
             if case .failure(let error) = result, (error as? CocoaError)?.code != .userCancelled {
-                model.actionError = .persistenceFailed(path: "the project file", reason: error.localizedDescription)
+                model.actionError = .PersistenceFailed(path: "the project file", reason: error.localizedDescription)
             }
         }
         .alert(

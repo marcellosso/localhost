@@ -70,7 +70,7 @@ extension AppModel {
         if FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue {
             return true
         }
-        actionError = .workingDirectoryMissing(folder.path)
+        actionError = .WorkingDirectoryMissing(folder.path)
         return false
     }
 

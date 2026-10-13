@@ -273,10 +273,10 @@ private struct FailedBanner: View {
         .padding(.bottom, 4)
         .task(id: run.id) {
             // Lines may still arrive after the Service turned Failed.
-            let (_, updates) = await logs.subscribe(toRun: run.id)
-            excerpt = Self.excerpt(of: await logs.recentOutput(forRun: run.id, limit: 40))
+            let (_, updates) = logs.subscribe(toRun: run.id)
+            excerpt = Self.excerpt(of: logs.recentOutput(forRun: run.id, limit: 40))
             for await _ in updates {
-                excerpt = Self.excerpt(of: await logs.recentOutput(forRun: run.id, limit: 40))
+                excerpt = Self.excerpt(of: logs.recentOutput(forRun: run.id, limit: 40))
             }
         }
     }
@@ -479,11 +479,11 @@ final class LogViewController {
             case .run(nil):
                 break
             case .run(let runID?):
-                let (lines, updates) = await logs.subscribe(toRun: runID)
+                let (lines, updates) = logs.subscribe(toRun: runID)
                 batcher.append(lines.map { Line(line: $0, serviceID: nil) })
                 for await line in updates { batcher.append([Line(line: line, serviceID: nil)]) }
             case .services(let prefixes):
-                let (lines, updates) = await logs.subscribe(toServices: Set(prefixes.keys))
+                let (lines, updates) = logs.subscribe(toServices: Set(prefixes.keys))
                 batcher.append(lines.map { Line(line: $0.line, serviceID: $0.serviceID) })
                 for await line in updates { batcher.append([Line(line: line.line, serviceID: line.serviceID)]) }
             }

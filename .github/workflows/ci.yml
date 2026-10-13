@@ -50,22 +50,19 @@ jobs:
         working-directory: Packages/LocalhostCoreFFI
         run: swift test
 
-  core:
-    name: Core tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      - run: swift --version
-      - name: Test LocalhostCore
-        working-directory: Packages/LocalhostCore
-        run: swift test
-
   app:
     name: App build
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
       - run: xcodebuild -version
+      # The scheme's pre-action builds it too, but hides the output.
+      - name: Build the Rust core
+        run: scripts/build-core.sh debug
       - name: Build (unsigned)
         run: >
           xcodebuild -project localhost.xcodeproj -scheme localhost
