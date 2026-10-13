@@ -95,4 +95,4 @@ scripts/build-release.sh 0.3.0                                # ad hoc
 SIGNING_IDENTITY="localhost Release Signing" scripts/build-release.sh 0.3.0
 ```
 
-It builds a universal (Apple silicon and Intel) Release app unsigned, signs it with hardened runtime and the app's entitlements, and writes `build/release/localhost-0.3.0.dmg`. `SIGNING_IDENTITY` must be in a keychain on your search list (import the `.p12` into your login keychain, or a separate keychain added with `security list-keychains -s`). Notarization only runs in the workflow.
+It builds the Rust core for both architectures (`scripts/build-core.sh release`; Rust with both macOS targets, see CONTRIBUTING.md), then a universal (Apple silicon and Intel) Release app unsigned, checks it has both slices, signs it with hardened runtime and the app's entitlements, and writes `build/release/localhost-0.3.0.dmg`. `SIGNING_IDENTITY` must be in a keychain on your search list (import the `.p12` into your login keychain, or a separate keychain added with `security list-keychains -s`). Notarization only runs in the workflow.

@@ -4,13 +4,13 @@ Settled decisions for building V1. `localhost-v1.md` / `localhost-v2.md` are pro
 
 ## Architecture
 
-- **UI-free core** (ADR-0001). `Packages/LocalhostCore` holds all project state, Run lifecycle, logs, environment, persistence. It never imports SwiftUI or AppKit. The app target is only a client. In V1 the core runs in-process; V2 may host it in a daemon behind CLI/MCP, so keep the API shaped for that:
+- **UI-free core** (ADR-0001; in Rust since XP2, ADR-0007 and `docs/cross-platform.md`). `core/` holds all project state, Run lifecycle, logs, environment, persistence. It never imports SwiftUI or AppKit. The app target is only a client. In V1 the core runs in-process; V2 may host it in a daemon behind CLI/MCP, so keep the API shaped for that:
   - async API; state exposed as observable snapshots + an event stream (`serviceStateChanged`, `runStarted`, `runEnded`, …);
   - every state-changing call takes an **Origin** (`.mainWindow`, `.menuBar`; later `.cli`, `.agent`);
   - failures are a typed error enum (`portConflict(port:owner:)`, `commandNotFound`, `workingDirectoryMissing`, `dependencyFailed(…)`, `dockerDaemonUnavailable`, …), never bare strings;
   - all core types `Sendable`/`Codable`-friendly.
 - **Identity**: Projects and Services have a UUID identity plus a **Key** (slug). Project Keys unique app-wide, Service Keys unique per Project; editable but validated. Internal references (Dependencies, log files) use UUIDs.
-- **Layout**: `localhost.xcodeproj` + `App/` (SwiftUI target) + `Packages/LocalhostCore/{Sources,Tests}`. No Tuist/XcodeGen.
+- **Layout**: `localhost.xcodeproj` + `App/` (SwiftUI target) + `core/` (Cargo workspace) + `Packages/LocalhostCoreFFI` (the core as the Swift module `LocalhostCore`). No Tuist/XcodeGen.
 - **Toolchain**: Swift 6 language mode, strict concurrency, macOS 15 minimum, bundle id `com.sixpetals.localhost` (Keychain service for Secrets: `com.sixpetals.localhost.secret`). Non-sandboxed, distributed outside the Mac App Store (ADR-0002).
 - **Dependencies**: none by default; each third-party package must be justified (an MCP SDK in V2 is expected).
 - **Tests**: Swift Testing (`@Test`). The core is test-driven against **real processes** (fixture scripts that fork grandchildren, trap signals, exit with codes). No UI tests in V1.
@@ -107,7 +107,7 @@ No adapter in V1. A Compose service is just a command line run in the foreground
 ## Release (M3)
 
 - MIT license.
-- CI (GitHub Actions, `macos-26`): every PR and push to `main` runs the core's `swift test` and an unsigned app build.
+- CI (GitHub Actions, `macos-26`): every PR and push to `main` runs the core's `cargo test` (macOS and Linux), the Swift layer's `swift test` and an unsigned app build.
 - Distribution is a DMG on GitHub Releases, built by a workflow on `v*` tags into a **draft** release (notes generated from merged PRs) that the maintainer publishes. Version comes from the tag (SemVer, `0.x` for now). Fixes: branch → PR → merge → patch tag. No Sparkle, no in-app update check.
 - **Signing**: no Apple Developer Program yet. Releases are signed with a long-lived (20-year) **self-signed certificate** kept in a repo secret (and backed up by the maintainer), so the Keychain keeps trusting the app across updates. Without that secret the workflow falls back to ad-hoc signing. When the Apple secrets exist it signs with Developer ID (hardened runtime), notarizes with `notarytool` and staples, with no other workflow change. The app is built unsigned and signed by `scripts/build-release.sh`, so every mode takes the same path; `scripts/create-signing-certificate.sh` creates the certificate and stores its secrets. The process and the secret names are in `RELEASING.md`.
 - Consequences for users, documented in the README: a non-notarized build needs System Settings → Privacy & Security → **Open Anyway** on first launch (or `xattr -dr com.apple.quarantine`); an ad-hoc build asks again for Keychain access to each Secret after every update; switching signing identity (self-signed → Developer ID) asks once more, on that one update.

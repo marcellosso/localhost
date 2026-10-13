@@ -33,6 +33,9 @@ jobs:
       SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
       - run: xcodebuild -version
 
       - name: Read the version from the tag
