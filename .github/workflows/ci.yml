@@ -46,11 +46,9 @@ jobs:
       - name: Build the universal library and the Swift bindings
         run: scripts/build-core.sh release
       - run: scripts/build-core.sh --check
-      - name: Type-check the Swift bindings
-        run: >
-          swiftc -typecheck -module-name LocalhostCore
-          -I Packages/LocalhostCoreFFI/Generated/LocalhostCoreFFI.xcframework/macos-arm64_x86_64/Headers
-          Packages/LocalhostCoreFFI/Sources/LocalhostCore/Generated/LocalhostCore+FFI.swift
+      - name: Test the Swift layer
+        working-directory: Packages/LocalhostCoreFFI
+        run: swift test
 
   core:
     name: Core tests

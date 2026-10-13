@@ -1,4 +1,5 @@
-//! The objects the app holds. Their methods mirror the crate's own API,
+//! The objects the app holds. Their methods (`ffi_`-prefixed, so the Swift
+//! layer can expose the idiomatic names) mirror the crate's own API,
 //! reshaped where UniFFI can't carry it: owned arguments instead of borrows,
 //! records instead of tuples, and work moved onto the core's runtime so the
 //! caller's thread never blocks (a Keychain call can show a prompt).
@@ -28,27 +29,27 @@ pub struct LibrarySubscription {
 impl ProjectLibrary {
     /// Loads every stored Project from `storage_root`, with Secrets in the
     /// system store (the Keychain on macOS).
-    #[uniffi::constructor(name = "open")]
+    #[uniffi::constructor]
     pub fn ffi_open(storage_root: String) -> Result<Arc<ProjectLibrary>, LocalhostError> {
         ProjectLibrary::open(Path::new(&storage_root), Arc::new(SystemSecretStore::new())).map(Arc::new)
     }
 
-    #[uniffi::method(name = "unreadable_files")]
+    #[uniffi::method]
     pub fn ffi_unreadable_files(&self) -> Vec<UnreadableProjectFile> {
         self.unreadable_files().to_vec()
     }
 
-    #[uniffi::method(name = "projects")]
+    #[uniffi::method]
     pub fn ffi_projects(&self) -> Vec<Project> {
         self.projects()
     }
 
-    #[uniffi::method(name = "project")]
+    #[uniffi::method]
     pub fn ffi_project(&self, id: Id) -> Result<Project, LocalhostError> {
         self.project(id)
     }
 
-    #[uniffi::method(name = "secret_value")]
+    #[uniffi::method]
     pub async fn ffi_secret_value(
         self: Arc<Self>,
         name: String,
@@ -57,7 +58,7 @@ impl ProjectLibrary {
         blocking(move || self.secret_value(&name, layer)).await
     }
 
-    #[uniffi::method(name = "is_secret_set")]
+    #[uniffi::method]
     pub async fn ffi_is_secret_set(
         self: Arc<Self>,
         name: String,
@@ -66,18 +67,18 @@ impl ProjectLibrary {
         blocking(move || self.is_secret_set(&name, layer)).await
     }
 
-    #[uniffi::method(name = "subscribe")]
+    #[uniffi::method]
     pub fn ffi_subscribe(&self) -> LibrarySubscription {
         let (projects, receiver) = self.subscribe();
         LibrarySubscription { projects, events: LibraryEvents::new(receiver) }
     }
 
-    #[uniffi::method(name = "events")]
+    #[uniffi::method]
     pub fn ffi_events(&self) -> Arc<LibraryEvents> {
         LibraryEvents::new(self.events())
     }
 
-    #[uniffi::method(name = "add_project")]
+    #[uniffi::method]
     pub async fn ffi_add_project(
         self: Arc<Self>,
         name: String,
@@ -89,7 +90,7 @@ impl ProjectLibrary {
         blocking(move || self.add_project(&name, key, &path, services, origin)).await
     }
 
-    #[uniffi::method(name = "edit_project")]
+    #[uniffi::method]
     pub async fn ffi_edit_project(
         self: Arc<Self>,
         id: Id,
@@ -99,12 +100,12 @@ impl ProjectLibrary {
         blocking(move || self.edit_project(id, changes, origin)).await
     }
 
-    #[uniffi::method(name = "remove_project")]
+    #[uniffi::method]
     pub async fn ffi_remove_project(self: Arc<Self>, id: Id, origin: Origin) -> Result<(), LocalhostError> {
         blocking(move || self.remove_project(id, origin)).await
     }
 
-    #[uniffi::method(name = "import_project")]
+    #[uniffi::method]
     pub async fn ffi_import_project(
         self: Arc<Self>,
         document: Arc<ProjectDocument>,
@@ -114,12 +115,12 @@ impl ProjectLibrary {
         blocking(move || self.import_project(&document, on_key_clash, origin)).await
     }
 
-    #[uniffi::method(name = "free_project_key")]
+    #[uniffi::method]
     pub fn ffi_free_project_key(&self, key: Key) -> Key {
         self.free_project_key(&key)
     }
 
-    #[uniffi::method(name = "add_service")]
+    #[uniffi::method]
     pub async fn ffi_add_service(
         self: Arc<Self>,
         project_id: Id,
@@ -131,7 +132,7 @@ impl ProjectLibrary {
         blocking(move || self.add_service(project_id, service, variables, dependencies, origin)).await
     }
 
-    #[uniffi::method(name = "add_services")]
+    #[uniffi::method]
     pub async fn ffi_add_services(
         self: Arc<Self>,
         services: Vec<NewService>,
@@ -141,7 +142,7 @@ impl ProjectLibrary {
         blocking(move || self.add_services(services, project_id, origin)).await
     }
 
-    #[uniffi::method(name = "edit_service")]
+    #[uniffi::method]
     pub async fn ffi_edit_service(
         self: Arc<Self>,
         id: Id,
@@ -151,12 +152,12 @@ impl ProjectLibrary {
         blocking(move || self.edit_service(id, changes, origin)).await
     }
 
-    #[uniffi::method(name = "remove_service")]
+    #[uniffi::method]
     pub async fn ffi_remove_service(self: Arc<Self>, id: Id, origin: Origin) -> Result<(), LocalhostError> {
         blocking(move || self.remove_service(id, origin)).await
     }
 
-    #[uniffi::method(name = "add_profile")]
+    #[uniffi::method]
     pub async fn ffi_add_profile(
         self: Arc<Self>,
         project_id: Id,
@@ -167,7 +168,7 @@ impl ProjectLibrary {
         blocking(move || self.add_profile(project_id, &name, variables, origin)).await
     }
 
-    #[uniffi::method(name = "edit_profile")]
+    #[uniffi::method]
     pub async fn ffi_edit_profile(
         self: Arc<Self>,
         id: Id,
@@ -177,12 +178,12 @@ impl ProjectLibrary {
         blocking(move || self.edit_profile(id, changes, origin)).await
     }
 
-    #[uniffi::method(name = "remove_profile")]
+    #[uniffi::method]
     pub async fn ffi_remove_profile(self: Arc<Self>, id: Id, origin: Origin) -> Result<(), LocalhostError> {
         blocking(move || self.remove_profile(id, origin)).await
     }
 
-    #[uniffi::method(name = "set_active_profile")]
+    #[uniffi::method]
     pub async fn ffi_set_active_profile(
         self: Arc<Self>,
         profile_id: Option<Id>,
@@ -210,54 +211,54 @@ pub struct ServicesSubscription {
 #[uniffi::export]
 impl LogStore {
     /// A log store keeping its files in `root`/logs, with the default limits.
-    #[uniffi::constructor(name = "new")]
+    #[uniffi::constructor]
     pub fn ffi_new(root: String) -> Arc<LogStore> {
         Arc::new(LogStore::new(Path::new(&root)))
     }
 
-    #[uniffi::method(name = "lines")]
+    #[uniffi::method]
     pub fn ffi_lines(&self, run_id: Id) -> Vec<OutputLine> {
         self.lines(run_id)
     }
 
-    #[uniffi::method(name = "recent_lines")]
+    #[uniffi::method]
     pub fn ffi_recent_lines(&self, run_id: Id, limit: u64) -> Vec<OutputLine> {
         self.recent_lines(run_id, saturating_usize(limit))
     }
 
-    #[uniffi::method(name = "recent_output")]
+    #[uniffi::method]
     pub fn ffi_recent_output(&self, run_id: Id, limit: u64) -> Vec<OutputLine> {
         self.recent_output(run_id, saturating_usize(limit))
     }
 
-    #[uniffi::method(name = "latest_run_id")]
+    #[uniffi::method]
     pub fn ffi_latest_run_id(&self, service_id: Id) -> Option<Id> {
         self.latest_run_id(service_id)
     }
 
-    #[uniffi::method(name = "subscribe_to_run")]
+    #[uniffi::method]
     pub fn ffi_subscribe_to_run(&self, run_id: Id) -> RunSubscription {
         let (lines, receiver) = self.subscribe_to_run(run_id);
         RunSubscription { lines, updates: OutputLines::new(receiver) }
     }
 
-    #[uniffi::method(name = "subscribe_to_services")]
+    #[uniffi::method]
     pub fn ffi_subscribe_to_services(&self, service_ids: Vec<Id>) -> ServicesSubscription {
         let (lines, receiver) = self.subscribe_to_services(service_ids.into_iter().collect::<HashSet<Id>>());
         ServicesSubscription { lines, updates: ServiceOutputLines::new(receiver) }
     }
 
-    #[uniffi::method(name = "clear_buffer")]
+    #[uniffi::method]
     pub fn ffi_clear_buffer(&self, service_id: Id) {
         self.clear_buffer(service_id)
     }
 
-    #[uniffi::method(name = "log_file_path")]
+    #[uniffi::method]
     pub fn ffi_log_file_path(&self, run_id: Id) -> Option<String> {
         self.log_file_path(run_id).map(|path| path.to_string_lossy().into_owned())
     }
 
-    #[uniffi::method(name = "remove_logs")]
+    #[uniffi::method]
     pub async fn ffi_remove_logs(self: Arc<Self>, service_id: Id) {
         blocking(move || self.remove_logs(service_id)).await
     }
@@ -278,23 +279,23 @@ fn saturating_usize(value: u64) -> usize {
 #[uniffi::export]
 impl RunRegistry {
     /// The Run records kept in `root`/runs.
-    #[uniffi::constructor(name = "new")]
+    #[uniffi::constructor]
     pub fn ffi_new(root: String) -> Arc<RunRegistry> {
         Arc::new(RunRegistry::new(Path::new(&root)))
     }
 
-    #[uniffi::method(name = "orphans")]
+    #[uniffi::method]
     pub fn ffi_orphans(&self) -> Vec<Orphan> {
         self.orphans()
     }
 
     /// Stops each Orphan's process group with the default stop policy.
-    #[uniffi::method(name = "stop_orphans")]
+    #[uniffi::method]
     pub async fn ffi_stop_orphans(self: Arc<Self>, orphans: Vec<Orphan>) {
         on_runtime(async move { self.stop_orphans(&orphans, StopPolicy::default()).await }).await
     }
 
-    #[uniffi::method(name = "leave_orphans")]
+    #[uniffi::method]
     pub fn ffi_leave_orphans(&self, orphans: Vec<Orphan>) {
         self.leave_orphans(&orphans)
     }
@@ -312,7 +313,7 @@ pub struct ServiceSubscription {
 impl ServiceManager {
     /// A manager with the default options, starting with the automatic Port
     /// move on or off.
-    #[uniffi::constructor(name = "new")]
+    #[uniffi::constructor]
     pub fn ffi_new(
         library: Arc<ProjectLibrary>,
         logs: Arc<LogStore>,
@@ -325,20 +326,20 @@ impl ServiceManager {
         Arc::new(ServiceManager::new(library, logs, run_registry, options))
     }
 
-    #[uniffi::method(name = "status")]
+    #[uniffi::method]
     pub fn ffi_status(&self, service_id: Id) -> ServiceStatus {
         self.status(service_id)
     }
 
     /// Every known status (Services that never ran are left out), and the
     /// events after it.
-    #[uniffi::method(name = "subscribe")]
+    #[uniffi::method]
     pub fn ffi_subscribe(&self) -> ServiceSubscription {
         let (snapshot, receiver) = self.subscribe();
         ServiceSubscription { snapshot: snapshot.into_values().collect(), events: ServiceEvents::new(receiver) }
     }
 
-    #[uniffi::method(name = "start")]
+    #[uniffi::method]
     pub async fn ffi_start(
         self: Arc<Self>,
         service_id: Id,
@@ -348,47 +349,47 @@ impl ServiceManager {
         on_runtime(async move { self.start(service_id, on_port, origin).await }).await
     }
 
-    #[uniffi::method(name = "stop")]
+    #[uniffi::method]
     pub async fn ffi_stop(self: Arc<Self>, service_id: Id, origin: Origin) -> Result<ServiceStatus, LocalhostError> {
         on_runtime(async move { self.stop(service_id, origin).await }).await
     }
 
-    #[uniffi::method(name = "restart")]
+    #[uniffi::method]
     pub async fn ffi_restart(self: Arc<Self>, service_id: Id, origin: Origin) -> Result<ServiceStatus, LocalhostError> {
         on_runtime(async move { self.restart(service_id, origin).await }).await
     }
 
-    #[uniffi::method(name = "start_all")]
+    #[uniffi::method]
     pub async fn ffi_start_all(self: Arc<Self>, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
         on_runtime(async move { self.start_all(project_id, origin).await }).await
     }
 
-    #[uniffi::method(name = "stop_all")]
+    #[uniffi::method]
     pub async fn ffi_stop_all(self: Arc<Self>, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
         on_runtime(async move { self.stop_all(project_id, origin).await }).await
     }
 
-    #[uniffi::method(name = "stop_every_run")]
+    #[uniffi::method]
     pub async fn ffi_stop_every_run(self: Arc<Self>, origin: Origin) {
         on_runtime(async move { self.stop_every_run(origin).await }).await
     }
 
-    #[uniffi::method(name = "set_automatic_port_move")]
+    #[uniffi::method]
     pub fn ffi_set_automatic_port_move(&self, is_enabled: bool) {
         self.set_automatic_port_move(is_enabled)
     }
 
-    #[uniffi::method(name = "listeners")]
+    #[uniffi::method]
     pub async fn ffi_listeners(self: Arc<Self>) -> Vec<Listener> {
         on_runtime(async move { self.listeners().await }).await
     }
 
-    #[uniffi::method(name = "stop_listener")]
+    #[uniffi::method]
     pub async fn ffi_stop_listener(self: Arc<Self>, listener: Listener, origin: Origin) -> Result<(), LocalhostError> {
         on_runtime(async move { self.stop_listener(&listener, origin).await }).await
     }
 
-    #[uniffi::method(name = "next_free_port")]
+    #[uniffi::method]
     pub async fn ffi_next_free_port(self: Arc<Self>, service_id: Id) -> Result<Option<u16>, LocalhostError> {
         on_runtime(async move { self.next_free_port(service_id).await }).await
     }
@@ -399,61 +400,61 @@ impl ServiceManager {
 #[uniffi::export]
 impl ProjectDocument {
     /// The document exporting `project`.
-    #[uniffi::constructor(name = "from_project")]
+    #[uniffi::constructor]
     pub fn ffi_from_project(project: Project) -> Arc<ProjectDocument> {
         Arc::new(ProjectDocument::from(&project))
     }
 
-    #[uniffi::constructor(name = "from_yaml")]
+    #[uniffi::constructor]
     pub fn ffi_from_yaml(text: String) -> Result<Arc<ProjectDocument>, LocalhostError> {
         ProjectDocument::from_yaml(&text).map(Arc::new)
     }
 
     /// A copy whose Project lives at `path`. The document itself is
     /// immutable on this side of the bridge.
-    #[uniffi::method(name = "with_path")]
+    #[uniffi::method]
     pub fn ffi_with_path(&self, path: String) -> Arc<ProjectDocument> {
         let mut document = self.clone();
         document.set_path(path);
         Arc::new(document)
     }
 
-    #[uniffi::method(name = "name")]
+    #[uniffi::method]
     pub fn ffi_name(&self) -> String {
         self.name().to_string()
     }
 
-    #[uniffi::method(name = "key")]
+    #[uniffi::method]
     pub fn ffi_key(&self) -> Key {
         self.key().clone()
     }
 
-    #[uniffi::method(name = "path")]
+    #[uniffi::method]
     pub fn ffi_path(&self) -> String {
         self.path().to_string()
     }
 
-    #[uniffi::method(name = "variables")]
+    #[uniffi::method]
     pub fn ffi_variables(&self) -> crate::Variables {
         self.variables().clone()
     }
 
-    #[uniffi::method(name = "services")]
+    #[uniffi::method]
     pub fn ffi_services(&self) -> Vec<crate::DocumentService> {
         self.services().to_vec()
     }
 
-    #[uniffi::method(name = "profiles")]
+    #[uniffi::method]
     pub fn ffi_profiles(&self) -> Vec<crate::DocumentProfile> {
         self.profiles().to_vec()
     }
 
-    #[uniffi::method(name = "active_profile")]
+    #[uniffi::method]
     pub fn ffi_active_profile(&self) -> Option<String> {
         self.active_profile().map(str::to_string)
     }
 
-    #[uniffi::method(name = "to_yaml")]
+    #[uniffi::method]
     pub fn ffi_to_yaml(&self) -> String {
         self.to_yaml()
     }
