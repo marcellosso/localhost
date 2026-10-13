@@ -78,11 +78,9 @@ pub(crate) fn spawn(
         let mut actions: libc::posix_spawn_file_actions_t = std::mem::zeroed();
         libc::posix_spawn_file_actions_init(&mut actions);
 
-        let mut flags = POSIX_SPAWN_SETSID | libc::POSIX_SPAWN_SETSIGDEF | libc::POSIX_SPAWN_SETSIGMASK;
+        let flags = POSIX_SPAWN_SETSID | libc::POSIX_SPAWN_SETSIGDEF | libc::POSIX_SPAWN_SETSIGMASK;
         #[cfg(target_os = "macos")]
-        {
-            flags |= libc::POSIX_SPAWN_CLOEXEC_DEFAULT;
-        }
+        let flags = flags | libc::POSIX_SPAWN_CLOEXEC_DEFAULT;
         libc::posix_spawnattr_setflags(&mut attributes, flags as _);
         let mut all_signals: libc::sigset_t = std::mem::zeroed();
         libc::sigfillset(&mut all_signals);
