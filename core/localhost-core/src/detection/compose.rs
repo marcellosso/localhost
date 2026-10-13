@@ -1,5 +1,6 @@
-use super::manifest::{YamlLine, YamlLines, shell_quoted, unquoted};
+use super::manifest::shell_quoted;
 use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
+use crate::yaml::{YamlLine, YamlLines, unquoted};
 
 /// Suggests one Service per Compose service, run in the foreground
 /// (`docker compose up <service>`) so Stop's SIGINT shuts it down cleanly.
