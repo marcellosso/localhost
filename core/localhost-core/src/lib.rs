@@ -13,7 +13,6 @@ mod fuzzy;
 mod id;
 mod key;
 mod library;
-#[allow(dead_code)] // Scanning and stopping are used by the ServiceManager, ported next.
 mod listener;
 mod local_url;
 mod logs;
@@ -21,15 +20,13 @@ mod model;
 mod origin;
 mod output;
 mod paths;
-#[allow(dead_code)] // Scanning is used by the ServiceManager, ported next.
 mod platform;
-#[allow(dead_code)] // Used by the ServiceManager, ported next.
 mod port_probe;
 mod process;
 mod run_environment;
-#[allow(dead_code)] // Recording is used by the ServiceManager, ported next.
 mod run_registry;
 mod secrets;
+mod service_manager;
 mod storage;
 mod validate;
 
@@ -55,6 +52,9 @@ pub use process::{
 pub use run_environment::RunEnvironment;
 pub use run_registry::{Orphan, RunRegistry};
 pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
+pub use service_manager::{
+    PortChange, PortChangeReason, Run, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceState, ServiceStatus,
+};
 pub use storage::UnreadableProjectFile;
 
 /// Version of the core, surfaced by clients (and later the CLI/MCP).
