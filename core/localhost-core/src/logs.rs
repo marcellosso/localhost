@@ -220,7 +220,6 @@ impl LogStore {
 }
 
 // Writing, by the ServiceManager.
-#[allow(dead_code)] // The ServiceManager is ported in the next chunk.
 impl LogStore {
     pub(crate) fn begin_run(&self, run_id: Id, service_id: Id) {
         let mut state = self.state();

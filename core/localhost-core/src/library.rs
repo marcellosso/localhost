@@ -154,7 +154,6 @@ impl ProjectLibrary {
     /// The variables of a Run of the Service: the Project's, then the
     /// Service's, then the active Environment Profile's, each overriding the
     /// one before, with Secrets resolved.
-    #[allow(dead_code)] // Used by the ServiceManager, ported next.
     pub(crate) fn resolved_variables(&self, service_id: Id) -> Result<BTreeMap<String, String>, LocalhostError> {
         let (project, service) = self.service(service_id)?;
         let mut layers = vec![(VariableLayer::Project(project.id), project.variables.clone())];
