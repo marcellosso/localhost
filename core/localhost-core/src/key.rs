@@ -40,6 +40,24 @@ impl Key {
         Key::new(slug).ok()
     }
 
+    /// A Key suggested from `name` (or `fallback`, itself a valid Key, if
+    /// the name has no usable characters) that isn't taken: `-2`, `-3`, … is
+    /// appended until `is_taken` says no.
+    pub fn suggested_unique(name: &str, fallback: &str, is_taken: impl Fn(&str) -> bool) -> Key {
+        debug_assert!(Key::is_valid(fallback));
+        let base = Key::suggested_from(name).unwrap_or_else(|| Key(fallback.into()));
+        if !is_taken(base.as_str()) {
+            return base;
+        }
+        // Room for the suffix, without leaving a trailing hyphen before it.
+        let stem: String = base.0.chars().take(Key::MAX_LENGTH - 4).collect();
+        let stem = stem.trim_end_matches('-');
+        (2..)
+            .map(|suffix| Key(format!("{stem}-{suffix}")))
+            .find(|candidate| !is_taken(candidate.as_str()))
+            .expect("a free suffix")
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -118,5 +136,28 @@ mod tests {
         let key = Key::suggested_from(&"ab ".repeat(40)).unwrap();
         assert!(key.as_str().len() <= Key::MAX_LENGTH);
         assert!(!key.as_str().ends_with('-'));
+    }
+
+    #[test]
+    fn unique_suggestion_appends_a_number_until_free() {
+        let taken = ["my-saas", "my-saas-2"];
+        let key = Key::suggested_unique("My SaaS", "project", |key| taken.contains(&key));
+        assert_eq!(key.as_str(), "my-saas-3");
+        assert_eq!(Key::suggested_unique("My SaaS", "project", |_| false).as_str(), "my-saas");
+    }
+
+    #[test]
+    fn unique_suggestion_falls_back_when_the_name_has_no_usable_characters() {
+        assert_eq!(Key::suggested_unique("!!!", "service", |_| false).as_str(), "service");
+        assert_eq!(Key::suggested_unique("", "service", |key| key == "service").as_str(), "service-2");
+    }
+
+    #[test]
+    fn unique_suggestion_stays_valid_at_the_maximum_length() {
+        // 64 characters; cut to 60 for the suffix, it would end in a hyphen.
+        let name = format!("{} bbbb", "a".repeat(59));
+        let key = Key::suggested_unique(&name, "project", |key| key.len() == Key::MAX_LENGTH);
+        assert_eq!(key.as_str(), format!("{}-2", "a".repeat(59)));
+        assert!(Key::new(key.as_str()).is_ok());
     }
 }

@@ -93,7 +93,7 @@ struct MenuBarContent: View {
     }
 
     /// e.g. "Port 3000 (My SaaS › Web) is held by python3 (PID 123)."
-    private static func description(of warning: AppModel.PortWarning, in model: AppModel) -> String {
+    private static func description(of warning: PortWarning, in model: AppModel) -> String {
         let owner = model.service(warning.serviceID).map { "\($0.project.name) › \($0.service.name)" } ?? "a service"
         return "Port \(String(warning.port)) (\(owner)) is held by \(warning.holder.name) (PID \(warning.holder.pid))."
     }

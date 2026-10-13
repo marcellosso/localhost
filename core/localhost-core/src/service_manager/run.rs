@@ -29,6 +29,17 @@ impl ServiceState {
     pub fn is_active(&self) -> bool {
         matches!(self, ServiceState::Starting | ServiceState::Running | ServiceState::Stopping)
     }
+
+    /// The state that says most about a group of Services, e.g. a Project's
+    /// in the sidebar: Failed, then Stopping, Starting, Running, Exited,
+    /// Stopped. `None` for no states.
+    pub fn most_significant(states: impl IntoIterator<Item = ServiceState>) -> Option<ServiceState> {
+        use ServiceState::*;
+        let rank = |state: &ServiceState| {
+            [Failed, Stopping, Starting, Running, Exited, Stopped].iter().position(|s| s == state)
+        };
+        states.into_iter().min_by_key(rank)
+    }
 }
 
 /// One execution of a Service, from launch until its process tree has fully ended.
@@ -231,5 +242,14 @@ mod tests {
         assert_eq!(with_port_moved("http://[::1]:3000/x?y#z", 3000, 4000), "http://[::1]:4000/x?y#z");
         assert_eq!(with_port_moved("http://localhost:30000/", 3000, 3001), "http://localhost:30000/");
         assert_eq!(with_port_moved("http://localhost/a:3000", 3000, 3001), "http://localhost/a:3000");
+    }
+
+    #[test]
+    fn the_most_significant_state_puts_failures_first() {
+        use ServiceState::*;
+        assert_eq!(ServiceState::most_significant([Running, Failed, Stopped]), Some(Failed));
+        assert_eq!(ServiceState::most_significant([Stopped, Running, Starting]), Some(Starting));
+        assert_eq!(ServiceState::most_significant([Exited, Stopped]), Some(Exited));
+        assert_eq!(ServiceState::most_significant([]), None);
     }
 }

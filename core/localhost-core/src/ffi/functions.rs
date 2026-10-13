@@ -3,8 +3,9 @@
 //! extensions (`error.message`, `project.dependents(of:)`, …).
 
 use crate::{
-    Ansi, FuzzyMatch, Id, Key, Listener, LocalUrl, LocalhostError, Project, ProjectFileProblem, ProjectScanner, Run,
-    Service, ServiceState, ServiceStatus, ServiceSuggestion, StyledLine, Termination, Variables,
+    Ansi, FuzzyMatch, Id, Key, Listener, LocalUrl, LocalhostError, Orphan, PortWarning, Project, ProjectFileProblem,
+    ProjectScanner, Run, Service, ServiceState, ServiceStatus, ServiceSuggestion, StyledLine, Termination,
+    UnreadableProjectFile, Variables,
 };
 
 use super::runtime::blocking;
@@ -55,6 +56,16 @@ pub fn key_suggested_from(name: &str) -> Option<Key> {
     Key::suggested_from(name)
 }
 
+#[uniffi::export]
+pub fn suggested_project_key(projects: Vec<Project>, name: &str, excluding: Option<Id>) -> Key {
+    crate::suggested_project_key(&projects, name, excluding)
+}
+
+#[uniffi::export]
+pub fn project_suggested_service_key(project: &Project, name: &str, excluding: Option<Id>) -> Key {
+    project.suggested_service_key(name, excluding)
+}
+
 // MARK: Projects and Services
 
 #[uniffi::export]
@@ -98,6 +109,11 @@ pub fn service_state_is_active(state: ServiceState) -> bool {
 }
 
 #[uniffi::export]
+pub fn service_state_most_significant(states: Vec<ServiceState>) -> Option<ServiceState> {
+    ServiceState::most_significant(states)
+}
+
+#[uniffi::export]
 pub fn service_status_never_run(service_id: Id) -> ServiceStatus {
     ServiceStatus::never_run(service_id)
 }
@@ -105,6 +121,35 @@ pub fn service_status_never_run(service_id: Id) -> ServiceStatus {
 #[uniffi::export]
 pub fn listener_is_unmanaged(listener: &Listener) -> bool {
     listener.is_unmanaged()
+}
+
+#[uniffi::export]
+pub fn listener_reason_not_stoppable(listener: &Listener) -> Option<LocalhostError> {
+    listener.reason_not_stoppable()
+}
+
+#[uniffi::export]
+pub fn listener_owner_description(listener: &Listener, projects: Vec<Project>) -> String {
+    listener.owner_description(&projects)
+}
+
+#[uniffi::export]
+pub fn port_warnings(
+    projects: Vec<Project>,
+    statuses: Vec<ServiceStatus>,
+    listeners: Vec<Listener>,
+) -> Vec<PortWarning> {
+    crate::port_warnings(&projects, &statuses, &listeners)
+}
+
+#[uniffi::export]
+pub fn orphan_description(orphan: &Orphan, projects: Vec<Project>) -> String {
+    orphan.description(&projects)
+}
+
+#[uniffi::export]
+pub fn unreadable_project_file_description(file: &UnreadableProjectFile) -> String {
+    file.description()
 }
 
 // MARK: Detection

@@ -70,6 +70,57 @@ impl Project {
     pub fn working_directory(&self, service: &Service) -> PathBuf {
         standardize(&PathBuf::from(&self.path).join(&service.working_directory))
     }
+
+    /// A Key for a Service named `name` that no other Service of the Project
+    /// uses (`excluding` is the Service being edited, if any).
+    pub fn suggested_service_key(&self, name: &str, excluding: Option<Id>) -> Key {
+        Key::suggested_unique(name, "service", |key| {
+            self.services.iter().any(|service| Some(service.id) != excluding && service.key.as_str() == key)
+        })
+    }
+}
+
+#[cfg(test)]
+impl Project {
+    /// A Project named `name` with a Service per `(name, port)`; Keys are
+    /// suggested from the names.
+    pub(crate) fn with_services(name: &str, services: &[(&str, Option<u16>)]) -> Project {
+        let mut project = Project::new(name.into(), Key::suggested_from(name).unwrap(), "/tmp".into(), 0);
+        project.services = services
+            .iter()
+            .map(|&(name, port)| Service {
+                id: Id::new(),
+                name: name.into(),
+                key: Key::suggested_from(name).unwrap(),
+                working_directory: ".".into(),
+                command_line: "x".into(),
+                environment: BTreeMap::new(),
+                secret_names: Vec::new(),
+                dependencies: Vec::new(),
+                is_excluded_from_start_all: false,
+                port,
+                url: None,
+                port_can_change: true,
+            })
+            .collect();
+        project
+    }
+}
+
+/// A Key for a Project named `name` that no other Project uses (`excluding`
+/// is the Project being edited, if any).
+pub fn suggested_project_key(projects: &[Project], name: &str, excluding: Option<Id>) -> Key {
+    Key::suggested_unique(name, "project", |key| {
+        projects.iter().any(|project| Some(project.id) != excluding && project.key.as_str() == key)
+    })
+}
+
+/// How a Service is named outside its Project, e.g. "My SaaS › API".
+/// `None` if no Project has it.
+pub fn service_label(projects: &[Project], service_id: Id) -> Option<String> {
+    projects
+        .iter()
+        .find_map(|project| project.service(service_id).map(|service| format!("{} › {}", project.name, service.name)))
 }
 
 /// One independently manageable long-running command belonging to a Project.
@@ -308,5 +359,29 @@ mod tests {
         assert!(Service::command_line_uses_port("next dev -p $PORT"));
         assert!(Service::command_line_uses_port("vite --port ${PORT:-5173}"));
         assert!(!Service::command_line_uses_port("docker compose up postgres"));
+    }
+
+    #[test]
+    fn suggests_project_keys_no_other_project_uses() {
+        let projects = [Project::with_services("My SaaS", &[]), Project::with_services("Blog", &[])];
+        assert_eq!(suggested_project_key(&projects, "My SaaS", None).as_str(), "my-saas-2");
+        // Editing a Project may keep its own Key.
+        assert_eq!(suggested_project_key(&projects, "My SaaS", Some(projects[0].id)).as_str(), "my-saas");
+        assert_eq!(suggested_project_key(&projects, "?", None).as_str(), "project");
+    }
+
+    #[test]
+    fn suggests_service_keys_no_other_service_of_the_project_uses() {
+        let project = Project::with_services("My SaaS", &[("API", None), ("Web", None)]);
+        assert_eq!(project.suggested_service_key("api", None).as_str(), "api-2");
+        assert_eq!(project.suggested_service_key("API", Some(project.services[0].id)).as_str(), "api");
+        assert_eq!(project.suggested_service_key("Worker", None).as_str(), "worker");
+    }
+
+    #[test]
+    fn labels_a_service_with_its_project() {
+        let projects = [Project::with_services("My SaaS", &[("API", None)])];
+        assert_eq!(service_label(&projects, projects[0].services[0].id).as_deref(), Some("My SaaS › API"));
+        assert_eq!(service_label(&projects, Id::new()), None);
     }
 }

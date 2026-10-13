@@ -208,10 +208,7 @@ final class AppModel {
 
     /// The most significant state among a Project's Services, or `nil` if it has none.
     func aggregateState(of project: Project) -> ServiceState? {
-        let states = project.services.map { status(of: $0).state }
-        guard !states.isEmpty else { return nil }
-        let priority: [ServiceState] = [.failed, .stopping, .starting, .running, .exited, .stopped]
-        return priority.first(where: states.contains)
+        .mostSignificant(of: project.services.map { status(of: $0).state })
     }
 
     var activeServiceCount: Int {
@@ -220,25 +217,12 @@ final class AppModel {
 
     /// A Key derived from `name` that no other Project uses.
     func suggestedProjectKey(for name: String, excluding projectID: UUID? = nil) -> String {
-        let taken = Set(projects.filter { $0.id != projectID }.map(\.key.rawValue))
-        return Self.uniqueKey(from: name, fallback: "project", taken: taken)
+        Project.suggestedKey(for: name, among: projects, excluding: projectID).rawValue
     }
 
     /// A Key derived from `name` that no other Service of the Project uses.
     func suggestedServiceKey(for name: String, in project: Project, excluding serviceID: UUID? = nil) -> String {
-        let taken = Set(project.services.filter { $0.id != serviceID }.map(\.key.rawValue))
-        return Self.uniqueKey(from: name, fallback: "service", taken: taken)
-    }
-
-    private static func uniqueKey(from name: String, fallback: String, taken: Set<String>) -> String {
-        let base = Key(suggestedFrom: name)?.rawValue ?? fallback
-        var candidate = base
-        var suffix = 2
-        while taken.contains(candidate) {
-            candidate = "\(base.prefix(Key.maxLength - 4))-\(suffix)"
-            suffix += 1
-        }
-        return candidate
+        project.suggestedServiceKey(for: name, excluding: serviceID).rawValue
     }
 
     // MARK: Lifecycle
@@ -503,26 +487,18 @@ final class AppModel {
     /// Rescans Listeners for Unmanaged ones holding a configured Port. A
     /// Service that is active is left out: its Run already says why it moved or failed.
     func refreshPortWarnings() async {
-        guard let services = core?.services else { return }
-        let unmanaged = await services.listeners().filter(\.isUnmanaged)
-        var warnings: [PortWarning] = []
-        for project in projects {
-            for service in project.services {
-                guard let port = service.port, !status(of: service).state.isActive,
-                      let holder = unmanaged.first(where: { $0.ports.contains(port) })
-                else { continue }
-                warnings.append(PortWarning(port: port, serviceID: service.id, holder: holder))
-            }
-        }
+        guard let core else { return }
+        let warnings = PortWarning.warnings(
+            for: projects,
+            statuses: Array(core.statuses.statuses.values),
+            listeners: await core.services.listeners()
+        )
         if warnings != portWarnings { portWarnings = warnings }
     }
 
     /// Why localhost won't stop the Listener, or `nil` if it can.
     func reasonNotStoppable(_ listener: Listener) -> String? {
-        if listener.pid == ProcessInfo.processInfo.processIdentifier { return LocalhostError.ListenerIsLocalhost.message }
-        if let label = listener.launchdLabel { return LocalhostError.ListenerIsLaunchdJob(label: label).message }
-        if listener.kind == .docker { return LocalhostError.ListenerIsDocker.message }
-        return nil
+        listener.reasonNotStoppable?.message
     }
 
     /// Stops a Run's Listener (its Service) at once; asks before stopping any other.
@@ -544,20 +520,7 @@ final class AppModel {
 
     /// Who a Listener belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
     func ownerDescription(_ listener: Listener) -> String {
-        switch listener.owner {
-        case .run(let serviceID, _):
-            if let (project, service) = service(serviceID) { return "\(project.name) › \(service.name)" }
-            return "A removed service"
-        case .project(let projectID):
-            return "In \(project(projectID)?.name ?? "a removed project")"
-        case .unmanaged:
-            switch listener.kind {
-            case .docker: return "Docker"
-            case .app: return "App"
-            case .system: return "macOS"
-            case .development: return "Unmanaged"
-            }
-        }
+        listener.ownerDescription(in: projects)
     }
 
     /// Stops whatever holds the blocked start's port, then starts the Service.
@@ -598,18 +561,7 @@ final class AppModel {
 
     /// One line per file: its name, why, and where it is now.
     var unreadableFilesMessage: String {
-        (core?.library.unreadableFiles ?? []).map { file in
-            let name = (file.path as NSString).lastPathComponent
-            let reason = switch file.error {
-            case .PersistenceFailed(_, let reason): reason
-            case .UnsupportedSchemaVersion(let version, _): "It was saved by a newer version of localhost (schema \(version))."
-            default: file.error.message
-            }
-            let outcome = file.movedTo.map { "Kept as \(($0 as NSString).lastPathComponent)." }
-                ?? "Left in place for that version."
-            return "\(name): \(reason) \(outcome)"
-        }
-        .joined(separator: "\n\n")
+        (core?.library.unreadableFiles ?? []).map(\.description).joined(separator: "\n\n")
     }
 
     /// Closes the report (optionally showing the files), then checks for Orphans.
@@ -634,13 +586,7 @@ final class AppModel {
     func checkForOrphans() async {
         let orphans = runRegistry.orphans()
         guard !orphans.isEmpty else { return }
-        orphanDescriptions = orphans.map { orphan in
-            if let (project, service) = service(orphan.serviceID) {
-                "\(project.name) › \(service.name)"
-            } else {
-                "A removed service (process group \(orphan.processGroupID))"
-            }
-        }
+        orphanDescriptions = orphans.map { $0.description(in: projects) }
         self.orphans = orphans
         isShowingOrphanAlert = true
     }

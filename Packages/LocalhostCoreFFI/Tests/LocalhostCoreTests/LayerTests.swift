@@ -108,6 +108,23 @@ private final class TemporaryRoot {
         #expect(reopened.projects().map(\.name) == ["Shop"])
         #expect(reopened.unreadableFiles.isEmpty)
     }
+
+    @Test func suggestsKeysTheProjectDoesNotUse() async throws {
+        let root = try TemporaryRoot()
+        let library = try ProjectLibrary(storageRoot: root.url)
+        let project = try await library.addProject(name: "Shop", key: Key("shop"), path: "/tmp/shop", origin: .mainWindow)
+        let service = try await library.addService(
+            toProject: project.id, name: "Web", key: Key("web"), commandLine: "pnpm dev", origin: .mainWindow
+        )
+        let projects = library.projects()
+        #expect(Project.suggestedKey(for: "Shop", among: projects).rawValue == "shop-2")
+        #expect(Project.suggestedKey(for: "Shop", among: projects, excluding: project.id).rawValue == "shop")
+        let reloaded = try library.project(id: project.id)
+        #expect(reloaded.suggestedServiceKey(for: "Web").rawValue == "web-2")
+        #expect(reloaded.suggestedServiceKey(for: "Web", excluding: service.id).rawValue == "web")
+        #expect(ServiceState.mostSignificant(of: [.running, .failed]) == .failed)
+        #expect(ServiceState.mostSignificant(of: []) == nil)
+    }
 }
 
 @Suite(.serialized) struct RunTests {

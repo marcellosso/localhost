@@ -48,11 +48,12 @@ pub use fuzzy::FuzzyMatch;
 pub use id::Id;
 pub use key::Key;
 pub use library::{KeyClash, ProfileChanges, ProjectChanges, ProjectLibrary, ProjectLibraryEvent, ServiceChanges};
-pub use listener::{Listener, ListenerKind, ListenerOwner};
+pub use listener::{Listener, ListenerKind, ListenerOwner, PortWarning, port_warnings};
 pub use local_url::LocalUrl;
 pub use logs::{LogBuffer, LogStore};
 pub use model::{
     EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
+    service_label, suggested_project_key,
 };
 pub use origin::Origin;
 pub use output::{OutputChannel, OutputLine, ServiceOutputLine};
