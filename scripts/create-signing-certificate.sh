@@ -20,6 +20,8 @@ set -euo pipefail
 folder=${1:?usage: scripts/create-signing-certificate.sh <new folder> [--upload]}
 upload=${2:-}
 name="localhost Release Signing"
+# `gh` finds the repository from the working directory, which moves to $folder below.
+repo=$(cd "$(dirname "$0")/.." && pwd)
 
 if [[ -e $folder ]]; then
     echo "error: $folder already exists; pick a new folder so nothing is overwritten" >&2
@@ -51,7 +53,9 @@ echo "Created $(pwd)/localhost-signing.p12"
 openssl x509 -inform der -in localhost-signing.cer -noout -subject -enddate -fingerprint -sha1
 
 if [[ $upload == --upload ]]; then
-    base64 -i localhost-signing.p12 | gh secret set SIGNING_CERTIFICATE_P12
-    gh secret set SIGNING_CERTIFICATE_PASSWORD < localhost-signing.password
+    folder=$(pwd)
+    cd "$repo"
+    base64 -i "$folder/localhost-signing.p12" | gh secret set SIGNING_CERTIFICATE_P12
+    gh secret set SIGNING_CERTIFICATE_PASSWORD < "$folder/localhost-signing.password"
     echo "Stored SIGNING_CERTIFICATE_P12 and SIGNING_CERTIFICATE_PASSWORD in $(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 fi
