@@ -23,9 +23,10 @@ uniffi::custom_type!(Key, String, {
     try_lift: |raw| Ok(Key::new(raw)?),
 });
 
-type Environment = BTreeMap<String, String>;
+/// Environment variables and other ordered string maps: a Swift dictionary.
+type StringMap = BTreeMap<String, String>;
 
-uniffi::custom_type!(Environment, HashMap<String, String>, {
+uniffi::custom_type!(StringMap, HashMap<String, String>, {
     remote,
     lower: |values| values.into_iter().collect(),
     try_lift: |values| Ok(values.into_iter().collect()),

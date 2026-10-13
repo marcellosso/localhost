@@ -11,3 +11,22 @@ type_name = "UUID"
 imports = ["Foundation"]
 lift = "UUID(uuidString: {})!"
 lower = "{}.uuidString"
+
+# A Swift struct with the old `rawValue` API (Packages/LocalhostCoreFFI). The
+# core only ever hands out valid Keys.
+[bindings.swift.custom_types.CoreKey]
+type_name = "Key"
+lift = "Key(validatedRawValue: {})"
+lower = "{}.rawValue"
+
+[bindings.swift.rename]
+# Frees the name for the Swift struct above.
+Key = "CoreKey"
+# Ports are u16 in the core and Int in Swift: the layer reads these as `port`,
+# `ports` and `configuredPort`.
+"Service.port" = "core_port"
+"Run.port" = "core_port"
+"Listener.ports" = "core_ports"
+"PortChange.configured_port" = "core_configured_port"
+"ServiceSuggestion.port" = "core_port"
+"DocumentService.port" = "core_port"
