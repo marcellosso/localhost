@@ -1,7 +1,8 @@
 use std::collections::{BTreeSet, HashMap};
 
-use super::manifest::{YamlLines, shell_quoted};
+use super::manifest::shell_quoted;
 use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
+use crate::yaml::YamlLines;
 
 /// Suggests a Service for each `package.json` script, run with the package
 /// manager the lockfiles point to.

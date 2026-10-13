@@ -8,8 +8,8 @@ use crate::model::VariableValue;
 use crate::secrets::SecretStore;
 use crate::storage::{ProjectStorage, UnreadableProjectFile};
 use crate::{
-    EnvironmentProfile, Id, Key, LocalhostError, NewService, Origin, Project, Service, VariableInput, VariableLayer,
-    Variables, validate,
+    EnvironmentProfile, Id, Key, LocalhostError, NewService, Origin, Project, ProjectDocument, Service, VariableInput,
+    VariableLayer, Variables, validate,
 };
 
 /// A change to the Project Configuration, tagged with the Origin that caused it.
@@ -247,19 +247,100 @@ impl ProjectLibrary {
         Ok(())
     }
 
+    /// Adds the Project a Project file describes, in one save. Its Secrets
+    /// are named but have no value until they are set.
+    ///
+    /// If another Project has the document's Key, nothing is changed unless
+    /// `on_key_clash` says what to do. On [`KeyClash::Replace`], Services and
+    /// Profiles matching the old ones by Key and name keep their identity,
+    /// and with it their logs and the stored values of Secrets they still name.
+    pub fn import_project(
+        &self,
+        document: &ProjectDocument,
+        on_key_clash: Option<KeyClash>,
+        origin: Origin,
+    ) -> Result<Project, LocalhostError> {
+        let mut state = self.state();
+        let existing = state.projects.values().find(|project| project.key == *document.key()).cloned();
+        let (name, path) = (document.name().to_string(), String::new());
+        let mut project = match (&existing, on_key_clash) {
+            (None, _) => Project::new(name, document.key().clone(), path, next_sort_order(&state)),
+            (Some(_), None) => return Err(LocalhostError::DuplicateProjectKey(document.key().clone())),
+            (Some(_), Some(KeyClash::KeepBoth)) => {
+                let key = free_project_key(&state, document.key());
+                Project::new(name, key, path, next_sort_order(&state))
+            }
+            (Some(existing), Some(KeyClash::Replace)) => {
+                let mut project = Project::new(name, existing.key.clone(), path, existing.sort_order);
+                project.id = existing.id;
+                project.is_favorite = existing.is_favorite;
+                project
+            }
+        };
+        let replaced = existing.filter(|_| on_key_clash == Some(KeyClash::Replace));
+        project.path = validate::project_path(document.path())?;
+        project.variables = document.variables().clone();
+        project.services = document
+            .services()
+            .iter()
+            .map(|imported| Service {
+                id: replaced
+                    .as_ref()
+                    .and_then(|replaced| replaced.services.iter().find(|service| service.key == imported.key))
+                    .map_or_else(Id::new, |service| service.id),
+                name: imported.name.clone(),
+                key: imported.key.clone(),
+                working_directory: imported.working_directory.clone(),
+                command_line: imported.command_line.clone(),
+                environment: imported.variables.values.clone(),
+                secret_names: imported.variables.secret_names.clone(),
+                dependencies: Vec::new(),
+                is_excluded_from_start_all: imported.is_excluded_from_start_all,
+                port: imported.port,
+                url: imported.url.clone(),
+                port_can_change: imported.port_can_change,
+            })
+            .collect();
+        let ids_by_key: HashMap<Key, Id> =
+            project.services.iter().map(|service| (service.key.clone(), service.id)).collect();
+        for (service, imported) in project.services.iter_mut().zip(document.services()) {
+            service.dependencies =
+                imported.dependencies.iter().filter_map(|key| ids_by_key.get(key).copied()).collect();
+        }
+        project.profiles = document
+            .profiles()
+            .iter()
+            .map(|imported| {
+                let id = replaced
+                    .as_ref()
+                    .and_then(|replaced| replaced.profiles.iter().find(|profile| profile.name == imported.name))
+                    .map_or_else(Id::new, |profile| profile.id);
+                EnvironmentProfile::new(id, imported.name.clone(), imported.variables.clone())
+            })
+            .collect();
+        project.active_profile_id = project
+            .profiles
+            .iter()
+            .find(|profile| Some(profile.name.as_str()) == document.active_profile())
+            .map(|profile| profile.id);
+        self.commit(&mut state, &project)?;
+        let event = match replaced {
+            Some(replaced) => {
+                let kept: HashSet<String> = all_secret_accounts(&project).into_iter().collect();
+                let stale: Vec<String> =
+                    all_secret_accounts(&replaced).into_iter().filter(|account| !kept.contains(account)).collect();
+                self.remove_secrets(&stale);
+                ProjectLibraryEvent::ProjectUpdated { project: project.clone(), origin }
+            }
+            None => ProjectLibraryEvent::ProjectAdded { project: project.clone(), origin },
+        };
+        broadcast(&mut state, event);
+        Ok(project)
+    }
+
     /// `key` if no Project uses it, else the first free `key-2`, `key-3`, ….
     pub fn free_project_key(&self, key: &Key) -> Key {
-        let state = self.state();
-        let taken: HashSet<&str> = state.projects.values().map(|project| project.key.as_str()).collect();
-        let base: String = key.as_str().chars().take(Key::MAX_LENGTH - 4).collect();
-        let mut candidate = key.as_str().to_string();
-        let mut suffix = 2;
-        while taken.contains(candidate.as_str()) {
-            candidate = format!("{base}-{suffix}");
-            suffix += 1;
-        }
-        // Valid: a valid Key, cut short of the limit, plus `-<digits>`.
-        Key::new(candidate).unwrap_or_else(|_| key.clone())
+        free_project_key(&self.state(), key)
     }
 
     // MARK: Services
@@ -541,6 +622,19 @@ fn sorted(projects: &HashMap<Id, Project>) -> Vec<Project> {
 
 fn broadcast(state: &mut State, event: ProjectLibraryEvent) {
     state.subscribers.retain(|subscriber| subscriber.send(event.clone()).is_ok());
+}
+
+fn free_project_key(state: &State, key: &Key) -> Key {
+    let taken: HashSet<&str> = state.projects.values().map(|project| project.key.as_str()).collect();
+    let base: String = key.as_str().chars().take(Key::MAX_LENGTH - 4).collect();
+    let mut candidate = key.as_str().to_string();
+    let mut suffix = 2;
+    while taken.contains(candidate.as_str()) {
+        candidate = format!("{base}-{suffix}");
+        suffix += 1;
+    }
+    // Valid: a valid Key, cut short of the limit, plus `-<digits>`.
+    Key::new(candidate).unwrap_or_else(|_| key.clone())
 }
 
 fn next_sort_order(state: &State) -> i64 {

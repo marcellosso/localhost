@@ -24,12 +24,14 @@ mod paths;
 mod platform;
 mod port_probe;
 mod process;
+mod project_document;
 mod run_environment;
 mod run_registry;
 mod secrets;
 mod service_manager;
 mod storage;
 mod validate;
+mod yaml;
 
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use detection::{
@@ -54,6 +56,7 @@ pub use platform::ProcessStartTime;
 pub use process::{
     LaunchConfiguration, MAX_LINE_LENGTH, ProcessTree, ProcessTreeExit, StopPolicy, Termination, signal_name,
 };
+pub use project_document::{DocumentProfile, DocumentService, ProjectDocument, ProjectFileProblem, ValueKind};
 pub use run_environment::RunEnvironment;
 pub use run_registry::{Orphan, RunRegistry};
 pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
