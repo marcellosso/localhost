@@ -257,6 +257,8 @@ async fn refuses_to_stop_localhost_itself_launchd_jobs_and_docker() {
     );
     let mut docker = me.clone();
     docker.pid = 1;
+    // This test may itself run inside a launchd job (as on CI); Docker's backend doesn't.
+    docker.launchd_label = None;
     docker.kind = ListenerKind::Docker;
     assert_eq!(s.manager.stop_listener(&docker, Origin::MainWindow).await, Err(LocalhostError::ListenerIsDocker));
 }
