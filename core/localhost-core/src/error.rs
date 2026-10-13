@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Id, Key};
+use crate::{Id, Key, Listener, ProjectFileProblem};
 
 /// Every failure the core reports. Clients match on these cases; they are
 /// never flattened into strings inside the core.
@@ -50,6 +50,22 @@ pub enum LocalhostError {
     /// The Run failed after printing `Cannot connect to the Docker daemon`.
     DockerDaemonUnavailable,
 
+    // Ports and Listeners
+    /// Something already listens on the port; `owner` is that Listener, if
+    /// localhost can see it (processes of other users can't be inspected).
+    PortConflict {
+        port: u16,
+        owner: Option<Box<Listener>>,
+    },
+    /// localhost does not stop itself.
+    ListenerIsLocalhost,
+    /// launchd would restart it (a Homebrew service, an app): stop it there instead.
+    ListenerIsLaunchdJob {
+        label: String,
+    },
+    /// Docker's backend holds the ports of every running container.
+    ListenerIsDocker,
+
     // Persistence
     /// The system's secret store (the Keychain, the Secret Service) refused.
     SecretStoreFailed(String),
@@ -60,6 +76,15 @@ pub enum LocalhostError {
     PersistenceFailed {
         path: String,
         reason: String,
+    },
+
+    // Project files
+    /// A Project file can't be imported: `problem`, at `field` (e.g.
+    /// `["services", "web", "port"]`) on `line`, when known.
+    InvalidProjectFile {
+        problem: ProjectFileProblem,
+        field: Vec<String>,
+        line: Option<usize>,
     },
 }
 
@@ -100,11 +125,30 @@ impl LocalhostError {
                 "Docker isn’t running. Start Docker Desktop (or your Docker engine), then start the service again."
                     .into()
             }
+            PortConflict { port, owner: Some(owner) } => {
+                format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
+            }
+            PortConflict { port, owner: None } => format!("Port {port} is in use by another process."),
+            ListenerIsLocalhost => "localhost can't stop itself.".into(),
+            ListenerIsLaunchdJob { label } => format!(
+                "It is managed by launchd ({label}), which would start it again. Stop it with the tool that started it."
+            ),
+            ListenerIsDocker => "This is Docker listening for a container. Stop the container instead.".into(),
             SecretStoreFailed(reason) => format!("{} refused: {reason}.", crate::secrets::STORE_NAME),
             UnsupportedSchemaVersion { version, path } => {
                 format!("{path} was saved by a newer version of localhost (schema {version}).")
             }
             PersistenceFailed { path, reason } => format!("Could not read or write {path}: {reason}"),
+            InvalidProjectFile { problem, field, line } => {
+                let line = line.map(|line| format!("Line {line}"));
+                let field = (!field.is_empty()).then(|| field.join(" › "));
+                let place: Vec<String> = [line, field].into_iter().flatten().collect();
+                if place.is_empty() {
+                    problem.message()
+                } else {
+                    format!("{}: {}", place.join(", "), problem.message())
+                }
+            }
         }
     }
 }
@@ -145,5 +189,24 @@ mod tests {
         // ENOMEM is 12 on macOS and Linux.
         assert!(LocalhostError::LaunchFailed { errno: 12 }.message().contains("Cannot allocate memory"));
         assert!(!LocalhostError::LaunchFailed { errno: 12 }.message().contains("os error"));
+    }
+
+    #[test]
+    fn says_where_the_problem_in_a_project_file_is() {
+        let error = LocalhostError::InvalidProjectFile {
+            problem: ProjectFileProblem::Invalid(Box::new(LocalhostError::InvalidPort(70000))),
+            field: vec!["services".into(), "web".into(), "port".into()],
+            line: Some(8),
+        };
+        assert_eq!(
+            error.message(),
+            "Line 8, services › web › port: 70000 is not a valid port. Use a number from 1 to 65535."
+        );
+        let error = LocalhostError::InvalidProjectFile {
+            problem: ProjectFileProblem::NotAProjectFile,
+            field: vec![],
+            line: None,
+        };
+        assert_eq!(error.message(), "This isn’t a localhost project file: it has no “localhost: 1” line.");
     }
 }

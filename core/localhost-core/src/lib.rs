@@ -5,33 +5,64 @@
 //! [`Origin`], failures are a [`LocalhostError`], and changes are broadcast as
 //! events, so the core can later be hosted behind IPC without a rewrite.
 
+mod ansi;
 mod dependencies;
+mod detection;
 mod error;
 mod fold;
 mod fuzzy;
 mod id;
 mod key;
 mod library;
+mod listener;
+mod local_url;
+mod logs;
 mod model;
 mod origin;
+mod output;
 mod paths;
+mod platform;
+mod port_probe;
+mod process;
+mod project_document;
 mod run_environment;
+mod run_registry;
 mod secrets;
+mod service_manager;
 mod storage;
 mod validate;
+mod yaml;
 
+pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
+pub use detection::{
+    CargoDetector, ComposeDetector, NodeDetector, ProjectScanner, PythonDetector, ScannedDirectory, ServiceDetector,
+    ServiceSuggestion,
+};
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;
 pub use id::Id;
 pub use key::Key;
 pub use library::{KeyClash, ProfileChanges, ProjectChanges, ProjectLibrary, ProjectLibraryEvent, ServiceChanges};
+pub use listener::{Listener, ListenerKind, ListenerOwner};
+pub use local_url::LocalUrl;
+pub use logs::{LogBuffer, LogStore};
 pub use model::{
     EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
 };
 pub use origin::Origin;
+pub use output::{OutputChannel, OutputLine, ServiceOutputLine};
 pub use paths::default_storage_root;
+pub use platform::ProcessStartTime;
+pub use process::{
+    LaunchConfiguration, MAX_LINE_LENGTH, ProcessTree, ProcessTreeExit, StopPolicy, Termination, signal_name,
+};
+pub use project_document::{DocumentProfile, DocumentService, ProjectDocument, ProjectFileProblem, ValueKind};
 pub use run_environment::RunEnvironment;
+pub use run_registry::{Orphan, RunRegistry};
 pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
+pub use service_manager::{
+    PortChange, PortChangeReason, Run, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceState, ServiceStatus,
+};
 pub use storage::UnreadableProjectFile;
 
 /// Version of the core, surfaced by clients (and later the CLI/MCP).

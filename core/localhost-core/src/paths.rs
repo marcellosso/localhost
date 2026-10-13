@@ -31,6 +31,19 @@ pub(crate) fn expand_tilde(path: &str) -> String {
     }
 }
 
+/// `path` with the home folder (alone or followed by `/`) replaced by `~`.
+pub(crate) fn abbreviate_tilde(path: &str) -> String {
+    let home = home_directory().to_string_lossy().into_owned();
+    if home == "/" {
+        return path.to_string();
+    }
+    match path.strip_prefix(home.as_str()) {
+        Some("") => "~".into(),
+        Some(rest) if rest.starts_with('/') => format!("~{rest}"),
+        _ => path.to_string(),
+    }
+}
+
 /// `path` with `.` and `..` resolved without touching the file system, and
 /// no trailing separator: `/tmp/app/../shared/` → `/tmp/shared`.
 pub(crate) fn standardize(path: &Path) -> PathBuf {
@@ -67,5 +80,14 @@ mod tests {
         assert_eq!(expand_tilde("~"), home);
         assert_eq!(expand_tilde("/tmp/~/a"), "/tmp/~/a");
         assert_eq!(expand_tilde("~other/a"), "~other/a");
+    }
+
+    #[test]
+    fn abbreviates_the_home_folder_only() {
+        let home = home_directory().to_string_lossy().into_owned();
+        assert_eq!(abbreviate_tilde(&format!("{home}/Code/a")), "~/Code/a");
+        assert_eq!(abbreviate_tilde(&home), "~");
+        assert_eq!(abbreviate_tilde(&format!("{home}other/a")), format!("{home}other/a"));
+        assert_eq!(abbreviate_tilde("/tmp/a"), "/tmp/a");
     }
 }

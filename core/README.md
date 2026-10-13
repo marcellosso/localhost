@@ -13,5 +13,20 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt
 ```
 
+## The `localhost` command
+
+`localhost-cli` builds a `localhost` binary on the same core and the same
+storage as the app:
+
+```sh
+cargo run -p localhost-cli -- projects           # every Project
+cargo run -p localhost-cli -- status acme         # which Services are running
+cargo run -p localhost-cli -- logs acme [web]     # the latest Run's output
+cargo run -p localhost-cli -- up acme [web …]     # run in the foreground; Ctrl-C stops everything
+```
+
+Projects and Services are named by Key, name, or letters of either in order
+(`FuzzyMatch`).
+
 `localhost-core/tests/fixtures/swift-schema-1/` holds files written by the
 Swift core; the Rust core must keep reading them.
