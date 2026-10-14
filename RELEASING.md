@@ -1,12 +1,12 @@
 # Releasing localhost
 
-Releases are DMGs on GitHub Releases. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml), which builds the app, signs it, packs it into `localhost-<version>.dmg` and drafts a GitHub Release with the DMG, its SHA-256 and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
+Releases are on GitHub Releases: a DMG for macOS and, for Linux, a `.deb`, an `.rpm` and an AppImage. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml). It builds and signs the macOS app into `localhost-<version>.dmg`, and builds the Linux app (`apps/desktop/`) on Ubuntu 22.04 into `localhost-app_<version>_amd64.deb`, `localhost-app-<version>-1.x86_64.rpm` and `localhost-app_<version>_amd64.AppImage`, unsigned. Then it drafts one GitHub Release with all of them, a SHA-256 for each, and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
 
 There is no in-app update check: users download new versions from Releases.
 
 ## Versions
 
-[SemVer](https://semver.org), `0.x` for now. The tag is the only place the version lives: `v0.3.1` builds version `0.3.1` (`CFBundleShortVersionString`), with the workflow's run number as the build number (`CFBundleVersion`). `MARKETING_VERSION` in the Xcode project is only what local builds say.
+[SemVer](https://semver.org), `0.x` for now. The tag is the only place the version lives: `v0.3.1` builds version `0.3.1` (`CFBundleShortVersionString`), with the workflow's run number as the build number (`CFBundleVersion`). The Linux packages get the same version. `MARKETING_VERSION` in the Xcode project and `version` in `apps/desktop/src-tauri/tauri.conf.json` are only what local builds say.
 
 Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*` tag.
 
@@ -22,7 +22,7 @@ Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*`
    ```
 
 3. Wait for the **Release** workflow (Actions tab). It ends with a draft release named "localhost 0.3.0".
-4. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps.
+4. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears.
 5. Click **Publish release**.
 
 A fix is a normal change: branch → PR → merge → a patch tag (`v0.3.1`).

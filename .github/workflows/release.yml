@@ -1,7 +1,8 @@
 name: Release
 
-# A v* tag builds the DMG and drafts a GitHub Release for it; publishing the
-# draft is the maintainer's step. See RELEASING.md.
+# A v* tag builds the macOS DMG and the Linux packages (.deb, .rpm, AppImage)
+# and drafts one GitHub Release with all of them; publishing the draft is the
+# maintainer's step. See RELEASING.md.
 #
 # Signing follows the secrets that exist:
 #   Developer ID   DEVELOPER_ID_CERTIFICATE_P12, DEVELOPER_ID_CERTIFICATE_PASSWORD,
@@ -20,9 +21,27 @@ concurrency:
   group: release-${{ github.ref }}
 
 jobs:
-  release:
-    name: Build and draft the release
+  version:
+    name: Read the version from the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags look like v1.2.3, got $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  macos:
+    name: Build the macOS DMG
+    needs: version
     runs-on: macos-26
+    outputs:
+      mode: ${{ steps.signing.outputs.mode }}
     env:
       DEVELOPER_ID_CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
       DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
@@ -37,16 +56,6 @@ jobs:
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
       - run: xcodebuild -version
-
-      - name: Read the version from the tag
-        id: version
-        run: |
-          version=${GITHUB_REF_NAME#v}
-          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Release tags look like v1.2.3, got $GITHUB_REF_NAME"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Choose the signing mode
         id: signing
@@ -99,7 +108,7 @@ jobs:
           SIGNING_IDENTITY: ${{ steps.identity.outputs.identity || '-' }}
           DEVELOPER_ID: ${{ steps.signing.outputs.mode == 'developer-id' && '1' || '' }}
         run: |
-          dmg=$(scripts/build-release.sh "${{ steps.version.outputs.version }}" "$GITHUB_RUN_NUMBER" | tail -1)
+          dmg=$(scripts/build-release.sh "${{ needs.version.outputs.version }}" "$GITHUB_RUN_NUMBER" | tail -1)
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize and staple
@@ -123,23 +132,95 @@ jobs:
           xcrun stapler staple "$DMG"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
 
+      - name: Checksum
+        env:
+          DMG: ${{ steps.build.outputs.dmg }}
+        run: cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            ${{ steps.build.outputs.dmg }}
+            ${{ steps.build.outputs.dmg }}.sha256
+          if-no-files-found: error
+
+      - name: Remove the signing keychain
+        if: always() && steps.identity.outcome != 'skipped'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  linux:
+    name: Build the Linux packages
+    needs: version
+    # The oldest Ubuntu the packages support: they need its glibc or newer.
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      # With the AppIndicator library installed, the bundler adds the tray,
+      # webview and GTK libraries to the packages' dependencies itself.
+      - name: Install the webview and tray libraries
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the .deb, .rpm and AppImage
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: pnpm tauri build --bundles deb,rpm,appimage --config "{\"version\":\"$VERSION\"}"
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p "$RUNNER_TEMP/linux"
+          cp src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/rpm/*.rpm \
+            src-tauri/target/release/bundle/appimage/*.AppImage "$RUNNER_TEMP/linux/"
+          cd "$RUNNER_TEMP/linux"
+          for file in *; do sha256sum "$file" > "$file.sha256"; done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: ${{ runner.temp }}/linux/*
+          if-no-files-found: error
+
+  draft:
+    name: Draft the GitHub Release
+    needs: [version, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
       - name: Draft the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          DMG: ${{ steps.build.outputs.dmg }}
-          VERSION: ${{ steps.version.outputs.version }}
-          MODE: ${{ steps.signing.outputs.mode }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          MODE: ${{ needs.macos.outputs.mode }}
         run: |
-          (cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
           case $MODE in
             developer-id) install="Signed with Developer ID and notarized by Apple." ;;
             self-signed) install="Not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, see [First launch](${{ github.server_url }}/${{ github.repository }}#first-launch-of-a-build-that-isnt-notarized) in the README." ;;
             ad-hoc) install="Signed ad hoc and not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, and macOS asks again for Keychain access to each Secret after every update, see [the README](${{ github.server_url }}/${{ github.repository }}#install)." ;;
           esac
-          gh release create "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" \
+          linux="**Linux** (x86_64): the \`.deb\` (Ubuntu 22.04 or later, Debian 12), the \`.rpm\` (Fedora) or the AppImage; not signed. Secrets need a Secret Service (GNOME Keyring, KWallet) and the tray on GNOME needs the AppIndicator extension, see [Linux](${{ github.server_url }}/${{ github.repository }}#linux) in the README."
+          notes=$(printf '**macOS**: requires macOS 15 or later. %s\n\n%s' "$install" "$linux")
+          gh release create "$GITHUB_REF_NAME" assets/* \
             --draft --verify-tag --title "localhost $VERSION" \
-            --notes "Requires macOS 15 or later. $install" --generate-notes
+            --notes "$notes" --generate-notes
 
-      - name: Remove the signing keychain
-        if: always() && steps.identity.outcome != 'skipped'
-        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
