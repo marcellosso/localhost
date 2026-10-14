@@ -3,6 +3,7 @@ import { openUrl, start } from "../actions";
 import { commands, type Id, type LogSource, type Project, type Run } from "../bindings";
 import { type CoreView, serviceStatus } from "../core";
 import type { LogBuffer } from "../log/buffer";
+import { shortcutLabel } from "../keyboard";
 import { lineMatches } from "../log/segments";
 import { useLog } from "../log/useLog";
 import type { ServiceSelection } from "../selection";
@@ -17,8 +18,7 @@ import { ServiceDots } from "./ServiceDots";
 import { serviceColor } from "./ServicesColumn";
 import styles from "./LogPane.module.css";
 
-/** Ctrl on Linux, ⌘ on macOS (where the app runs for development). */
-const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
+const FIND = shortcutLabel({ code: "KeyF" });
 
 /** The selected Service's latest Run, or every Service of the Project in one stream. */
 export function LogPane({ project, view, selection }: { project: Project; view: CoreView; selection: ServiceSelection }) {
@@ -102,7 +102,7 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
   );
 
   return (
-    <section className={styles.pane} aria-label={`${service?.name ?? "All services"} log`}>
+    <section className={styles.pane} aria-label={`${service?.name ?? "All services"} log`} data-column="detail">
       <LogHeader
         filter={filter}
         onFilter={setFilter}
@@ -163,7 +163,7 @@ function LogHeader({ children, filter, onFilter, filterField, onCopy, onClear }:
     <header className={styles.header}>
       {children}
       <span className={styles.spacer} />
-      <label className={styles.filter} title={`Show only lines containing this text (${MOD}F)`}>
+      <label className={styles.filter} title={`Show only lines containing this text (${FIND})`}>
         <FilterIcon size={11} />
         <input
           ref={filterField}
@@ -184,7 +184,7 @@ function LogHeader({ children, filter, onFilter, filterField, onCopy, onClear }:
             <ClearIcon size={12} />
           </button>
         ) : (
-          !isFocused && <span className="keyHint">{MOD}F</span>
+          !isFocused && <span className="keyHint">{FIND}</span>
         )}
       </label>
       <Menu

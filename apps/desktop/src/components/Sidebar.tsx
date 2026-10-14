@@ -8,6 +8,7 @@ import { showAlert, showSheet } from "../ui";
 import { ClearIcon, GearIcon, GlobeIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
+import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph, stateLabel } from "./StateGlyph";
 import styles from "./Sidebar.module.css";
 
@@ -27,7 +28,7 @@ export function Sidebar({ view, selection, onSelect }: Props) {
   const running = [...view.statuses.values()].filter((status) => isActive(status.state)).length;
 
   return (
-    <nav className={styles.sidebar} aria-label="Sidebar">
+    <nav className={styles.sidebar} aria-label="Sidebar" data-column="sidebar">
       <header className={styles.header}>
         <span className={styles.wordmark} aria-label="localhost">
           localhost<span className={styles.colon}>:</span>
@@ -83,6 +84,7 @@ export function Sidebar({ view, selection, onSelect }: Props) {
             key={project.id}
             project={project}
             view={view}
+            index={view.projects.indexOf(project)}
             isSelected={selection?.kind === "project" && selection.projectId === project.id}
             onSelect={() => onSelect({ kind: "project", projectId: project.id })}
           />
@@ -108,8 +110,9 @@ export function Sidebar({ view, selection, onSelect }: Props) {
   );
 }
 
-function ProjectRow(props: { project: Project; view: CoreView; isSelected: boolean; onSelect: () => void }) {
-  const { project, view, isSelected, onSelect } = props;
+type ProjectRowProps = { project: Project; view: CoreView; index: number; isSelected: boolean; onSelect: () => void };
+
+function ProjectRow({ project, view, index, isSelected, onSelect }: ProjectRowProps) {
   const state = view.projectStates.get(project.id) ?? null;
   const context = useContextMenu(`${project.name} actions`, () => projectMenuItems(project));
   return (
@@ -128,6 +131,7 @@ function ProjectRow(props: { project: Project; view: CoreView; isSelected: boole
           ★
         </span>
       )}
+      <ShortcutBadge kind="projects" index={index} />
       {context.menu}
     </li>
   );

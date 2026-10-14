@@ -119,3 +119,7 @@
 .addService:hover {
   color: var(--text);
 }
+
+.addServiceTitle {
+  flex: 1;
+}

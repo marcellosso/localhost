@@ -40,9 +40,12 @@ export type UiState = {
   /** The pids of Listeners being stopped. */
   stoppingListeners: ReadonlySet<number>;
   sheet: Sheet | null;
+  /** Whether the command palette (Ctrl+K) is open. */
+  isPaletteOpen: boolean;
 };
 
-let state: UiState = { alerts: [], progress: null, stoppingListeners: new Set(), sheet: null };
+const initialState: UiState = { alerts: [], progress: null, stoppingListeners: new Set(), sheet: null, isPaletteOpen: false };
+let state: UiState = initialState;
 const listeners = new Set<() => void>();
 
 function update(change: Partial<UiState>) {
@@ -91,6 +94,10 @@ export function closeSheet() {
   update({ sheet: null });
 }
 
+export function setPaletteOpen(isPaletteOpen: boolean) {
+  update({ isPaletteOpen });
+}
+
 export function setProgress(progress: string | null) {
   update({ progress });
 }
@@ -104,5 +111,5 @@ export function setStoppingListener(pid: number, isStopping: boolean) {
 
 /** For tests. */
 export function resetUi() {
-  state = { alerts: [], progress: null, stoppingListeners: new Set(), sheet: null };
+  state = initialState;
 }

@@ -454,6 +454,13 @@ async clearLogs(serviceIds: Id[]) : Promise<Result<null, CommandError>> {
 }
 },
 /**
+ * How well `query` matches each of `texts`, higher is better; `None` where
+ * some word of the query isn't found.
+ */
+async fuzzyScores(query: string, texts: string[]) : Promise<(number | null)[]> {
+    return await TAURI_INVOKE("fuzzy_scores", { query, texts });
+},
+/**
  * The run to measure, if this is a measurement.
  */
 async perfSettings() : Promise<PerfSettings | null> {
