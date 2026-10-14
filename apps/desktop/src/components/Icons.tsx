@@ -153,3 +153,79 @@ export const ChevronIcon = (props: Props) => (
     <path d="m6 3.5 4.5 4.5L6 12.5" />
   </Icon>
 );
+
+/** `lock.fill`: a Secret. */
+export const LockIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <rect x="3.3" y="7" width="9.4" height="6.8" rx="1.4" fill="currentColor" />
+    <path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7" />
+  </Icon>
+);
+
+/** `lock.open`: a plain variable that could be a Secret. */
+export const LockOpenIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <rect x="3.3" y="7" width="9.4" height="6.8" rx="1.4" />
+    <path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.5-.8" />
+  </Icon>
+);
+
+/** `eye`: reveal a Secret's value. */
+export const EyeIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <path d="M1.5 8S3.8 3.8 8 3.8 14.5 8 14.5 8 12.2 12.2 8 12.2 1.5 8 1.5 8Z" />
+    <circle cx="8" cy="8" r="2" />
+  </Icon>
+);
+
+/** `eye.slash`: hide it again. */
+export const EyeSlashIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <path d="M1.5 8S3.8 3.8 8 3.8 14.5 8 14.5 8 12.2 12.2 8 12.2 1.5 8 1.5 8Z" />
+    <circle cx="8" cy="8" r="2" />
+    <path d="m2.5 13.5 11-11" />
+  </Icon>
+);
+
+/** `minus.circle`: remove a row. */
+export const MinusCircleIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <circle cx="8" cy="8" r="6" />
+    <path d="M5.2 8h5.6" />
+  </Icon>
+);
+
+export const TrashIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.2}>
+    <path d="M2.8 4.3h10.4M6.3 4.3V2.8h3.4v1.5M4.2 4.3l.7 9h6.2l.7-9M6.8 6.6v4.6M9.2 6.6v4.6" />
+  </Icon>
+);
+
+/** `square.3.layers.3d`: the Environment. */
+export const LayersIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.2}>
+    <path d="M8 2 14 5 8 8 2 5Z" />
+    <path d="m2 8 6 3 6-3M2 11l6 3 6-3" />
+  </Icon>
+);
+
+/** `sparkle.magnifyingglass`: Detect Services. */
+export const DetectIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <circle cx="6.8" cy="6.8" r="4.6" />
+    <path d="m10.2 10.2 3.8 3.8M6.8 4.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6Z" />
+  </Icon>
+);
+
+/** `square.and.arrow.down`: Import Project. */
+export const ImportIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.3}>
+    <path d="M5.5 5.5H4a1.2 1.2 0 0 0-1.2 1.2v6.1A1.2 1.2 0 0 0 4 14h8a1.2 1.2 0 0 0 1.2-1.2V6.7A1.2 1.2 0 0 0 12 5.5h-1.5M8 1.8v8M5.3 7.3 8 10l2.7-2.7" />
+  </Icon>
+);
+
+export const CheckIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={2}>
+    <path d="m3.5 8.3 3 3 6-6.6" />
+  </Icon>
+);

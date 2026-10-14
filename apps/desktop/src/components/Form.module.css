@@ -1,0 +1,376 @@
+/* The editor sheets, after the macOS FormKit. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.2);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  max-height: min(640px, calc(100vh - 48px));
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 14px;
+}
+
+.icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--tint);
+  background: color-mix(in srgb, var(--tint) 15%, transparent);
+}
+
+.heading {
+  min-width: 0;
+}
+
+.heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.heading p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 0 24px 16px;
+  overflow-y: auto;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--separator);
+}
+
+.hint,
+.error {
+  flex: 1;
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.error {
+  color: var(--state-failed);
+  user-select: text;
+}
+
+.field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.label > span {
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.fieldHint {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* The box behind a field, with the accent focus ring. */
+.box {
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text);
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+
+.box:focus-within,
+.box:focus-visible,
+.input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+.input.mono,
+.commandLine {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.input::placeholder,
+.commandLine::placeholder {
+  color: var(--text-tertiary);
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.folderPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+.choose {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.command {
+  display: flex;
+  align-items: stretch;
+  height: 40px;
+  border-radius: 9px;
+  background: var(--surface-log);
+}
+
+.directory {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  max-width: 170px;
+  padding: 0 10px;
+  border: none;
+  border-right: 1px solid var(--separator);
+  border-radius: 9px 0 0 9px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.directoryPath {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+.down {
+  rotate: 90deg;
+}
+
+.prompt {
+  align-self: center;
+  padding: 0 8px 0 12px;
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.commandLine {
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px 0 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  user-select: text;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fill) 50%, transparent);
+}
+
+/* Rows of a card, separated by lines. */
+.cardRow + .cardRow {
+  border-top: 1px solid var(--separator);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--separator);
+  border-radius: 13px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--chip) 50%, transparent);
+  background: color-mix(in srgb, var(--chip) 15%, transparent);
+  font-weight: 600;
+}
+
+.chip:disabled {
+  opacity: 0.4;
+}
+
+.swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--chip);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.switchText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.switchTitle {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* A switch tinted with the accent while on, as in Settings. */
+.switch {
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background: var(--fill-strong);
+  transition: background 0.15s;
+}
+
+.switch span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  transition: translate 0.15s;
+}
+
+.switch[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.switch[aria-checked="true"] span {
+  translate: 14px 0;
+}
+
+.working {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 11.5px;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--fill-strong);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box,
+  .switch,
+  .switch span {
+    transition: none;
+  }
+
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}

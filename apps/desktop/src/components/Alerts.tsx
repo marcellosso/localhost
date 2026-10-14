@@ -7,6 +7,7 @@ import {
   stopOrphans,
 } from "../actions";
 import type { BlockedStart } from "../bindings";
+import { removeProject, removeService } from "../editors";
 import { type CoreView, findService } from "../core";
 import { processDescription } from "../listeners";
 import { formatList } from "../status";
@@ -162,6 +163,53 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
       );
     }
 
+    case "removeProject":
+    case "removeService": {
+      const name =
+        alert.kind === "removeProject"
+          ? view.projects.find((project) => project.id === alert.projectId)?.name
+          : (() => {
+              const found = findService(view, alert.serviceId);
+              return found?.project.services[found.index].name;
+            })();
+      const remove = alert.kind === "removeProject" ? () => removeProject(alert.projectId) : () => removeService(alert.serviceId);
+      return (
+        <Dialog
+          title={`Remove “${name ?? (alert.kind === "removeProject" ? "project" : "service")}”?`}
+          onCancel={close}
+          actions={
+            <>
+              <button className="button" onClick={close} data-autofocus>
+                Cancel
+              </button>
+              <button className="button destructive" onClick={then(remove)}>
+                Remove
+              </button>
+            </>
+          }
+        >
+          {removalMessage(alert).map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </Dialog>
+      );
+    }
+
+    case "importFailure":
+      return (
+        <Dialog
+          title={`“${alert.fileName}” can’t be imported`}
+          onCancel={close}
+          actions={
+            <button className="button accent" onClick={close} data-autofocus>
+              OK
+            </button>
+          }
+        >
+          <p>{alert.message}</p>
+        </Dialog>
+      );
+
     case "settings":
       return alert.forEditor ? (
         <ChooseEditorDialog onChosen={alert.forEditor} onClose={close} />
@@ -169,6 +217,17 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
         <SettingsDialog onClose={close} />
       );
   }
+}
+
+/** What removing deletes, and which Services stop depending on a removed one. */
+export function removalMessage(alert: Extract<Alert, { kind: "removeProject" | "removeService" }>): string[] {
+  const paragraphs = [
+    "Running services are stopped first. Their configuration is deleted; the project folder is not touched.",
+  ];
+  if (alert.kind === "removeService" && alert.dependents.length > 0) {
+    paragraphs.push(`${formatList(alert.dependents.map((name) => `“${name}”`))} will no longer depend on it.`);
+  }
+  return paragraphs;
 }
 
 /** Who holds the port, why it can't be stopped, and what starting elsewhere means. */

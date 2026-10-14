@@ -172,6 +172,246 @@ async openFolder(folder: Folder, app: FolderApp) : Promise<Result<null, CommandE
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * A Key derived from `name` that no other Project uses.
+ */
+async suggestedProjectKey(name: string, excluding: Id | null) : Promise<Result<Key, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("suggested_project_key", { name, excluding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A Key derived from `name` that no other Service of the Project uses.
+ */
+async suggestedServiceKey(projectId: Id, name: string, excluding: Id | null) : Promise<Result<Key, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("suggested_service_key", { projectId, name, excluding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A Key derived from a Suggestion's name; empty if it has no usable characters.
+ */
+async keyFromName(name: string) : Promise<string> {
+    return await TAURI_INVOKE("key_from_name", { name });
+},
+/**
+ * Adds a Project with the reviewed Suggestions as its first Services.
+ */
+async addProject(name: string, key: string, path: string, services: SuggestionEdit[]) : Promise<Result<Project, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_project", { name, key, path, services }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async editProject(projectId: Id, name: string, key: string, path: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("edit_project", { projectId, name, key, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setFavorite(projectId: Id, isFavorite: boolean) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_favorite", { projectId, isFavorite }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops the Project's Services, then removes it and their logs. The
+ * folder is not touched.
+ */
+async removeProject(projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_project", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addService(projectId: Id, service: ServiceEdit) : Promise<Result<Service, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_service", { projectId, service }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async editService(serviceId: Id, service: ServiceEdit) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("edit_service", { serviceId, service }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Adds the reviewed Suggestions of Detect Services in one save.
+ */
+async addServices(projectId: Id, services: SuggestionEdit[]) : Promise<Result<Service[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_services", { projectId, services }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether the command line mentions `$PORT`, so a moved port reaches it.
+ */
+async commandLineUsesPort(commandLine: string) : Promise<boolean> {
+    return await TAURI_INVOKE("command_line_uses_port", { commandLine });
+},
+/**
+ * Stops the Service, then removes it and its logs.
+ */
+async removeService(serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_service", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The Dependencies the Service can't have, and who depends on it.
+ */
+async serviceRelations(serviceId: Id) : Promise<Result<ServiceRelations, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("service_relations", { serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Suggestions for a folder being added as a Project.
+ */
+async scanFolder(path: string) : Promise<Result<ServiceSuggestion[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("scan_folder", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Suggestions for an existing Project, without what its Services cover.
+ */
+async scanProject(projectId: Id) : Promise<Result<ServiceSuggestion[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("scan_project", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Saves the Environment editor: the Project's variables, its Profiles
+ * (added, edited, removed), then which one is active (an index into
+ * `profiles`, or none).
+ */
+async saveEnvironment(projectId: Id, variables: VariableEdit[], profiles: ProfileEdit[], active: number | null) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_environment", { projectId, variables, profiles, active }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setActiveProfile(projectId: Id, profileId: Id | null) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_active_profile", { projectId, profileId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A stored Secret's value, to reveal it; `None` if it has none.
+ */
+async secretValue(name: string, layer: VariableLayer) : Promise<Result<string | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("secret_value", { name, layer }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Reads a Project file for the import's review step.
+ */
+async readProjectFile(file: string) : Promise<Result<ImportPreview, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("read_project_file", { file }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Imports the Project file into `folder`. On Replace, Services the file no
+ * longer has are stopped first, and their logs removed after.
+ */
+async importProject(file: string, folder: string, choice: ImportChoice | null) : Promise<Result<Project, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_project", { file, folder, choice }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Writes the Project's file to `file`.
+ */
+async exportProject(projectId: Id, file: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_project", { projectId, file }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A folder, starting in `start` when it exists.
+ */
+async chooseFolder(start: string | null) : Promise<string | null> {
+    return await TAURI_INVOKE("choose_folder", { start });
+},
+/**
+ * A folder for a Service's working directory, relative to `project_path`,
+ * e.g. `web` or `../shared`.
+ */
+async chooseWorkingDirectory(projectPath: string) : Promise<string | null> {
+    return await TAURI_INVOKE("choose_working_directory", { projectPath });
+},
+/**
+ * A Project file to import.
+ */
+async chooseProjectFile() : Promise<string | null> {
+    return await TAURI_INVOKE("choose_project_file");
+},
+/**
+ * Where to save the Project's file, named after its Key.
+ */
+async chooseExportFile(projectId: Id) : Promise<Result<string | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("choose_export_file", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async settings() : Promise<Settings> {
     return await TAURI_INVOKE("settings");
 },
@@ -281,6 +521,7 @@ export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } |
  * Sent after the event that changed it.
  */
 { kind: "projectState"; event: ProjectState }
+export type Cycle = { serviceId: Id; message: string }
 /**
  * A named set of environment variables for a Project (e.g. Development,
  * Testing) applying to all its Services; at most one is active at a time.
@@ -306,6 +547,45 @@ export type FolderApp = "fileManager" | "terminal" | "editor"
  * and in the Secret accounts (`<ID>/<NAME>`), so existing data keeps working.
  */
 export type Id = string
+/**
+ * What to do when the imported Key is taken.
+ */
+export type ImportChoice = "keepBoth" | "replace"
+export type ImportClash = { projectName: string; 
+/**
+ * The Key "Keep both" imports it under.
+ */
+freeKey: Key; 
+/**
+ * What Replace removes, e.g. "Web (running, stopped first)"; empty if nothing.
+ */
+removed: string[] }
+/**
+ * The review step of an import: what the file brings, read again on Import.
+ */
+export type ImportPreview = { fileName: string; name: string; key: Key; 
+/**
+ * The folder the file names; it may not exist here.
+ */
+path: string; folderExists: boolean; services: ImportedService[]; 
+/**
+ * e.g. "2 project variables · profiles Development (active), Testing".
+ */
+environment: string | null; 
+/**
+ * Every Secret the file names, which has no value until it is set.
+ */
+secrets: ImportedSecret[]; 
+/**
+ * The Project already using the file's Key, if any.
+ */
+clash: ImportClash | null }
+export type ImportedSecret = { name: string; 
+/**
+ * "project", the Service's name, or "profile Testing".
+ */
+owner: string }
+export type ImportedService = { name: string; key: Key; workingDirectory: string; commandLine: string; port: number | null; isExcludedFromStartAll: boolean; dependencies: Key[] }
 /**
  * The short, human-readable, stable handle of a Project or Service
  * (e.g. `my-saas`, `api`).
@@ -545,6 +825,10 @@ export type PortChangeReason =
  */
 export type ProcessStartTime = { seconds: number; microseconds: number }
 /**
+ * One Environment Profile as edited; `profile_id` is `None` for a new one.
+ */
+export type ProfileEdit = { profileId: Id | null; name: string; variables: VariableEdit[] }
+/**
  * One local development project, rooted at a folder on the developer's
  * machine, grouping the Services needed to work on it.
  */
@@ -689,6 +973,31 @@ url?: string | null;
  */
 portCanChange?: boolean }
 /**
+ * The Service editor's fields.
+ */
+export type ServiceEdit = { name: string; key: string; workingDirectory: string; commandLine: string; 
+/**
+ * As typed; empty for none.
+ */
+port: string; 
+/**
+ * Empty for none.
+ */
+url: string; portCanChange: boolean; variables: VariableEdit[]; dependencies: Id[]; isExcludedFromStartAll: boolean }
+/**
+ * What a Service's editor needs to know about the others of its Project.
+ */
+export type ServiceRelations = { 
+/**
+ * The other Services it can't depend on, with the cycle that would make,
+ * e.g. "api → worker → api would be a dependency cycle."
+ */
+cycles: Cycle[]; 
+/**
+ * The names of the Services that depend on it.
+ */
+dependents: string[] }
+/**
  * The single, unambiguous status of a Service (see `GLOSSARY.md`).
  */
 export type ServiceState = 
@@ -716,6 +1025,37 @@ export type ServiceState =
  * The Run ended on its own unsuccessfully, or could not be launched at all.
  */
 "failed"
+/**
+ * A Service that scanning a Project's folder suggests. It is only a
+ * proposal: the user reviews and edits it before anything is saved, and an
+ * unchecked suggestion is never added.
+ * 
+ * Suggestions are plain command lines like any Service. Detectors only shape
+ * them, so a suggested Service is never inherently "a Node service".
+ */
+export type ServiceSuggestion = { name: string; key: Key; 
+/**
+ * Relative to the Project's path; `.` is the Project root.
+ */
+workingDirectory: string; commandLine: string; port: number | null; 
+/**
+ * Off when the command line can't take another port (e.g. a port fixed
+ * in a Compose file or written into the script).
+ */
+portCanChange: boolean; 
+/**
+ * Whether the review step checks it by default.
+ */
+isRecommended: boolean; 
+/**
+ * The file the suggestion comes from, relative to the Project's path,
+ * e.g. `apps/web/package.json`.
+ */
+foundIn: string; 
+/**
+ * What in that file it comes from, e.g. `"dev": vite`.
+ */
+detail: string }
 export type Settings = { 
 /**
  * The command that opens a folder in the user's editor, e.g. `code`.
@@ -759,6 +1099,14 @@ awaitedDependencies: Id[];
  */
 isRestartNeeded: boolean }) & { failureMessage: string | null; urlToOpen: string | null }
 /**
+ * A reviewed Suggestion to add, as edited.
+ */
+export type SuggestionEdit = { name: string; key: string; workingDirectory: string; commandLine: string; 
+/**
+ * As typed; empty for none.
+ */
+port: string; portCanChange: boolean }
+/**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.
  */
@@ -775,6 +1123,23 @@ export type TextStyle = { foreground: AnsiColor | null; background: AnsiColor | 
  * The kind of value a Project file field takes.
  */
 export type ValueKind = "text" | "number" | "boolean" | "list" | "mapping"
+/**
+ * One variable row as the user left it.
+ */
+export type VariableEdit = { name: string; value: VariableEditValue }
+export type VariableEditValue = { kind: "plain"; value: string } | 
+/**
+ * A Secret with a value typed (or revealed) in the editor.
+ */
+{ kind: "secret"; value: string } | 
+/**
+ * A stored Secret whose value wasn't touched, possibly renamed.
+ */
+{ kind: "storedSecret"; previousName: string }
+/**
+ * Which layer of a Run's environment variables belong to.
+ */
+export type VariableLayer = { kind: "project"; id: Id } | { kind: "service"; id: Id } | { kind: "profile"; id: Id }
 /**
  * The variables of one layer of a Run's environment (a Project, a Service,
  * or an Environment Profile): plain values, plus the names of its Secrets,

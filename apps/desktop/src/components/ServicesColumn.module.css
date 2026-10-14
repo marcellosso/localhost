@@ -1,12 +1,19 @@
 .column {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
   background: var(--surface-column);
   border-right: 1px solid var(--separator);
 }
 
+.column > * {
+  flex: 1;
+}
+
 .list {
+  min-height: 0;
+  overflow-y: auto;
   margin: 0;
   padding: 10px 10px 16px;
   list-style: none;
@@ -93,4 +100,22 @@
   margin-top: 5px;
   padding-left: 23px;
   font-size: 11px;
+}
+
+/* Below the list, always visible, as macOS's safe-area inset. */
+.column > .addService {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px 10px 19px;
+  border: none;
+  border-top: 1px solid var(--separator);
+  background: transparent;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.addService:hover {
+  color: var(--text);
 }

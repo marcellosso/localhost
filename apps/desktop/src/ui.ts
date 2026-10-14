@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { BlockedStart, ListenerDetails } from "./bindings";
+import type { BlockedStart, Id, ImportPreview, ListenerDetails } from "./bindings";
 
 /** A question or report over the main window. They are asked one at a time, in order. */
 export type Alert =
@@ -14,7 +14,23 @@ export type Alert =
   /** At launch: Services of an earlier session still running. */
   | { kind: "orphans"; orphans: string[] }
   /** Settings; `forEditor` when Open in Editor needs one picked first, then retried. */
-  | { kind: "settings"; forEditor?: () => void };
+  | { kind: "settings"; forEditor?: () => void }
+  /** Removing a Project or Service, which stops it first. */
+  | { kind: "removeProject"; projectId: Id }
+  | { kind: "removeService"; serviceId: Id; dependents: string[] }
+  /** A Project file that can't be imported, and why. */
+  | { kind: "importFailure"; fileName: string; message: string };
+
+/** An editor over the main window, one at a time. */
+export type Sheet =
+  | { kind: "addProject" }
+  | { kind: "editProject"; projectId: Id }
+  | { kind: "addService"; projectId: Id }
+  | { kind: "editService"; serviceId: Id }
+  | { kind: "detectServices"; projectId: Id }
+  | { kind: "environment"; projectId: Id }
+  /** The review step of an import, before anything is saved. */
+  | { kind: "importProject"; file: string; preview: ImportPreview };
 
 /** The UI's own state, outside the core. */
 export type UiState = {
@@ -23,9 +39,10 @@ export type UiState = {
   progress: string | null;
   /** The pids of Listeners being stopped. */
   stoppingListeners: ReadonlySet<number>;
+  sheet: Sheet | null;
 };
 
-let state: UiState = { alerts: [], progress: null, stoppingListeners: new Set() };
+let state: UiState = { alerts: [], progress: null, stoppingListeners: new Set(), sheet: null };
 const listeners = new Set<() => void>();
 
 function update(change: Partial<UiState>) {
@@ -66,6 +83,14 @@ export function dismissAlert(alert: Alert) {
   update({ alerts: state.alerts.filter((shown) => shown !== alert) });
 }
 
+export function showSheet(sheet: Sheet) {
+  update({ sheet });
+}
+
+export function closeSheet() {
+  update({ sheet: null });
+}
+
 export function setProgress(progress: string | null) {
   update({ progress });
 }
@@ -79,5 +104,5 @@ export function setStoppingListener(pid: number, isStopping: boolean) {
 
 /** For tests. */
 export function resetUi() {
-  state = { alerts: [], progress: null, stoppingListeners: new Set() };
+  state = { alerts: [], progress: null, stoppingListeners: new Set(), sheet: null };
 }

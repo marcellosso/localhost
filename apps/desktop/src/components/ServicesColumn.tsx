@@ -1,11 +1,13 @@
 import type { CSSProperties } from "react";
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "../actions";
 import type { Folder, Project, Service, StatusView } from "../bindings";
+import { exportProject, requestRemoveService, setActiveProfile, setFavorite } from "../editors";
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
 import { isActive, isManual, isWarning, rowSummary, rowSummaryHelp } from "../status";
+import { showAlert, showSheet } from "../ui";
 import { EmptyState } from "./EmptyState";
-import { ArrowUpRightIcon, PlayIcon, StopIcon, TerminalIcon } from "./Icons";
+import { ArrowUpRightIcon, LayersIcon, PlayIcon, PlusIcon, StopIcon, TerminalIcon } from "./Icons";
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
 import { StateGlyph, stateLabel } from "./StateGlyph";
@@ -27,7 +29,14 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
           icon={<TerminalIcon size={40} />}
           title="No Services"
           description="A service is a command that runs in this project, like “pnpm dev”."
-        />
+        >
+          <button className="button accent" onClick={() => showSheet({ kind: "detectServices", projectId: project.id })}>
+            Detect Services…
+          </button>
+          <button className="button" onClick={() => showSheet({ kind: "addService", projectId: project.id })}>
+            Add Service…
+          </button>
+        </EmptyState>
       </section>
     );
   }
@@ -66,15 +75,23 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
           />
         ))}
       </ul>
+      <button
+        className={`${styles.addService} secondary`}
+        onClick={() => showSheet({ kind: "addService", projectId: project.id })}
+      >
+        <PlusIcon size={11} />
+        Add Service
+      </button>
     </section>
   );
 }
 
-/** The selected Project's toolbar actions: Start All, Stop All, and the rest in `⋯`. */
+/** The selected Project's toolbar actions: its Environment Profile once it has one, Start All, Stop All, and the rest in `⋯`. */
 export function ProjectActions({ project, view }: { project: Project; view: CoreView }) {
   const anyActive = project.services.some((service) => isActive(serviceStatus(view, service.id).state));
   return (
     <>
+      {(project.profiles ?? []).length > 0 && <ProfileMenu project={project} />}
       <button
         className="button accent"
         disabled={project.services.length === 0}
@@ -88,9 +105,58 @@ export function ProjectActions({ project, view }: { project: Project; view: Core
         <StopIcon size={11} />
         Stop All
       </button>
-      <Menu label="More actions for this project" items={folderMenuItems({ kind: "project", projectId: project.id })} />
+      <Menu label="More actions for this project" items={projectMenuItems(project, true)} />
     </>
   );
+}
+
+/** Switches the active Environment Profile; opens the Environment editor. */
+function ProfileMenu({ project }: { project: Project }) {
+  const profiles = project.profiles ?? [];
+  const active = profiles.find((profile) => profile.id === project.activeProfileID);
+  return (
+    <Menu
+      label="Environment profile"
+      button={{
+        className: "button",
+        content: (
+          <>
+            <LayersIcon size={12} />
+            {active?.name ?? "No Profile"}
+          </>
+        ),
+      }}
+      items={[
+        { label: "No Profile", isChecked: !active, onSelect: () => void setActiveProfile(project.id, null) },
+        ...profiles.map((profile) => ({
+          label: profile.name,
+          isChecked: profile.id === active?.id,
+          onSelect: () => void setActiveProfile(project.id, profile.id),
+        })),
+        "separator",
+        { label: "Edit Environment…", onSelect: () => showSheet({ kind: "environment", projectId: project.id }) },
+      ]}
+    />
+  );
+}
+
+/** A Project's actions, in the toolbar's `⋯` (with Detect Services…) and the sidebar's context menu. */
+export function projectMenuItems(project: Project, withDetect = false): MenuItem[] {
+  const projectId = project.id;
+  return [
+    { label: "Edit Project…", onSelect: () => showSheet({ kind: "editProject", projectId }) },
+    { label: "Edit Environment…", onSelect: () => showSheet({ kind: "environment", projectId }) },
+    ...(withDetect ? [{ label: "Detect Services…", onSelect: () => showSheet({ kind: "detectServices", projectId }) }] : []),
+    {
+      label: project.isFavorite ? "Unfavorite" : "Favorite",
+      onSelect: () => void setFavorite(project, !project.isFavorite),
+    },
+    { label: "Export Project…", onSelect: () => void exportProject(projectId) },
+    "separator",
+    ...folderMenuItems({ kind: "project", projectId }),
+    "separator",
+    { label: "Remove Project…", isDestructive: true, onSelect: () => showAlert({ kind: "removeProject", projectId }) },
+  ];
 }
 
 type RowProps = {
@@ -109,10 +175,15 @@ function ServiceRow({ project, service, status, index, isSelected, onSelect }: R
   const port = isActive(state) ? (status.run?.port ?? service.port) : service.port;
   const summary = rowSummary(project, service, status);
   const summaryClass = state === "failed" ? styles.failed : isWarning(status) ? styles.warning : "secondary";
+  const edit = () => showSheet({ kind: "editService", serviceId: service.id });
   const context = useContextMenu(`${service.name} actions`, () => [
     ...stateMenuItems(service, status),
     "separator",
+    { label: "Edit Service…", onSelect: edit },
+    "separator",
     ...folderMenuItems({ kind: "service", serviceId: service.id }),
+    "separator",
+    { label: "Remove Service…", isDestructive: true, onSelect: () => void requestRemoveService(service.id) },
   ]);
   return (
     <li
@@ -121,6 +192,7 @@ function ServiceRow({ project, service, status, index, isSelected, onSelect }: R
       aria-selected={isSelected}
       aria-label={`${service.name}, ${summary.startsWith(stateLabel(state)) ? summary : `${stateLabel(state)}, ${summary}`}`}
       onClick={onSelect}
+      onDoubleClick={edit}
       onContextMenu={context.onContextMenu}
       style={{ "--service": serviceColor(index) } as CSSProperties}
     >
@@ -179,6 +251,13 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
     <div className={styles.actions}>
       <button className="button compact prominent" onClick={act(() => start(service.id))}>
         Start
+      </button>
+      <button
+        className="button compact"
+        title="Edit Service"
+        onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id }))}
+      >
+        Edit…
       </button>
     </div>
   );

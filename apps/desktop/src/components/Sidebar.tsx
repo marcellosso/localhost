@@ -2,9 +2,12 @@ import { useState } from "react";
 import type { Project } from "../bindings";
 import type { CoreView } from "../core";
 import type { SidebarSelection } from "../selection";
+import { importProject } from "../editors";
 import { isActive } from "../status";
-import { showAlert } from "../ui";
-import { ClearIcon, GearIcon, GlobeIcon, SearchIcon } from "./Icons";
+import { showAlert, showSheet } from "../ui";
+import { ClearIcon, GearIcon, GlobeIcon, PlusIcon, SearchIcon } from "./Icons";
+import { Menu, useContextMenu } from "./Menu";
+import { projectMenuItems } from "./ServicesColumn";
 import { StateGlyph, stateLabel } from "./StateGlyph";
 import styles from "./Sidebar.module.css";
 
@@ -29,27 +32,37 @@ export function Sidebar({ view, selection, onSelect }: Props) {
         <span className={styles.wordmark} aria-label="localhost">
           localhost<span className={styles.colon}>:</span>
         </span>
-        <label className={styles.search}>
-          <SearchIcon size={12} />
-          <input
-            type="search"
-            placeholder="Search projects"
-            aria-label="Search projects"
-            value={search}
-            spellCheck={false}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setSearch("");
-              // ↩ opens the first match.
-              if (event.key === "Enter" && projects[0]) onSelect({ kind: "project", projectId: projects[0].id });
-            }}
+        <div className={styles.searchRow}>
+          <label className={styles.search}>
+            <SearchIcon size={12} />
+            <input
+              type="search"
+              placeholder="Search projects"
+              aria-label="Search projects"
+              value={search}
+              spellCheck={false}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setSearch("");
+                // ↩ opens the first match.
+                if (event.key === "Enter" && projects[0]) onSelect({ kind: "project", projectId: projects[0].id });
+              }}
+            />
+            {search && (
+              <button className={styles.clear} aria-label="Clear Search" onClick={() => setSearch("")}>
+                <ClearIcon size={13} />
+              </button>
+            )}
+          </label>
+          <Menu
+            label="Add Project"
+            button={{ className: "iconButton", content: <PlusIcon size={14} /> }}
+            items={[
+              { label: "New Project…", onSelect: () => showSheet({ kind: "addProject" }) },
+              { label: "Import Project…", onSelect: () => void importProject() },
+            ]}
           />
-          {search && (
-            <button className={styles.clear} aria-label="Clear Search" onClick={() => setSearch("")}>
-              <ClearIcon size={13} />
-            </button>
-          )}
-        </label>
+        </div>
       </header>
       <ul className={styles.list} role="listbox" aria-label="Projects and Ports" tabIndex={0}>
         <li
@@ -98,6 +111,7 @@ export function Sidebar({ view, selection, onSelect }: Props) {
 function ProjectRow(props: { project: Project; view: CoreView; isSelected: boolean; onSelect: () => void }) {
   const { project, view, isSelected, onSelect } = props;
   const state = view.projectStates.get(project.id) ?? null;
+  const context = useContextMenu(`${project.name} actions`, () => projectMenuItems(project));
   return (
     <li
       className={`${styles.row} selectable`}
@@ -105,6 +119,7 @@ function ProjectRow(props: { project: Project; view: CoreView; isSelected: boole
       aria-selected={isSelected}
       aria-label={`${project.name}${project.isFavorite ? ", favourite" : ""}, ${stateLabel(state)}`}
       onClick={onSelect}
+      onContextMenu={context.onContextMenu}
     >
       <StateGlyph state={state} />
       <span className={styles.name}>{project.name}</span>
@@ -113,6 +128,7 @@ function ProjectRow(props: { project: Project; view: CoreView; isSelected: boole
           ★
         </span>
       )}
+      {context.menu}
     </li>
   );
 }
