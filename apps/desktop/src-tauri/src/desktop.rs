@@ -16,8 +16,8 @@ use serde::Deserialize;
 use specta::Type;
 use tokio::process::Command;
 
-use crate::AppState;
 use crate::bridge::{CommandError, CommandResult};
+use crate::{AppState, Core};
 
 /// A folder an action opens.
 #[derive(Clone, Copy, Debug, Deserialize, Type)]
@@ -48,7 +48,11 @@ const EDITOR_CHECK: Duration = Duration::from_secs(3);
 #[tauri::command]
 #[specta::specta]
 pub fn open_service_url(state: tauri::State<'_, AppState>, service_id: Id) -> CommandResult {
-    let core = state.core()?;
+    open_url_of(state.core()?, service_id)
+}
+
+/// Open in Browser, for the window and the tray alike.
+pub fn open_url_of(core: &Core, service_id: Id) -> CommandResult {
     let (_, service) = core.library.service(service_id)?;
     let run = core.services.status(service_id).run;
     let Some(url) = service.url_to_open(run.as_ref()) else { return Ok(()) };

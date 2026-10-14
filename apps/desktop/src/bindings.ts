@@ -471,12 +471,29 @@ async perfSettings() : Promise<PerfSettings | null> {
  */
 async finishPerfRun(report: PerfReport) : Promise<void> {
     await TAURI_INVOKE("finish_perf_run", { report });
+},
+/**
+ * Ctrl+Q in the window.
+ */
+async quitApp() : Promise<void> {
+    await TAURI_INVOKE("quit_app");
+},
+/**
+ * Where the tray asked a new window to go, once.
+ */
+async takeReveal() : Promise<Reveal | null> {
+    return await TAURI_INVOKE("take_reveal");
 }
 }
 
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+reveal: Reveal
+}>({
+reveal: "reveal"
+})
 
 /** user-defined constants **/
 
@@ -893,6 +910,14 @@ export type ProjectLibraryEvent = { kind: "projectAdded"; project: Project; orig
  * for a Project without Services.
  */
 export type ProjectState = { projectId: Id; state: ServiceState | null }
+/**
+ * Where the window should go when the tray opens it.
+ */
+export type Reveal = 
+/**
+ * A Project, and one of its Services if given.
+ */
+{ kind: "project"; projectId: Id; serviceId: Id | null } | { kind: "ports" }
 /**
  * One execution of a Service, from launch until its process tree has fully ended.
  */

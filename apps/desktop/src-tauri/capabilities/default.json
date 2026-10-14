@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "The main window: the app's own commands and events.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-set-theme"]
+  "permissions": ["core:default", "core:window:allow-set-theme", "core:window:allow-close"]
 }

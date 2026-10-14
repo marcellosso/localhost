@@ -4,12 +4,14 @@
 //! never words errors or builds URLs itself.
 
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use localhost_core::{
     Id, LocalhostError, Project, ProjectLibraryEvent, Service, ServiceEvent, ServiceState, ServiceStatus,
 };
 use serde::Serialize;
 use specta::Type;
+use tauri::async_runtime::JoinHandle;
 use tauri::ipc::Channel;
 
 use crate::AppState;
@@ -85,6 +87,19 @@ pub enum CoreEvent {
     ProjectState(ProjectState),
 }
 
+/// The windows' subscriptions, stopped once the window is gone: a send to
+/// a closed window doesn't always fail.
+#[derive(Default)]
+pub struct Subscriptions(Mutex<Vec<JoinHandle<()>>>);
+
+impl Subscriptions {
+    pub fn close_all(&self) {
+        for task in self.0.lock().unwrap().drain(..) {
+            task.abort();
+        }
+    }
+}
+
 /// The snapshot, then every change over `events` until the window goes away.
 #[tauri::command]
 #[specta::specta]
@@ -101,7 +116,7 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
         project_states,
     };
 
-    tauri::async_runtime::spawn(async move {
+    let task = tauri::async_runtime::spawn(async move {
         loop {
             let (mut sent, project_id) = tokio::select! {
                 Some(event) = library_events.recv() => {
@@ -127,6 +142,7 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
             }
         }
     });
+    state.subscriptions.0.lock().unwrap().push(task);
     Ok(snapshot)
 }
 

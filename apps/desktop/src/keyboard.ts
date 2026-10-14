@@ -63,6 +63,8 @@ export const SHORTCUTS = {
   previousService: { code: "BracketLeft" },
   nextService: { code: "BracketRight" },
   settings: { code: "Comma" },
+  closeWindow: { code: "KeyW" },
+  quit: { code: "KeyQ" },
 } satisfies Record<string, Shortcut>;
 
 /** Ctrl+1–9 selects a Project; Ctrl+Alt+1–9 a Service of the selected one. */

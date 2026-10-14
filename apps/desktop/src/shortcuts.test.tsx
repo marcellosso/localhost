@@ -14,8 +14,11 @@ const commands = vi.hoisted(() => ({
   stopService: vi.fn(),
   startAll: vi.fn(),
   fuzzyScores: vi.fn(),
+  quitApp: vi.fn(),
 }));
 vi.mock("./bindings", () => ({ commands }));
+const closeWindow = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ close: closeWindow }) }));
 
 const web = service("Web", 3000);
 const api = service("API");
@@ -92,6 +95,15 @@ describe("window shortcuts", () => {
     act(() => showSheet({ kind: "addProject" }));
     press({ code: "KeyR", key: "R", ctrlKey: true, shiftKey: true });
     expect(commands.startAll).not.toHaveBeenCalled();
+  });
+
+  it("quits with Ctrl+Q and closes the window with Ctrl+W, even under a sheet", () => {
+    render(<Window initial={{ kind: "all" }} />);
+    act(() => showSheet({ kind: "addProject" }));
+    press({ code: "KeyQ", key: "q", ctrlKey: true });
+    expect(commands.quitApp).toHaveBeenCalled();
+    press({ code: "KeyW", key: "w", ctrlKey: true });
+    expect(closeWindow).toHaveBeenCalled();
   });
 
   it("moves through the list with ↑/↓ and across the columns with ←/→ and Escape", () => {

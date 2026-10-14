@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { runLaunchChecks } from "./actions";
+import { commands, events, type Reveal } from "./bindings";
 import { Alerts } from "./components/Alerts";
 import { CommandPalette } from "./components/CommandPalette";
 import { EmptyState } from "./components/EmptyState";
@@ -82,6 +83,7 @@ function MainWindow({ view }: { view: CoreView }) {
     [],
   );
   useWindowShortcuts({ view, selected, selection, setSelection, navigator });
+  useReveal(navigator);
 
   return (
     <div className="app">
@@ -132,4 +134,18 @@ function MainWindow({ view }: { view: CoreView }) {
       <Alerts view={view} />
     </div>
   );
+}
+
+/** Goes where the tray asks: once as the window opens, then on each reveal while it is open. */
+function useReveal(navigator: Navigator) {
+  useEffect(() => {
+    const go = (reveal: Reveal | null) => {
+      if (reveal?.kind === "ports") navigator.selectPorts();
+      else if (reveal?.serviceId) navigator.selectService(reveal.projectId, reveal.serviceId);
+      else if (reveal) navigator.selectProject(reveal.projectId);
+    };
+    void commands.takeReveal().then(go);
+    const unlisten = events.reveal.listen((event) => go(event.payload));
+    return () => void unlisten.then((stop) => stop());
+  }, [navigator]);
 }
