@@ -7,12 +7,14 @@ mod desktop;
 mod dialogs;
 mod editors;
 mod launch;
+mod lifecycle;
 mod listeners;
 mod logs;
 mod palette;
 mod perf;
 mod services;
 mod settings;
+mod tray;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -21,8 +23,8 @@ use localhost_core::{
     LocalhostError, LogStore, Origin, ProjectLibrary, RunRegistry, SecretStore, ServiceManager, ServiceManagerOptions,
     SystemSecretStore, default_storage_root,
 };
-use tauri::{Manager, RunEvent};
-use tauri_specta::collect_commands;
+use tauri::{Manager, RunEvent, WindowEvent};
+use tauri_specta::{collect_commands, collect_events};
 
 /// The core objects every window shares.
 pub struct Core {
@@ -50,10 +52,13 @@ impl Core {
 }
 
 /// What the commands share: the core, or why it couldn't be opened (the UI
-/// says so), the open log streams, the launch questions and the settings.
+/// says so), the open log streams, the launch questions, the settings and
+/// the app's lifetime.
 pub struct AppState {
     core: Result<Core, LocalhostError>,
     logs: logs::LogStreams,
+    subscriptions: bridge::Subscriptions,
+    lifecycle: lifecycle::Lifecycle,
     launch: Mutex<launch::Launch>,
     settings: settings::SettingsStore,
     perf: Option<perf::PerfSettings>,
@@ -79,63 +84,69 @@ fn storage_root() -> PathBuf {
 /// The commands and events the UI may use; also what `bindings.ts` is
 /// generated from.
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
-    tauri_specta::Builder::new().commands(collect_commands![
-        bridge::subscribe,
-        services::start_service,
-        services::stop_service,
-        services::restart_service,
-        services::stop_holder_and_start,
-        services::start_all,
-        services::stop_all,
-        listeners::listeners,
-        listeners::stop_listener,
-        launch::launch_checks,
-        launch::dismiss_unreadable_files,
-        launch::stop_orphans,
-        launch::leave_orphans,
-        desktop::open_service_url,
-        desktop::open_url,
-        desktop::open_folder,
-        editors::suggested_project_key,
-        editors::suggested_service_key,
-        editors::key_from_name,
-        editors::add_project,
-        editors::edit_project,
-        editors::set_favorite,
-        editors::remove_project,
-        editors::add_service,
-        editors::edit_service,
-        editors::add_services,
-        editors::command_line_uses_port,
-        editors::remove_service,
-        editors::service_relations,
-        editors::scan_folder,
-        editors::scan_project,
-        editors::save_environment,
-        editors::set_active_profile,
-        editors::secret_value,
-        editors::read_project_file,
-        editors::import_project,
-        editors::export_project,
-        dialogs::choose_folder,
-        dialogs::choose_working_directory,
-        dialogs::choose_project_file,
-        dialogs::choose_export_file,
-        settings::settings,
-        settings::save_settings,
-        logs::open_log,
-        logs::close_log,
-        logs::clear_logs,
-        palette::fuzzy_scores,
-        perf::perf_settings,
-        perf::finish_perf_run,
-    ])
+    tauri_specta::Builder::new()
+        .commands(collect_commands![
+            bridge::subscribe,
+            services::start_service,
+            services::stop_service,
+            services::restart_service,
+            services::stop_holder_and_start,
+            services::start_all,
+            services::stop_all,
+            listeners::listeners,
+            listeners::stop_listener,
+            launch::launch_checks,
+            launch::dismiss_unreadable_files,
+            launch::stop_orphans,
+            launch::leave_orphans,
+            desktop::open_service_url,
+            desktop::open_url,
+            desktop::open_folder,
+            editors::suggested_project_key,
+            editors::suggested_service_key,
+            editors::key_from_name,
+            editors::add_project,
+            editors::edit_project,
+            editors::set_favorite,
+            editors::remove_project,
+            editors::add_service,
+            editors::edit_service,
+            editors::add_services,
+            editors::command_line_uses_port,
+            editors::remove_service,
+            editors::service_relations,
+            editors::scan_folder,
+            editors::scan_project,
+            editors::save_environment,
+            editors::set_active_profile,
+            editors::secret_value,
+            editors::read_project_file,
+            editors::import_project,
+            editors::export_project,
+            dialogs::choose_folder,
+            dialogs::choose_working_directory,
+            dialogs::choose_project_file,
+            dialogs::choose_export_file,
+            settings::settings,
+            settings::save_settings,
+            logs::open_log,
+            logs::close_log,
+            logs::clear_logs,
+            palette::fuzzy_scores,
+            perf::perf_settings,
+            perf::finish_perf_run,
+            lifecycle::quit_app,
+            lifecycle::take_reveal,
+        ])
+        .events(collect_events![lifecycle::Reveal])
 }
 
 pub fn run() {
     let builder = specta_builder();
     let perf = perf::PerfSettings::from_environment();
     tauri::Builder::default()
+        // First, so a second launch only brings the window forward.
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| lifecycle::show_window(app, None)))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
@@ -160,18 +171,32 @@ pub fn run() {
             app.manage(AppState {
                 core,
                 logs: logs::LogStreams::default(),
+                subscriptions: bridge::Subscriptions::default(),
+                lifecycle: lifecycle::Lifecycle::default(),
                 launch: launch::Launch::new(orphans),
                 settings,
                 perf,
             });
+            tray::install(app)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // A closed window's streams have no one to send to.
+            if let WindowEvent::Destroyed = event {
+                let state = window.state::<AppState>();
+                state.subscriptions.close_all();
+                state.logs.close_all();
+            }
         })
         .build(tauri::generate_context!())
         .expect("error while building localhost")
-        .run(|app, event| {
-            // Quitting stops every Service, as in the macOS app. Asking first
-            // comes with the tray.
-            if let RunEvent::Exit = event {
+        .run(|app, event| match event {
+            // Closing the window keeps the app running; quitting asks first (`lifecycle`).
+            RunEvent::ExitRequested { code, api, .. } if !lifecycle::should_exit(app, code) => api.prevent_exit(),
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { has_visible_windows: false, .. } => lifecycle::show_window(app, None),
+            RunEvent::Exit => {
+                // Quitting has stopped every Run already; this catches any other way out.
                 let state = app.state::<AppState>();
                 if let Ok(core) = state.core() {
                     tauri::async_runtime::block_on(core.services.stop_every_run(Origin::MainWindow));
@@ -180,6 +205,7 @@ pub fn run() {
                     perf::clean_up(settings);
                 }
             }
+            _ => {}
         });
 }
 

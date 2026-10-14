@@ -140,6 +140,15 @@ pub fn clear_logs(state: tauri::State<'_, AppState>, service_ids: Vec<Id>) -> Co
     Ok(())
 }
 
+impl LogStreams {
+    /// Stops every stream, once the window is gone.
+    pub fn close_all(&self) {
+        for (_, task) in self.tasks.lock().unwrap().drain() {
+            task.abort();
+        }
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn close_log(state: tauri::State<'_, AppState>, id: u32) {

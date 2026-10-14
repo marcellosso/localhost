@@ -105,7 +105,7 @@ pub fn finish_perf_run(app: AppHandle, state: tauri::State<'_, AppState>, report
     let settings = state.perf.as_ref().map(|settings| serde_json::to_value(settings).unwrap_or_default());
     let line = serde_json::json!({ "settings": settings, "report": report });
     println!("LOCALHOST_PERF_REPORT {line}");
-    app.exit(0);
+    crate::lifecycle::exit_now(&app);
 }
 
 /// Deletes the throwaway folder, once its Services have stopped.

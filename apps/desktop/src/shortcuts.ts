@@ -1,6 +1,7 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 import { openUrl, restart, start, startAll, stop, stopAll } from "./actions";
-import type { Project } from "./bindings";
+import { commands, type Project } from "./bindings";
 import { type CoreView, serviceStatus } from "./core";
 import {
   columnOf,
@@ -35,10 +36,12 @@ export type ShortcutContext = {
  * - Ctrl+R starts (or restarts) the selected Service, Ctrl+. stops it,
  *   Ctrl+Shift+O opens its URL; Ctrl+Shift+R / Ctrl+Shift+. Start / Stop All.
  * - Ctrl+N New Project, Ctrl+Shift+N New Service, Ctrl+, Settings.
+ * - Ctrl+W closes the window (Services keep running), Ctrl+Q quits; these
+ *   work under sheets and alerts too.
  * - Across the columns (sidebar → Services → log): → (and ↩ in the sidebar)
  *   moves right, ← (and Escape in the log) moves left; ↑/↓ move through a list.
  *
- * Nothing happens under a sheet or an alert, and keys typed into fields are left alone.
+ * Nothing else happens under a sheet or an alert, and keys typed into fields are left alone.
  */
 export function useWindowShortcuts(context: ShortcutContext) {
   const latest = useRef(context);
@@ -48,6 +51,11 @@ export function useWindowShortcuts(context: ShortcutContext) {
     const onKeyDown = (event: KeyboardEvent) => {
       trackBadgeModifiers(event);
       if (event.defaultPrevented) return;
+      if (isShortcut(event, SHORTCUTS.quit) || isShortcut(event, SHORTCUTS.closeWindow)) {
+        event.preventDefault();
+        void (isShortcut(event, SHORTCUTS.quit) ? commands.quitApp() : getCurrentWindow().close());
+        return;
+      }
       const ui = currentUi();
       if (ui.sheet || ui.alerts.length > 0) return;
       if (ui.isPaletteOpen) {
