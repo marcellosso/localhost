@@ -1,0 +1,110 @@
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.disclosure:disabled {
+  opacity: 1;
+}
+
+.tertiary {
+  color: var(--text-tertiary);
+}
+
+.open {
+  rotate: 90deg;
+}
+
+.row.unchecked .summary {
+  opacity: 0.65;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px 9px 12px;
+}
+
+.checkbox {
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.swatch {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--service);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.title .mono {
+  font-size: 11px;
+}
+
+.name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.commandLine {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expand {
+  width: 22px;
+  height: 22px;
+}
+
+.down {
+  rotate: 90deg;
+}
+
+.up {
+  rotate: -90deg;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 12px 12px 38px;
+}
+
+.foundIn {
+  margin: 0;
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  user-select: text;
+}

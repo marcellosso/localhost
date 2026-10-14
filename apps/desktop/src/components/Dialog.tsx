@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import { type ReactNode, type RefObject, useEffect, useId, useRef } from "react";
 import appIcon from "../../src-tauri/icons/128x128.png";
 import styles from "./Dialog.module.css";
 
@@ -23,28 +23,7 @@ export function Dialog({ title, children, actions, onCancel, role = "alertdialog
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const bodyId = useId();
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const element = panel.current;
-    const first = element?.querySelector<HTMLElement>("[data-autofocus]") ?? focusable(element)[0];
-    first?.focus();
-    return () => previous?.focus();
-  }, []);
-
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    } else if (event.key === "Tab") {
-      const elements = focusable(panel.current);
-      if (elements.length === 0) return;
-      const index = elements.indexOf(document.activeElement as HTMLElement);
-      const next = event.shiftKey ? (index <= 0 ? elements.length - 1 : index - 1) : (index + 1) % elements.length;
-      event.preventDefault();
-      elements[next].focus();
-    }
-  };
+  const onKeyDown = useModal(panel, onCancel);
 
   return (
     <div className={styles.backdrop}>
@@ -70,6 +49,35 @@ export function Dialog({ title, children, actions, onCancel, role = "alertdialog
       </div>
     </div>
   );
+}
+
+/**
+ * Focus for a modal: the element marked `data-autofocus` (else the first
+ * focusable one) on open, Tab cycling inside, Escape as `onCancel`, and focus
+ * back where it was on close. Spread the returned handler as `onKeyDown`.
+ */
+export function useModal(panel: RefObject<HTMLElement | null>, onCancel: () => void) {
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const element = panel.current;
+    const first = element?.querySelector<HTMLElement>("[data-autofocus]") ?? focusable(element)[0];
+    first?.focus();
+    return () => previous?.focus();
+  }, [panel]);
+
+  return (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onCancel();
+    } else if (event.key === "Tab") {
+      const elements = focusable(panel.current);
+      if (elements.length === 0) return;
+      const index = elements.indexOf(document.activeElement as HTMLElement);
+      const next = event.shiftKey ? (index <= 0 ? elements.length - 1 : index - 1) : (index + 1) % elements.length;
+      event.preventDefault();
+      elements[next].focus();
+    }
+  };
 }
 
 function focusable(element: HTMLElement | null): HTMLElement[] {

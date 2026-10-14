@@ -15,7 +15,8 @@
 }
 
 .menu button {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   padding: 3px 10px;
   border: none;
@@ -44,6 +45,27 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
+}
+
+.alignLeft {
+  right: auto;
+  left: 0;
+}
+
+.check {
+  display: inline-grid;
+  width: 16px;
+  place-items: center start;
+}
+
+.menu .destructive {
+  color: var(--state-failed);
+}
+
+.menu .destructive:hover,
+.menu .destructive:focus-visible {
+  background: var(--state-failed);
+  color: #fff;
 }
 
 .atPointer {

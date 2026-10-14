@@ -4,6 +4,8 @@
 
 mod bridge;
 mod desktop;
+mod dialogs;
+mod editors;
 mod launch;
 mod listeners;
 mod logs;
@@ -15,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use localhost_core::{
-    LocalhostError, LogStore, Origin, ProjectLibrary, RunRegistry, ServiceManager, ServiceManagerOptions,
+    LocalhostError, LogStore, Origin, ProjectLibrary, RunRegistry, SecretStore, ServiceManager, ServiceManagerOptions,
     SystemSecretStore, default_storage_root,
 };
 use tauri::{Manager, RunEvent};
@@ -33,7 +35,11 @@ impl Core {
     /// Opens the Projects in `root`. Needs a tokio runtime: the manager
     /// spawns a task watching the library.
     fn open(root: &Path) -> Result<Core, LocalhostError> {
-        let library = Arc::new(ProjectLibrary::open(root, Arc::new(SystemSecretStore::new()))?);
+        Core::open_with_secrets(root, Arc::new(SystemSecretStore::new()))
+    }
+
+    fn open_with_secrets(root: &Path, secrets: Arc<dyn SecretStore>) -> Result<Core, LocalhostError> {
+        let library = Arc::new(ProjectLibrary::open(root, secrets)?);
         let logs = Arc::new(LogStore::new(root));
         let runs = Arc::new(RunRegistry::new(root));
         let services =
@@ -89,6 +95,31 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         desktop::open_service_url,
         desktop::open_url,
         desktop::open_folder,
+        editors::suggested_project_key,
+        editors::suggested_service_key,
+        editors::key_from_name,
+        editors::add_project,
+        editors::edit_project,
+        editors::set_favorite,
+        editors::remove_project,
+        editors::add_service,
+        editors::edit_service,
+        editors::add_services,
+        editors::command_line_uses_port,
+        editors::remove_service,
+        editors::service_relations,
+        editors::scan_folder,
+        editors::scan_project,
+        editors::save_environment,
+        editors::set_active_profile,
+        editors::secret_value,
+        editors::read_project_file,
+        editors::import_project,
+        editors::export_project,
+        dialogs::choose_folder,
+        dialogs::choose_working_directory,
+        dialogs::choose_project_file,
+        dialogs::choose_export_file,
         settings::settings,
         settings::save_settings,
         logs::open_log,
@@ -103,6 +134,7 @@ pub fn run() {
     let builder = specta_builder();
     let perf = perf::PerfSettings::from_environment();
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

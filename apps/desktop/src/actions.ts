@@ -88,7 +88,7 @@ export async function dismissUnreadableFiles(reveal: boolean) {
   report(await commands.dismissUnreadableFiles(reveal));
 }
 
-function report(result: Result<unknown, CommandError>) {
+export function report(result: Result<unknown, CommandError>) {
   if (result.status === "error") showAlert({ kind: "error", message: result.error.message });
 }
 
