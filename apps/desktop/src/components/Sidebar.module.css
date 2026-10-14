@@ -8,6 +8,8 @@
 
 .header {
   display: grid;
+  /* One column that never grows past the sidebar, so the search row fits. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding: 14px 10px 8px;
 }
@@ -46,7 +48,9 @@
 }
 
 .search input {
+  /* WebKit gives a search field a default width; start from none and fill. */
   flex: 1;
+  width: 0;
   min-width: 0;
   padding: 0;
   border: none;
