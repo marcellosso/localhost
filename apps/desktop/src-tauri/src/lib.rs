@@ -9,6 +9,7 @@ mod editors;
 mod launch;
 mod listeners;
 mod logs;
+mod palette;
 mod perf;
 mod services;
 mod settings;
@@ -125,6 +126,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         logs::open_log,
         logs::close_log,
         logs::clear_logs,
+        palette::fuzzy_scores,
         perf::perf_settings,
         perf::finish_perf_run,
     ])

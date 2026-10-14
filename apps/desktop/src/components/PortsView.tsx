@@ -57,7 +57,7 @@ export function PortsView({ view }: { view: CoreView }) {
 
   return (
     <>
-      <section className={styles.column} aria-label="Ports">
+      <section className={styles.column} aria-label="Ports" data-column="list">
         {listeners !== null && listeners.length === 0 ? (
           <EmptyState
             icon={<NetworkIcon size={40} />}
@@ -94,7 +94,7 @@ export function PortsView({ view }: { view: CoreView }) {
       {selected ? (
         <ListenerDetail details={selected} isStopping={stoppingListeners.has(selected.listener.pid)} />
       ) : (
-        <section className={styles.detail} aria-label="Listener">
+        <section className={styles.detail} aria-label="Listener" data-column="detail">
           <EmptyState
             icon={<NetworkIcon size={40} />}
             title="No Listener Selected"
@@ -188,7 +188,7 @@ function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isS
     ["launchd Job", listener.launchdLabel, true],
   ];
   return (
-    <section className={styles.detail} aria-label={`${listener.name} process`}>
+    <section className={styles.detail} aria-label={`${listener.name} process`} data-column="detail">
       <dl className={styles.form}>
         {fields.map(([label, value, isMono]) =>
           value === null ? null : (

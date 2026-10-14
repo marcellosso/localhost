@@ -5,11 +5,13 @@ import { exportProject, requestRemoveService, setActiveProfile, setFavorite } fr
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
 import { isActive, isManual, isWarning, rowSummary, rowSummaryHelp } from "../status";
+import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { showAlert, showSheet } from "../ui";
 import { EmptyState } from "./EmptyState";
 import { ArrowUpRightIcon, LayersIcon, PlayIcon, PlusIcon, StopIcon, TerminalIcon } from "./Icons";
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
+import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph, stateLabel } from "./StateGlyph";
 import styles from "./ServicesColumn.module.css";
 
@@ -24,7 +26,7 @@ type Props = {
 export function ServicesColumn({ project, view, selection, onSelect }: Props) {
   if (project.services.length === 0) {
     return (
-      <section className={styles.column} aria-label={`${project.name} services`}>
+      <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
         <EmptyState
           icon={<TerminalIcon size={40} />}
           title="No Services"
@@ -45,7 +47,7 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
   const activeCount = active.filter(Boolean).length;
   const failedCount = statuses.filter((status) => status.state === "failed").length;
   return (
-    <section className={styles.column} aria-label={`${project.name} services`}>
+    <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
       <ul className={styles.list} role="listbox" aria-label="Services" tabIndex={0}>
         <li
           className={`${styles.row} selectable`}
@@ -80,7 +82,8 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
         onClick={() => showSheet({ kind: "addService", projectId: project.id })}
       >
         <PlusIcon size={11} />
-        Add Service
+        <span className={styles.addServiceTitle}>Add Service</span>
+        <span className="keyHint">{shortcutLabel(SHORTCUTS.newService)}</span>
       </button>
     </section>
   );
@@ -95,13 +98,13 @@ export function ProjectActions({ project, view }: { project: Project; view: Core
       <button
         className="button accent"
         disabled={project.services.length === 0}
-        title="Start every service except Manual ones"
+        title={`Start every service except Manual ones (${shortcutLabel(SHORTCUTS.startAll)})`}
         onClick={() => void startAll(project.id)}
       >
         <PlayIcon size={11} />
         Start All
       </button>
-      <button className="button" disabled={!anyActive} title="Stop All" onClick={() => void stopAll(project.id)}>
+      <button className="button" disabled={!anyActive} title={`Stop All (${shortcutLabel(SHORTCUTS.stopAll)})`} onClick={() => void stopAll(project.id)}>
         <StopIcon size={11} />
         Stop All
       </button>
@@ -206,6 +209,7 @@ function ServiceRow({ project, service, status, index, isSelected, onSelect }: R
       </div>
       <div className={`${styles.command} mono secondary`}>{service.commandLine}</div>
       {isSelected && <ServiceActions service={service} status={status} />}
+      <ShortcutBadge kind="services" index={index} />
       {context.menu}
     </li>
   );
@@ -224,17 +228,21 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
         {url && (
           <button
             className="button compact prominent"
-            title={`Open ${url}`}
+            title={`Open ${url} (${shortcutLabel(SHORTCUTS.openUrl)})`}
             aria-label="Open in Browser"
             onClick={act(() => openUrl(service.id))}
           >
             Open <ArrowUpRightIcon size={9} />
           </button>
         )}
-        <button className={`button compact ${url ? "" : "prominent"}`} onClick={act(() => restart(service.id))}>
+        <button
+          className={`button compact ${url ? "" : "prominent"}`}
+          title={`Restart (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
+          onClick={act(() => restart(service.id))}
+        >
           Restart
         </button>
-        <button className="button compact" onClick={act(() => stop(service.id))}>
+        <button className="button compact" title={`Stop (${shortcutLabel(SHORTCUTS.stop)})`} onClick={act(() => stop(service.id))}>
           Stop
         </button>
       </div>
@@ -249,7 +257,11 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
   }
   return (
     <div className={styles.actions}>
-      <button className="button compact prominent" onClick={act(() => start(service.id))}>
+      <button
+        className="button compact prominent"
+        title={`Start (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
+        onClick={act(() => start(service.id))}
+      >
         Start
       </button>
       <button

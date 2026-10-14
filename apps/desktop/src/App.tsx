@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { runLaunchChecks } from "./actions";
 import { Alerts } from "./components/Alerts";
+import { CommandPalette } from "./components/CommandPalette";
 import { EmptyState } from "./components/EmptyState";
 import { Sheets } from "./components/Sheets";
 import { FolderIcon, LinesIcon } from "./components/Icons";
@@ -14,8 +15,11 @@ import { loadHome, tildePath } from "./paths";
 import { runPerfMeasurement } from "./perf";
 import { allServices, type ServiceSelection, type SidebarSelection } from "./selection";
 import { loadSettings } from "./settings";
+import type { CoreView } from "./core";
+import type { Navigator } from "./palette";
+import { useWindowShortcuts } from "./shortcuts";
 import { startCore, useCore } from "./store";
-import { showSheet } from "./ui";
+import { showSheet, useUi } from "./ui";
 
 let started: Promise<void> | null = null;
 
@@ -30,8 +34,6 @@ function start(): Promise<void> {
 
 export function App() {
   const core = useCore();
-  const [sidebarSelection, setSidebarSelection] = useState<SidebarSelection | null>(null);
-  const [selection, setSelection] = useState<ServiceSelection>(allServices);
 
   useEffect(() => {
     void start();
@@ -46,7 +48,15 @@ export function App() {
     );
   }
 
-  const { view } = core;
+  return <MainWindow view={core.view} />;
+}
+
+/** Sidebar → Services (or Ports) → log, the sheets and alerts over them, and the keyboard. */
+function MainWindow({ view }: { view: CoreView }) {
+  const [sidebarSelection, setSidebarSelection] = useState<SidebarSelection | null>(null);
+  const [selection, setSelection] = useState<ServiceSelection>(allServices);
+  const { isPaletteOpen } = useUi();
+
   const isPorts = sidebarSelection?.kind === "ports";
   const selectedId = sidebarSelection?.kind === "project" ? sidebarSelection.projectId : null;
   const selected = isPorts ? undefined : (view.projects.find((project) => project.id === selectedId) ?? view.projects[0]);
@@ -54,6 +64,25 @@ export function App() {
     setSidebarSelection(next);
     setSelection(allServices);
   };
+  const navigator = useMemo<Navigator>(
+    () => ({
+      selectPorts: () => {
+        setSidebarSelection({ kind: "ports" });
+        setSelection(allServices);
+      },
+      selectProject: (projectId) => {
+        setSidebarSelection({ kind: "project", projectId });
+        setSelection(allServices);
+      },
+      selectService: (projectId, serviceId) => {
+        setSidebarSelection({ kind: "project", projectId });
+        setSelection({ kind: "service", serviceId });
+      },
+    }),
+    [],
+  );
+  useWindowShortcuts({ view, selected, selection, setSelection, navigator });
+
   return (
     <div className="app">
       <Sidebar
@@ -79,7 +108,7 @@ export function App() {
       ) : (
         <>
           <Toolbar title="localhost" />
-          <section className="emptyColumn">
+          <section className="emptyColumn" data-column="list">
             <EmptyState icon={<FolderIcon size={40} />} title="No Projects" description="Add a project folder to get started.">
               <button className="button accent" onClick={() => showSheet({ kind: "addProject" })}>
                 Add Project…
@@ -89,7 +118,7 @@ export function App() {
               </button>
             </EmptyState>
           </section>
-          <section className="emptyLog">
+          <section className="emptyLog" data-column="detail">
             <EmptyState
               icon={<LinesIcon size={40} />}
               title="No Service Selected"
@@ -98,14 +127,8 @@ export function App() {
           </section>
         </>
       )}
-      <Sheets
-        view={view}
-        onSelectProject={(projectId) => select({ kind: "project", projectId })}
-        onSelectService={(projectId, serviceId) => {
-          setSidebarSelection({ kind: "project", projectId });
-          setSelection({ kind: "service", serviceId });
-        }}
-      />
+      <Sheets view={view} onSelectProject={navigator.selectProject} onSelectService={navigator.selectService} />
+      {isPaletteOpen && <CommandPalette view={view} selected={selected} selection={selection} navigator={navigator} />}
       <Alerts view={view} />
     </div>
   );

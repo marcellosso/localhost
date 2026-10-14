@@ -163,6 +163,22 @@ button {
   font-weight: 500;
 }
 
+/* A row's shortcut, over its trailing edge while Ctrl (or Ctrl+Alt) is held. */
+.shortcutBadge {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  translate: 0 -50%;
+  padding: 1px 5px;
+  border: 1px solid var(--separator);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text-base);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 /* A selected row of a focused list: filled, everything on it white. */
 .selectable[aria-selected="true"] {
   background: var(--selection-quiet);
