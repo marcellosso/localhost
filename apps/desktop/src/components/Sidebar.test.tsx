@@ -1,16 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { viewFromSnapshot } from "../core";
-import { project, service } from "../test/fixtures";
+import { project, service, status } from "../test/fixtures";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
-  it("names each project with its state, and selects on click", () => {
-    const shop = project("Shop", 0, [service("Web")]);
+  it("names each project with its Services' states, and selects on click", () => {
+    const shop = project("Shop", 0, [service("Web"), service("Worker")]);
     const blog = project("Blog", 1);
     const view = viewFromSnapshot({
       projects: [shop, blog],
-      statuses: [],
+      statuses: [status(shop.services[0].id, "running"), status(shop.services[1].id, "failed")],
       projectStates: [{ projectId: shop.id, state: "failed" }],
     });
     const onSelect = vi.fn();
@@ -19,10 +19,12 @@ describe("Sidebar", () => {
     const rows = screen.getAllByRole("option");
     expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
       "Ports",
-      "Shop, Failed",
+      "Shop, 1 of 2 running, 1 failed",
       "Blog, No services",
     ]);
     expect(rows[1].getAttribute("aria-selected")).toBe("true");
+    // Focus stays on the list; Orca follows the selected row.
+    expect(screen.getByRole("listbox").getAttribute("aria-activedescendant")).toBe(rows[1].id);
 
     fireEvent.click(rows[2]);
     expect(onSelect).toHaveBeenCalledWith({ kind: "project", projectId: blog.id });

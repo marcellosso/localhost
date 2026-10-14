@@ -1,23 +1,11 @@
 import type { ServiceState } from "../bindings";
+import { stateLabel } from "../status";
 import styles from "./StateGlyph.module.css";
-
-const labels: Record<ServiceState, string> = {
-  stopped: "Stopped",
-  starting: "Starting",
-  running: "Running",
-  stopping: "Stopping",
-  exited: "Exited",
-  failed: "Failed",
-};
-
-export function stateLabel(state: ServiceState | null): string {
-  return state ? labels[state] : "No services";
-}
 
 /**
  * The state glyph. Its shape carries the state without colour: a dot with a
- * halo for Running, a pulsing ring for Starting/Stopping (still under reduced
- * motion), a diamond for Failed, a hollow ring for Stopped/Exited.
+ * halo for Running, a ring for Starting/Stopping (pulsing, unless motion is
+ * reduced), a diamond for Failed, a hollow ring for Stopped/Exited.
  * `null` is a Project without Services.
  */
 export function StateGlyph({ state }: { state: ServiceState | null }) {

@@ -1,10 +1,10 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useId } from "react";
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "../actions";
 import type { Folder, Project, Service, StatusView } from "../bindings";
 import { exportProject, requestRemoveService, setActiveProfile, setFavorite } from "../editors";
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
-import { isActive, isManual, isWarning, rowSummary, rowSummaryHelp } from "../status";
+import { isActive, isManual, isWarning, projectServicesSummary, rowSummary, rowSummaryHelp, serviceRowLabel } from "../status";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { showAlert, showSheet } from "../ui";
 import { EmptyState } from "./EmptyState";
@@ -12,7 +12,7 @@ import { ArrowUpRightIcon, LayersIcon, PlayIcon, PlusIcon, StopIcon, TerminalIco
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
 import { ShortcutBadge } from "./ShortcutBadge";
-import { StateGlyph, stateLabel } from "./StateGlyph";
+import { StateGlyph } from "./StateGlyph";
 import styles from "./ServicesColumn.module.css";
 
 type Props = {
@@ -46,14 +46,30 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
   const active = statuses.map((status) => isActive(status.state));
   const activeCount = active.filter(Boolean).length;
   const failedCount = statuses.filter((status) => status.state === "failed").length;
+  // Orca follows the selected row, as focus stays on the list.
+  const listId = useId();
+  const optionId = (key: string) => `${listId}-${key}`;
+  const selectedKey =
+    selection.kind === "all"
+      ? "all"
+      : project.services.some((service) => service.id === selection.serviceId)
+        ? selection.serviceId
+        : null;
   return (
     <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
-      <ul className={styles.list} role="listbox" aria-label="Services" tabIndex={0}>
+      <ul
+        className={styles.list}
+        role="listbox"
+        aria-label="Services"
+        aria-activedescendant={selectedKey ? optionId(selectedKey) : undefined}
+        tabIndex={0}
+      >
         <li
+          id={optionId("all")}
           className={`${styles.row} selectable`}
           role="option"
           aria-selected={selection.kind === "all"}
-          aria-label={`All services, ${activeCount} of ${statuses.length} running${failedCount > 0 ? `, ${failedCount} failed` : ""}`}
+          aria-label={`All services, ${projectServicesSummary(project, statuses.map((status) => status.state))}`}
           onClick={() => onSelect({ kind: "all" })}
         >
           <div className={styles.line}>
@@ -72,6 +88,7 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
             service={service}
             status={statuses[index]}
             index={index}
+            id={optionId(service.id)}
             isSelected={selection.kind === "service" && selection.serviceId === service.id}
             onSelect={() => onSelect({ kind: "service", serviceId: service.id })}
           />
@@ -108,7 +125,7 @@ export function ProjectActions({ project, view }: { project: Project; view: Core
         <StopIcon size={11} />
         Stop All
       </button>
-      <Menu label="More actions for this project" items={projectMenuItems(project, true)} />
+      <Menu label={`More actions for ${project.name}`} items={projectMenuItems(project, true)} />
     </>
   );
 }
@@ -167,12 +184,13 @@ type RowProps = {
   service: Service;
   status: StatusView;
   index: number;
+  id: string;
   isSelected: boolean;
   onSelect: () => void;
 };
 
 /** A Service: a rail in its colour, its state, name and Port, its command, and, while selected, its actions. */
-function ServiceRow({ project, service, status, index, isSelected, onSelect }: RowProps) {
+function ServiceRow({ project, service, status, index, id, isSelected, onSelect }: RowProps) {
   const state = status.state;
   // The active Run's port, which may have moved, else the Service's Port.
   const port = isActive(state) ? (status.run?.port ?? service.port) : service.port;
@@ -190,10 +208,11 @@ function ServiceRow({ project, service, status, index, isSelected, onSelect }: R
   ]);
   return (
     <li
+      id={id}
       className={`${styles.row} selectable ${isManual(service, status) ? styles.manual : ""}`}
       role="option"
       aria-selected={isSelected}
-      aria-label={`${service.name}, ${summary.startsWith(stateLabel(state)) ? summary : `${stateLabel(state)}, ${summary}`}`}
+      aria-label={serviceRowLabel(project, service, status, port)}
       onClick={onSelect}
       onDoubleClick={edit}
       onContextMenu={context.onContextMenu}
@@ -229,7 +248,7 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
           <button
             className="button compact prominent"
             title={`Open ${url} (${shortcutLabel(SHORTCUTS.openUrl)})`}
-            aria-label="Open in Browser"
+            aria-label={`Open ${service.name} in Browser`}
             onClick={act(() => openUrl(service.id))}
           >
             Open <ArrowUpRightIcon size={9} />
@@ -238,11 +257,17 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
         <button
           className={`button compact ${url ? "" : "prominent"}`}
           title={`Restart (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
+          aria-label={`Restart ${service.name}`}
           onClick={act(() => restart(service.id))}
         >
           Restart
         </button>
-        <button className="button compact" title={`Stop (${shortcutLabel(SHORTCUTS.stop)})`} onClick={act(() => stop(service.id))}>
+        <button
+          className="button compact"
+          title={`Stop (${shortcutLabel(SHORTCUTS.stop)})`}
+          aria-label={`Stop ${service.name}`}
+          onClick={act(() => stop(service.id))}
+        >
           Stop
         </button>
       </div>
@@ -260,6 +285,7 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
       <button
         className="button compact prominent"
         title={`Start (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
+        aria-label={`Start ${service.name}`}
         onClick={act(() => start(service.id))}
       >
         Start
@@ -267,6 +293,7 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
       <button
         className="button compact"
         title="Edit Service"
+        aria-label={`Edit ${service.name}…`}
         onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id }))}
       >
         Edit…

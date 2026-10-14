@@ -1,8 +1,9 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useId, useState } from "react";
 import { requestStopListener } from "../actions";
 import { commands, type ListenerDetails } from "../bindings";
 import { type CoreView, findService } from "../core";
 import { listenerSubtitle, portsText } from "../listeners";
+import { spoken } from "../status";
 import { useUi } from "../ui";
 import { EmptyState } from "./EmptyState";
 import { ChevronIcon, NetworkIcon } from "./Icons";
@@ -44,9 +45,15 @@ export function PortsView({ view }: { view: CoreView }) {
   const development = all.filter(({ listener }) => listener.kind === "development" || listener.kind === "docker");
   const others = all.filter(({ listener }) => listener.kind === "app" || listener.kind === "system");
   const selected = all.find(({ listener }) => listener.pid === selectedPid);
+  // Orca follows the selected row, as focus stays on the list.
+  const listId = useId();
+  const optionId = (pid: number) => `${listId}-${pid}`;
+  const isSelectedShown =
+    selected !== undefined && (showsOthers || development.some(({ listener }) => listener.pid === selectedPid));
   const row = (details: ListenerDetails) => (
     <ListenerRow
       key={details.listener.pid}
+      id={optionId(details.listener.pid)}
       details={details}
       view={view}
       isSelected={details.listener.pid === selectedPid}
@@ -65,7 +72,13 @@ export function PortsView({ view }: { view: CoreView }) {
             description="Nothing of yours is listening on a TCP port."
           />
         ) : (
-          <ul className={styles.list} role="listbox" aria-label="Listeners" tabIndex={0}>
+          <ul
+            className={styles.list}
+            role="listbox"
+            aria-label="Listeners"
+            aria-activedescendant={isSelectedShown && selectedPid !== null ? optionId(selectedPid) : undefined}
+            tabIndex={0}
+          >
             <li className={styles.section} role="presentation">
               Development
             </li>
@@ -107,6 +120,7 @@ export function PortsView({ view }: { view: CoreView }) {
 }
 
 type RowProps = {
+  id: string;
   details: ListenerDetails;
   view: CoreView;
   isSelected: boolean;
@@ -114,18 +128,27 @@ type RowProps = {
   onSelect: () => void;
 };
 
-function ListenerRow({ details, view, isSelected, isStopping, onSelect }: RowProps) {
+function ListenerRow({ id, details, view, isSelected, isStopping, onSelect }: RowProps) {
   const { listener, owner } = details;
   const service = listener.owner.kind === "run" ? findService(view, listener.owner.serviceId) : null;
   const color = service ? serviceColor(service.index) : undefined;
   // A Service's Listener is named by its Service; others by their process.
   const showsOwner = listener.owner.kind === "project" || listener.kind === "docker";
+  // As one sentence: who, then ports, process, and owner and state.
+  const label = [
+    service ? spoken(owner) : listener.name,
+    portsText(listener),
+    listenerSubtitle(listener),
+    ...(!service && showsOwner ? [spoken(owner)] : []),
+    ...(isStopping ? ["stopping"] : []),
+  ];
   return (
     <li
+      id={id}
       className={`${styles.row} selectable`}
       role="option"
       aria-selected={isSelected}
-      aria-label={[service ? owner : listener.name, portsText(listener), listenerSubtitle(listener)].join(", ")}
+      aria-label={label.join(", ")}
       onClick={onSelect}
       style={color ? ({ "--service": color } as CSSProperties) : undefined}
     >
@@ -164,7 +187,7 @@ function StopButton({ details, isStopping }: { details: ListenerDetails; isStopp
       className="button compact"
       disabled={reason !== null}
       title={reason ?? (isRun ? "Stop the service" : "Stop this process")}
-      aria-label={`Stop ${details.listener.name}`}
+      aria-label={`Stop ${isRun ? spoken(details.owner) : details.listener.name}`}
       onClick={(event) => {
         event.stopPropagation();
         requestStopListener(details);

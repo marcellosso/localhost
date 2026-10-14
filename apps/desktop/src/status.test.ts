@@ -4,8 +4,11 @@ import {
   failureExcerpt,
   failureTitle,
   portChangeExplanation,
+  projectServicesSummary,
   rowSummary,
   runDuration,
+  serviceRowLabel,
+  spokenSummary,
   statusSummary,
 } from "./status";
 import { project, run, service, status } from "./test/fixtures";
@@ -111,5 +114,32 @@ describe("the failure banner", () => {
     expect(failureTitle(worker, ended, "Command not found.")).toBe("Command not found.");
     expect(runDuration(ended)).toBe("after 1.2s");
     expect(runDuration({ ...ended, endedAt: { secs_since_epoch: 1_185, nanos_since_epoch: 0 } })).toBe("after 3m 5s");
+  });
+});
+
+describe("what a screen reader says", () => {
+  it("reads a Service row as one sentence, without separators", () => {
+    const web = service("Web", 3000);
+    const shop = project("Shop", 0, [web]);
+    expect(serviceRowLabel(shop, web, status(web.id, "running"), 3000)).toBe("Web, Running, port 3000, run Web");
+    const moved = status(web.id, "running", {
+      run: run(web.id, { port: 3001, portChange: { configuredPort: 3000, reason: { kind: "portInUse", holder: null } } }),
+    });
+    expect(serviceRowLabel(shop, web, moved, 3001)).toBe("Web, Running, moved to port 3001, run Web");
+    expect(serviceRowLabel(shop, web, status(web.id, "starting"), 3000)).toBe("Web, Starting, port 3000, run Web");
+  });
+
+  it("says the state before a summary that doesn't start with it", () => {
+    const web = service("Web");
+    expect(spokenSummary(status(web.id, "failed", { failureMessage: "Command not found." }))).toBe(
+      "Failed, Command not found.",
+    );
+    expect(spokenSummary(status(web.id, "exited"))).toBe("Exited, code 0");
+  });
+
+  it("counts a Project's running and failed Services", () => {
+    const shop = project("Shop", 0, [service("Web"), service("Worker"), service("Docs")]);
+    expect(projectServicesSummary(shop, ["running", "failed", "stopped"])).toBe("1 of 3 running, 1 failed");
+    expect(projectServicesSummary(project("Blog", 1), [])).toBe("No services");
   });
 });

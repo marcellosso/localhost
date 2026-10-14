@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Project } from "../bindings";
-import type { CoreView } from "../core";
+import { type CoreView, serviceState } from "../core";
 import type { SidebarSelection } from "../selection";
 import { importProject } from "../editors";
-import { isActive } from "../status";
+import { isActive, projectServicesSummary } from "../status";
 import { showAlert, showSheet } from "../ui";
 import { ClearIcon, GearIcon, GlobeIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
-import { StateGlyph, stateLabel } from "./StateGlyph";
+import { StateGlyph } from "./StateGlyph";
 import styles from "./Sidebar.module.css";
 
 type Props = {
@@ -26,6 +26,15 @@ export function Sidebar({ view, selection, onSelect }: Props) {
     ? view.projects.filter((p) => p.name.toLowerCase().includes(query) || p.key.includes(query))
     : view.projects;
   const running = [...view.statuses.values()].filter((status) => isActive(status.state)).length;
+  // Orca follows the selected row, as focus stays on the list.
+  const listId = useId();
+  const optionId = (key: string) => `${listId}-${key}`;
+  const selectedKey =
+    selection?.kind === "ports"
+      ? "ports"
+      : selection?.kind === "project" && projects.some((project) => project.id === selection.projectId)
+        ? selection.projectId
+        : null;
 
   return (
     <nav className={styles.sidebar} aria-label="Sidebar" data-column="sidebar">
@@ -65,8 +74,15 @@ export function Sidebar({ view, selection, onSelect }: Props) {
           />
         </div>
       </header>
-      <ul className={styles.list} role="listbox" aria-label="Projects and Ports" tabIndex={0}>
+      <ul
+        className={styles.list}
+        role="listbox"
+        aria-label="Projects and Ports"
+        aria-activedescendant={selectedKey ? optionId(selectedKey) : undefined}
+        tabIndex={0}
+      >
         <li
+          id={optionId("ports")}
           className={`${styles.row} selectable`}
           role="option"
           aria-selected={selection?.kind === "ports"}
@@ -85,6 +101,7 @@ export function Sidebar({ view, selection, onSelect }: Props) {
             project={project}
             view={view}
             index={view.projects.indexOf(project)}
+            id={optionId(project.id)}
             isSelected={selection?.kind === "project" && selection.projectId === project.id}
             onSelect={() => onSelect({ kind: "project", projectId: project.id })}
           />
@@ -110,17 +127,28 @@ export function Sidebar({ view, selection, onSelect }: Props) {
   );
 }
 
-type ProjectRowProps = { project: Project; view: CoreView; index: number; isSelected: boolean; onSelect: () => void };
+type ProjectRowProps = {
+  project: Project;
+  view: CoreView;
+  index: number;
+  id: string;
+  isSelected: boolean;
+  onSelect: () => void;
+};
 
-function ProjectRow({ project, view, index, isSelected, onSelect }: ProjectRowProps) {
+function ProjectRow({ project, view, index, id, isSelected, onSelect }: ProjectRowProps) {
   const state = view.projectStates.get(project.id) ?? null;
   const context = useContextMenu(`${project.name} actions`, () => projectMenuItems(project));
   return (
     <li
+      id={id}
       className={`${styles.row} selectable`}
       role="option"
       aria-selected={isSelected}
-      aria-label={`${project.name}${project.isFavorite ? ", favourite" : ""}, ${stateLabel(state)}`}
+      aria-label={`${project.name}${project.isFavorite ? ", favourite" : ""}, ${projectServicesSummary(
+        project,
+        project.services.map((service) => serviceState(view, service.id)),
+      )}`}
       onClick={onSelect}
       onContextMenu={context.onContextMenu}
     >

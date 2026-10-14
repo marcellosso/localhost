@@ -159,7 +159,7 @@
 
 .input::placeholder,
 .commandLine::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .folder {
@@ -370,7 +370,14 @@
     transition: none;
   }
 
+  /* Fades instead of turning. */
   .spinner {
-    animation-duration: 2.4s;
+    animation: fade 1.2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes fade {
+  to {
+    opacity: 0.35;
   }
 }

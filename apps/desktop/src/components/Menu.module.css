@@ -65,7 +65,7 @@
 .menu .destructive:hover,
 .menu .destructive:focus-visible {
   background: var(--state-failed);
-  color: #fff;
+  color: var(--on-destructive);
 }
 
 .atPointer {

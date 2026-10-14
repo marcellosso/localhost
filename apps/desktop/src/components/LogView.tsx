@@ -102,6 +102,8 @@ export function LogView({ buffer, prefixes, label, filter = "", rowHeight }: Pro
       style={{ lineHeight: `${rowHeight}px` }}
       onScroll={onScroll}
       role="log"
+      // Not read out as it streams: settling Services are announced instead.
+      aria-live="off"
       aria-label={label}
       tabIndex={0}
     >
