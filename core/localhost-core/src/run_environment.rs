@@ -35,11 +35,43 @@ impl RunEnvironment {
         environment
     }
 
-    /// The environment this process was started with.
+    /// The environment this process was started with, less what an AppImage
+    /// added for the app itself (see `without_appimage`).
     pub fn current() -> BTreeMap<String, String> {
-        std::env::vars_os()
+        let environment = std::env::vars_os()
             .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
-            .collect()
+            .collect();
+        Self::without_appimage(environment)
+    }
+
+    /// An AppImage's runtime points `PATH`, `LD_LIBRARY_PATH`,
+    /// `XDG_DATA_DIRS`, the GTK and GIO module paths and more into its own
+    /// mount, which goes away when the app quits. The user's commands (and
+    /// the terminal or browser the app opens) must not load from there: drop
+    /// every list entry under `$APPDIR`, then variables left with nothing,
+    /// and the AppImage's own variables.
+    pub fn without_appimage(mut environment: BTreeMap<String, String>) -> BTreeMap<String, String> {
+        let Some(appdir) = environment.get("APPDIR").filter(|_| environment.contains_key("APPIMAGE")).cloned() else {
+            return environment;
+        };
+        let appdir = appdir.trim_end_matches('/').to_string();
+        let is_inside = |entry: &str| entry == appdir || entry.starts_with(&format!("{appdir}/"));
+        for name in ["APPDIR", "APPIMAGE", "ARGV0", "OWD"] {
+            environment.remove(name);
+        }
+        environment.retain(|_, value| {
+            if !value.contains(&appdir) {
+                return true;
+            }
+            let kept = value.split(':').filter(|entry| !is_inside(entry)).collect::<Vec<_>>().join(":");
+            *value = kept;
+            !value.split(':').all(str::is_empty)
+        });
+        // The GTK hook sets it to `$APPIMAGE_GTK_THEME`, usually empty.
+        if environment.get("GTK_THEME").is_some_and(String::is_empty) {
+            environment.remove("GTK_THEME");
+        }
+        environment
     }
 
     /// The user's shell: `$SHELL`, or the platform's default (zsh on macOS, sh elsewhere).
@@ -110,5 +142,36 @@ mod tests {
         assert_eq!(RunEnvironment::shell(&map(&[("SHELL", "/opt/homebrew/bin/fish")])), "/opt/homebrew/bin/fish");
         assert_eq!(RunEnvironment::shell(&map(&[])), fallback);
         assert_eq!(RunEnvironment::shell(&map(&[("SHELL", "")])), fallback);
+    }
+
+    #[test]
+    fn drops_what_an_appimage_added() {
+        let environment = RunEnvironment::without_appimage(map(&[
+            ("APPDIR", "/tmp/.mount_localhXYZ"),
+            ("APPIMAGE", "/home/me/localhost-app.AppImage"),
+            ("OWD", "/home/me"),
+            ("PATH", "/tmp/.mount_localhXYZ/usr/bin:/home/me/.cargo/bin:/usr/bin"),
+            ("LD_LIBRARY_PATH", "/tmp/.mount_localhXYZ/usr/lib:"),
+            ("XDG_DATA_DIRS", "/tmp/.mount_localhXYZ/usr/share:/usr/share:/usr/local/share"),
+            ("GTK_PATH", "/tmp/.mount_localhXYZ/usr/lib/gtk-3.0"),
+            ("GTK_THEME", ""),
+            ("NOTES", "/tmp/.mount_localhXYZother/kept"),
+            ("HOME", "/home/me"),
+        ]));
+        assert_eq!(
+            environment,
+            map(&[
+                ("PATH", "/home/me/.cargo/bin:/usr/bin"),
+                ("XDG_DATA_DIRS", "/usr/share:/usr/local/share"),
+                ("NOTES", "/tmp/.mount_localhXYZother/kept"),
+                ("HOME", "/home/me"),
+            ])
+        );
+    }
+
+    #[test]
+    fn outside_an_appimage_nothing_is_dropped() {
+        let original = map(&[("APPDIR", "/opt/thing"), ("PATH", "/opt/thing/bin:/usr/bin"), ("GTK_THEME", "")]);
+        assert_eq!(RunEnvironment::without_appimage(original.clone()), original);
     }
 }

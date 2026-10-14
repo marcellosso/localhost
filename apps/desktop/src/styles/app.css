@@ -40,7 +40,7 @@ body {
   height: 100%;
 }
 
-.app > nav {
+.app > .contents > nav {
   grid-row: span 2;
 }
 
@@ -54,6 +54,21 @@ button {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Groups grid items without a box of its own, e.g. to make them inert together. */
+.contents {
+  display: contents;
+}
+
+/* Read by a screen reader, not shown (and out of the window's grid). */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .button {
@@ -90,14 +105,14 @@ button {
 
 /* The main one among several labelled actions. */
 .button.prominent {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-text);
   font-weight: 600;
 }
 
 .button.destructive {
   background: var(--state-failed);
-  color: #fff;
+  color: var(--on-destructive);
   font-weight: 600;
 }
 
@@ -188,7 +203,7 @@ button {
   background: var(--selection);
   color: var(--on-selection);
   --text: var(--on-selection);
-  --text-secondary: rgb(255 255 255 / 0.78);
+  --text-secondary: rgb(255 255 255 / 0.9);
   --service: var(--on-selection);
 }
 
@@ -208,6 +223,11 @@ button {
 
 [role="listbox"] {
   outline: none;
+}
+
+/* The selected row shows where focus is; with none selected, the list does. */
+[role="listbox"]:focus-visible:not(:has([aria-selected="true"])) {
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .progress {

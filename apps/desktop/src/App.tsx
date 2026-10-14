@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { runLaunchChecks } from "./actions";
 import { commands, events, type Reveal } from "./bindings";
 import { Alerts } from "./components/Alerts";
+import { Announcer } from "./components/Announcer";
 import { CommandPalette } from "./components/CommandPalette";
 import { EmptyState } from "./components/EmptyState";
 import { Sheets } from "./components/Sheets";
@@ -56,7 +57,9 @@ export function App() {
 function MainWindow({ view }: { view: CoreView }) {
   const [sidebarSelection, setSidebarSelection] = useState<SidebarSelection | null>(null);
   const [selection, setSelection] = useState<ServiceSelection>(allServices);
-  const { isPaletteOpen } = useUi();
+  const { isPaletteOpen, sheet, alerts } = useUi();
+  // Under a sheet, an alert or the palette, the window behind can't be reached, by screen readers either.
+  const isBehindModal = isPaletteOpen || sheet !== null || alerts.length > 0;
 
   const isPorts = sidebarSelection?.kind === "ports";
   const selectedId = sidebarSelection?.kind === "project" ? sidebarSelection.projectId : null;
@@ -87,51 +90,54 @@ function MainWindow({ view }: { view: CoreView }) {
 
   return (
     <div className="app">
-      <Sidebar
-        view={view}
-        selection={isPorts ? sidebarSelection : selected ? { kind: "project", projectId: selected.id } : null}
-        onSelect={select}
-      />
-      {isPorts ? (
-        <>
-          <Toolbar title="Ports" />
-          <PortsView view={view} />
-        </>
-      ) : selected ? (
-        <>
-          <Toolbar
-            title={selected.name}
-            subtitle={tildePath(selected.path)}
-            actions={<ProjectActions project={selected} view={view} />}
-          />
-          <ServicesColumn project={selected} view={view} selection={selection} onSelect={setSelection} />
-          <LogPane project={selected} view={view} selection={selection} />
-        </>
-      ) : (
-        <>
-          <Toolbar title="localhost" />
-          <section className="emptyColumn" data-column="list">
-            <EmptyState icon={<FolderIcon size={40} />} title="No Projects" description="Add a project folder to get started.">
-              <button className="button accent" onClick={() => showSheet({ kind: "addProject" })}>
-                Add Project…
-              </button>
-              <button className="button" onClick={() => void importProject()}>
-                Import Project…
-              </button>
-            </EmptyState>
-          </section>
-          <section className="emptyLog" data-column="detail">
-            <EmptyState
-              icon={<LinesIcon size={40} />}
-              title="No Service Selected"
-              description="Select a service to see its output."
+      <div className="contents" inert={isBehindModal}>
+        <Sidebar
+          view={view}
+          selection={isPorts ? sidebarSelection : selected ? { kind: "project", projectId: selected.id } : null}
+          onSelect={select}
+        />
+        {isPorts ? (
+          <>
+            <Toolbar title="Ports" />
+            <PortsView view={view} />
+          </>
+        ) : selected ? (
+          <>
+            <Toolbar
+              title={selected.name}
+              subtitle={tildePath(selected.path)}
+              actions={<ProjectActions project={selected} view={view} />}
             />
-          </section>
-        </>
-      )}
+            <ServicesColumn project={selected} view={view} selection={selection} onSelect={setSelection} />
+            <LogPane project={selected} view={view} selection={selection} />
+          </>
+        ) : (
+          <>
+            <Toolbar title="localhost" />
+            <section className="emptyColumn" data-column="list">
+              <EmptyState icon={<FolderIcon size={40} />} title="No Projects" description="Add a project folder to get started.">
+                <button className="button accent" onClick={() => showSheet({ kind: "addProject" })}>
+                  Add Project…
+                </button>
+                <button className="button" onClick={() => void importProject()}>
+                  Import Project…
+                </button>
+              </EmptyState>
+            </section>
+            <section className="emptyLog" data-column="detail">
+              <EmptyState
+                icon={<LinesIcon size={40} />}
+                title="No Service Selected"
+                description="Select a service to see its output."
+              />
+            </section>
+          </>
+        )}
+      </div>
       <Sheets view={view} onSelectProject={navigator.selectProject} onSelectService={navigator.selectService} />
       {isPaletteOpen && <CommandPalette view={view} selected={selected} selection={selection} navigator={navigator} />}
       <Alerts view={view} />
+      <Announcer view={view} selectedProjectId={selected?.id ?? null} />
     </div>
   );
 }

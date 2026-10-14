@@ -148,10 +148,13 @@ fn open_terminal(folder: &Path) -> CommandResult {
 /// Runs `<editor> '<folder>'` through the login shell. Reports a command
 /// that isn't found (or can't run) if the shell says so within `EDITOR_CHECK`.
 async fn open_in_editor(editor: &str, folder: &Path) -> CommandResult {
-    let shell = RunEnvironment::shell(&RunEnvironment::current());
+    let environment = RunEnvironment::current();
+    let shell = RunEnvironment::shell(&environment);
     let line = format!("{editor} {}", shell_quoted(&folder.to_string_lossy()));
     let mut child = Command::new(&shell)
         .args(["-l", "-c", &line])
+        .env_clear()
+        .envs(environment)
         .current_dir(folder)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -179,9 +182,11 @@ async fn open_in_editor(editor: &str, folder: &Path) -> CommandResult {
 }
 
 /// Starts `program` without waiting for it; its exit is collected later.
+/// It gets the environment a Service would, without an AppImage's paths.
 fn spawn(program: &str, arguments: &[&str], folder: Option<&Path>) -> CommandResult {
     let mut command = std::process::Command::new(program);
-    command.args(arguments).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    command.args(arguments).env_clear().envs(RunEnvironment::current());
+    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     if let Some(folder) = folder {
         command.current_dir(folder);
     }

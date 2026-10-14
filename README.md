@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-<p align="center">Every local project, one place to run it. A native macOS app.</p>
+<p align="center">Every local project, one place to run it. A native macOS app, and an app for Linux.</p>
 
 ![The localhost window: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
@@ -21,7 +21,7 @@ A **Project** is a folder on your Mac. A **Service** is one long-running command
 
 localhost stores its configuration in `~/Library/Application Support/localhost`, never in your project folders. To move a Project to another Mac or share it, export it as a YAML Project file (see [docs/configuration.md](docs/configuration.md)).
 
-Requires macOS 15 or later.
+Requires macOS 15 or later. There is also an app for Linux; see [Linux](#linux).
 
 ## Install
 
@@ -56,6 +56,34 @@ Secret values live in your login Keychain. macOS lets the app that saved them re
 - **When the signing identity changes** (for example once releases become notarized), macOS asks once for each Secret on that one update, the same way.
 
 **Deny** isn't remembered: Services that use that Secret fail to start, and the next start asks again.
+
+## Linux
+
+The Linux app does what the macOS app does, with Ctrl in place of ⌘ (Ctrl+K for the command palette) and a tray icon in place of the menu bar. It runs on x86_64 with a glibc at least as new as Ubuntu 22.04's.
+
+### Install
+
+Download one of these from [GitHub Releases](https://github.com/sixpetals/localhost/releases):
+
+- **Ubuntu, Debian** (Ubuntu 22.04 or later, Debian 12): `localhost-app_<version>_amd64.deb`, then `sudo apt install ./localhost-app_<version>_amd64.deb`.
+- **Fedora**: `localhost-app-<version>-1.x86_64.rpm`, then `sudo dnf install ./localhost-app-<version>-1.x86_64.rpm`.
+- **Anything else**: `localhost-app_<version>_amd64.AppImage`. Make it executable (`chmod +x`) and run it.
+
+The packages install the app as `localhost-app`, with a **localhost** entry in your applications. They aren't signed yet. Not available as a Flatpak or Snap: their sandboxes can't run your project's commands on the host.
+
+### Secrets need a Secret Service
+
+Secret values are kept by your desktop's **Secret Service**: GNOME Keyring on GNOME, KWallet on KDE Plasma (or another provider such as KeePassXC with Secret Service enabled). Most desktops run one already. Without one, Services that use a Secret fail to start with “The secret store refused: …”, and saving a Secret fails the same way; everything else works.
+
+### The tray icon on GNOME
+
+The tray icon (each favourite or running Project's Services, with Start, Stop, Restart and Open in Browser) uses AppIndicator. KDE Plasma, Cinnamon, Xfce and Ubuntu's GNOME show it as is. Stock GNOME, as on Fedora, needs the [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) extension (`gnome-shell-extension-appindicator` on Fedora).
+
+Without a tray, nothing is lost: closing the window still leaves your Services running, and launching localhost again brings the window back. Quit with Ctrl+Q; it asks first when something is running.
+
+### Data
+
+Everything is in `~/.local/share/localhost` (or `$XDG_DATA_HOME/localhost`), laid out as in [Data](#data) below. Secret values are in the Secret Service, under the attributes `service` = `com.sixpetals.localhost.secret` and `account`.
 
 ## Getting started
 

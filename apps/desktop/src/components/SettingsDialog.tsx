@@ -1,7 +1,7 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import type { Appearance } from "../bindings";
 import { saveSettings, useSettings } from "../settings";
-import { Dialog } from "./Dialog";
+import { Dialog, useModal } from "./Dialog";
 import { CircleHalfIcon, GearIcon, GlobeIcon } from "./Icons";
 import styles from "./SettingsDialog.module.css";
 
@@ -24,12 +24,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("appearance");
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>("[aria-current=true]")?.focus();
-    return () => previous?.focus();
-  }, []);
+  // Starts on the current section; Tab stays inside, Escape closes.
+  const onKeyDown = useModal(panel, onClose);
 
   return (
     <div className={styles.backdrop}>
@@ -39,12 +35,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            onClose();
-          }
-        }}
+        onKeyDown={onKeyDown}
       >
         <h2 id={titleId} className={styles.hidden}>
           Settings
@@ -55,6 +46,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               key={item.id}
               className={styles.railItem}
               aria-current={section === item.id}
+              data-autofocus={section === item.id ? true : undefined}
               onClick={() => setSection(item.id)}
             >
               {item.icon}

@@ -49,7 +49,7 @@ describe("PortsView", () => {
     await renderPorts();
     const rows = screen.getAllByRole("option");
     expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
-      "Shop › Web, port 3000, node --port 3000",
+      "Shop, Web, port 3000, node --port 3000",
       "python3, port 8000, python3 --port 8000",
     ]);
 

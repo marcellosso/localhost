@@ -8,6 +8,20 @@ export function isActive(state: ServiceState): boolean {
   return state === "starting" || state === "running" || state === "stopping";
 }
 
+const STATE_LABELS: Record<ServiceState, string> = {
+  stopped: "Stopped",
+  starting: "Starting",
+  running: "Running",
+  stopping: "Stopping",
+  exited: "Exited",
+  failed: "Failed",
+};
+
+/** "Running", …; "No services" for a Project without any. */
+export function stateLabel(state: ServiceState | null): string {
+  return state ? STATE_LABELS[state] : "No services";
+}
+
 /** Running although its Port has not accepted connections in time. */
 export function hasPortWarning(status: StatusView): boolean {
   return status.state === "running" && status.run?.isPortUnresponsive === true;
@@ -66,6 +80,46 @@ export function rowSummary(project: Project, service: Service, status: StatusVie
     if (names.length > 0) return `Waiting for ${listFormat.format(names)}…`;
   }
   return statusSummary(status);
+}
+
+// MARK: Screen readers (docs/v1-decisions.md, Accessibility)
+
+/**
+ * The text as a screen reader should say it: "Running · port 3000" →
+ * "Running, port 3000", "Shop › Web" → "Shop, Web".
+ */
+export function spoken(text: string): string {
+  return text.replaceAll(" · ", ", ").replaceAll(" › ", ", ").replaceAll("…", "");
+}
+
+/** What a screen reader says about a Service besides its name, e.g. "Running, moved to port 3001". */
+export function spokenSummary(status: StatusView): string {
+  return withState(status.state, spoken(statusSummary(status)));
+}
+
+/**
+ * A Service row as one sentence: its name, then state and summary, Port and
+ * command, e.g. "Web, Running, port 3000, pnpm dev".
+ */
+export function serviceRowLabel(project: Project, service: Service, status: StatusView, port?: number | null): string {
+  const summary = withState(status.state, spoken(rowSummary(project, service, status)));
+  const parts = [service.name, summary];
+  if (port != null && !summary.includes(`port ${port}`)) parts.push(`port ${port}`);
+  parts.push(service.commandLine);
+  return parts.join(", ");
+}
+
+/** A Project's Services for a screen reader, e.g. "2 of 3 running, 1 failed", or "No services". */
+export function projectServicesSummary(project: Project, states: readonly ServiceState[]): string {
+  if (project.services.length === 0) return "No services";
+  const failed = states.filter((state) => state === "failed").length;
+  const active = states.filter(isActive).length;
+  return `${active} of ${states.length} running${failed > 0 ? `, ${failed} failed` : ""}`;
+}
+
+function withState(state: ServiceState, summary: string): string {
+  const label = stateLabel(state);
+  return summary.startsWith(label) ? summary : `${label}, ${summary}`;
 }
 
 /** The row summary's tooltip: why it says what it says. */

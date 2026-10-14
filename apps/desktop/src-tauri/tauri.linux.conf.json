@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "localhost-app",
+  "bundle": {
+    "linux": {
+      "deb": { "desktopTemplate": "linux/localhost-app.desktop" },
+      "rpm": { "desktopTemplate": "linux/localhost-app.desktop" }
+    }
+  }
+}
