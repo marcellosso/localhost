@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
-import { commands, type Project } from "../bindings";
+import { useEffect, useRef, useState } from "react";
+import { commands, type ExecutionTarget, type Project, type ProjectFolder } from "../bindings";
 import { type SuggestionDraft, suggestionDrafts, suggestionEdits } from "../editors";
+import { folderName, isSameTarget, projectFolder, targetId, thisMachine } from "../targets";
 import { closeSheet } from "../ui";
-import { Field, FieldRow, FolderField, FormSheet, TextField, useFollowingKey } from "./Form";
+import { Field, FieldRow, FolderField, FormSheet, TargetField, TextField, useFollowingKey } from "./Form";
 import { FolderIcon } from "./Icons";
 import { SuggestionReview } from "./SuggestionReview";
 
@@ -16,9 +17,15 @@ type Props = {
  * Adds a Project (folder, name, Key derived from the name) or edits one.
  * When adding, the folder is scanned as soon as it is chosen and the
  * Suggestions are reviewed in the same sheet, then saved with the Project.
+ *
+ * On Windows it also says which WSL distro the Project runs in (the
+ * default one, for a new Project). A folder picked inside a distro runs
+ * there; one on a Windows drive, in the chosen distro through its mount.
  */
 export function ProjectForm({ editing, onAdded }: Props) {
-  const [path, setPath] = useState(editing?.path ?? "");
+  const [folder, setFolder] = useState<ProjectFolder | null>(editing ? projectFolder(editing) : null);
+  const [target, setTarget] = useState<ExecutionTarget>(editing ? projectFolder(editing).target : thisMachine);
+  const [distros, setDistros] = useState<string[]>([]);
   const [name, setName] = useState(editing?.name ?? "");
   const key = useFollowingKey(editing?.key ?? "", editing !== undefined, async (name) => {
     const result = await commands.suggestedProjectKey(name, editing?.id ?? null);
@@ -29,42 +36,65 @@ export function ProjectForm({ editing, onAdded }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   /** The folder the shown Suggestions are for, so a late scan of an earlier folder is ignored. */
-  const scannedPath = useRef("");
+  const scannedFolder = useRef("");
+
+  useEffect(() => {
+    void commands.wslDistros().then((names) => {
+      setDistros(names);
+      // Windows itself can't run Services yet: a new Project runs in the default distro.
+      if (!editing && names.length > 0) setTarget((target) => (target.kind === "thisMachine" ? { kind: "wsl", distro: names[0] } : target));
+    });
+  }, [editing]);
 
   const changeName = (value: string) => {
     setName(value);
     key.follow(value);
   };
 
-  const chooseFolder = async () => {
-    const folder = await commands.chooseFolder(path || null);
-    if (folder === null) return;
-    setPath(folder);
-    if (!name) changeName(folder.split("/").filter(Boolean).pop() ?? "");
-    if (!editing) void scan(folder);
+  /** Another target: a folder chosen on the previous one no longer applies. */
+  const changeTarget = (next: ExecutionTarget) => {
+    setTarget(next);
+    if (folder && !isSameTarget(folder.target, next)) {
+      setFolder(editing ? { target: next, path: "" } : null);
+      scannedFolder.current = "";
+      setDrafts([]);
+      setIsScanning(false);
+    }
   };
 
-  const scan = async (folder: string) => {
-    scannedPath.current = folder;
+  const chooseFolder = async () => {
+    const start = folder?.path && isSameTarget(folder.target, target) ? folder.path : null;
+    const chosen = await commands.chooseFolder(target, start);
+    if (chosen === null) return;
+    setFolder(chosen);
+    setTarget(chosen.target);
+    if (!name) changeName(folderName(chosen.path));
+    if (!editing) void scan(chosen);
+  };
+
+  const scan = async (chosen: ProjectFolder) => {
+    const scanned = `${targetId(chosen.target)}:${chosen.path}`;
+    scannedFolder.current = scanned;
     setDrafts([]);
     setIsScanning(true);
-    const result = await commands.scanFolder(folder);
-    if (scannedPath.current !== folder) return;
+    const result = await commands.scanFolder(chosen);
+    if (scannedFolder.current !== scanned) return;
     if (result.status === "ok") setDrafts(suggestionDrafts(result.data));
     else setError(result.error.message);
     setIsScanning(false);
   };
 
   const save = async () => {
+    if (!folder) return;
     setIsSaving(true);
     setError(null);
     if (editing) {
-      const result = await commands.editProject(editing.id, name, key.key, path);
+      const result = await commands.editProject(editing.id, name, key.key, folder);
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
     } else {
-      const result = await commands.addProject(name, key.key, path, suggestionEdits(drafts));
+      const result = await commands.addProject(name, key.key, folder, suggestionEdits(drafts));
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
@@ -72,6 +102,8 @@ export function ProjectForm({ editing, onAdded }: Props) {
     }
   };
 
+  const path = folder?.path ?? "";
+  const moves = editing !== undefined && !isSameTarget(projectFolder(editing).target, target);
   const count = drafts.filter((draft) => draft.isChecked).length;
   const hint = editing ? "↩ to save" : count === 0 ? "↩ to add" : `↩ to add with ${count} service${count === 1 ? "" : "s"}`;
   return (
@@ -87,7 +119,14 @@ export function ProjectForm({ editing, onAdded }: Props) {
       onCancel={closeSheet}
       onSubmit={() => void save()}
     >
-      <Field title="Folder">{(id) => <FolderField id={id} path={path} onChoose={() => void chooseFolder()} />}</Field>
+      {(distros.length > 0 || target.kind === "wsl") && (
+        <Field title="Runs in" hint={moves ? "Its services are stopped first, and their logs where it ran are removed." : null}>
+          {(id) => <TargetField id={id} target={target} distros={distros} onChange={changeTarget} />}
+        </Field>
+      )}
+      <Field title="Folder">
+        {(id) => <FolderField id={id} path={path} target={folder?.target} onChoose={() => void chooseFolder()} />}
+      </Field>
       <FieldRow>
         <Field title="Name">
           {(id) => <TextField id={id} value={name} onChange={changeName} placeholder="My App" autoFocus={!!editing} />}
@@ -101,7 +140,7 @@ export function ProjectForm({ editing, onAdded }: Props) {
           drafts={drafts}
           setDrafts={setDrafts}
           isScanning={isScanning}
-          projectPath={path}
+          project={folder ?? { target, path }}
           emptyMessage="Nothing recognised in this folder. Add the project, then add its services yourself."
         />
       )}

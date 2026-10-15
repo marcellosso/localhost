@@ -1,9 +1,10 @@
-import { type CSSProperties, useEffect, useId, useState } from "react";
+import { type CSSProperties, Fragment, useEffect, useId, useState } from "react";
 import { requestStopListener } from "../actions";
-import { commands, type ListenerDetails } from "../bindings";
+import { commands, type ExecutionTarget, type ListenerDetails } from "../bindings";
 import { type CoreView, findService } from "../core";
-import { listenerSubtitle, portsText } from "../listeners";
+import { listenerKey, listenerSubtitle, portsText } from "../listeners";
 import { spoken } from "../status";
+import { distroOf, targetId } from "../targets";
 import { useUi } from "../ui";
 import { EmptyState } from "./EmptyState";
 import { ChevronIcon, NetworkIcon } from "./Icons";
@@ -13,15 +14,39 @@ import styles from "./PortsView.module.css";
 /** How often Listeners are rescanned while the Ports view is open. */
 const REFRESH_INTERVAL = 2_000;
 
+/** The Listeners of one Execution Target: development servers and Docker, then apps and system services. */
+type Group = { target: ExecutionTarget; development: ListenerDetails[]; others: ListenerDetails[] };
+
 /**
- * Every Listener on this machine, rescanned every 2 seconds while visible:
- * development servers and Docker first, apps and system services folded
- * below. The selected one's process is shown in full on the right.
+ * This machine's Listeners, then each WSL distro's (Windows only; this
+ * machine's are left out while Windows itself can't be scanned and has none).
+ */
+function grouped(all: ListenerDetails[]): Group[] {
+  const groups = new Map<string, Group>([["thisMachine", { target: { kind: "thisMachine" }, development: [], others: [] }]]);
+  for (const details of all) {
+    const id = targetId(details.target);
+    const group = groups.get(id) ?? { target: details.target, development: [], others: [] };
+    groups.set(id, group);
+    const isDevelopment = details.listener.kind === "development" || details.listener.kind === "docker";
+    (isDevelopment ? group.development : group.others).push(details);
+  }
+  const [here, ...distros] = groups.values();
+  distros.sort((a, b) => (distroOf(a.target) ?? "").localeCompare(distroOf(b.target) ?? ""));
+  const isHereEmpty = here.development.length === 0 && here.others.length === 0;
+  return distros.length > 0 && isHereEmpty ? distros : [here, ...distros];
+}
+
+/**
+ * Every Listener on this machine and in the WSL distros in use, rescanned
+ * every 2 seconds while visible: development servers and Docker first,
+ * apps and system services folded below, grouped by distro on Windows.
+ * The selected one's process is shown in full on the right.
  */
 export function PortsView({ view }: { view: CoreView }) {
   const [listeners, setListeners] = useState<ListenerDetails[] | null>(null);
-  const [selectedPid, setSelectedPid] = useState<number | null>(null);
-  const [showsOthers, setShowsOthers] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /** The groups whose apps and system services are unfolded, by target. */
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
   const { stoppingListeners } = useUi();
 
   // Restarted when a stop begins or ends, so the list catches up at once.
@@ -42,25 +67,33 @@ export function PortsView({ view }: { view: CoreView }) {
   }, [stoppingListeners]);
 
   const all = listeners ?? [];
-  const development = all.filter(({ listener }) => listener.kind === "development" || listener.kind === "docker");
-  const others = all.filter(({ listener }) => listener.kind === "app" || listener.kind === "system");
-  const selected = all.find(({ listener }) => listener.pid === selectedPid);
+  const groups = grouped(all);
+  const isGrouped = groups.length > 1 || groups[0].target.kind === "wsl";
+  const selected = all.find((details) => listenerKey(details) === selectedKey);
+  const isShown = (details: ListenerDetails) =>
+    unfolded.has(targetId(details.target)) || groups.some((group) => group.development.includes(details));
   // Orca follows the selected row, as focus stays on the list.
   const listId = useId();
-  const optionId = (pid: number) => `${listId}-${pid}`;
-  const isSelectedShown =
-    selected !== undefined && (showsOthers || development.some(({ listener }) => listener.pid === selectedPid));
-  const row = (details: ListenerDetails) => (
-    <ListenerRow
-      key={details.listener.pid}
-      id={optionId(details.listener.pid)}
-      details={details}
-      view={view}
-      isSelected={details.listener.pid === selectedPid}
-      isStopping={stoppingListeners.has(details.listener.pid)}
-      onSelect={() => setSelectedPid(details.listener.pid)}
-    />
-  );
+  const optionId = (key: string) => `${listId}-${key}`;
+  const toggle = (id: string) => {
+    const next = new Set(unfolded);
+    if (!next.delete(id)) next.add(id);
+    setUnfolded(next);
+  };
+  const row = (details: ListenerDetails) => {
+    const key = listenerKey(details);
+    return (
+      <ListenerRow
+        key={key}
+        id={optionId(key)}
+        details={details}
+        view={view}
+        isSelected={key === selectedKey}
+        isStopping={stoppingListeners.has(key)}
+        onSelect={() => setSelectedKey(key)}
+      />
+    );
+  };
 
   return (
     <>
@@ -76,36 +109,45 @@ export function PortsView({ view }: { view: CoreView }) {
             className={styles.list}
             role="listbox"
             aria-label="Listeners"
-            aria-activedescendant={isSelectedShown && selectedPid !== null ? optionId(selectedPid) : undefined}
+            aria-activedescendant={selected && isShown(selected) ? optionId(listenerKey(selected)) : undefined}
             tabIndex={0}
           >
-            <li className={styles.section} role="presentation">
-              Development
-            </li>
-            {development.map(row)}
-            {listeners !== null && development.length === 0 && (
-              <li className={`${styles.note} secondary`} role="presentation">
-                No development servers are listening.
-              </li>
-            )}
-            {others.length > 0 && (
-              <li role="presentation">
-                <button
-                  className={styles.disclosure}
-                  aria-expanded={showsOthers}
-                  onClick={() => setShowsOthers(!showsOthers)}
-                >
-                  <ChevronIcon className={styles.chevron} size={9} />
-                  Apps &amp; System ({others.length})
-                </button>
-              </li>
-            )}
-            {showsOthers && others.map(row)}
+            {groups.map(({ target, development, others }) => {
+              const id = targetId(target);
+              const distro = distroOf(target);
+              return (
+                <Fragment key={id}>
+                  <li className={styles.section} role="presentation">
+                    {!isGrouped ? "Development" : distro ? `${distro} (WSL)` : "Windows"}
+                  </li>
+                  {distro && (
+                    <li className={`${styles.note} ${styles.forwarding} secondary`} role="presentation">
+                      Windows reaches these ports at localhost, through WSL’s port forwarding.
+                    </li>
+                  )}
+                  {development.map(row)}
+                  {listeners !== null && development.length === 0 && (
+                    <li className={`${styles.note} secondary`} role="presentation">
+                      No development servers are listening.
+                    </li>
+                  )}
+                  {others.length > 0 && (
+                    <li role="presentation">
+                      <button className={styles.disclosure} aria-expanded={unfolded.has(id)} onClick={() => toggle(id)}>
+                        <ChevronIcon className={styles.chevron} size={9} />
+                        Apps &amp; System ({others.length})
+                      </button>
+                    </li>
+                  )}
+                  {unfolded.has(id) && others.map(row)}
+                </Fragment>
+              );
+            })}
           </ul>
         )}
       </section>
       {selected ? (
-        <ListenerDetail details={selected} isStopping={stoppingListeners.has(selected.listener.pid)} />
+        <ListenerDetail details={selected} isStopping={stoppingListeners.has(listenerKey(selected))} />
       ) : (
         <section className={styles.detail} aria-label="Listener" data-column="detail">
           <EmptyState
@@ -204,6 +246,7 @@ function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isS
     ["Ports", listener.ports.join(", "), true],
     ["Command", listener.command, true],
     ["Executable", listener.executablePath, true],
+    ["Distro", distroOf(details.target), false],
     ["PID", String(listener.pid), true],
     ["Process Group", String(listener.processGroupId), true],
     ["Working Directory", listener.workingDirectory ?? "Unknown", true],
@@ -224,6 +267,11 @@ function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isS
       </dl>
       {listener.owner.kind === "unmanaged" && listener.kind === "development" && (
         <p className={styles.footnote}>localhost didn’t start this process and it isn’t inside a project folder.</p>
+      )}
+      {details.target.kind === "wsl" && (
+        <p className={styles.footnote}>
+          It listens in WSL. Windows reaches it at localhost:{listener.ports[0]}, through WSL’s port forwarding.
+        </p>
       )}
       <div className={`${styles.form} ${styles.detailActions}`}>
         <StopButton details={details} isStopping={isStopping} />

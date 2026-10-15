@@ -203,17 +203,21 @@ async keyFromName(name: string) : Promise<string> {
 /**
  * Adds a Project with the reviewed Suggestions as its first Services.
  */
-async addProject(name: string, key: string, path: string, services: SuggestionEdit[]) : Promise<Result<Project, CommandError>> {
+async addProject(name: string, key: string, folder: ProjectFolder, services: SuggestionEdit[]) : Promise<Result<Project, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("add_project", { name, key, path, services }) };
+    return { status: "ok", data: await TAURI_INVOKE("add_project", { name, key, folder, services }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async editProject(projectId: Id, name: string, key: string, path: string) : Promise<Result<null, CommandError>> {
+/**
+ * Saves the Project's editor. A Project moved to another Execution Target
+ * has its Services stopped first, and their logs on the old one removed.
+ */
+async editProject(projectId: Id, name: string, key: string, folder: ProjectFolder) : Promise<Result<null, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("edit_project", { projectId, name, key, path }) };
+    return { status: "ok", data: await TAURI_INVOKE("edit_project", { projectId, name, key, folder }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -295,11 +299,12 @@ async serviceRelations(serviceId: Id) : Promise<Result<ServiceRelations, Command
 }
 },
 /**
- * Suggestions for a folder being added as a Project, on this machine.
+ * Suggestions for a folder being added as a Project, scanned where it
+ * will run: in a distro, by its `localhostd`.
  */
-async scanFolder(path: string) : Promise<Result<ServiceSuggestion[], CommandError>> {
+async scanFolder(folder: ProjectFolder) : Promise<Result<ServiceSuggestion[], CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("scan_folder", { path }) };
+    return { status: "ok", data: await TAURI_INVOKE("scan_folder", { folder }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -362,9 +367,10 @@ async readProjectFile(file: string) : Promise<Result<ImportPreview, CommandError
 },
 /**
  * Imports the Project file into `folder`. On Replace, Services the file no
- * longer has are stopped first, and their logs removed after.
+ * longer has are stopped first, and their logs removed after; all of them
+ * if the Project moves to another Execution Target.
  */
-async importProject(file: string, folder: string, choice: ImportChoice | null) : Promise<Result<Project, CommandError>> {
+async importProject(file: string, folder: ProjectFolder, choice: ImportChoice | null) : Promise<Result<Project, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("import_project", { file, folder, choice }) };
 } catch (e) {
@@ -384,17 +390,18 @@ async exportProject(projectId: Id, file: string) : Promise<Result<null, CommandE
 }
 },
 /**
- * A folder, starting in `start` when it exists.
+ * A Project's folder, starting in `start` (a path on `target`) when it
+ * exists, or in a distro's `/home`.
  */
-async chooseFolder(start: string | null) : Promise<string | null> {
-    return await TAURI_INVOKE("choose_folder", { start });
+async chooseFolder(target: ExecutionTarget, start: string | null) : Promise<ProjectFolder | null> {
+    return await TAURI_INVOKE("choose_folder", { target, start });
 },
 /**
- * A folder for a Service's working directory, relative to `project_path`,
- * e.g. `web` or `../shared`.
+ * A folder for a Service's working directory, relative to the Project's
+ * folder, e.g. `web` or `../shared`. `None` if it isn't where the Project runs.
  */
-async chooseWorkingDirectory(projectPath: string) : Promise<string | null> {
-    return await TAURI_INVOKE("choose_working_directory", { projectPath });
+async chooseWorkingDirectory(project: ProjectFolder) : Promise<string | null> {
+    return await TAURI_INVOKE("choose_working_directory", { project });
 },
 /**
  * A Project file to import.
@@ -412,6 +419,13 @@ async chooseExportFile(projectId: Id) : Promise<Result<string | null, CommandErr
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * The distros a Project can run in, for its editor: none without WSL, or
+ * off Windows.
+ */
+async wslDistros() : Promise<string[]> {
+    return await TAURI_INVOKE("wsl_distros");
 },
 async settings() : Promise<Settings> {
     return await TAURI_INVOKE("settings");
@@ -603,7 +617,7 @@ export type ImportPreview = { fileName: string; name: string; key: Key;
 /**
  * The folder the file names; it may not exist here.
  */
-path: string; folderExists: boolean; services: ImportedService[]; 
+folder: ProjectFolder; folderExists: boolean; services: ImportedService[]; 
 /**
  * e.g. "2 project variables · profiles Development (active), Testing".
  */
@@ -932,6 +946,10 @@ export type ProjectFileProblem =
  * The value breaks an editor's rule (Key, port, URL, cycle, …).
  */
 { kind: "invalid"; detail: LocalhostError }
+/**
+ * A Project's folder: the Execution Target it runs on, and its path there.
+ */
+export type ProjectFolder = { target: ExecutionTarget; path: string }
 /**
  * A change to the Project Configuration, tagged with the Origin that caused it.
  */

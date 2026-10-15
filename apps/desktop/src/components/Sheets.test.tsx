@@ -22,6 +22,7 @@ const commands = vi.hoisted(() => ({
   saveEnvironment: vi.fn(),
   importProject: vi.fn(),
   removeService: vi.fn(),
+  wslDistros: vi.fn(),
 }));
 vi.mock("../bindings", () => ({ commands }));
 
@@ -62,18 +63,23 @@ describe("Sheets", () => {
     commands.suggestedProjectKey.mockImplementation(async (name: string) => ok(name.toLowerCase().replace(/ /g, "-")));
     commands.serviceRelations.mockResolvedValue(ok({ cycles: [], dependents: [] }));
     commands.commandLineUsesPort.mockResolvedValue(true);
+    commands.wslDistros.mockResolvedValue([]);
   });
   afterEach(() => act(resetUi));
 
   it("adds a Project from a chosen folder with the Suggestions left checked", async () => {
-    commands.chooseFolder.mockResolvedValue("/home/me/my-saas");
+    const folder = { target: { kind: "thisMachine" }, path: "/home/me/my-saas" } as const;
+    commands.chooseFolder.mockResolvedValue(folder);
     commands.scanFolder.mockResolvedValue(ok([suggestion("Dev", true), suggestion("Build", false)]));
     const added = { ...shop, id: "new" };
     commands.addProject.mockResolvedValue(ok(added));
     const selected = renderSheets();
     act(() => showSheet({ kind: "addProject" }));
 
+    expect(screen.queryByLabelText("Runs in")).toBeNull();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
+    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "thisMachine" }, null);
+    expect(commands.scanFolder).toHaveBeenCalledWith(folder);
     expect(field("Name").value).toBe("my-saas");
     await waitFor(() => expect(field("Key").value).toBe("my-saas"));
     expect(screen.getByText("1 selected · edit before adding")).toBeTruthy();
@@ -88,11 +94,41 @@ describe("Sheets", () => {
     expect(field("Key").value).toBe("saas");
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add Project" })));
-    expect(commands.addProject).toHaveBeenCalledWith("My Other SaaS", "saas", "/home/me/my-saas", [
+    expect(commands.addProject).toHaveBeenCalledWith("My Other SaaS", "saas", folder, [
       { name: "Dev", key: "dev", workingDirectory: ".", commandLine: "pnpm dev", port: "", portCanChange: true },
     ]);
     expect(currentUi().sheet).toBeNull();
     expect(selected.project).toHaveBeenCalledWith("new");
+  });
+
+  it("adds a Project in the default WSL distro, or where its folder is", async () => {
+    commands.wslDistros.mockResolvedValue(["Ubuntu", "Debian"]);
+    const inDebian = { target: { kind: "wsl", distro: "Debian" }, path: "/home/me/shop" } as const;
+    commands.chooseFolder.mockResolvedValue(inDebian);
+    commands.scanFolder.mockResolvedValue(ok([]));
+    commands.addProject.mockResolvedValue(ok({ ...shop, id: "new" }));
+    renderSheets();
+    act(() => showSheet({ kind: "addProject" }));
+
+    const runsIn = (await screen.findByLabelText("Runs in")) as HTMLSelectElement;
+    await waitFor(() => expect(runsIn.selectedOptions[0].textContent).toBe("Ubuntu (WSL)"));
+    expect([...runsIn.options].map((option) => option.textContent)).toEqual(["Ubuntu (WSL)", "Debian (WSL)"]);
+
+    // Picked inside another distro's folders: the Project runs there.
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
+    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "wsl", distro: "Ubuntu" }, null);
+    expect(runsIn.selectedOptions[0].textContent).toBe("Debian (WSL)");
+    expect(screen.getByRole("button", { name: "Folder" }).textContent).toContain("Debian/home/me/shop");
+    expect(commands.scanFolder).toHaveBeenCalledWith(inDebian);
+
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add Project" })));
+    expect(commands.addProject).toHaveBeenCalledWith("shop", "shop", inDebian, []);
+
+    // Another target: the folder is chosen again.
+    act(() => showSheet({ kind: "addProject" }));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
+    fireEvent.change(await screen.findByLabelText("Runs in"), { target: { value: "wsl:Ubuntu" } });
+    expect(screen.getByRole("button", { name: "Folder" }).textContent).toContain("Choose a folder…");
   });
 
   it("keeps the sheet open with the core's message when saving fails", async () => {
@@ -179,14 +215,15 @@ describe("Sheets", () => {
       fileName: "shop.yaml",
       name: "Shop",
       key: "shop",
-      path: "/elsewhere/shop",
+      folder: { target: { kind: "thisMachine" }, path: "/elsewhere/shop" },
       folderExists: false,
       services: [{ name: "API", key: "api", workingDirectory: ".", commandLine: "run API", port: 4000, isExcludedFromStartAll: false, dependencies: [] }],
       environment: "1 project variable",
       secrets: [{ name: "TOKEN", owner: "project" }],
       clash: { projectName: "Shop", freeKey: "shop-2", removed: ["Worker (running, stopped first)"] },
     };
-    commands.chooseFolder.mockResolvedValue("/home/me/shop");
+    const folder = { target: { kind: "thisMachine" }, path: "/home/me/shop" } as const;
+    commands.chooseFolder.mockResolvedValue(folder);
     commands.importProject.mockResolvedValue(ok(shop));
     const selected = renderSheets();
     act(() => showSheet({ kind: "importProject", file: "/tmp/shop.yaml", preview }));
@@ -198,7 +235,7 @@ describe("Sheets", () => {
     expect(screen.getByText("Removes Worker (running, stopped first), which the file doesn’t have.")).toBeTruthy();
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Replace" })));
-    expect(commands.importProject).toHaveBeenCalledWith("/tmp/shop.yaml", "/home/me/shop", "replace");
+    expect(commands.importProject).toHaveBeenCalledWith("/tmp/shop.yaml", folder, "replace");
     expect(selected.project).toHaveBeenCalledWith(shop.id);
   });
 

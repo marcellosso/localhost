@@ -65,6 +65,34 @@ describe("PortsView", () => {
     expect(detail.textContent).toContain("localhost didn’t start this process");
   });
 
+  it("groups each WSL distro's Listeners under it, telling a pid used in both apart", async () => {
+    const inUbuntu = (details: ListenerDetails): ListenerDetails => ({ ...details, target: { kind: "wsl", distro: "Ubuntu" } });
+    // Windows itself has none: it isn't scanned yet.
+    commands.listeners.mockResolvedValue({ status: "ok", data: [inUbuntu(runs), inUbuntu(stray), inUbuntu(app)] });
+    commands.stopListener.mockResolvedValue({ status: "ok", data: null });
+    const { unmount } = render(<PortsView view={view} />);
+    await act(async () => {});
+
+    expect(screen.queryByText("Windows")).toBeNull();
+    expect(screen.getByText("Ubuntu (WSL)")).toBeTruthy();
+    expect(screen.getByText("Windows reaches these ports at localhost, through WSL’s port forwarding.")).toBeTruthy();
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+
+    // The same pid on Windows and in the distro: two rows, selected apart.
+    unmount();
+    commands.listeners.mockResolvedValue({ status: "ok", data: [stray, inUbuntu(stray)] });
+    render(<PortsView view={view} />);
+    await act(async () => {});
+    expect(screen.getByText("Windows")).toBeTruthy();
+    const rows = screen.getAllByRole("option");
+    expect(rows).toHaveLength(2);
+    fireEvent.click(rows[1]);
+    expect(rows.map((row) => row.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    const detail = screen.getByRole("region", { name: "python3 process" });
+    expect(detail.textContent).toContain("Ubuntu");
+    expect(detail.textContent).toContain("Windows reaches it at localhost:8000");
+  });
+
   it("stops a Service's Listener at once, and asks before stopping any other", async () => {
     await renderPorts();
     const [serviceStop, strayStop] = screen.getAllByRole("button", { name: /^Stop / });

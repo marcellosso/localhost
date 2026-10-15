@@ -1,5 +1,12 @@
 import { type CSSProperties, useState } from "react";
-import { commands, type ImportChoice, type ImportedService, type ImportPreview, type Project } from "../bindings";
+import {
+  commands,
+  type ImportChoice,
+  type ImportedService,
+  type ImportPreview,
+  type Project,
+  type ProjectFolder,
+} from "../bindings";
 import { directoryLabel } from "../editors";
 import { closeSheet } from "../ui";
 import { Field, FieldHint, FolderField, FormCard, FormSheet, cardRow } from "./Form";
@@ -20,7 +27,7 @@ type Props = {
  * is saved until Import or Replace.
  */
 export function ImportProjectForm({ file, preview, onImported }: Props) {
-  const [path, setPath] = useState(preview.path);
+  const [folder, setFolder] = useState<ProjectFolder>(preview.folder);
   const [folderExists, setFolderExists] = useState(preview.folderExists);
   const [choice, setChoice] = useState<ImportChoice>("keepBoth");
   const [error, setError] = useState<string | null>(null);
@@ -29,16 +36,16 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
   const isReplacing = clash !== null && choice === "replace";
 
   const chooseFolder = async () => {
-    const folder = await commands.chooseFolder(folderExists ? path : null);
-    if (folder === null) return;
-    setPath(folder);
+    const chosen = await commands.chooseFolder(folder.target, folderExists ? folder.path : null);
+    if (chosen === null) return;
+    setFolder(chosen);
     setFolderExists(true);
   };
 
   const save = async () => {
     setIsSaving(true);
     setError(null);
-    const result = await commands.importProject(file, path, clash ? choice : null);
+    const result = await commands.importProject(file, folder, clash ? choice : null);
     setIsSaving(false);
     if (result.status === "error") return setError(result.error.message);
     closeSheet();
@@ -64,7 +71,7 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
       onSubmit={() => void save()}
     >
       <Field title="Folder" hint={folderExists ? null : "This folder isn’t on this computer. Choose where the project is."}>
-        {(id) => <FolderField id={id} path={path} onChoose={() => void chooseFolder()} />}
+        {(id) => <FolderField id={id} path={folder.path} target={folder.target} onChoose={() => void chooseFolder()} />}
       </Field>
       {clash && (
         <Field title="Key" note={`“${preview.key}” is already used by ${clash.projectName}`} hint={replacementHint}>

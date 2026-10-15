@@ -24,6 +24,12 @@
   font-size: 12px;
 }
 
+/* Under a distro's name: a hint, not an empty list. */
+.forwarding {
+  padding-top: 0;
+  font-size: 11px;
+}
+
 .disclosure {
   display: flex;
   align-items: center;

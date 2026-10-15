@@ -8,6 +8,7 @@ import {
   type ListenerDetails,
   type Result,
 } from "./bindings";
+import { listenerKey } from "./listeners";
 import { currentUi, setProgress, setStoppingListener, showAlert } from "./ui";
 
 // What the main window's buttons do. Failures become an alert; a start
@@ -58,10 +59,11 @@ export function requestStopListener(details: ListenerDetails) {
   else showAlert({ kind: "stopListener", details });
 }
 
-export async function stopListener({ target, listener }: ListenerDetails) {
-  setStoppingListener(listener.pid, true);
-  report(await commands.stopListener(target, listener));
-  setStoppingListener(listener.pid, false);
+export async function stopListener(details: ListenerDetails) {
+  const key = listenerKey(details);
+  setStoppingListener(key, true);
+  report(await commands.stopListener(details.target, details.listener));
+  setStoppingListener(key, false);
 }
 
 /** What the user must hear about at launch: unreadable Project files, then Orphans. */
