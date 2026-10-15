@@ -52,8 +52,8 @@ pub use listener::{Listener, ListenerKind, ListenerOwner, PortWarning, port_warn
 pub use local_url::LocalUrl;
 pub use logs::{LogBuffer, LogStore};
 pub use model::{
-    EnvironmentProfile, NewService, Project, Service, VariableInput, VariableLayer, VariableValue, Variables,
-    service_label, suggested_project_key,
+    EnvironmentProfile, ExecutionTarget, NewService, Project, Service, VariableInput, VariableLayer, VariableValue,
+    Variables, service_label, suggested_project_key,
 };
 pub use origin::Origin;
 pub use output::{OutputChannel, OutputLine, ServiceOutputLine};

@@ -24,11 +24,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.90
         with:
           components: clippy, rustfmt
+          targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      # The Windows app links the core (XP4). Checked here rather than on a
+      # Windows runner: clippy doesn't link, so it needs no Windows toolchain.
+      - name: Clippy for Windows
+        run: cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
       - run: cargo test
 
   macos:

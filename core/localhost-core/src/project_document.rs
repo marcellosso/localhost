@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths::abbreviate_tilde;
 use crate::yaml::{YamlEntry, YamlKind, YamlValue, write_scalar};
-use crate::{Id, Key, LocalhostError, Project, Service, Variables, validate};
+use crate::{ExecutionTarget, Id, Key, LocalhostError, Project, Service, Variables, validate};
 
 /// A Project's Configuration as a Project file, so it can move between
 /// machines (and later into a repo or a CLI). It has no ids, sort order or
@@ -24,6 +24,7 @@ pub struct ProjectDocument {
     name: String,
     key: Key,
     path: String,
+    execution_target: ExecutionTarget,
     variables: Variables,
     services: Vec<DocumentService>,
     profiles: Vec<DocumentProfile>,
@@ -64,6 +65,7 @@ impl From<&Project> for ProjectDocument {
             name: project.name.clone(),
             key: project.key.clone(),
             path: project.path.clone(),
+            execution_target: project.execution_target.clone(),
             variables: project.variables.clone(),
             services: project
                 .services
@@ -118,6 +120,17 @@ impl ProjectDocument {
         self.path = path.into();
     }
 
+    /// Where the Project ran on the machine that wrote the file.
+    pub fn execution_target(&self) -> &ExecutionTarget {
+        &self.execution_target
+    }
+
+    /// Runs the import elsewhere, e.g. on this machine when the file came
+    /// from a WSL distro. Validated on import, with the path.
+    pub fn set_execution_target(&mut self, target: ExecutionTarget) {
+        self.execution_target = target;
+    }
+
     pub fn variables(&self) -> &Variables {
         &self.variables
     }
@@ -144,8 +157,17 @@ impl ProjectDocument {
             format!("localhost: {}", Self::FORMAT_VERSION),
             format!("name: {}", write_scalar(&self.name)),
             format!("key: {}", write_scalar(self.key.as_str())),
-            format!("path: {}", write_scalar(&abbreviate_tilde(&self.path))),
         ];
+        match &self.execution_target {
+            ExecutionTarget::ThisMachine => {
+                lines.push(format!("path: {}", write_scalar(&abbreviate_tilde(&self.path))));
+            }
+            // `~` would stand for this machine's home folder, not the distro's.
+            ExecutionTarget::Wsl { distro } => {
+                lines.push(format!("wsl: {}", write_scalar(distro)));
+                lines.push(format!("path: {}", write_scalar(&self.path)));
+            }
+        }
         lines.extend(variable_lines(&self.variables, ""));
         if !self.services.is_empty() {
             lines.push("services:".into());
@@ -225,7 +247,10 @@ impl ProjectDocument {
         file.entry("localhost");
         let name = file.required("name", |raw| Ok(validate::name(raw)?))?;
         let key = file.required("key", |raw| Ok(Key::new(raw)?))?;
-        let path = file.required("path", |raw| Ok(validate::project_path(raw)?))?;
+        let execution_target = file
+            .optional("wsl", |raw| Ok(validate::execution_target(ExecutionTarget::Wsl { distro: raw.into() })?))?
+            .unwrap_or_default();
+        let path = file.required("path", |raw| Ok(validate::project_path(raw, &execution_target)?))?;
         let variables = read_variables(&mut file)?;
 
         let mut services = Vec::new();
@@ -264,7 +289,7 @@ impl ProjectDocument {
             }
         })?;
         file.finish()?;
-        Ok(ProjectDocument { name, key, path, variables, services, profiles, active_profile })
+        Ok(ProjectDocument { name, key, path, execution_target, variables, services, profiles, active_profile })
     }
 }
 

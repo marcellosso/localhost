@@ -15,6 +15,7 @@ pub enum LocalhostError {
     InvalidKey(String),
     InvalidName,
     InvalidProjectPath(String),
+    InvalidDistroName(String),
     InvalidWorkingDirectory(String),
     EmptyCommandLine,
     InvalidEnvironmentVariableName(String),
@@ -103,6 +104,7 @@ impl LocalhostError {
             }
             InvalidName => "Enter a name.".into(),
             InvalidProjectPath(_) => "The project folder must be an absolute path.".into(),
+            InvalidDistroName(name) => format!("“{name}” is not the name of a WSL distro."),
             InvalidWorkingDirectory(_) => "The working directory must be relative to the project folder.".into(),
             EmptyCommandLine => "Enter a command line.".into(),
             InvalidEnvironmentVariableName(name) => format!("“{name}” is not a valid environment variable name."),

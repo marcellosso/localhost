@@ -60,6 +60,15 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt
 ```
 
+The Windows app links the core too, so it must also compile for Windows. Check it from macOS or Linux (clippy doesn't link, so no Windows toolchain is needed):
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+```
+
+On Windows, Services run in a WSL distro (ADR-0008), so the core's process layer is Unix-only there: a Run on Windows itself fails with `ExecutionUnavailable` until native execution (XP5).
+
 The Swift layer has its own tests, which need the library built first:
 
 ```sh

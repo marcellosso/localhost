@@ -552,6 +552,15 @@ export type Cycle = { serviceId: Id; message: string }
  */
 export type EnvironmentProfile = { id: Id; name: string; variables: Variables }
 /**
+ * Where a Project's Services run: this machine, or a WSL distro, where
+ * `localhostd` runs them (ADR-0008).
+ */
+export type ExecutionTarget = { kind: "thisMachine" } | 
+/**
+ * A WSL distro, by the name `wsl.exe --list` gives it.
+ */
+{ kind: "wsl"; distro: string }
+/**
  * A folder an action opens.
  */
 export type Folder = 
@@ -711,7 +720,7 @@ export type ListenerOwner =
  * Every failure the core reports. Clients match on these cases; they are
  * never flattened into strings inside the core.
  */
-export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "invalidName" } | { kind: "invalidProjectPath"; detail: string } | { kind: "invalidWorkingDirectory"; detail: string } | { kind: "emptyCommandLine" } | { kind: "invalidEnvironmentVariableName"; detail: string } | { kind: "duplicateVariableName"; detail: string } | { kind: "duplicateProfileName"; detail: string } | { kind: "invalidPort"; detail: number } | { kind: "invalidUrl"; detail: string } | { kind: "duplicateProjectKey"; detail: Key } | { kind: "duplicateServiceKey"; detail: { key: Key; project_id: Id } } | 
+export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "invalidName" } | { kind: "invalidProjectPath"; detail: string } | { kind: "invalidDistroName"; detail: string } | { kind: "invalidWorkingDirectory"; detail: string } | { kind: "emptyCommandLine" } | { kind: "invalidEnvironmentVariableName"; detail: string } | { kind: "duplicateVariableName"; detail: string } | { kind: "duplicateProfileName"; detail: string } | { kind: "invalidPort"; detail: number } | { kind: "invalidUrl"; detail: string } | { kind: "duplicateProjectKey"; detail: Key } | { kind: "duplicateServiceKey"; detail: { key: Key; project_id: Id } } | 
 /**
  * The Dependency would make a Service depend on itself, e.g. `[api, worker, api]`.
  */
@@ -863,9 +872,14 @@ export type ProfileEdit = { profileId: Id | null; name: string; variables: Varia
  */
 export type Project = { id: Id; name: string; key: Key; 
 /**
- * Absolute path of the Project's root folder.
+ * Absolute path of the Project's root folder, on its Execution Target.
  */
-path: string; sortOrder: number; isFavorite: boolean; services: Service[]; 
+path: string; 
+/**
+ * Where its Services run. Left out for this machine, so files of
+ * Projects on this machine are unchanged since before Execution Targets.
+ */
+executionTarget?: ExecutionTarget; sortOrder: number; isFavorite: boolean; services: Service[]; 
 /**
  * Variables every Service of the Project gets, below its own.
  */

@@ -9,8 +9,8 @@ use crate::model::VariableValue;
 use crate::secrets::SecretStore;
 use crate::storage::{ProjectStorage, UnreadableProjectFile};
 use crate::{
-    EnvironmentProfile, Id, Key, LocalhostError, NewService, Origin, Project, ProjectDocument, Service, VariableInput,
-    VariableLayer, Variables, validate,
+    EnvironmentProfile, ExecutionTarget, Id, Key, LocalhostError, NewService, Origin, Project, ProjectDocument,
+    Service, VariableInput, VariableLayer, Variables, validate,
 };
 
 /// A change to the Project Configuration, tagged with the Origin that caused it.
@@ -52,7 +52,10 @@ pub enum KeyClash {
 pub struct ProjectChanges {
     pub name: Option<String>,
     pub key: Option<Key>,
+    /// Validated against the Execution Target the Project ends up with.
     pub path: Option<String>,
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub execution_target: Option<ExecutionTarget>,
     pub is_favorite: Option<bool>,
     pub variables: Option<Vec<VariableInput>>,
 }
@@ -198,8 +201,8 @@ impl ProjectLibrary {
 
     // MARK: Projects
 
-    /// Adds a Project, with `services` (e.g. reviewed Suggestions) in the
-    /// same save: either all of it is added or none of it.
+    /// Adds a Project on this machine, with `services` (e.g. reviewed
+    /// Suggestions) in the same save: either all of it is added or none of it.
     pub fn add_project(
         &self,
         name: &str,
@@ -208,10 +211,25 @@ impl ProjectLibrary {
         services: Vec<NewService>,
         origin: Origin,
     ) -> Result<Project, LocalhostError> {
+        self.add_project_on(ExecutionTarget::ThisMachine, name, key, path, services, origin)
+    }
+
+    /// Adds a Project whose Services run on `target`, like `add_project`.
+    pub fn add_project_on(
+        &self,
+        target: ExecutionTarget,
+        name: &str,
+        key: Key,
+        path: &str,
+        services: Vec<NewService>,
+        origin: Origin,
+    ) -> Result<Project, LocalhostError> {
         let mut state = self.state();
         ensure_project_key_is_free(&state, &key)?;
-        let mut project =
-            Project::new(validate::name(name)?, key, validate::project_path(path)?, next_sort_order(&state));
+        let target = validate::execution_target(target)?;
+        let path = validate::project_path(path, &target)?;
+        let mut project = Project::new(validate::name(name)?, key, path, next_sort_order(&state));
+        project.execution_target = target;
         append(services, &mut project)?;
         self.commit(&mut state, &project)?;
         broadcast(&mut state, ProjectLibraryEvent::ProjectAdded { project: project.clone(), origin });
@@ -231,9 +249,12 @@ impl ProjectLibrary {
             ensure_project_key_is_free(&state, &key)?;
             project.key = key;
         }
-        if let Some(path) = changes.path {
-            project.path = validate::project_path(&path)?;
+        if let Some(target) = changes.execution_target {
+            project.execution_target = validate::execution_target(target)?;
         }
+        // A new target needs a path on it, so the old path is checked again.
+        let path = changes.path.unwrap_or_else(|| project.path.clone());
+        project.path = validate::project_path(&path, &project.execution_target)?;
         if let Some(is_favorite) = changes.is_favorite {
             project.is_favorite = is_favorite;
         }
@@ -288,7 +309,8 @@ impl ProjectLibrary {
             }
         };
         let replaced = existing.filter(|_| on_key_clash == Some(KeyClash::Replace));
-        project.path = validate::project_path(document.path())?;
+        project.execution_target = validate::execution_target(document.execution_target().clone())?;
+        project.path = validate::project_path(document.path(), &project.execution_target)?;
         project.variables = document.variables().clone();
         project.services = document
             .services()

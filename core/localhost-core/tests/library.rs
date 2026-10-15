@@ -7,8 +7,8 @@ use std::os::unix::fs::PermissionsExt;
 
 use common::{Fixture, key};
 use localhost_core::{
-    Id, LocalhostError, NewService, Origin, ProjectChanges, ProjectLibraryEvent, ServiceChanges, UnreadableProjectFile,
-    VariableInput,
+    ExecutionTarget, Id, LocalhostError, NewService, Origin, ProjectChanges, ProjectLibraryEvent, ServiceChanges,
+    UnreadableProjectFile, VariableInput,
 };
 
 fn web(command_line: &str) -> NewService {
@@ -137,6 +137,61 @@ fn rejects_a_relative_project_path() {
         Fixture::new().library().add_project("A", key("a"), "Code/a", vec![], Origin::MainWindow),
         Err(LocalhostError::InvalidProjectPath("Code/a".into()))
     );
+}
+
+#[test]
+fn adds_a_project_in_a_wsl_distro_with_its_path_as_is() {
+    let fixture = Fixture::new();
+    let wsl = ExecutionTarget::Wsl { distro: "Ubuntu".into() };
+    let project = fixture
+        .library()
+        .add_project_on(
+            ExecutionTarget::Wsl { distro: " Ubuntu ".into() },
+            "Shop",
+            key("shop"),
+            "/home/dev/shop/",
+            vec![],
+            Origin::MainWindow,
+        )
+        .unwrap();
+    assert_eq!(project.execution_target, wsl);
+    assert_eq!(project.path, "/home/dev/shop");
+    // A distro's home folder isn't known on this machine.
+    assert_eq!(
+        fixture.library().add_project_on(wsl, "A", key("a"), "~/a", vec![], Origin::MainWindow),
+        Err(LocalhostError::InvalidProjectPath("~/a".into()))
+    );
+    // Stored, and read back on the next launch.
+    assert_eq!(fixture.library().project(project.id).unwrap().execution_target, project.execution_target);
+}
+
+#[test]
+fn a_project_on_this_machine_is_stored_without_a_target() {
+    let fixture = Fixture::new();
+    let project = fixture.library().add_project("A", key("a"), "/tmp/a", vec![], Origin::MainWindow).unwrap();
+    let file = std::fs::read_to_string(fixture.project_file(project.id)).unwrap();
+    assert!(!file.contains("executionTarget"), "{file}");
+}
+
+#[test]
+fn moving_a_project_to_another_target_checks_its_path_there() {
+    let library = Fixture::new().library();
+    let project = library.add_project("A", key("a"), "~/Code/a", vec![], Origin::MainWindow).unwrap();
+    let wsl = ExecutionTarget::Wsl { distro: "Debian".into() };
+
+    let moved = ProjectChanges { execution_target: Some(wsl.clone()), ..Default::default() };
+    let moved = library.edit_project(project.id, moved, Origin::MainWindow).unwrap();
+    assert_eq!((moved.execution_target, moved.path), (wsl.clone(), project.path));
+
+    let invalid = ProjectChanges {
+        execution_target: Some(ExecutionTarget::Wsl { distro: "no spaces".into() }),
+        ..Default::default()
+    };
+    assert_eq!(
+        library.edit_project(project.id, invalid, Origin::MainWindow),
+        Err(LocalhostError::InvalidDistroName("no spaces".into()))
+    );
+    assert_eq!(library.project(project.id).unwrap().execution_target, wsl);
 }
 
 #[test]
