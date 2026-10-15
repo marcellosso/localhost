@@ -1,6 +1,10 @@
 //! The Tauri app for Linux (and later Windows): a thin shell that hosts the
 //! Rust core in-process and bridges it to the React UI (ADR-0009). Commands
 //! and events are typed: `src/bindings.ts` is generated from this crate.
+//!
+//! Services are reached through `Targets`, whatever their Project's
+//! Execution Target: this machine in-process, a WSL distro through its
+//! `localhostd` (ADR-0008, `targets`).
 
 mod bridge;
 mod desktop;
@@ -14,40 +18,38 @@ mod palette;
 mod perf;
 mod services;
 mod settings;
+mod targets;
 mod tray;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use localhost_core::{
-    LocalhostError, LogStore, Origin, ProjectLibrary, RunRegistry, SecretStore, ServiceManager, ServiceManagerOptions,
-    SystemSecretStore, default_storage_root,
+    LocalhostError, Origin, ProjectLibrary, SecretStore, ServiceManagerOptions, SystemSecretStore, Targets,
+    default_storage_root,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
-/// The core objects every window shares.
+/// The core objects every window shares: the Project Configuration, and
+/// the Execution Targets its Services run on.
 pub struct Core {
     library: Arc<ProjectLibrary>,
-    services: ServiceManager,
-    logs: Arc<LogStore>,
-    runs: Arc<RunRegistry>,
+    targets: Targets,
 }
 
 impl Core {
-    /// Opens the Projects in `root`. Needs a tokio runtime: the manager
-    /// spawns a task watching the library.
+    /// Opens the Projects in `root`. Needs a tokio runtime: the Service
+    /// manager spawns a task watching the library.
     fn open(root: &Path) -> Result<Core, LocalhostError> {
         Core::open_with_secrets(root, Arc::new(SystemSecretStore::new()))
     }
 
     fn open_with_secrets(root: &Path, secrets: Arc<dyn SecretStore>) -> Result<Core, LocalhostError> {
         let library = Arc::new(ProjectLibrary::open(root, secrets)?);
-        let logs = Arc::new(LogStore::new(root));
-        let runs = Arc::new(RunRegistry::new(root));
-        let services =
-            ServiceManager::new(library.clone(), logs.clone(), runs.clone(), ServiceManagerOptions::default());
-        Ok(Core { library, services, logs, runs })
+        let launcher = targets::launcher(root);
+        let targets = Targets::open(library.clone(), root, ServiceManagerOptions::default(), launcher);
+        Ok(Core { library, targets })
     }
 }
 
@@ -138,7 +140,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             lifecycle::quit_app,
             lifecycle::take_reveal,
         ])
-        .events(collect_events![lifecycle::Reveal])
+        .events(collect_events![lifecycle::Reveal, launch::OrphansFound])
 }
 
 pub fn run() {
@@ -159,14 +161,14 @@ pub fn run() {
             });
             // Before anything starts, so this session's Runs can't be mistaken for Orphans.
             let orphans = match &core {
-                Ok(core) if perf.is_none() => core.runs.orphans(),
+                Ok(core) if perf.is_none() => core.targets.orphans(),
                 _ => Vec::new(),
             };
             let settings = settings::SettingsStore::open(
                 app.path().app_config_dir().ok().map(|folder| folder.join("settings.json")),
             );
             if let Ok(core) = &core {
-                core.services.set_automatic_port_move(settings.get().automatic_port_move);
+                core.targets.set_automatic_port_move(settings.get().automatic_port_move);
             }
             app.manage(AppState {
                 core,
@@ -178,6 +180,7 @@ pub fn run() {
                 perf,
             });
             tray::install(app)?;
+            launch::watch_found_orphans(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -199,7 +202,7 @@ pub fn run() {
                 // Quitting has stopped every Run already; this catches any other way out.
                 let state = app.state::<AppState>();
                 if let Ok(core) = state.core() {
-                    tauri::async_runtime::block_on(core.services.stop_every_run(Origin::MainWindow));
+                    tauri::async_runtime::block_on(core.targets.stop_every_run(Origin::MainWindow));
                 }
                 if let Some(settings) = &state.perf {
                     perf::clean_up(settings);

@@ -331,6 +331,11 @@ impl Remote {
         self.call(Request::RemoveLogs { service_id }).await
     }
 
+    /// As `LogStore::clear_buffer`: the log files are kept.
+    pub async fn clear_buffer(&self, service_id: Id) -> Result<(), LocalhostError> {
+        self.call(Request::ClearBuffer { service_id }).await
+    }
+
     /// The buffered lines of a Run plus a stream of every line after them.
     /// The stream ends when the Run's output ends; dropping it stops it.
     pub async fn subscribe_to_run(

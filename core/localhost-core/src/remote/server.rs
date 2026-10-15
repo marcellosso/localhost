@@ -154,6 +154,10 @@ impl Context {
                 self.logs.remove_logs(service_id);
                 done()
             }
+            Request::ClearBuffer { service_id } => {
+                self.logs.clear_buffer(service_id);
+                done()
+            }
             Request::OpenRunLog { stream, run_id } => {
                 let (lines, receiver) = self.logs.subscribe_to_run(run_id);
                 let output = self.output.clone();

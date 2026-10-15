@@ -76,8 +76,8 @@ async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
 }
 },
 /**
- * Every Listener on this machine, scanned now. The Ports view polls this
- * while it is visible.
+ * Every Listener on this machine and on the WSL distros in use, scanned
+ * now. The Ports view polls this while it is visible.
  */
 async listeners() : Promise<Result<ListenerDetails[], CommandError>> {
     try {
@@ -91,9 +91,9 @@ async listeners() : Promise<Result<ListenerDetails[], CommandError>> {
  * Stops a Listener: its Service for a Run's, otherwise its processes (the
  * UI confirms first). Returns once it has ended.
  */
-async stopListener(listener: Listener) : Promise<Result<null, CommandError>> {
+async stopListener(target: ExecutionTarget, listener: Listener) : Promise<Result<null, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("stop_listener", { listener }) };
+    return { status: "ok", data: await TAURI_INVOKE("stop_listener", { target, listener }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -295,7 +295,7 @@ async serviceRelations(serviceId: Id) : Promise<Result<ServiceRelations, Command
 }
 },
 /**
- * Suggestions for a folder being added as a Project.
+ * Suggestions for a folder being added as a Project, on this machine.
  */
 async scanFolder(path: string) : Promise<Result<ServiceSuggestion[], CommandError>> {
     try {
@@ -306,7 +306,8 @@ async scanFolder(path: string) : Promise<Result<ServiceSuggestion[], CommandErro
 }
 },
 /**
- * Suggestions for an existing Project, without what its Services cover.
+ * Suggestions for an existing Project, where it runs, without what its
+ * Services cover.
  */
 async scanProject(projectId: Id) : Promise<Result<ServiceSuggestion[], CommandError>> {
     try {
@@ -490,8 +491,10 @@ async takeReveal() : Promise<Reveal | null> {
 
 
 export const events = __makeEvents__<{
+orphansFound: OrphansFound,
 reveal: Reveal
 }>({
+orphansFound: "orphans-found",
 reveal: "reveal"
 })
 
@@ -675,6 +678,10 @@ launchdLabel: string | null; kind: ListenerKind; startTime: ProcessStartTime }
  */
 export type ListenerDetails = { listener: Listener; 
 /**
+ * Where it listens: this machine, or a WSL distro.
+ */
+target: ExecutionTarget; 
+/**
  * Who it belongs to, e.g. "My SaaS › API", "In My SaaS", "Docker", "Unmanaged".
  */
 owner: string; 
@@ -827,6 +834,10 @@ export type LogSource =
  * can tell who changed what.
  */
 export type Origin = "mainWindow" | "menuBar" | "cli"
+/**
+ * A WSL distro had Orphans as it connected: the window asks about them.
+ */
+export type OrphansFound = null
 /**
  * Where a line of a Run's output came from.
  */

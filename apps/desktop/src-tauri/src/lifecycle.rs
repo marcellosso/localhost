@@ -77,7 +77,7 @@ pub fn quit(app: &AppHandle, origin: Origin) {
     let count = state.core().map_or(0, |core| {
         let projects = core.library.projects();
         let services = projects.iter().flat_map(|project| &project.services);
-        services.filter(|service| core.services.status(service.id).state.is_active()).count()
+        services.filter(|service| core.targets.status(service.id).state.is_active()).count()
     });
     if count == 0 {
         exit(app, origin);
@@ -110,7 +110,7 @@ fn exit(app: &AppHandle, origin: Origin) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         if let Ok(core) = app.state::<AppState>().core() {
-            core.services.stop_every_run(origin).await;
+            core.targets.stop_every_run(origin).await;
         }
         app.exit(0);
     });

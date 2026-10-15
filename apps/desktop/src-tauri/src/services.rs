@@ -35,14 +35,14 @@ pub async fn start_service(
     port: Option<u16>,
 ) -> CommandResult<Option<BlockedStart>> {
     let core = state.core()?;
-    let status = core.services.start(service_id, port, Origin::MainWindow).await?;
+    let status = core.targets.start(service_id, port, Origin::MainWindow).await?;
     blocked_start(core, &status).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn stop_service(state: tauri::State<'_, AppState>, service_id: Id) -> CommandResult {
-    state.core()?.services.stop(service_id, Origin::MainWindow).await?;
+    state.core()?.targets.stop(service_id, Origin::MainWindow).await?;
     Ok(())
 }
 
@@ -50,7 +50,7 @@ pub async fn stop_service(state: tauri::State<'_, AppState>, service_id: Id) -> 
 #[specta::specta]
 pub async fn restart_service(state: tauri::State<'_, AppState>, service_id: Id) -> CommandResult<Option<BlockedStart>> {
     let core = state.core()?;
-    let status = core.services.restart(service_id, Origin::MainWindow).await?;
+    let status = core.targets.restart(service_id, Origin::MainWindow).await?;
     blocked_start(core, &status).await
 }
 
@@ -63,8 +63,10 @@ pub async fn stop_holder_and_start(
     holder: Listener,
 ) -> CommandResult<Option<BlockedStart>> {
     let core = state.core()?;
-    core.services.stop_listener(&holder, Origin::MainWindow).await?;
-    let status = core.services.start(service_id, None, Origin::MainWindow).await?;
+    // The holder is where the Service runs: it was found starting there.
+    let (project, _) = core.library.service(service_id)?;
+    core.targets.stop_listener(&project.execution_target, &holder, Origin::MainWindow).await?;
+    let status = core.targets.start(service_id, None, Origin::MainWindow).await?;
     blocked_start(core, &status).await
 }
 
@@ -73,13 +75,13 @@ pub async fn stop_holder_and_start(
 #[tauri::command]
 #[specta::specta]
 pub async fn start_all(state: tauri::State<'_, AppState>, project_id: Id) -> CommandResult {
-    Ok(state.core()?.services.start_all(project_id, Origin::MainWindow).await?)
+    Ok(state.core()?.targets.start_all(project_id, Origin::MainWindow).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn stop_all(state: tauri::State<'_, AppState>, project_id: Id) -> CommandResult {
-    Ok(state.core()?.services.stop_all(project_id, Origin::MainWindow).await?)
+    Ok(state.core()?.targets.stop_all(project_id, Origin::MainWindow).await?)
 }
 
 async fn blocked_start(core: &Core, status: &ServiceStatus) -> CommandResult<Option<BlockedStart>> {
@@ -88,13 +90,13 @@ async fn blocked_start(core: &Core, status: &ServiceStatus) -> CommandResult<Opt
         return Ok(None);
     };
     let service_id = status.service_id;
-    let next_free_port = core.services.next_free_port(service_id).await?;
+    let next_free_port = core.targets.next_free_port(service_id).await?;
     let (project, _) = core.library.service(service_id)?;
     let projects = core.library.projects();
     Ok(Some(BlockedStart {
         service_id,
         port,
-        holder: owner.map(|owner| ListenerDetails::new(*owner, &projects)),
+        holder: owner.map(|owner| ListenerDetails::new(project.execution_target.clone(), *owner, &projects)),
         next_free_port,
         dependents: project.dependents(service_id).iter().map(|service| service.name.clone()).collect(),
     }))
@@ -110,7 +112,8 @@ mod tests {
     async fn a_start_blocked_by_a_taken_port_says_who_holds_it_and_where_else_to_start() {
         let root = std::env::temp_dir().join(format!("localhost-blocked-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        let core = Core::open(&root).unwrap();
+        let core =
+            Core::open_with_secrets(&root, std::sync::Arc::new(localhost_core::MemorySecretStore::new())).unwrap();
         // This test process holds the port, so it is a holder localhost won't stop.
         let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = socket.local_addr().unwrap().port();
@@ -128,7 +131,7 @@ mod tests {
         let changes = ServiceChanges { dependencies: Some(vec![web.id]), ..Default::default() };
         core.library.edit_service(worker.id, changes, Origin::Cli).unwrap();
 
-        let status = core.services.start(web.id, None, Origin::MainWindow).await.unwrap();
+        let status = core.targets.start(web.id, None, Origin::MainWindow).await.unwrap();
         let blocked = blocked_start(&core, &status).await.unwrap().expect("the start is blocked");
 
         assert_eq!(blocked.port, port);
@@ -139,9 +142,9 @@ mod tests {
         assert_eq!(holder.listener.pid, std::process::id() as i32);
         assert_eq!(holder.reason_not_stoppable, Some(LocalhostError::ListenerIsLocalhost.message()));
 
-        let started = core.services.start(web.id, Some(next), Origin::MainWindow).await.unwrap();
+        let started = core.targets.start(web.id, Some(next), Origin::MainWindow).await.unwrap();
         assert!(blocked_start(&core, &started).await.unwrap().is_none());
-        core.services.stop_every_run(Origin::MainWindow).await;
+        core.targets.stop_every_run(Origin::MainWindow).await;
         let _ = std::fs::remove_dir_all(root);
     }
 }

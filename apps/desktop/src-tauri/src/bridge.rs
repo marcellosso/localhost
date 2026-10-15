@@ -106,7 +106,7 @@ impl Subscriptions {
 pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) -> Result<Snapshot, CommandError> {
     let core = state.core()?;
     let (projects, mut library_events) = core.library.subscribe();
-    let (statuses, mut service_events) = core.services.subscribe();
+    let (statuses, mut service_events) = core.targets.subscribe();
     let mut view = View { projects, statuses, states: HashMap::new() };
     let project_states: Vec<ProjectState> = view.projects.iter().map(|project| view.project_state(project)).collect();
     view.states = project_states.iter().map(|state| (state.project_id, state.state)).collect();

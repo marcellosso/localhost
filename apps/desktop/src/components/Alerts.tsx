@@ -91,7 +91,8 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
     }
 
     case "stopListener": {
-      const { listener } = alert.details;
+      const { details } = alert;
+      const { listener } = details;
       const ports = listener.ports.join(", ");
       return (
         <Dialog
@@ -102,7 +103,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
               <button className="button" onClick={close} data-autofocus>
                 Cancel
               </button>
-              <button className="button destructive" onClick={then(() => stopListener(listener))}>
+              <button className="button destructive" onClick={then(() => stopListener(details))}>
                 Stop
               </button>
             </>

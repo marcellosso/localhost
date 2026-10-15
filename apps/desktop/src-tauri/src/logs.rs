@@ -99,15 +99,15 @@ pub struct LogStreams {
 /// lines. Returns the id to close it with.
 #[tauri::command]
 #[specta::specta]
-pub fn open_log(
+pub async fn open_log(
     state: tauri::State<'_, AppState>,
     source: LogSource,
     batches: Channel<LogBatch>,
 ) -> CommandResult<u32> {
-    let logs = &state.core()?.logs;
+    let targets = &state.core()?.targets;
     let (buffered, receiver) = match &source {
         LogSource::Run { run_id } => {
-            let (lines, receiver) = logs.subscribe_to_run(*run_id);
+            let (lines, receiver) = targets.subscribe_to_run(*run_id).await?;
             let lines: Vec<LogLine> = lines.iter().map(|line| LogLine::new(line, None)).collect();
             let (sender, combined) = mpsc::unbounded_channel();
             forward(receiver, sender, |line| LogLine::new(&line, None));
@@ -115,7 +115,7 @@ pub fn open_log(
         }
         LogSource::Services { service_ids } => {
             let ids: HashSet<Id> = service_ids.iter().copied().collect();
-            let (lines, receiver) = logs.subscribe_to_services(ids);
+            let (lines, receiver) = targets.subscribe_to_services(ids).await?;
             let lines = lines.iter().map(|line| LogLine::new(&line.line, Some(line.service_id))).collect();
             let (sender, combined) = mpsc::unbounded_channel();
             forward(receiver, sender, |line| LogLine::new(&line.line, Some(line.service_id)));
@@ -132,10 +132,10 @@ pub fn open_log(
 /// show only what comes next once reopened.
 #[tauri::command]
 #[specta::specta]
-pub fn clear_logs(state: tauri::State<'_, AppState>, service_ids: Vec<Id>) -> CommandResult {
-    let logs = &state.core()?.logs;
+pub async fn clear_logs(state: tauri::State<'_, AppState>, service_ids: Vec<Id>) -> CommandResult {
+    let targets = &state.core()?.targets;
     for service_id in service_ids {
-        logs.clear_buffer(service_id);
+        targets.clear_buffer(service_id).await?;
     }
     Ok(())
 }
