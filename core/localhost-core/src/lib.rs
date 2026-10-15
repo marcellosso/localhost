@@ -36,6 +36,7 @@ mod run_registry;
 mod secrets;
 mod service_manager;
 mod storage;
+mod targets;
 mod validate;
 mod yaml;
 
@@ -71,6 +72,7 @@ pub use service_manager::{
     PortChange, PortChangeReason, Run, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceState, ServiceStatus,
 };
 pub use storage::UnreadableProjectFile;
+pub use targets::{Connecting, FoundOrphans, Launcher, Link, Targets};
 
 /// How serde writes a `SystemTime`, for the TypeScript types: specta's own
 /// description of it doesn't match.

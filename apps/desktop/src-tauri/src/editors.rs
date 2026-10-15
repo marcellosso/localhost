@@ -8,8 +8,8 @@
 use std::collections::HashSet;
 
 use localhost_core::{
-    Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileChanges, Project, ProjectChanges, ProjectDocument,
-    ProjectScanner, Service, ServiceChanges, ServiceSuggestion, VariableInput, VariableLayer,
+    ExecutionTarget, Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileChanges, Project, ProjectChanges,
+    ProjectDocument, Service, ServiceChanges, ServiceSuggestion, VariableInput, VariableLayer,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -254,11 +254,11 @@ pub async fn remove_project(state: tauri::State<'_, AppState>, project_id: Id) -
     let core = state.core()?;
     let project = core.library.project(project_id)?;
     for service in &project.services {
-        core.services.stop(service.id, ORIGIN).await?;
+        core.targets.stop(service.id, ORIGIN).await?;
     }
     core.library.remove_project(project_id, ORIGIN)?;
     for service in &project.services {
-        core.logs.remove_logs(service.id);
+        core.targets.remove_logs(&project.execution_target, service.id).await?;
     }
     Ok(())
 }
@@ -325,9 +325,10 @@ pub fn add_services(
 #[specta::specta]
 pub async fn remove_service(state: tauri::State<'_, AppState>, service_id: Id) -> CommandResult {
     let core = state.core()?;
-    core.services.stop(service_id, ORIGIN).await?;
+    let (project, _) = core.library.service(service_id)?;
+    core.targets.stop(service_id, ORIGIN).await?;
     core.library.remove_service(service_id, ORIGIN)?;
-    core.logs.remove_logs(service_id);
+    core.targets.remove_logs(&project.execution_target, service_id).await?;
     Ok(())
 }
 
@@ -355,28 +356,21 @@ fn relations(project: &Project, service_id: Id) -> ServiceRelations {
 
 // MARK: Detection
 
-/// Suggestions for a folder being added as a Project.
+/// Suggestions for a folder being added as a Project, on this machine.
 #[tauri::command]
 #[specta::specta]
-pub async fn scan_folder(path: String) -> CommandResult<Vec<ServiceSuggestion>> {
-    blocking(move || ProjectScanner::default().scan_folder(&path)).await
+pub async fn scan_folder(state: tauri::State<'_, AppState>, path: String) -> CommandResult<Vec<ServiceSuggestion>> {
+    Ok(state.core()?.targets.scan_folder(&ExecutionTarget::ThisMachine, &path).await?)
 }
 
-/// Suggestions for an existing Project, without what its Services cover.
+/// Suggestions for an existing Project, where it runs, without what its
+/// Services cover.
 #[tauri::command]
 #[specta::specta]
 pub async fn scan_project(state: tauri::State<'_, AppState>, project_id: Id) -> CommandResult<Vec<ServiceSuggestion>> {
-    let project = state.core()?.library.project(project_id)?;
-    blocking(move || ProjectScanner::default().scan_project(&project)).await
-}
-
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> CommandResult<T> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|error| {
-        CommandError::new(
-            LocalhostError::PersistenceFailed { path: String::new(), reason: error.to_string() },
-            "The folder couldn’t be scanned.",
-        )
-    })
+    let core = state.core()?;
+    let project = core.library.project(project_id)?;
+    Ok(core.targets.scan_project(&project).await?)
 }
 
 // MARK: Environment
@@ -471,13 +465,13 @@ pub async fn import_project(
     };
     if let Some(existing) = &replaced {
         for service in removed_by(existing, &document) {
-            core.services.stop(service.id, ORIGIN).await?;
+            core.targets.stop(service.id, ORIGIN).await?;
         }
     }
     let project = core.library.import_project(&document, on_key_clash, ORIGIN)?;
-    for service in replaced.iter().flat_map(|existing| &existing.services) {
-        if project.service(service.id).is_none() {
-            core.logs.remove_logs(service.id);
+    if let Some(existing) = &replaced {
+        for service in existing.services.iter().filter(|service| project.service(service.id).is_none()) {
+            core.targets.remove_logs(&existing.execution_target, service.id).await?;
         }
     }
     Ok(project)
@@ -519,7 +513,7 @@ fn preview(core: &Core, document: &ProjectDocument, file_name: String) -> Import
         free_key: core.library.free_project_key(document.key()),
         removed: removed_by(&existing, document)
             .map(|service| {
-                if core.services.status(service.id).state.is_active() {
+                if core.targets.status(service.id).state.is_active() {
                     format!("{} (running, stopped first)", service.name)
                 } else {
                     service.name.clone()

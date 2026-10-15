@@ -103,7 +103,7 @@ pub fn save_settings(state: tauri::State<'_, AppState>, settings: Settings) -> C
     let settings = Settings { editor_command: editor_command.map(String::from), log_font_size, ..settings };
     state.settings.save(settings.clone())?;
     if let Ok(core) = state.core() {
-        core.services.set_automatic_port_move(settings.automatic_port_move);
+        core.targets.set_automatic_port_move(settings.automatic_port_move);
     }
     Ok(())
 }

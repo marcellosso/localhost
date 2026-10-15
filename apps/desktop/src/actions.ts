@@ -5,11 +5,10 @@ import {
   type Folder,
   type FolderApp,
   type Id,
-  type Listener,
   type ListenerDetails,
   type Result,
 } from "./bindings";
-import { setProgress, setStoppingListener, showAlert } from "./ui";
+import { currentUi, setProgress, setStoppingListener, showAlert } from "./ui";
 
 // What the main window's buttons do. Failures become an alert; a start
 // blocked by a taken port becomes the question about it.
@@ -55,13 +54,13 @@ export async function openFolder(folder: Folder, app: FolderApp) {
 
 /** Stops a Run's Listener (its Service) at once; asks before stopping any other. */
 export function requestStopListener(details: ListenerDetails) {
-  if (details.listener.owner.kind === "run") void stopListener(details.listener);
+  if (details.listener.owner.kind === "run") void stopListener(details);
   else showAlert({ kind: "stopListener", details });
 }
 
-export async function stopListener(listener: Listener) {
+export async function stopListener({ target, listener }: ListenerDetails) {
   setStoppingListener(listener.pid, true);
-  report(await commands.stopListener(listener));
+  report(await commands.stopListener(target, listener));
   setStoppingListener(listener.pid, false);
 }
 
@@ -71,7 +70,20 @@ export async function runLaunchChecks() {
   if (result.status === "error") return;
   const { unreadableFiles, orphans } = result.data;
   if (unreadableFiles.length > 0) showAlert({ kind: "unreadableFiles", files: unreadableFiles });
-  if (orphans.length > 0) showAlert({ kind: "orphans", orphans });
+  if (orphans.length > 0 && !isAskingAboutOrphans()) showAlert({ kind: "orphans", orphans });
+}
+
+/** A WSL distro found Orphans as it connected: asks about them, unless the question is already up. */
+export async function askAboutFoundOrphans() {
+  if (isAskingAboutOrphans()) return;
+  const result = await commands.launchChecks();
+  if (result.status === "ok" && result.data.orphans.length > 0 && !isAskingAboutOrphans()) {
+    showAlert({ kind: "orphans", orphans: result.data.orphans });
+  }
+}
+
+function isAskingAboutOrphans(): boolean {
+  return currentUi().alerts.some((alert) => alert.kind === "orphans");
 }
 
 export async function stopOrphans() {
