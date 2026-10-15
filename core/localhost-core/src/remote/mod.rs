@@ -107,6 +107,9 @@ pub(crate) enum Request {
     RemoveLogs {
         service_id: Id,
     },
+    ClearBuffer {
+        service_id: Id,
+    },
     /// Replies with the Run's buffered lines; the rest arrive as `RunLog`.
     OpenRunLog {
         stream: u64,

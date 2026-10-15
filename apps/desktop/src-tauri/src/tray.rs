@@ -204,7 +204,7 @@ pub fn install(app: &App) -> tauri::Result<()> {
         let state = handle.state::<AppState>();
         let Ok(core) = state.core() else { return };
         let (_, mut library_events) = core.library.subscribe();
-        let (_, mut service_events) = core.services.subscribe();
+        let (_, mut service_events) = core.targets.subscribe();
         let mut scan = tokio::time::interval(LISTENER_SCAN);
         let mut warnings = Vec::new();
         let mut shown = menu;
@@ -213,7 +213,7 @@ pub fn install(app: &App) -> tauri::Result<()> {
                 Some(_) = library_events.recv() => {}
                 Some(_) = service_events.recv() => {}
                 _ = scan.tick() => {
-                    let listeners = core.services.listeners().await;
+                    let listeners: Vec<_> = core.targets.listeners().await.into_iter().map(|(_, listener)| listener).collect();
                     let (projects, statuses) = current(core);
                     let statuses: Vec<ServiceStatus> = statuses.into_values().collect();
                     warnings = port_warnings(&projects, &statuses, &listeners);
@@ -244,7 +244,7 @@ fn current(core: &Core) -> (Vec<Project>, HashMap<Id, ServiceStatus>) {
     let statuses = projects
         .iter()
         .flat_map(|project| &project.services)
-        .map(|service| (service.id, core.services.status(service.id)))
+        .map(|service| (service.id, core.targets.status(service.id)))
         .collect();
     (projects, statuses)
 }
@@ -314,11 +314,11 @@ fn perform(app: &AppHandle, action: Action) {
                 // A failure shows in the Service's status (a port conflict
                 // Fails the start); there is nowhere else to say it here.
                 let _ = match action {
-                    Action::Start(id) => core.services.start(id, None, origin).await.map(drop),
-                    Action::Stop(id) => core.services.stop(id, origin).await.map(drop),
-                    Action::Restart(id) => core.services.restart(id, origin).await.map(drop),
-                    Action::StartAll(id) => core.services.start_all(id, origin).await,
-                    Action::StopAll(id) => core.services.stop_all(id, origin).await,
+                    Action::Start(id) => core.targets.start(id, None, origin).await.map(drop),
+                    Action::Stop(id) => core.targets.stop(id, origin).await.map(drop),
+                    Action::Restart(id) => core.targets.restart(id, origin).await.map(drop),
+                    Action::StartAll(id) => core.targets.start_all(id, origin).await,
+                    Action::StopAll(id) => core.targets.stop_all(id, origin).await,
                     Action::OpenUrl(id) => desktop::open_url_of(core, id).map_err(|error| error.error),
                     Action::Show(_) | Action::OpenWindow | Action::Quit => Ok(()),
                 };

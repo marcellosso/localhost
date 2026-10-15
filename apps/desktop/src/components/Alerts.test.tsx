@@ -36,7 +36,7 @@ function blocked(changes: Partial<BlockedStart> = {}): BlockedStart {
   return {
     serviceId: web.id,
     port: 3000,
-    holder: { listener, owner: "Unmanaged", reasonNotStoppable: null },
+    holder: { listener, target: { kind: "thisMachine" }, owner: "Unmanaged", reasonNotStoppable: null },
     nextFreePort: 3001,
     dependents: [],
     ...changes,
@@ -69,7 +69,7 @@ describe("Alerts", () => {
     act(() =>
       showAlert({
         kind: "blockedStart",
-        blocked: blocked({ holder: { listener, owner: "Unmanaged", reasonNotStoppable: reason }, nextFreePort: null }),
+        blocked: blocked({ holder: { listener, target: { kind: "thisMachine" }, owner: "Unmanaged", reasonNotStoppable: reason }, nextFreePort: null }),
       }),
     );
     expect(screen.queryByRole("button", { name: "Stop It and Start" })).toBeNull();

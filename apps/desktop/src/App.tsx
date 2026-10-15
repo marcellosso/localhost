@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { runLaunchChecks } from "./actions";
+import { askAboutFoundOrphans, runLaunchChecks } from "./actions";
 import { commands, events, type Reveal } from "./bindings";
 import { Alerts } from "./components/Alerts";
 import { Announcer } from "./components/Announcer";
@@ -25,9 +25,13 @@ import { showSheet, useUi } from "./ui";
 
 let started: Promise<void> | null = null;
 
-/** Subscribes to the core, then asks the launch questions: once per window, though effects may run twice. */
+/**
+ * Subscribes to the core, then asks the launch questions: once per window, though effects may run twice.
+ * A WSL distro's Orphans are asked about when it connects, which may be later.
+ */
 function start(): Promise<void> {
   started ??= Promise.all([loadSettings(), loadHome(), startCore()]).then(async () => {
+    void events.orphansFound.listen(() => void askAboutFoundOrphans());
     await runLaunchChecks();
     await runPerfMeasurement();
   });

@@ -54,7 +54,7 @@ pub fn open_service_url(state: tauri::State<'_, AppState>, service_id: Id) -> Co
 /// Open in Browser, for the window and the tray alike.
 pub fn open_url_of(core: &Core, service_id: Id) -> CommandResult {
     let (_, service) = core.library.service(service_id)?;
-    let run = core.services.status(service_id).run;
+    let run = core.targets.status(service_id).run;
     let Some(url) = service.url_to_open(run.as_ref()) else { return Ok(()) };
     spawn(opener(), &[url.as_str()], None)
 }

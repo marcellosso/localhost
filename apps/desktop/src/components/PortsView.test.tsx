@@ -28,7 +28,7 @@ function details(name: string, port: number, changes: Partial<Listener>, owner: 
     startTime: { seconds: 0, microseconds: 0 },
     ...changes,
   };
-  return { listener, owner, reasonNotStoppable: null };
+  return { listener, target: { kind: "thisMachine" }, owner, reasonNotStoppable: null };
 }
 
 const runs = details("node", 3000, { owner: { kind: "run", serviceId: web.id, runId: "r" } }, "Shop › Web");
@@ -70,7 +70,7 @@ describe("PortsView", () => {
     const [serviceStop, strayStop] = screen.getAllByRole("button", { name: /^Stop / });
 
     await act(async () => fireEvent.click(serviceStop));
-    expect(commands.stopListener).toHaveBeenCalledWith(runs.listener);
+    expect(commands.stopListener).toHaveBeenCalledWith(runs.target, runs.listener);
     expect(currentUi().alerts).toEqual([]);
 
     fireEvent.click(strayStop);
