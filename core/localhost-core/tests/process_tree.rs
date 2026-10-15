@@ -1,5 +1,6 @@
 //! Ported from `ProcessTreeTests.swift`. These tests launch real processes;
 //! each command line is a fixture.
+#![cfg(unix)]
 
 use std::collections::BTreeMap;
 use std::path::Path;

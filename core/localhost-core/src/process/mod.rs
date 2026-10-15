@@ -7,7 +7,9 @@
 //! are stopped (starting at SIGTERM: background jobs of a non-interactive
 //! shell ignore SIGINT), so a Run never leaves anything behind.
 
+#[cfg(unix)]
 mod reader;
+#[cfg(unix)]
 mod spawn;
 mod termination;
 
@@ -16,16 +18,17 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::sync::{Mutex as AsyncMutex, Semaphore, mpsc, oneshot, watch};
+#[cfg(unix)]
+use tokio::sync::oneshot;
+use tokio::sync::{Mutex as AsyncMutex, Semaphore, mpsc, watch};
 use tokio::time::Instant;
 
-pub use reader::MAX_LINE_LENGTH;
 pub use termination::{ProcessTreeExit, StopPolicy, Termination, signal_name};
 
-use crate::output::{OutputChannel, OutputLine};
+use crate::output::OutputLine;
+use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
+use crate::platform::{self, Pid, process_group_exists};
 use crate::{LocalhostError, RunEnvironment};
-
-pub(crate) use spawn::process_group_exists;
 
 /// Everything needed to launch one Run's process tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -55,10 +58,15 @@ impl LaunchConfiguration {
     }
 }
 
+/// A line longer than this is delivered in pieces, so output without
+/// newlines (progress bars) can't grow the buffer without bound.
+pub const MAX_LINE_LENGTH: usize = 64 * 1024;
+
 /// How often to check whether the process group is gone.
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// How long to wait for the pipes to drain once the group is gone. A process
 /// that left the group may still hold them open.
+#[cfg(unix)]
 const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// A running (or ended) process tree. Cheap to clone; every clone is the same tree.
@@ -70,7 +78,7 @@ pub struct ProcessTree {
 }
 
 struct Inner {
-    pid: libc::pid_t,
+    pid: Pid,
     stop_policy: StopPolicy,
     output: AsyncMutex<mpsc::UnboundedReceiver<Vec<OutputLine>>>,
     flow: Arc<Semaphore>,
@@ -89,6 +97,22 @@ impl ProcessTree {
     /// Launches the command line. Fails before anything runs if the working
     /// directory or the shell is missing.
     pub fn launch(configuration: &LaunchConfiguration, stop_policy: StopPolicy) -> Result<ProcessTree, LocalhostError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (configuration, stop_policy);
+            Err(LocalhostError::ExecutionUnavailable)
+        }
+        #[cfg(unix)]
+        Self::launch_on_unix(configuration, stop_policy)
+    }
+
+    #[cfg(unix)]
+    fn launch_on_unix(
+        configuration: &LaunchConfiguration,
+        stop_policy: StopPolicy,
+    ) -> Result<ProcessTree, LocalhostError> {
+        use crate::output::OutputChannel;
+
         if !configuration.working_directory.is_dir() {
             return Err(LocalhostError::WorkingDirectoryMissing(
                 configuration.working_directory.to_string_lossy().into_owned(),
@@ -130,7 +154,7 @@ impl ProcessTree {
     }
 
     /// The shell's pid, which is also the process group and session id.
-    pub fn pid(&self) -> libc::pid_t {
+    pub fn pid(&self) -> Pid {
         self.inner.pid
     }
 
@@ -173,10 +197,11 @@ impl ProcessTree {
         if let Some(exit) = self.exit() {
             return exit;
         }
-        self.escalate(libc::SIGINT).await;
+        self.escalate(SIGINT).await;
         self.wait_for_exit().await
     }
 
+    #[cfg(unix)]
     async fn monitor(
         self,
         shell_status: oneshot::Receiver<i32>,
@@ -189,7 +214,7 @@ impl ProcessTree {
 
         // Anything still in the group is left over from the shell: stop it.
         if process_group_exists(self.inner.pid) {
-            self.escalate(libc::SIGTERM).await;
+            self.escalate(SIGTERM).await;
         }
         while process_group_exists(self.inner.pid) {
             tokio::time::sleep(POLL_INTERVAL).await;
@@ -222,17 +247,14 @@ impl ProcessTree {
             escalation.is_escalating = true;
         }
         let policy = self.inner.stop_policy;
-        let steps = [
-            (libc::SIGINT, Some(policy.interrupt_timeout)),
-            (libc::SIGTERM, Some(policy.terminate_timeout)),
-            (libc::SIGKILL, None),
-        ];
+        let steps =
+            [(SIGINT, Some(policy.interrupt_timeout)), (SIGTERM, Some(policy.terminate_timeout)), (SIGKILL, None)];
         for (signal, timeout) in steps.into_iter().skip_while(|(signal, _)| *signal != first_signal) {
             if !process_group_exists(self.inner.pid) {
                 return;
             }
             self.inner.escalation.lock().unwrap().strongest_signal_sent = Some(signal);
-            spawn::signal_process_group(self.inner.pid, signal);
+            platform::signal_process_group(self.inner.pid, signal);
             if self.wait_for_process_group_to_end(timeout).await {
                 return;
             }
@@ -252,8 +274,9 @@ impl ProcessTree {
     }
 }
 
+#[cfg(unix)]
 /// Blocks a thread in `waitpid` until the shell exits, and reaps it.
-fn wait_for_shell(pid: libc::pid_t) -> oneshot::Receiver<i32> {
+fn wait_for_shell(pid: Pid) -> oneshot::Receiver<i32> {
     let (sender, receiver) = oneshot::channel();
     std::thread::Builder::new()
         .name(format!("localhost-wait-{pid}"))

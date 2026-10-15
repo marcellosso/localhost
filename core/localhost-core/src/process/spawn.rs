@@ -108,14 +108,3 @@ pub(crate) fn spawn(
         }
     }
 }
-
-/// Whether any process is left in the group (a zombie still counts).
-pub(crate) fn process_group_exists(pgid: libc::pid_t) -> bool {
-    unsafe { libc::kill(-pgid, 0) == 0 || errno() == libc::EPERM }
-}
-
-pub(crate) fn signal_process_group(pgid: libc::pid_t, signal: i32) {
-    unsafe {
-        libc::kill(-pgid, signal);
-    }
-}

@@ -1,5 +1,6 @@
 //! Ported from `ServiceManagerTests.swift`: Service lifecycle against real
 //! processes. Each Service's command line is a fixture.
+#![cfg(unix)]
 
 mod common;
 

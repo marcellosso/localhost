@@ -12,8 +12,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use crate::platform::ProcessStartTime;
-use crate::process::{StopPolicy, process_group_exists};
+use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
+use crate::platform::{self, ProcessStartTime, process_group_exists};
+use crate::process::StopPolicy;
 use crate::{Id, Project, service_label};
 
 const SCHEMA_VERSION: i64 = 1;
@@ -178,16 +179,13 @@ fn is_alive(orphan: &Orphan) -> bool {
 }
 
 async fn stop(orphan: &Orphan, policy: StopPolicy) {
-    let steps = [
-        (libc::SIGINT, policy.interrupt_timeout),
-        (libc::SIGTERM, policy.terminate_timeout),
-        (libc::SIGKILL, Duration::from_secs(5)),
-    ];
+    let steps =
+        [(SIGINT, policy.interrupt_timeout), (SIGTERM, policy.terminate_timeout), (SIGKILL, Duration::from_secs(5))];
     for (signal, timeout) in steps {
         if !is_alive(orphan) {
             return;
         }
-        unsafe { libc::kill(-orphan.process_group_id, signal) };
+        platform::signal_process_group(orphan.process_group_id, signal);
         let deadline = Instant::now() + timeout;
         while is_alive(orphan) && Instant::now() < deadline {
             tokio::time::sleep(Duration::from_millis(20)).await;

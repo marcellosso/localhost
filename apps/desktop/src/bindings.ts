@@ -737,6 +737,11 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  */
 { kind: "dockerDaemonUnavailable" } | 
 /**
+ * Services can't run on this machine itself: on Windows they run in a
+ * WSL distro until native execution (XP5).
+ */
+{ kind: "executionUnavailable" } | 
+/**
  * Something already listens on the port; `owner` is that Listener, if
  * localhost can see it (processes of other users can't be inspected).
  */

@@ -4,8 +4,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use crate::platform::{self, ProcessStartTime};
-use crate::process::{StopPolicy, process_group_exists};
+use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
+use crate::platform::{self, ProcessStartTime, process_group_exists};
+use crate::process::StopPolicy;
 use crate::{Id, LocalhostError, Project, ServiceStatus, service_label};
 
 /// A process listening on one or more TCP ports on this machine, whoever
@@ -201,18 +202,15 @@ pub(crate) fn scan() -> (Vec<platform::ListeningProcess>, HashMap<i32, String>) 
 /// then only the Listener's process and its descendants.
 pub(crate) async fn stop_listener(listener: &Listener, policy: StopPolicy) {
     let group = listener.process_group_id;
-    let is_own_group = group == unsafe { libc::getpgrp() };
-    let leads_session = unsafe { libc::getsid(group) } == group;
+    let is_own_group = group == platform::own_process_group();
+    let leads_session = platform::leads_session(group);
     let mut target = if group > 1 && !is_own_group && !leads_session {
         Target::Group(group)
     } else {
         Target::Processes(HashMap::from([(listener.pid, listener.start_time)]))
     };
-    let steps = [
-        (libc::SIGINT, policy.interrupt_timeout),
-        (libc::SIGTERM, policy.terminate_timeout),
-        (libc::SIGKILL, Duration::from_secs(5)),
-    ];
+    let steps =
+        [(SIGINT, policy.interrupt_timeout), (SIGTERM, policy.terminate_timeout), (SIGKILL, Duration::from_secs(5))];
     for (signal, timeout) in steps {
         target.include_descendants();
         if !target.is_alive() {
@@ -244,13 +242,11 @@ impl Target {
 
     fn send(&self, signal: i32) {
         match self {
-            Target::Group(group) => unsafe {
-                libc::kill(-group, signal);
-            },
+            Target::Group(group) => platform::signal_process_group(*group, signal),
             Target::Processes(processes) => {
                 for (&pid, start_time) in processes {
                     if ProcessStartTime::of(pid) == Some(*start_time) {
-                        unsafe { libc::kill(pid, signal) };
+                        platform::signal_process(pid, signal);
                     }
                 }
             }
@@ -372,6 +368,7 @@ mod tests {
         assert!(!crate::port_probe::is_accepting(port).await);
     }
 
+    #[cfg(unix)]
     fn kind(path: &str, label: Option<&str>) -> ListenerKind {
         ListenerKind::of(Some(path), label, ListenerOwner::Unmanaged)
     }

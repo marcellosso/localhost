@@ -907,6 +907,7 @@ dependencies = [
  "uniffi",
  "url",
  "uuid",
+ "windows-sys",
 ]
 
 [[package]]

@@ -51,6 +51,9 @@ pub enum LocalhostError {
     SecretMissing(String),
     /// The Run failed after printing `Cannot connect to the Docker daemon`.
     DockerDaemonUnavailable,
+    /// Services can't run on this machine itself: on Windows they run in a
+    /// WSL distro until native execution (XP5).
+    ExecutionUnavailable,
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -127,6 +130,9 @@ impl LocalhostError {
                 "Docker isn’t running. Start Docker Desktop (or your Docker engine), then start the service again."
                     .into()
             }
+            ExecutionUnavailable => {
+                "Services can’t run on Windows itself yet. Run this project in a WSL distro.".into()
+            }
             PortConflict { port, owner: Some(owner) } => {
                 format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
             }
@@ -156,12 +162,32 @@ impl LocalhostError {
 }
 
 /// The system's description of an errno value, e.g. "Cannot allocate memory".
+#[cfg(unix)]
 fn describe_errno(errno: i32) -> String {
     let description = std::io::Error::from_raw_os_error(errno).to_string();
     // std appends " (os error N)".
     match description.rfind(" (os error ") {
         Some(index) => description[..index].to_string(),
         None => description,
+    }
+}
+
+/// The description of a Linux errno value: on Windows, a launch fails in a
+/// WSL distro, so its errno is Linux's, not a Windows error code.
+#[cfg(not(unix))]
+fn describe_errno(errno: i32) -> String {
+    match errno {
+        1 => "Operation not permitted".into(),
+        2 => "No such file or directory".into(),
+        7 => "Argument list too long".into(),
+        8 => "Exec format error".into(),
+        11 => "Resource temporarily unavailable".into(),
+        12 => "Cannot allocate memory".into(),
+        13 => "Permission denied".into(),
+        20 => "Not a directory".into(),
+        22 => "Invalid argument".into(),
+        24 => "Too many open files".into(),
+        other => format!("error {other}"),
     }
 }
 

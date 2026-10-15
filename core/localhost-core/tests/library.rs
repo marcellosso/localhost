@@ -2,6 +2,7 @@
 
 mod common;
 
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use common::{Fixture, key};
@@ -398,6 +399,7 @@ fn adding_a_service_to_a_missing_project_fails() {
 // MARK: Persistence failures
 
 #[test]
+#[cfg(unix)]
 fn a_failed_write_leaves_the_library_unchanged() {
     let fixture = Fixture::new();
     let library = fixture.library();
@@ -420,6 +422,7 @@ fn a_failed_write_leaves_the_library_unchanged() {
     assert_eq!(library.project(project.id).unwrap().name, "App");
 }
 
+#[cfg(unix)]
 fn unsafe_is_root() -> bool {
     std::process::Command::new("id").arg("-u").output().is_ok_and(|output| output.stdout.starts_with(b"0\n"))
 }
