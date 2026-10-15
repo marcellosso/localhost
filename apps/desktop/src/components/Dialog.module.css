@@ -42,6 +42,8 @@
   font-size: 11.5px;
   color: var(--text-secondary);
   user-select: text;
+  /* Paths and commands have no spaces to wrap at. */
+  overflow-wrap: anywhere;
 }
 
 .body p {
