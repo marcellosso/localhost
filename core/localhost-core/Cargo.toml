@@ -11,7 +11,7 @@ libc = "0.2.190"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 serde_path_to_error = "0.1.20"
-tokio = { version = "1.53.2", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "net", "io-util"] }
+tokio = { version = "1.53.2", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "net", "io-util", "process"] }
 unicode-normalization = "0.1.25"
 url = "2.5.8"
 uuid = { version = "1.28.0", features = ["v4", "serde"] }

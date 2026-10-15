@@ -25,7 +25,8 @@ const REFERENCE_DATE_OFFSET: f64 = 978_307_200.0;
 /// A process tree left over from a Run whose localhost session ended
 /// unexpectedly (crash, force-quit). Orphans are never re-adopted as
 /// Running: they can only be stopped or left alone.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct Orphan {
     pub run_id: Id,
