@@ -52,6 +52,9 @@ pub enum LocalhostError {
     SecretMissing(String),
     /// The Run failed after printing `Cannot connect to the Docker daemon`.
     DockerDaemonUnavailable,
+    /// The core on the Project's Execution Target (`localhostd` in a WSL
+    /// distro) can't be reached, or the connection to it was lost.
+    TargetUnavailable(String),
     /// Services can't run on this machine itself: on Windows they run in a
     /// WSL distro until native execution (XP5).
     ExecutionUnavailable,
@@ -132,6 +135,7 @@ impl LocalhostError {
                 "Docker isn’t running. Start Docker Desktop (or your Docker engine), then start the service again."
                     .into()
             }
+            TargetUnavailable(reason) => format!("localhost can’t reach the WSL distro: {reason}."),
             ExecutionUnavailable => {
                 "Services can’t run on Windows itself yet. Run this project in a WSL distro.".into()
             }

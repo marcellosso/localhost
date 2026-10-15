@@ -746,6 +746,11 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  */
 { kind: "dockerDaemonUnavailable" } | 
 /**
+ * The core on the Project's Execution Target (`localhostd` in a WSL
+ * distro) can't be reached, or the connection to it was lost.
+ */
+{ kind: "targetUnavailable"; detail: string } | 
+/**
  * Services can't run on this machine itself: on Windows they run in a
  * WSL distro until native execution (XP5).
  */

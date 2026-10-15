@@ -911,6 +911,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "localhost-daemon"
+version = "0.1.0"
+dependencies = [
+ "localhost-core",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "localhost-ffi"
 version = "0.1.0"
 dependencies = [

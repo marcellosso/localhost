@@ -195,6 +195,46 @@ fn moving_a_project_to_another_target_checks_its_path_there() {
 }
 
 #[test]
+fn a_mirror_takes_projects_as_given_and_announces_what_changed() {
+    let library = Fixture::new().library();
+    let one = library.add_project("One", key("one"), "/tmp/one", vec![], Origin::MainWindow).unwrap();
+    let two = library.add_project("Two", key("two"), "/tmp/two", vec![], Origin::MainWindow).unwrap();
+    let mirror = localhost_core::ProjectLibrary::mirror(std::sync::Arc::new(localhost_core::MemorySecretStore::new()));
+    let mut events = mirror.events();
+
+    mirror.replace_projects(vec![one.clone(), two.clone()], Origin::MainWindow);
+    let mut renamed = two.clone();
+    renamed.name = "Renamed".into();
+    mirror.replace_projects(vec![renamed.clone()], Origin::MainWindow);
+
+    let mut announced = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        announced.push(match event {
+            ProjectLibraryEvent::ProjectAdded { project, .. } => format!("added {}", project.name),
+            ProjectLibraryEvent::ProjectUpdated { project, .. } => format!("updated {}", project.name),
+            ProjectLibraryEvent::ProjectRemoved { id, .. } => {
+                format!("removed {}", if id == one.id { "One" } else { "?" })
+            }
+        });
+    }
+    assert_eq!(announced, ["added One", "added Two", "updated Renamed", "removed One"]);
+    assert_eq!(mirror.projects(), [renamed]);
+}
+
+#[test]
+fn lists_the_stored_values_of_a_projects_secrets_by_account() {
+    let library = Fixture::new().library();
+    let project = library.add_project("App", key("app"), "/tmp/app", vec![], Origin::MainWindow).unwrap();
+    let changes = ProjectChanges {
+        variables: Some(vec![VariableInput::secret("TOKEN", "t0ken"), VariableInput::plain("MODE", "dev")]),
+        ..Default::default()
+    };
+    library.edit_project(project.id, changes, Origin::MainWindow).unwrap();
+    let account = localhost_core::VariableLayer::Project(project.id).secret_account("TOKEN");
+    assert_eq!(library.stored_secrets(project.id).unwrap(), [(account, "t0ken".to_string())].into());
+}
+
+#[test]
 fn rejects_an_empty_name() {
     assert_eq!(
         Fixture::new().library().add_project("  ", key("a"), "/tmp/a", vec![], Origin::MainWindow),

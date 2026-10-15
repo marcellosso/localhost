@@ -45,6 +45,11 @@ impl MemorySecretStore {
         Self::default()
     }
 
+    /// Makes `items` (value by account) the only stored values.
+    pub fn replace_all(&self, items: HashMap<String, String>) {
+        *self.items.lock().unwrap() = items;
+    }
+
     /// Every account with a stored value.
     pub fn accounts(&self) -> Vec<String> {
         let mut accounts: Vec<String> = self.items.lock().unwrap().keys().cloned().collect();

@@ -97,7 +97,8 @@ pub struct ProfileChanges {
 /// only to reveal it.
 #[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct ProjectLibrary {
-    storage: ProjectStorage,
+    /// `None` for a mirror: its Projects are kept elsewhere.
+    storage: Option<ProjectStorage>,
     secrets: Arc<dyn SecretStore>,
     state: Mutex<State>,
     unreadable_files: Vec<UnreadableProjectFile>,
@@ -116,7 +117,7 @@ impl ProjectLibrary {
         let storage = ProjectStorage::new(storage_root);
         let (projects, unreadable_files) = storage.load_all()?;
         Ok(ProjectLibrary {
-            storage,
+            storage: Some(storage),
             secrets,
             state: Mutex::new(State {
                 projects: projects.into_iter().map(|project| (project.id, project)).collect(),
@@ -124,6 +125,53 @@ impl ProjectLibrary {
             }),
             unreadable_files,
         })
+    }
+
+    /// A library that stores nothing and holds the Projects another
+    /// localhost gives it with `mirror`: `localhostd`'s, inside a WSL distro,
+    /// where the Project Configuration isn't kept (ADR-0008).
+    pub fn mirror(secrets: Arc<dyn SecretStore>) -> ProjectLibrary {
+        ProjectLibrary {
+            storage: None,
+            secrets,
+            state: Mutex::new(State { projects: HashMap::new(), subscribers: Vec::new() }),
+            unreadable_files: Vec::new(),
+        }
+    }
+
+    /// Makes `projects` the library's Projects, as they are: they were
+    /// validated where they are kept. Announces each one added, changed or
+    /// removed, so a Service manager notices changed Configurations.
+    pub fn replace_projects(&self, projects: Vec<Project>, origin: Origin) {
+        let mut state = self.state();
+        let mut removed: HashMap<Id, Project> = std::mem::take(&mut state.projects);
+        for project in projects {
+            let event = match removed.remove(&project.id) {
+                Some(old) if old == project => None,
+                Some(_) => Some(ProjectLibraryEvent::ProjectUpdated { project: project.clone(), origin }),
+                None => Some(ProjectLibraryEvent::ProjectAdded { project: project.clone(), origin }),
+            };
+            state.projects.insert(project.id, project);
+            if let Some(event) = event {
+                broadcast(&mut state, event);
+            }
+        }
+        for id in removed.into_keys() {
+            broadcast(&mut state, ProjectLibraryEvent::ProjectRemoved { id, origin });
+        }
+    }
+
+    /// The stored value of every Secret the Project names, by account
+    /// (`VariableLayer::secret_account`). Secrets without a value are left out.
+    pub fn stored_secrets(&self, project_id: Id) -> Result<BTreeMap<String, String>, LocalhostError> {
+        let project = self.project(project_id)?;
+        let mut values = BTreeMap::new();
+        for account in all_secret_accounts(&project) {
+            if let Some(value) = self.secrets.value(&account)? {
+                values.insert(account, value);
+            }
+        }
+        Ok(values)
     }
 
     /// The Project files that couldn't be loaded, to tell the user once.
@@ -271,7 +319,9 @@ impl ProjectLibrary {
     pub fn remove_project(&self, id: Id, origin: Origin) -> Result<(), LocalhostError> {
         let mut state = self.state();
         let project = state.projects.get(&id).cloned().ok_or(LocalhostError::ProjectNotFound(id))?;
-        self.storage.delete(id)?;
+        if let Some(storage) = &self.storage {
+            storage.delete(id)?;
+        }
         state.projects.remove(&id);
         self.remove_secrets(&all_secret_accounts(&project));
         broadcast(&mut state, ProjectLibraryEvent::ProjectRemoved { id, origin });
@@ -633,7 +683,9 @@ impl ProjectLibrary {
     }
 
     fn commit(&self, state: &mut State, project: &Project) -> Result<(), LocalhostError> {
-        self.storage.save(project)?;
+        if let Some(storage) = &self.storage {
+            storage.save(project)?;
+        }
         state.projects.insert(project.id, project.clone());
         Ok(())
     }

@@ -30,6 +30,7 @@ mod platform;
 mod port_probe;
 mod process;
 mod project_document;
+pub mod remote;
 mod run_environment;
 mod run_registry;
 mod secrets;

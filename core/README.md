@@ -28,6 +28,23 @@ cargo run -p localhost-cli -- up acme [web …]     # run in the foreground; Ctr
 Projects and Services are named by Key, name, or letters of either in order
 (`FuzzyMatch`).
 
+## localhostd
+
+`localhost-daemon` builds `localhostd`, the core driven over its standard
+input and output. The Windows app runs it inside each WSL distro it uses
+(ADR-0008). The protocol is in `localhost-core/src/remote/`: JSON lines, a
+`Hello` first, then requests with ids, replies, Service events and log
+batches. `Remote` is the app's side of it.
+
+- The app sends the Projects with their Secret values, which `localhostd`
+  holds in memory only.
+- Runs' logs and records go to `~/.local/share/localhost/localhostd/`.
+- When its input closes, it stops every Run and exits.
+
+```sh
+cargo run -p localhost-daemon -- --stdio    # speaks the protocol on stdin/stdout
+```
+
 ## The macOS app's library
 
 `localhost-ffi` is the static library the macOS app links. It is the core

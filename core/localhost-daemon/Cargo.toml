@@ -1,0 +1,19 @@
+[package]
+name = "localhost-daemon"
+description = "localhostd: the core driven over its standard input and output, inside a WSL distro (ADR-0008)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "localhostd"
+path = "src/main.rs"
+
+[dependencies]
+localhost-core = { path = "../localhost-core" }
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "io-std"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "io-std", "macros", "process", "time"] }
