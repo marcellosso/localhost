@@ -7,11 +7,8 @@ use tokio::io::AsyncReadExt;
 use tokio::net::unix::pipe;
 use tokio::sync::{Semaphore, mpsc, watch};
 
+use super::MAX_LINE_LENGTH;
 use crate::output::{OutputChannel, OutputLine};
-
-/// A line longer than this is delivered in pieces, so output without
-/// newlines (progress bars) can't grow the buffer without bound.
-pub const MAX_LINE_LENGTH: usize = 64 * 1024;
 
 /// How many batches read but not yet taken a process tree may have before
 /// its readers pause: about 1 MB of output at 64 KB per read. A command that

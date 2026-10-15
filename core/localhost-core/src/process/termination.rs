@@ -3,6 +3,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::LocalhostError;
+use crate::platform::signal::*;
 
 /// How the command's shell ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -16,6 +17,7 @@ pub enum Termination {
 
 impl Termination {
     /// Decodes a `waitpid` status.
+    #[cfg(unix)]
     pub(crate) fn from_wait_status(status: i32) -> Termination {
         if libc::WIFSIGNALED(status) {
             Termination::Signaled { signal: libc::WTERMSIG(status) }
@@ -45,15 +47,15 @@ impl Termination {
 /// The conventional name of a signal, e.g. "SIGTERM".
 pub fn signal_name(signal: i32) -> String {
     match signal {
-        libc::SIGHUP => "SIGHUP".into(),
-        libc::SIGINT => "SIGINT".into(),
-        libc::SIGQUIT => "SIGQUIT".into(),
-        libc::SIGABRT => "SIGABRT".into(),
-        libc::SIGKILL => "SIGKILL".into(),
-        libc::SIGBUS => "SIGBUS".into(),
-        libc::SIGSEGV => "SIGSEGV".into(),
-        libc::SIGPIPE => "SIGPIPE".into(),
-        libc::SIGTERM => "SIGTERM".into(),
+        SIGHUP => "SIGHUP".into(),
+        SIGINT => "SIGINT".into(),
+        SIGQUIT => "SIGQUIT".into(),
+        SIGABRT => "SIGABRT".into(),
+        SIGKILL => "SIGKILL".into(),
+        SIGBUS => "SIGBUS".into(),
+        SIGSEGV => "SIGSEGV".into(),
+        SIGPIPE => "SIGPIPE".into(),
+        SIGTERM => "SIGTERM".into(),
         other => other.to_string(),
     }
 }
@@ -70,7 +72,7 @@ pub struct ProcessTreeExit {
 
 impl ProcessTreeExit {
     pub fn was_force_killed(&self) -> bool {
-        self.strongest_signal_sent == Some(libc::SIGKILL)
+        self.strongest_signal_sent == Some(SIGKILL)
     }
 }
 
@@ -99,7 +101,7 @@ mod tests {
     fn success_and_ordinary_failures_are_not_launch_errors() {
         assert_eq!(Termination::Exited { code: 0 }.launch_error(), None);
         assert_eq!(Termination::Exited { code: 1 }.launch_error(), None);
-        assert_eq!(Termination::Signaled { signal: libc::SIGKILL }.launch_error(), None);
+        assert_eq!(Termination::Signaled { signal: SIGKILL }.launch_error(), None);
         assert_eq!(Termination::Exited { code: 127 }.launch_error(), Some(LocalhostError::CommandNotFound));
         assert_eq!(Termination::Exited { code: 126 }.launch_error(), Some(LocalhostError::CommandNotExecutable));
     }
@@ -107,7 +109,7 @@ mod tests {
     #[test]
     fn summaries_name_the_code_or_signal() {
         assert_eq!(Termination::Exited { code: 1 }.summary(), "Exited with code 1");
-        assert_eq!(Termination::Signaled { signal: libc::SIGTERM }.summary(), "Terminated by signal SIGTERM");
+        assert_eq!(Termination::Signaled { signal: SIGTERM }.summary(), "Terminated by signal SIGTERM");
     }
 
     #[test]

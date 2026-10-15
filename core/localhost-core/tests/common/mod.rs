@@ -269,6 +269,7 @@ pub fn leftover_ignoring_signals(then_parent: &str) -> String {
     )
 }
 
+#[cfg(unix)]
 pub fn process_group_exists(pgid: i32) -> bool {
     unsafe { libc::kill(-pgid, 0) == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM) }
 }

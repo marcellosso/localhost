@@ -1,11 +1,18 @@
 use std::path::{Component, Path, PathBuf};
 
 /// Where localhost keeps its data on this platform (`docs/cross-platform.md`):
-/// `~/Library/Application Support/localhost` on macOS, and
-/// `$XDG_DATA_HOME/localhost` (by default `~/.local/share/localhost`) elsewhere.
+/// `~/Library/Application Support/localhost` on macOS, `%APPDATA%\localhost`
+/// on Windows, and `$XDG_DATA_HOME/localhost` (by default
+/// `~/.local/share/localhost`) elsewhere.
 pub fn default_storage_root() -> PathBuf {
     if cfg!(target_os = "macos") {
         return home_directory().join("Library/Application Support/localhost");
+    }
+    if cfg!(windows) {
+        return match std::env::var_os("APPDATA") {
+            Some(data) if Path::new(&data).is_absolute() => PathBuf::from(data).join("localhost"),
+            _ => home_directory().join("AppData").join("Roaming").join("localhost"),
+        };
     }
     match std::env::var_os("XDG_DATA_HOME") {
         Some(data) if Path::new(&data).is_absolute() => PathBuf::from(data).join("localhost"),
@@ -62,9 +69,34 @@ pub(crate) fn standardize(path: &Path) -> PathBuf {
     if result.as_os_str().is_empty() { PathBuf::from(".") } else { result }
 }
 
+/// An absolute POSIX path with `.` and `..` resolved and no trailing `/`,
+/// as text, so it is the same on every platform (a WSL distro's paths are
+/// POSIX on Windows too): `/tmp/app/../shared/` → `/tmp/shared`.
+pub(crate) fn standardize_posix(path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    format!("/{}", parts.join("/"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn standardizes_posix_paths_as_text() {
+        assert_eq!(standardize_posix("/tmp/app/../shared/tools/"), "/tmp/shared/tools");
+        assert_eq!(standardize_posix("/tmp/app/./."), "/tmp/app");
+        assert_eq!(standardize_posix("/../.."), "/");
+        assert_eq!(standardize_posix("//home//me"), "/home/me");
+    }
 
     #[test]
     fn standardizes_lexically() {

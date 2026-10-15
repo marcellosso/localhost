@@ -1,10 +1,8 @@
 //! Field validation and normalization shared by Project and Service edits
 //! and Project files.
 
-use std::path::Path;
-
-use crate::LocalhostError;
-use crate::paths::{expand_tilde, standardize};
+use crate::paths::{expand_tilde, standardize_posix};
+use crate::{ExecutionTarget, LocalhostError};
 
 pub(crate) fn name(raw: &str) -> Result<String, LocalhostError> {
     let name = raw.trim();
@@ -14,13 +12,34 @@ pub(crate) fn name(raw: &str) -> Result<String, LocalhostError> {
     Ok(name.to_string())
 }
 
-/// An absolute path (a leading `~` is expanded), standardized.
-pub(crate) fn project_path(raw: &str) -> Result<String, LocalhostError> {
-    let expanded = expand_tilde(raw.trim());
+/// An absolute path on the target, standardized. A leading `~` is expanded
+/// on this machine only: a distro's home folder isn't known here.
+pub(crate) fn project_path(raw: &str, target: &ExecutionTarget) -> Result<String, LocalhostError> {
+    let expanded = match target {
+        ExecutionTarget::ThisMachine => expand_tilde(raw.trim()),
+        ExecutionTarget::Wsl { .. } => raw.trim().to_string(),
+    };
     if !expanded.starts_with('/') {
         return Err(LocalhostError::InvalidProjectPath(raw.to_string()));
     }
-    Ok(standardize(Path::new(&expanded)).to_string_lossy().into_owned())
+    Ok(standardize_posix(&expanded))
+}
+
+/// The target with its distro name trimmed. WSL distro names are letters,
+/// digits, `.`, `-` and `_`.
+pub(crate) fn execution_target(target: ExecutionTarget) -> Result<ExecutionTarget, LocalhostError> {
+    match target {
+        ExecutionTarget::ThisMachine => Ok(ExecutionTarget::ThisMachine),
+        ExecutionTarget::Wsl { distro } => {
+            let name = distro.trim();
+            let is_valid = !name.is_empty()
+                && name.chars().all(|character| character.is_ascii_alphanumeric() || ".-_".contains(character));
+            if !is_valid {
+                return Err(LocalhostError::InvalidDistroName(distro));
+            }
+            Ok(ExecutionTarget::Wsl { distro: name.to_string() })
+        }
+    }
 }
 
 /// A path relative to the Project, e.g. `web` or `../shared`; empty means `.`.
@@ -75,6 +94,23 @@ pub(crate) fn is_valid_variable_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn project_paths_are_absolute_and_only_this_machines_expand_a_tilde() {
+        let wsl = ExecutionTarget::Wsl { distro: "Ubuntu".into() };
+        assert_eq!(project_path(" /home/me/app/../shop/ ", &wsl), Ok("/home/me/shop".into()));
+        assert_eq!(project_path("~/shop", &wsl), Err(LocalhostError::InvalidProjectPath("~/shop".into())));
+        assert!(project_path("~/shop", &ExecutionTarget::ThisMachine).unwrap().ends_with("/shop"));
+        assert!(project_path("shop", &ExecutionTarget::ThisMachine).is_err());
+    }
+
+    #[test]
+    fn distro_names_are_trimmed_and_checked() {
+        let wsl = |distro: &str| ExecutionTarget::Wsl { distro: distro.into() };
+        assert_eq!(execution_target(wsl(" Ubuntu-24.04 ")), Ok(wsl("Ubuntu-24.04")));
+        assert_eq!(execution_target(wsl("")), Err(LocalhostError::InvalidDistroName("".into())));
+        assert_eq!(execution_target(wsl("my distro")), Err(LocalhostError::InvalidDistroName("my distro".into())));
+    }
 
     #[test]
     fn urls_need_http_and_a_host() {

@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use common::{Fixture, key};
 use localhost_core::{
-    KeyClash, LocalhostError, MemorySecretStore, NewService, Origin, Project, ProjectChanges, ProjectDocument,
-    ProjectFileProblem, ProjectLibrary, ServiceChanges, ValueKind, VariableInput, VariableLayer,
+    ExecutionTarget, KeyClash, LocalhostError, MemorySecretStore, NewService, Origin, Project, ProjectChanges,
+    ProjectDocument, ProjectFileProblem, ProjectLibrary, ServiceChanges, ValueKind, VariableInput, VariableLayer,
 };
 
 fn home() -> String {
@@ -392,6 +392,31 @@ fn replace_keeps_the_projects_identity_matching_services_and_profiles_and_their_
     assert_eq!(fixture.secrets.accounts(), [VariableLayer::Service(api.id).secret_account("STRIPE_KEY")]);
     assert_eq!(library.projects(), std::slice::from_ref(&replaced));
     assert_eq!(fixture.library().projects(), [replaced]);
+}
+
+#[test]
+fn a_project_in_a_wsl_distro_names_it_and_keeps_its_path_as_is() {
+    let fixture = Fixture::new();
+    let library = fixture.library();
+    let wsl = ExecutionTarget::Wsl { distro: "Ubuntu-24.04".into() };
+    let project =
+        library.add_project_on(wsl.clone(), "Shop", key("shop"), "/home/dev/shop", vec![], Origin::MainWindow).unwrap();
+    let text = ProjectDocument::from(&project).to_yaml();
+    assert_eq!(text, "localhost: 1\nname: Shop\nkey: shop\nwsl: Ubuntu-24.04\npath: /home/dev/shop\n");
+
+    let mut document = ProjectDocument::from_yaml(&text).unwrap();
+    assert_eq!(document.execution_target(), &wsl);
+    // Imported on a machine without WSL: this machine, in a folder picked there.
+    document.set_execution_target(ExecutionTarget::ThisMachine);
+    document.set_path("/tmp/shop");
+    let imported = library.import_project(&document, Some(KeyClash::KeepBoth), Origin::MainWindow).unwrap();
+    assert_eq!((imported.execution_target, imported.path.as_str()), (ExecutionTarget::ThisMachine, "/tmp/shop"));
+}
+
+#[test]
+fn rejects_a_wsl_distro_name_that_cant_be_one() {
+    let error = ProjectDocument::from_yaml("localhost: 1\nname: A\nkey: a\nwsl: my distro\npath: /a\n").unwrap_err();
+    assert_eq!(error.message(), "Line 4, wsl: “my distro” is not the name of a WSL distro.");
 }
 
 #[test]

@@ -24,8 +24,13 @@ pub struct Project {
     pub id: Id,
     pub name: String,
     pub key: Key,
-    /// Absolute path of the Project's root folder.
+    /// Absolute path of the Project's root folder, on its Execution Target.
     pub path: String,
+    /// Where its Services run. Left out for this machine, so files of
+    /// Projects on this machine are unchanged since before Execution Targets.
+    // `default` last: specta reads it as optional, and the other attribute as not.
+    #[serde(skip_serializing_if = "ExecutionTarget::is_this_machine", default)]
+    pub execution_target: ExecutionTarget,
     pub sort_order: i64,
     pub is_favorite: bool,
     pub services: Vec<Service>,
@@ -46,6 +51,7 @@ impl Project {
             name,
             key,
             path,
+            execution_target: ExecutionTarget::ThisMachine,
             sort_order,
             is_favorite: false,
             services: Vec::new(),
@@ -105,6 +111,25 @@ impl Project {
             })
             .collect();
         project
+    }
+}
+
+/// Where a Project's Services run: this machine, or a WSL distro, where
+/// `localhostd` runs them (ADR-0008).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub enum ExecutionTarget {
+    #[default]
+    ThisMachine,
+    /// A WSL distro, by the name `wsl.exe --list` gives it.
+    Wsl { distro: String },
+}
+
+impl ExecutionTarget {
+    pub fn is_this_machine(&self) -> bool {
+        *self == ExecutionTarget::ThisMachine
     }
 }
 
