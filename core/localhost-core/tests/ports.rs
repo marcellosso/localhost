@@ -111,7 +111,18 @@ fn nc_service(s: &Services, raw: &str, port: u16) -> Service {
 /// `directory`, and waits until it shows up as a Listener.
 async fn listen(s: &Services, port: u16, directory: &Path, command_line: Option<&str>) -> ProcessTree {
     let default = listening(&port.to_string());
-    let configuration = LaunchConfiguration::new(command_line.unwrap_or(&default), directory, base_environment());
+    let command_line = command_line.unwrap_or(&default);
+    let configuration = if cfg!(windows) {
+        LaunchConfiguration::new(command_line, directory, base_environment())
+    } else {
+        // No `HOME`, so the login shell reads no profile.
+        LaunchConfiguration {
+            command_line: command_line.into(),
+            working_directory: directory.into(),
+            environment: [("PATH".to_string(), "/usr/bin:/bin".to_string())].into(),
+            shell: "/bin/sh".into(),
+        }
+    };
     let quick =
         StopPolicy { interrupt_timeout: Duration::from_millis(500), terminate_timeout: Duration::from_millis(500) };
     let tree = ProcessTree::launch(&configuration, quick).unwrap();
