@@ -1,10 +1,8 @@
 //! Reads a Run's pipes and splits them into lines, delivered a read at a time.
 
-use std::os::fd::OwnedFd;
 use std::sync::Arc;
 
-use tokio::io::AsyncReadExt;
-use tokio::net::unix::pipe;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::{Semaphore, mpsc, watch};
 
 use super::MAX_LINE_LENGTH;
@@ -75,12 +73,12 @@ fn make_line(bytes: &[u8], channel: OutputChannel) -> OutputLine {
     OutputLine::new(channel, String::from_utf8_lossy(bytes))
 }
 
-/// Reads `fd` until it ends or `cancel` turns true, sending each read's lines
+/// Reads `pipe` until it ends or `cancel` turns true, sending each read's lines
 /// as one batch. Before each read it takes one of `flow`'s permits, which the
 /// consumer gives back for every batch it takes. On cancel, the partial line
 /// is delivered.
 pub(crate) async fn read_lines(
-    fd: OwnedFd,
+    mut pipe: impl AsyncRead + Unpin,
     channel: OutputChannel,
     batches: mpsc::UnboundedSender<Vec<OutputLine>>,
     flow: Arc<Semaphore>,
@@ -88,7 +86,6 @@ pub(crate) async fn read_lines(
 ) {
     let mut splitter = LineSplitter::default();
     let mut chunk = vec![0u8; 64 * 1024];
-    let Ok(mut pipe) = pipe::Receiver::from_owned_fd(fd) else { return };
     loop {
         let permit = tokio::select! {
             biased;

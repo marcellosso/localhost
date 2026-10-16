@@ -36,6 +36,25 @@ jobs:
         run: cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
       - run: cargo test
 
+  windows:
+    name: Rust core (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      # The real-process fixtures are Python scripts.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # Native execution (XP5): the tests ported so far, against real processes.
+      - run: cargo test -p localhost-core --lib --test process_tree_windows
+
   macos:
     name: Rust core and app (macOS)
     if: github.event_name == 'push' || !github.event.pull_request.draft

@@ -26,19 +26,24 @@ impl Termination {
         }
     }
 
-    /// A short human-readable summary, e.g. "Exited with code 1".
+    /// A short human-readable summary, e.g. "Exited with code 1". Windows
+    /// status codes (negative as an `i32`) are shown in hex, as Windows writes
+    /// them: "Exited with code 0xC000013A".
     pub fn summary(&self) -> String {
         match self {
+            Termination::Exited { code } if *code < 0 => format!("Exited with code {:#X}", *code as u32),
             Termination::Exited { code } => format!("Exited with code {code}"),
             Termination::Signaled { signal } => format!("Terminated by signal {}", signal_name(*signal)),
         }
     }
 
-    /// The launch failure this termination stands for, by shell convention.
+    /// The launch failure this termination stands for, by shell convention
+    /// (cmd's on Windows: 9009 when the command isn't recognised).
     pub fn launch_error(&self) -> Option<LocalhostError> {
         match self {
-            Termination::Exited { code: 127 } => Some(LocalhostError::CommandNotFound),
-            Termination::Exited { code: 126 } => Some(LocalhostError::CommandNotExecutable),
+            Termination::Exited { code: 9009 } if cfg!(windows) => Some(LocalhostError::CommandNotFound),
+            Termination::Exited { code: 127 } if cfg!(unix) => Some(LocalhostError::CommandNotFound),
+            Termination::Exited { code: 126 } if cfg!(unix) => Some(LocalhostError::CommandNotExecutable),
             _ => None,
         }
     }
@@ -98,6 +103,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
     fn success_and_ordinary_failures_are_not_launch_errors() {
         assert_eq!(Termination::Exited { code: 0 }.launch_error(), None);
         assert_eq!(Termination::Exited { code: 1 }.launch_error(), None);
@@ -107,8 +113,18 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
+    fn cmds_unrecognised_command_is_command_not_found() {
+        assert_eq!(Termination::Exited { code: 0 }.launch_error(), None);
+        assert_eq!(Termination::Exited { code: 1 }.launch_error(), None);
+        assert_eq!(Termination::Exited { code: 127 }.launch_error(), None);
+        assert_eq!(Termination::Exited { code: 9009 }.launch_error(), Some(LocalhostError::CommandNotFound));
+    }
+
+    #[test]
     fn summaries_name_the_code_or_signal() {
         assert_eq!(Termination::Exited { code: 1 }.summary(), "Exited with code 1");
+        assert_eq!(Termination::Exited { code: 0xC000013A_u32 as i32 }.summary(), "Exited with code 0xC000013A");
         assert_eq!(Termination::Signaled { signal: SIGTERM }.summary(), "Terminated by signal SIGTERM");
     }
 

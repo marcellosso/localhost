@@ -44,7 +44,9 @@ const DOCKER_DAEMON_ERROR_TEXTS: [&str; 2] =
 /// How a ServiceManager runs Services.
 #[derive(Clone, Debug)]
 pub struct ServiceManagerOptions {
-    /// The environment every Run starts from (see `RunEnvironment`).
+    /// The environment every Run starts from (see `RunEnvironment`). On
+    /// Windows, variables put on top of the user's environment, which is read
+    /// fresh at every start (`RunEnvironment::base`).
     pub base_environment: BTreeMap<String, String>,
     /// How long a Run without a Port must stay alive in Starting to be Running.
     pub grace_period: Duration,
@@ -61,7 +63,7 @@ pub struct ServiceManagerOptions {
 impl Default for ServiceManagerOptions {
     fn default() -> Self {
         ServiceManagerOptions {
-            base_environment: RunEnvironment::current(),
+            base_environment: if cfg!(windows) { BTreeMap::new() } else { RunEnvironment::current() },
             grace_period: Duration::from_millis(1500),
             port_timeout: Duration::from_secs(30),
             port_probe_interval: Duration::from_millis(250),
@@ -763,7 +765,8 @@ impl Inner {
                 let (port, change) = self.port_for_run(&service, port, &project, requested_port).await?;
                 (run.port, run.port_change) = (Some(port), change);
             }
-            let environment = RunEnvironment::merged(&self.options.base_environment, &variables, run.port);
+            let environment =
+                RunEnvironment::merged(&RunEnvironment::base(&self.options.base_environment), &variables, run.port);
             let configuration = LaunchConfiguration::new(
                 service.command_line.clone(),
                 project.working_directory(&service),

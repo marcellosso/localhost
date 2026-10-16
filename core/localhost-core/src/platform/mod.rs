@@ -2,9 +2,10 @@
 //! which TCP port, when a process started, its parent, and signalling them.
 //! One implementation per platform; everything above this module is shared.
 //!
-//! On Windows, Services run in a WSL distro (ADR-0008) until native execution
-//! (XP5): there this module sees no processes, and pids and signals that reach
-//! it come from the distro's Linux.
+//! On Windows there are no process groups or signals: Runs live in Job
+//! Objects (ADR-0011), and the signals here stand for what localhost does
+//! instead (`windows.rs`). Pids and signals of WSL Projects come from the
+//! distro's Linux (ADR-0008).
 
 use std::collections::HashMap;
 
@@ -30,11 +31,13 @@ use windows as groups;
 #[cfg(windows)]
 use windows as imp;
 
-/// A process id: `pid_t` on every Unix localhost runs on.
+/// A process id: `pid_t` on every Unix localhost runs on; a Windows process
+/// id (a `DWORD`, always small enough) on Windows.
 pub type Pid = i32;
 
-/// The signals localhost sends or names. On Windows they are Linux's, the
-/// numbering of the WSL distros Runs happen in.
+/// The signals localhost sends or names. On Windows they have Linux's
+/// numbers, as in WSL distros; natively SIGINT stands for Ctrl-Break and the
+/// others for terminating.
 pub mod signal {
     #[cfg(unix)]
     pub use libc::{SIGABRT, SIGBUS, SIGHUP, SIGINT, SIGKILL, SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM};
