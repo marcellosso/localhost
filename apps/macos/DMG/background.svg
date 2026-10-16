@@ -1,0 +1,25 @@
+<!-- The DMG window's background, 660×400 points: localhost.app sits on the left
+     dot (170, 190), Applications on the right (490, 190), as in dmg-settings.py.
+     Exported as background.png (1x) and background@2x.png (2x). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="400" viewBox="0 0 660 400">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBFBFC"/>
+      <stop offset="1" stop-color="#EEEEF2"/>
+    </linearGradient>
+  </defs>
+  <rect width="660" height="400" fill="url(#fill)"/>
+  <!-- The app icon's colon, laid on its side and walking towards Applications. -->
+  <g fill="#FF5C8A">
+    <rect x="262" y="183" width="14" height="14" rx="4" opacity="0.25"/>
+    <rect x="290" y="183" width="14" height="14" rx="4" opacity="0.45"/>
+    <rect x="318" y="183" width="14" height="14" rx="4" opacity="0.65"/>
+    <rect x="346" y="183" width="14" height="14" rx="4" opacity="0.85"/>
+  </g>
+  <path d="M378 174 L394 190 L378 206" fill="none" stroke="#FF5C8A" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="330" y="338" text-anchor="middle" fill="#7A7A85"
+        font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif" font-size="14">
+    Drag localhost to Applications to install it
+  </text>
+</svg>

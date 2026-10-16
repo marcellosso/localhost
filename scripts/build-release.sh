@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds localhost.app in Release, signs it and packs it into a DMG. Needs
-# Rust with both macOS targets (CONTRIBUTING.md).
+# Rust with both macOS targets (CONTRIBUTING.md), and python3 for dmgbuild.
 #
 #   scripts/build-release.sh <version> [build number]
 #
@@ -60,12 +60,13 @@ codesign --force --sign "$identity" "${timestamp[@]}" \
 codesign --verify --strict --verbose=2 "$app" >&2
 
 echo "==> Packing $dmg" >&2
-staging="$output/dmg"
-mkdir -p "$staging"
-ditto "$app" "$staging/localhost.app"
-ln -s /Applications "$staging/Applications"
-hdiutil create -volname localhost -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg" >&2
-rm -rf "$staging"
+# dmgbuild lays out the DMG's window (apps/macos/DMG), in a venv of its own.
+dmgbuild_venv=build/dmgbuild-venv
+if [[ ! -x $dmgbuild_venv/bin/dmgbuild ]]; then
+    python3 -m venv "$dmgbuild_venv" >&2
+    "$dmgbuild_venv/bin/pip" install --quiet --disable-pip-version-check dmgbuild==1.6.7 >&2
+fi
+"$dmgbuild_venv/bin/dmgbuild" -s apps/macos/DMG/dmg-settings.py -D app="$app" localhost "$dmg" >&2
 if [[ $identity != - ]]; then
     codesign --force --sign "$identity" "${timestamp[@]}" "$dmg" >&2
 fi

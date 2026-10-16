@@ -19,6 +19,7 @@ apps/macos/                   # the macOS app (SwiftUI)
   localhost.xcodeproj
   App/                        # its sources
   LocalhostCoreFFI/           # the core as the Swift module `LocalhostCore`: generated bindings + a thin layer
+  DMG/                        # the release DMG's window: background and dmgbuild settings
 apps/desktop/                 # the Linux (later Windows) app: Tauri, React UI in src/, Rust shell in src-tauri/
 scripts/                      # build-core.sh (core/ for the macOS app + Swift bindings), build-release.sh
 docs/                         # product spec (localhost-v1.md, localhost-v2.md), decisions, ADRs, configuration.md
