@@ -57,8 +57,8 @@ jobs:
         with:
           python-version: "3.13"
       # Native execution (XP5): the tests ported so far, against real processes.
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --no-run
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --no-run
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies
         timeout-minutes: 5
 
   macos:

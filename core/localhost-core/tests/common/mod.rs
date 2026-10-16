@@ -47,6 +47,11 @@ pub fn key(raw: &str) -> Key {
     Key::new(raw).unwrap()
 }
 
+/// An absolute Project path on this platform, for Projects nothing runs in.
+pub fn some_project_path(name: &str) -> String {
+    if cfg!(windows) { format!(r"C:\{name}") } else { format!("/tmp/{name}") }
+}
+
 // MARK: Running Services
 
 use std::collections::{BTreeMap, HashSet};
@@ -62,7 +67,12 @@ use tokio::sync::mpsc::UnboundedReceiver;
 /// How long a test waits for something before failing instead of hanging.
 pub const PATIENCE: Duration = Duration::from_secs(20);
 
+/// A small, predictable environment; on Windows this process's own, so
+/// `python` resolves as it does for the test runner.
 pub fn base_environment() -> BTreeMap<String, String> {
+    if cfg!(windows) {
+        return std::env::vars().collect();
+    }
     [("PATH", "/usr/bin:/bin"), ("HOME", std::env::var("HOME").unwrap_or_default().as_str()), ("SHELL", "/bin/sh")]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
