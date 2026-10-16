@@ -206,8 +206,16 @@ async fn a_tree_ignoring_ctrl_break_is_terminated_with_its_job() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn what_the_shell_leaves_behind_is_terminated_when_it_exits() {
-    let folder = python("import os, time\nprint('leftover', os.getpid(), flush=True)\ntime.sleep(1000)\n");
-    let tree = launch_in(folder.path(), "start /b python script.py & exit /b 3", QUICK_STOP).unwrap();
+    // The shell waits until the leftover has said its pid, then exits.
+    let folder = python(
+        "import os, time\nprint('leftover', os.getpid(), flush=True)\nopen('ready', 'w').close()\ntime.sleep(1000)\n",
+    );
+    std::fs::write(
+        folder.path().join("wait.py"),
+        "import os, time\nwhile not os.path.exists('ready'): time.sleep(0.01)\n",
+    )
+    .unwrap();
+    let tree = launch_in(folder.path(), "start /b python script.py & python wait.py & exit /b 3", QUICK_STOP).unwrap();
     let leftover: u32 = line_starting_with("leftover", &tree).await.parse().unwrap();
 
     let exit = tree.wait_for_exit().await;
@@ -245,20 +253,24 @@ async fn force_killing_localhost_ends_every_run() {
 
     let folder = python(IGNORES_CTRL_BREAK);
     let mut helper = std::process::Command::new(std::env::current_exe().unwrap())
-        .args(["helper_launches_a_run_and_waits", "--exact", "--nocapture", "--test-threads=1"])
+        .args(["helper_launches_a_run_and_waits", "--exact", "--nocapture"])
         .env("LOCALHOST_TEST_HELPER_FOLDER", folder.path())
         .stdout(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    let mut reader = BufReader::new(helper.stdout.take().unwrap());
-    let grandchild: u32 = loop {
-        let mut line = String::new();
-        assert!(reader.read_line(&mut line).unwrap() > 0, "the helper ended before launching");
-        if let Some(pid) = line.trim().strip_prefix("helper-grandchild ") {
-            break pid.parse().unwrap();
+    // libtest's own output may share the line, so look for the marker anywhere in it.
+    let stdout = helper.stdout.take().unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if let Some((_, pid)) = line.split_once("helper-grandchild ") {
+                let _ = sender.send(pid.trim().parse::<u32>().unwrap());
+                return;
+            }
         }
-    };
-    assert!(is_alive(grandchild));
+    });
+    let grandchild = receiver.recv_timeout(Duration::from_secs(60));
+    let alive = grandchild.as_ref().is_ok_and(|&pid| is_alive(pid));
 
     unsafe {
         let process = OpenProcess(PROCESS_TERMINATE, 0, helper.id());
@@ -266,5 +278,7 @@ async fn force_killing_localhost_ends_every_run() {
         CloseHandle(process);
     }
     let _ = helper.wait();
+    let grandchild = grandchild.expect("the helper's Run printed its grandchild within 60s");
+    assert!(alive, "the grandchild was running before the helper was killed");
     wait_until_dead(grandchild).await;
 }
