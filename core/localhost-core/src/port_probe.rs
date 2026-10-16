@@ -12,7 +12,15 @@ pub(crate) async fn is_accepting(port: u16) -> bool {
 async fn connects(address: SocketAddr) -> bool {
     // Connecting to loopback is answered at once, accepted or refused; the
     // timeout only guards against a firewall that drops instead.
-    matches!(tokio::time::timeout(Duration::from_secs(1), tokio::net::TcpStream::connect(address)).await, Ok(Ok(_)))
+    let Ok(Ok(stream)) = tokio::time::timeout(Duration::from_secs(1), tokio::net::TcpStream::connect(address)).await
+    else {
+        return false;
+    };
+    // A connection to itself: with nothing listening, a connect whose source
+    // port happens to be the port probed is answered by itself. Windows hands
+    // out source ports in order, so probing ports in order can meet them
+    // every time.
+    stream.local_addr().ok() != Some(address)
 }
 
 #[cfg(test)]

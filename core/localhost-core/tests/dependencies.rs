@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{Fixture, key};
+use common::{Fixture, key, some_project_path};
 use localhost_core::{Id, LocalhostError, NewService, Origin, Project, ProjectLibrary, Service, ServiceChanges};
 
 struct Setup {
@@ -16,7 +16,8 @@ impl Setup {
     fn new() -> Setup {
         let fixture = Fixture::new();
         let library = fixture.library();
-        let project = library.add_project("App", key("app"), "/tmp/app", vec![], Origin::MainWindow).unwrap();
+        let project =
+            library.add_project("App", key("app"), &some_project_path("app"), vec![], Origin::MainWindow).unwrap();
         Setup { fixture, library, project }
     }
 
@@ -90,7 +91,10 @@ fn rejects_a_dependency_that_closes_a_cycle_naming_it() {
 fn rejects_a_dependency_on_a_service_of_another_project() {
     let setup = Setup::new();
     let api = setup.service("api", &[]);
-    let other = setup.library.add_project("Other", key("other"), "/tmp/other", vec![], Origin::MainWindow).unwrap();
+    let other = setup
+        .library
+        .add_project("Other", key("other"), &some_project_path("other"), vec![], Origin::MainWindow)
+        .unwrap();
     let foreign = setup
         .library
         .add_service(other.id, NewService::new("DB", key("db"), "true"), vec![], vec![], Origin::MainWindow)

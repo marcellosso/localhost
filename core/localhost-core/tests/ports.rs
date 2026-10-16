@@ -1,7 +1,8 @@
 //! Ported from `PortTests.swift` and `ListenerTests.swift`: readiness on a
 //! Port, `PORT`, detected URLs, Listener attribution, port conflicts and
 //! automatic moves, against real processes. Listeners not started by
-//! localhost are `nc` process trees launched directly with `ProcessTree`.
+//! localhost are process trees launched directly with `ProcessTree`. The
+//! listening process is `nc`, or a Python fixture on Windows (see `commands`).
 
 mod common;
 
@@ -13,6 +14,76 @@ use localhost_core::{
     LaunchConfiguration, Listener, ListenerKind, ListenerOwner, LocalhostError, NewService, Origin, PortChange,
     PortChangeReason, ProcessTree, Service, ServiceManagerOptions, ServiceState, StopPolicy, VariableInput,
 };
+
+/// The tests' command lines, in the login shell's syntax with `nc`.
+#[cfg(unix)]
+mod commands {
+    use std::path::Path;
+
+    pub const LISTENER_NAME: &str = "nc";
+    pub const SLEEPING: &str = "sleep 1000";
+    pub const PRINTING_URLS: &str =
+        r"printf '\033[32mLocal:\033[0m http://0.0.0.0:5173/\n'; echo http://localhost:9999; exec sleep 1000";
+
+    /// Listens on `port` (a number or `$PORT`) until stopped.
+    pub fn listening(port: &str) -> String {
+        format!("exec nc -lk {port}")
+    }
+
+    pub fn listening_after(seconds: f64, port: &str) -> String {
+        format!("sleep {seconds}; exec nc -lk {port}")
+    }
+
+    pub fn listening_on_ipv6_loopback(port: &str) -> String {
+        format!("exec nc -6 -lk ::1 {port}")
+    }
+
+    pub fn writing_port_then_sleeping(marker: &Path) -> String {
+        format!("echo $PORT > '{}'; exec sleep 1000", marker.display())
+    }
+
+    pub const PORT: &str = "$PORT";
+}
+
+/// The tests' command lines for cmd.exe (ADR-0010), with `fixtures/listen.py`
+/// standing in for `nc`. cmd stays the tree's root process, so the Listener
+/// is its child, `python.exe`.
+#[cfg(windows)]
+mod commands {
+    use std::path::Path;
+
+    pub const LISTENER_NAME: &str = "python.exe";
+    pub const SLEEPING: &str = r#"python -c "import time; time.sleep(1000)""#;
+    pub const PRINTING_URLS: &str = r#"python -u -c "print('\x1b[32mLocal:\x1b[0m http://0.0.0.0:5173/'); print('http://localhost:9999'); import time; time.sleep(1000)""#;
+
+    fn listen_py() -> String {
+        format!(r#"python "{}\tests\fixtures\listen.py""#, env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// Listens on `port` (a number or `%PORT%`) until stopped.
+    pub fn listening(port: &str) -> String {
+        format!("{} {port}", listen_py())
+    }
+
+    pub fn listening_after(seconds: f64, port: &str) -> String {
+        format!("{} {port} --after {seconds}", listen_py())
+    }
+
+    pub fn listening_on_ipv6_loopback(port: &str) -> String {
+        format!("{} {port} --ipv6-loopback", listen_py())
+    }
+
+    pub fn writing_port_then_sleeping(marker: &Path) -> String {
+        format!(
+            r#"python -c "import os, time; open(r'{}', 'w', newline='').write(os.environ['PORT'] + '\n'); time.sleep(1000)""#,
+            marker.display()
+        )
+    }
+
+    pub const PORT: &str = "%PORT%";
+}
+
+use commands::*;
 
 fn port_options(port_timeout: Duration) -> ServiceManagerOptions {
     ServiceManagerOptions { port_timeout, ..test_options() }
@@ -33,18 +104,24 @@ fn with_port(
 }
 
 fn nc_service(s: &Services, raw: &str, port: u16) -> Service {
-    with_port(s, raw, "exec nc -lk $PORT", Some(port), true, &[])
+    with_port(s, raw, &listening(PORT), Some(port), true, &[])
 }
 
 /// Starts a process tree listening on `port` that localhost doesn't run, in
 /// `directory`, and waits until it shows up as a Listener.
 async fn listen(s: &Services, port: u16, directory: &Path, command_line: Option<&str>) -> ProcessTree {
-    let default = format!("exec nc -lk {port}");
-    let configuration = LaunchConfiguration {
-        command_line: command_line.unwrap_or(&default).into(),
-        working_directory: directory.into(),
-        environment: [("PATH".to_string(), "/usr/bin:/bin".to_string())].into(),
-        shell: "/bin/sh".into(),
+    let default = listening(&port.to_string());
+    let command_line = command_line.unwrap_or(&default);
+    let configuration = if cfg!(windows) {
+        LaunchConfiguration::new(command_line, directory, base_environment())
+    } else {
+        // No `HOME`, so the login shell reads no profile.
+        LaunchConfiguration {
+            command_line: command_line.into(),
+            working_directory: directory.into(),
+            environment: [("PATH".to_string(), "/usr/bin:/bin".to_string())].into(),
+            shell: "/bin/sh".into(),
+        }
     };
     let quick =
         StopPolicy { interrupt_timeout: Duration::from_millis(500), terminate_timeout: Duration::from_millis(500) };
@@ -79,7 +156,7 @@ fn outside(s: &Services) -> std::path::PathBuf {
 async fn with_a_port_stays_starting_until_the_port_accepts_connections() {
     let s = Services::new();
     let port = free_port();
-    let service = with_port(&s, "web", "sleep 0.6; exec nc -lk $PORT", Some(port), true, &[]);
+    let service = with_port(&s, "web", &listening_after(0.6, PORT), Some(port), true, &[]);
     let (_, mut events) = s.manager.subscribe();
 
     let started = Instant::now();
@@ -98,7 +175,7 @@ async fn a_port_that_never_opens_times_out_to_running_with_a_warning_cleared_onc
     let s = Services::new();
     let port = free_port();
     // Opens well after the timeout, however slow the machine is.
-    let service = with_port(&s, "web", "sleep 3; exec nc -lk $PORT", Some(port), true, &[]);
+    let service = with_port(&s, "web", &listening_after(3.0, PORT), Some(port), true, &[]);
     let manager = s.manager_with(port_options(Duration::from_millis(800)));
     let (_, mut events) = manager.subscribe();
     manager.start(service.id, None, Origin::MainWindow).await.unwrap();
@@ -121,7 +198,7 @@ async fn a_port_that_never_opens_times_out_to_running_with_a_warning_cleared_onc
 async fn a_service_listening_on_ipv6_loopback_only_counts_as_accepting() {
     let s = Services::new();
     let port = free_port();
-    let service = with_port(&s, "web", "exec nc -6 -lk ::1 $PORT", Some(port), true, &[]);
+    let service = with_port(&s, "web", &listening_on_ipv6_loopback(PORT), Some(port), true, &[]);
     let (_, mut events) = s.manager.subscribe();
     s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
 
@@ -135,7 +212,7 @@ async fn the_command_gets_the_port_as_port_overriding_a_service_variable() {
     let s = Services::new();
     let marker = s.fixture.path().join("port.txt");
     let port = free_port();
-    let mut web = NewService::new("Web", key("web"), format!("echo $PORT > '{}'; exec sleep 1000", marker.display()));
+    let mut web = NewService::new("Web", key("web"), writing_port_then_sleeping(&marker));
     web.port = Some(i64::from(port));
     let service = s.add(web, VariableInput::plain_all([("PORT", "1")]), vec![]);
     s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
@@ -150,8 +227,7 @@ async fn the_command_gets_the_port_as_port_overriding_a_service_variable() {
 #[tokio::test(flavor = "multi_thread")]
 async fn remembers_the_first_local_url_a_run_prints() {
     let s = Services::new();
-    let service = s
-        .service(r"printf '\033[32mLocal:\033[0m http://0.0.0.0:5173/\n'; echo http://localhost:9999; exec sleep 1000");
+    let service = s.service(PRINTING_URLS);
     let (_, mut events) = s.manager.subscribe();
     s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
 
@@ -173,12 +249,16 @@ async fn discovers_a_listeners_command_ports_and_working_directory_unmanaged_out
     let tree = listen(&s, port, &folder, None).await;
 
     let listener = listener_on(&s, port).await;
-    assert_eq!(listener.pid, tree.pid());
-    assert_eq!(listener.name, "nc");
-    assert!(listener.command.ends_with(&format!("-lk {port}")), "{}", listener.command);
+    if cfg!(unix) {
+        assert_eq!(listener.pid, tree.pid());
+    }
+    assert!(listener.name.eq_ignore_ascii_case(LISTENER_NAME), "{}", listener.name);
+    assert!(listener.command.ends_with(&format!(" {port}")), "{}", listener.command);
     assert_eq!(listener.ports, [port]);
     let resolved = std::fs::canonicalize(&folder).unwrap();
-    assert_eq!(listener.working_directory.as_deref(), resolved.to_str());
+    let resolved = resolved.to_str().unwrap();
+    // Without Windows' `\\?\` prefix for long paths.
+    assert_eq!(listener.working_directory.as_deref(), Some(resolved.strip_prefix(r"\\?\").unwrap_or(resolved)));
     assert_eq!(listener.owner, ListenerOwner::Unmanaged);
     assert_eq!(listener.launchd_label, None);
     assert_eq!(listener.kind, ListenerKind::Development);
@@ -270,19 +350,20 @@ async fn a_taken_port_moves_the_run_to_the_next_free_port_saying_why() {
     let s = Services::new();
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
+    let held_by = listener_on(&s, port).await;
     let service = nc_service(&s, "web", port);
     let (_, mut events) = s.manager.subscribe();
 
     let status = s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
     let run = status.run.unwrap();
-    let moved = run.port.unwrap();
+    let moved = run.port.unwrap_or_else(|| panic!("the start should move, got {:?} {run:?}", status.state));
     assert!(moved > port && moved <= port + 100);
     let Some(PortChange { configured_port, reason: PortChangeReason::PortInUse { holder: Some(reported) } }) =
         &run.port_change
     else {
         panic!("expected a move away from the holder, got {:?}", run.port_change)
     };
-    assert_eq!(reported.pid, holder.pid());
+    assert_eq!(reported.pid, held_by.pid);
     assert_eq!(*configured_port, port);
     // The command got the moved port as $PORT.
     let seen = statuses_until(&mut events, service.id, |s| s.state == ServiceState::Running).await;
@@ -293,7 +374,7 @@ async fn a_taken_port_moves_the_run_to_the_next_free_port_saying_why() {
     let note = s.logs.lines(run.id).into_iter().find(|line| line.text.starts_with("Port ")).unwrap();
     assert_eq!(
         note.text,
-        format!("Port {port} is in use by nc (PID {}): starting on port {moved} instead", holder.pid())
+        format!("Port {port} is in use by {} (PID {}): starting on port {moved} instead", held_by.name, held_by.pid)
     );
 
     s.manager.stop(service.id, Origin::MainWindow).await.unwrap();
@@ -305,6 +386,7 @@ async fn with_automatic_moves_off_a_taken_port_fails_the_start_naming_its_owner(
     let s = Services::new();
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
+    let held_by = listener_on(&s, port).await;
     let service = nc_service(&s, "web", port);
     s.manager.set_automatic_port_move(false);
 
@@ -314,8 +396,8 @@ async fn with_automatic_moves_off_a_taken_port_fails_the_start_naming_its_owner(
     let failure = status.run.unwrap().failure.unwrap();
     let LocalhostError::PortConflict { port: conflict, owner: Some(owner) } = &failure else { panic!("{failure:?}") };
     assert_eq!(*conflict, port);
-    assert_eq!(owner.pid, holder.pid());
-    assert_eq!(failure.message(), format!("Port {port} is in use by nc (PID {}).", holder.pid()));
+    assert_eq!(owner.pid, held_by.pid);
+    assert_eq!(failure.message(), format!("Port {port} is in use by {} (PID {}).", held_by.name, held_by.pid));
     holder.stop().await;
 }
 
@@ -324,7 +406,7 @@ async fn a_service_whose_port_cant_change_is_not_moved() {
     let s = Services::new();
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
-    let service = with_port(&s, "db", "exec nc -lk $PORT", Some(port), false, &[]);
+    let service = with_port(&s, "db", &listening(PORT), Some(port), false, &[]);
 
     let status = s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
 
@@ -340,7 +422,7 @@ async fn a_service_with_dependents_is_not_moved() {
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
     let api = nc_service(&s, "api", port);
-    with_port(&s, "web", "sleep 1000", None, true, &[&api]);
+    with_port(&s, "web", SLEEPING, None, true, &[&api]);
 
     let status = s.manager.start(api.id, None, Origin::MainWindow).await.unwrap();
 
@@ -371,7 +453,7 @@ async fn a_move_skips_ports_configured_for_other_services() {
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
     let service = nc_service(&s, "web", port);
-    with_port(&s, "api", "sleep 1000", Some(port + 1), true, &[]);
+    with_port(&s, "api", SLEEPING, Some(port + 1), true, &[]);
 
     assert!(s.manager.next_free_port(service.id).await.unwrap().is_some_and(|free| free > port + 1));
     let status = s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
@@ -405,7 +487,7 @@ async fn in_start_all_a_blocked_service_fails_with_port_conflict_and_its_depende
     let port = free_port();
     let holder = listen(&s, port, &outside(&s), None).await;
     let api = nc_service(&s, "api", port);
-    let web = with_port(&s, "web", "sleep 1000", None, true, &[&api]);
+    let web = with_port(&s, "web", SLEEPING, None, true, &[&api]);
 
     s.manager.start_all(s.project.id, Origin::MainWindow).await.unwrap();
     // Start All returns once every start has taken effect.
