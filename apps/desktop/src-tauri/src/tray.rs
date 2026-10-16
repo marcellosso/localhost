@@ -7,6 +7,9 @@
 //!
 //! It reads the core directly, not the window, so it stays current while the
 //! window is closed. Its actions carry `Origin::MenuBar`.
+//!
+//! In Windows' notification area, as there, a left click opens the window and
+//! a right click the menu, and the icon is dark on a light taskbar.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -15,7 +18,7 @@ use std::time::Duration;
 use localhost_core::{Id, LocalhostError, Origin, PortWarning, Project, ServiceState, ServiceStatus, port_warnings};
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::tray::{TrayIcon, TrayIconBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, Wry};
 
 use crate::lifecycle::{self, Reveal};
@@ -184,15 +187,22 @@ type Actions = Arc<Mutex<HashMap<String, Action>>>;
 pub fn install(app: &App) -> tauri::Result<()> {
     let actions = Actions::default();
     let handler_actions = actions.clone();
+    let mut look = Look { has_failure: false, is_taskbar_light: is_taskbar_light() };
     let tray = TrayIconBuilder::with_id("main")
-        .icon(icon(false))
+        .icon(icon(look))
         .icon_as_template(true)
         .tooltip("localhost")
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(!cfg!(windows))
         .on_menu_event(move |app, event| {
             let action = handler_actions.lock().unwrap().get(event.id().as_ref()).cloned();
             if let Some(action) = action {
                 perform(app, action);
+            }
+        })
+        // Windows only: AppIndicators and the macOS menu bar always show the menu.
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                lifecycle::show_window(tray.app_handle(), None);
             }
         })
         .build(app)?;
@@ -208,11 +218,13 @@ pub fn install(app: &App) -> tauri::Result<()> {
         let mut scan = tokio::time::interval(LISTENER_SCAN);
         let mut warnings = Vec::new();
         let mut shown = menu;
+        let mut shown_look = look;
         loop {
             tokio::select! {
                 Some(_) = library_events.recv() => {}
                 Some(_) = service_events.recv() => {}
                 _ = scan.tick() => {
+                    look.is_taskbar_light = is_taskbar_light();
                     let listeners: Vec<_> = core.targets.listeners().await.into_iter().map(|(_, listener)| listener).collect();
                     let (projects, statuses) = current(core);
                     let statuses: Vec<ServiceStatus> = statuses.into_values().collect();
@@ -225,11 +237,13 @@ pub fn install(app: &App) -> tauri::Result<()> {
             while library_events.try_recv().is_ok() || service_events.try_recv().is_ok() {}
             let (projects, statuses) = current(core);
             let menu = TrayMenu::new(&projects, &statuses, &warnings);
+            let new_look = Look { has_failure: menu.has_failure, ..look };
+            if new_look != shown_look {
+                let _ = tray.set_icon(Some(icon(new_look)));
+                let _ = tray.set_icon_as_template(!new_look.has_failure);
+                shown_look = new_look;
+            }
             if menu != shown {
-                if menu.has_failure != shown.has_failure {
-                    let _ = tray.set_icon(Some(icon(menu.has_failure)));
-                    let _ = tray.set_icon_as_template(!menu.has_failure);
-                }
                 let _ = render(&handle, &tray, &actions, &menu);
                 shown = menu;
             }
@@ -327,10 +341,49 @@ fn perform(app: &AppHandle, action: Action) {
     }
 }
 
+/// How the tray icon looks.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Look {
+    /// A red dot, while any Service is Failed.
+    has_failure: bool,
+    /// Dark on a light Windows taskbar, white elsewhere.
+    is_taskbar_light: bool,
+}
+
+/// Whether Windows' taskbar is light (Settings › Personalization › Colors).
+/// Read again at every Listener scan, so a change shows within seconds.
+#[cfg(windows)]
+fn is_taskbar_light() -> bool {
+    use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
+    use windows::core::w;
+    let mut value = 0u32;
+    let mut size = size_of::<u32>() as u32;
+    // SAFETY: `value` and `size` describe a DWORD that outlives the call.
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"),
+            w!("SystemUsesLightTheme"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&raw mut value).cast()),
+            Some(&raw mut size),
+        )
+    };
+    // Missing before Windows 10 1903, whose taskbar is dark.
+    result.is_ok() && value == 1
+}
+
+#[cfg(not(windows))]
+fn is_taskbar_light() -> bool {
+    false
+}
+
 /// The app icon's colon as a tray icon: white for the dark panels of GNOME
-/// and most desktops (a template on macOS), with a red dot while a Service
-/// is Failed.
-fn icon(has_failure: bool) -> Image<'static> {
+/// and most desktops (a template on macOS), near-black on a light Windows
+/// taskbar, with a red dot while a Service is Failed.
+fn icon(Look { has_failure, is_taskbar_light }: Look) -> Image<'static> {
+    let ink: u32 = if is_taskbar_light { 0x1C } else { 255 };
     const SIZE: usize = 32;
     const SAMPLES: usize = 4;
     // Two rounded squares, as in icon.svg, filling the height.
@@ -367,7 +420,7 @@ fn icon(has_failure: bool) -> Image<'static> {
                 let alpha = (white + red) * 255 / total;
                 let channel =
                     |white_value: u32, red_value: u32| ((white * white_value + red * red_value) / (white + red)) as u8;
-                pixel.copy_from_slice(&[channel(255, 0xE5), channel(255, 0x48), channel(255, 0x4D), alpha as u8]);
+                pixel.copy_from_slice(&[channel(ink, 0xE5), channel(ink, 0x48), channel(ink, 0x4D), alpha as u8]);
             }
         }
     }
@@ -496,13 +549,24 @@ mod tests {
         assert_eq!(escaped("R&D"), "R&&D");
     }
 
+    const PLAIN: Look = Look { has_failure: false, is_taskbar_light: false };
+
     #[test]
     fn the_failure_icon_has_a_red_dot() {
-        let (plain, failed) = (icon(false), icon(true));
+        let (plain, failed) = (icon(PLAIN), icon(Look { has_failure: true, ..PLAIN }));
         let pixel = |image: &Image, x: usize, y: usize| image.rgba()[(y * 32 + x) * 4..][..4].to_vec();
         assert_eq!(pixel(&plain, 16, 8), [255, 255, 255, 255], "the top square");
         assert_eq!(pixel(&plain, 26, 6)[3], 0, "no dot");
         assert_eq!(pixel(&failed, 26, 6), [0xE5, 0x48, 0x4D, 255]);
         assert_eq!(pixel(&failed, 16, 24), pixel(&plain, 16, 24), "the bottom square is untouched");
+    }
+
+    #[test]
+    fn the_icon_is_dark_on_a_light_taskbar() {
+        let light = Look { is_taskbar_light: true, ..PLAIN };
+        let pixel = |image: &Image, x: usize, y: usize| image.rgba()[(y * 32 + x) * 4..][..4].to_vec();
+        assert_eq!(pixel(&icon(light), 16, 8), [0x1C, 0x1C, 0x1C, 255]);
+        let failed = icon(Look { has_failure: true, ..light });
+        assert_eq!(pixel(&failed, 26, 6), [0xE5, 0x48, 0x4D, 255], "the same red dot");
     }
 }

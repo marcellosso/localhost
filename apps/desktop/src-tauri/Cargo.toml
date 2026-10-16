@@ -32,6 +32,11 @@ tauri-plugin-single-instance = "2"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 tokio = { version = "1", features = ["sync", "macros", "time", "process", "rt"] }
 
+# The same versions Tauri uses: WebView2's settings, and the taskbar's theme.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_System_Registry"] }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread"] }
 

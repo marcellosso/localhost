@@ -6,6 +6,9 @@
 //! keep a webview (and its log streams) alive. The tray's Open localhost,
 //! and launching the app again (single instance), bring it back. Without a
 //! tray (GNOME without the AppIndicator extension) launching again is the way.
+//!
+//! On Windows the window is a WebView2, which acts as a browser unless told
+//! otherwise: `prepare` turns its browser keys off.
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,7 +22,7 @@ use tauri_specta::Event;
 
 use crate::AppState;
 
-const MAIN_WINDOW: &str = "main";
+pub const MAIN_WINDOW: &str = "main";
 
 /// Where the window should go when the tray opens it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type, Event)]
@@ -62,8 +65,28 @@ pub fn show_window(app: &AppHandle, reveal: Option<Reveal>) {
         && let Ok(builder) = WebviewWindowBuilder::from_config(app, config)
         && let Ok(window) = builder.build()
     {
+        prepare(&window);
         let _ = window.set_focus();
     }
+}
+
+/// Readies a new main window. On Windows, in release builds, WebView2's
+/// browser keys are turned off: F5 and Ctrl+R reload, Ctrl+P prints, Ctrl+F
+/// finds in the page, Alt+← goes back, F12 opens the developer tools.
+/// Debug builds keep them, for the developer tools.
+pub fn prepare(window: &WebviewWindow) {
+    #[cfg(all(windows, not(debug_assertions)))]
+    let _ = window.with_webview(|webview| {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+        use windows::core::Interface;
+        // SAFETY: COM calls on the webview's own thread, where `with_webview` runs this.
+        let _ = unsafe {
+            webview.controller().CoreWebView2().and_then(|core| core.Settings()).and_then(|settings| {
+                settings.cast::<ICoreWebView2Settings3>()?.SetAreBrowserAcceleratorKeysEnabled(false)
+            })
+        };
+    });
+    let _ = window;
 }
 
 /// Quits, asking first if any Service is active. The stops that follow
