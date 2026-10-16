@@ -1,14 +1,17 @@
 name: Release
 
-# A v* tag builds the macOS DMG and the Linux packages (.deb, .rpm, AppImage)
-# and drafts one GitHub Release with all of them; publishing the draft is the
-# maintainer's step. See RELEASING.md.
+# A v* tag builds the macOS DMG, the Linux packages (.deb, .rpm, AppImage) and
+# the Windows installer (with localhostd for WSL inside), and drafts one GitHub
+# Release with all of them; publishing the draft is the maintainer's step.
+# See RELEASING.md.
 #
-# Signing follows the secrets that exist:
+# macOS signing follows the secrets that exist:
 #   Developer ID   DEVELOPER_ID_CERTIFICATE_P12, DEVELOPER_ID_CERTIFICATE_PASSWORD,
 #                  NOTARY_KEY_P8, NOTARY_KEY_ID, NOTARY_ISSUER_ID → signed, notarized, stapled
 #   self-signed    SIGNING_CERTIFICATE_P12, SIGNING_CERTIFICATE_PASSWORD
 #   ad hoc         neither
+# Windows: Authenticode with WINDOWS_CERTIFICATE_PFX and WINDOWS_CERTIFICATE_PASSWORD,
+# unsigned without them.
 
 on:
   push:
@@ -196,9 +199,124 @@ jobs:
           path: ${{ runner.temp }}/linux/*
           if-no-files-found: error
 
+  localhostd:
+    name: Build localhostd for WSL
+    needs: version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # Static, so it runs in any distro whatever its glibc (#49).
+      - name: Build localhostd (static, musl)
+        run: cargo build -p localhost-daemon --release --target x86_64-unknown-linux-musl
+      - name: Check that it is static and runs
+        run: |
+          binary=target/x86_64-unknown-linux-musl/release/localhostd
+          file "$binary"
+          file "$binary" | grep -q 'statically linked'
+          ls -l "$binary"
+          "$binary" --version
+          LOCALHOST_STORAGE_ROOT=$(mktemp -d) "$binary" --stdio < /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: localhostd
+          path: core/target/x86_64-unknown-linux-musl/release/localhostd
+          if-no-files-found: error
+
+  windows:
+    name: Build the Windows installer
+    needs: [version, localhostd]
+    runs-on: windows-latest
+    outputs:
+      signed: ${{ steps.certificate.outcome == 'success' }}
+    env:
+      WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # Installed beside localhost-app.exe, where the app looks for it (src-tauri/src/wsl.rs).
+      - uses: actions/download-artifact@v4
+        with:
+          name: localhostd
+          path: apps/desktop/src-tauri/wsl
+
+      # Into the runner's certificate store, where signtool finds it by thumbprint.
+      - name: Import the code signing certificate
+        id: certificate
+        if: env.WINDOWS_CERTIFICATE_PFX != '' && env.WINDOWS_CERTIFICATE_PASSWORD != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX))
+          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfx
+          if (-not $certificate.HasPrivateKey) { Write-Error "The certificate secret has no private key"; exit 1 }
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+
+      - name: Build the installer
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+        run: |
+          config=$(jq -nc --arg version "$VERSION" --arg thumbprint "$THUMBPRINT" '
+            {version: $version, bundle: {resources: {"wsl/localhostd": "localhostd"}}}
+            * if $thumbprint == "" then {} else {bundle: {windows: {certificateThumbprint: $thumbprint}}} end')
+          pnpm tauri build --bundles nsis --config "$config"
+
+      - name: Check the signature
+        if: steps.certificate.outcome == 'success'
+        shell: pwsh
+        run: |
+          foreach ($file in @(Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe) + @(Get-Item src-tauri/target/release/localhost-app.exe)) {
+            $signature = Get-AuthenticodeSignature $file
+            "$($file.Name): $($signature.Status), $($signature.SignerCertificate.Subject)"
+            if (-not $signature.SignerCertificate) { Write-Error "$($file.Name) isn't signed"; exit 1 }
+          }
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p "$RUNNER_TEMP/windows"
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe "$RUNNER_TEMP/windows/"
+          cd "$RUNNER_TEMP/windows"
+          for file in *; do sha256sum "$file" > "$file.sha256"; done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: ${{ runner.temp }}/windows/*
+          if-no-files-found: error
+
+      - name: Remove the signing certificate
+        if: always() && steps.certificate.outcome == 'success'
+        shell: pwsh
+        run: Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -DeleteKey
+
   draft:
     name: Draft the GitHub Release
-    needs: [version, macos, linux]
+    needs: [version, macos, linux, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -212,6 +330,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.version.outputs.version }}
           MODE: ${{ needs.macos.outputs.mode }}
+          WINDOWS_SIGNED: ${{ needs.windows.outputs.signed }}
         run: |
           case $MODE in
             developer-id) install="Signed with Developer ID and notarized by Apple." ;;
@@ -219,7 +338,10 @@ jobs:
             ad-hoc) install="Signed ad hoc and not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, and macOS asks again for Keychain access to each Secret after every update, see [the README](${{ github.server_url }}/${{ github.repository }}#install)." ;;
           esac
           linux="**Linux** (x86_64): the \`.deb\` (Ubuntu 22.04 or later, Debian 12), the \`.rpm\` (Fedora) or the AppImage; not signed. Secrets need a Secret Service (GNOME Keyring, KWallet) and the tray on GNOME needs the AppIndicator extension, see [Linux](${{ github.server_url }}/${{ github.repository }}#linux) in the README."
-          notes=$(printf '**macOS**: requires macOS 15 or later. %s\n\n%s' "$install" "$linux")
+          if [[ $WINDOWS_SIGNED == true ]]; then windows_signing="Signed."; else
+            windows_signing="Not signed: SmartScreen asks first, see [Windows](${{ github.server_url }}/${{ github.repository }}#windows) in the README."; fi
+          windows="**Windows** (x64): \`localhost_${VERSION}_x64-setup.exe\`, for Projects in a WSL 2 distro. $windows_signing"
+          notes=$(printf '**macOS**: requires macOS 15 or later. %s\n\n%s\n\n%s' "$install" "$linux" "$windows")
           gh release create "$GITHUB_REF_NAME" assets/* \
             --draft --verify-tag --title "localhost $VERSION" \
             --notes "$notes" --generate-notes

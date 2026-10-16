@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-<p align="center">Every local project, one place to run it. A native macOS app, and an app for Linux.</p>
+<p align="center">Every local project, one place to run it. A native macOS app, and an app for Linux and Windows.</p>
 
 ![The localhost window: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
@@ -21,7 +21,7 @@ A **Project** is a folder on your Mac. A **Service** is one long-running command
 
 localhost stores its configuration in `~/Library/Application Support/localhost`, never in your project folders. To move a Project to another Mac or share it, export it as a YAML Project file (see [docs/configuration.md](docs/configuration.md)).
 
-Requires macOS 15 or later. There is also an app for Linux; see [Linux](#linux).
+Requires macOS 15 or later. There is also an app for Linux, see [Linux](#linux), and one for Windows with your projects in WSL, see [Windows](#windows).
 
 ## Install
 
@@ -84,6 +84,39 @@ Without a tray, nothing is lost: closing the window still leaves your Services r
 ### Data
 
 Everything is in `~/.local/share/localhost` (or `$XDG_DATA_HOME/localhost`), laid out as in [Data](#data) below. Secret values are in the Secret Service, under the attributes `service` = `com.sixpetals.localhost.secret` and `account`.
+
+## Windows
+
+The Windows app runs your projects inside **WSL 2**: each Project lives in a distro, such as Ubuntu, and its Services run there, as they would on Linux. It works like the Linux app: Ctrl in place of ⌘, and a tray icon in the notification area. It needs Windows 11 on x64 with WSL 2 and at least one distro (`wsl --install`). Projects on the Windows drive itself, run with Windows toolchains, aren't supported yet.
+
+### Install
+
+1. Download `localhost_<version>_x64-setup.exe` from [GitHub Releases](https://github.com/sixpetals/localhost/releases).
+2. Run it. It installs for your user only, so it needs no administrator rights, and adds **localhost** to the Start menu.
+
+Unsigned releases make SmartScreen say “Windows protected your PC”. Click **More info**, check that the publisher and file name are what you downloaded, then click **Run anyway**. Only do this for a copy from this project's releases. Each new version asks once again.
+
+Uninstall it from **Settings › Apps › Installed apps**.
+
+### Projects in WSL
+
+**Add Project** asks which distro the Project runs in. Pick its folder under **Linux** in the folder picker (`\\wsl.localhost\<distro>\…`). A folder on a Windows drive runs in the chosen distro through its `/mnt/c/…` path, which is much slower than the distro's own disk. Detection, commands and the Ports view all run inside the distro.
+
+The first time a distro is used, localhost copies a small helper, `localhostd`, into it at `~/.local/share/localhost/windows/`, and runs it through `wsl.exe`. It is replaced whenever localhost is updated. When localhost quits, or is ended from Task Manager, `localhostd` stops every Service it started in the distro.
+
+Open in Browser uses `localhost:<port>`, which WSL forwards to Windows by default. If a Service is Running but the browser can't reach it, check that `%UserProfile%\.wslconfig` doesn't turn `localhostForwarding` off, then run `wsl --shutdown` and start the Service again. Open in Terminal uses Windows Terminal's profile for the distro when Windows Terminal is installed. VS Code, Cursor, VSCodium and Windsurf open the folder through their WSL remote (`code --remote wsl+<distro> <path>`).
+
+### The tray icon
+
+Windows 11 puts a new app's tray icon in the overflow (the `^` next to the clock). To keep it on the taskbar, turn localhost on in **Settings › Personalization › Taskbar › Other system tray icons**. Left-click the icon to open the window, and right-click it for the menu.
+
+Closing the window leaves your Services running. Quit from the tray menu or with Ctrl+Q; it asks first when something is running.
+
+### Data
+
+The app's data is in `%APPDATA%\localhost`, laid out as in [Data](#data) below, and its settings are in `%APPDATA%\com.sixpetals.localhost.desktop`. Each Run's logs and records are kept in its distro, under `~/.local/share/localhost/windows/`. Secret values are in Windows Credential Manager (**Control Panel › Credential Manager › Windows Credentials**), as generic credentials named `com.sixpetals.localhost.secret/<account>`. They are sent to the distro's `localhostd` when needed, and kept only in its memory.
+
+After uninstalling, remove the copies in each distro with `rm -rf ~/.local/share/localhost/windows`.
 
 ## Getting started
 

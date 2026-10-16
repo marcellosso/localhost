@@ -1,6 +1,6 @@
 # Releasing localhost
 
-Releases are on GitHub Releases: a DMG for macOS and, for Linux, a `.deb`, an `.rpm` and an AppImage. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml). It builds and signs the macOS app into `localhost-<version>.dmg`, and builds the Linux app (`apps/desktop/`) on Ubuntu 22.04 into `localhost-app_<version>_amd64.deb`, `localhost-app-<version>-1.x86_64.rpm` and `localhost-app_<version>_amd64.AppImage`, unsigned. Then it drafts one GitHub Release with all of them, a SHA-256 for each, and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
+Releases are on GitHub Releases: a DMG for macOS; for Linux, a `.deb`, an `.rpm` and an AppImage; and an installer for Windows. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml). It builds and signs the macOS app into `localhost-<version>.dmg`, and builds the Linux app (`apps/desktop/`) on Ubuntu 22.04 into `localhost-app_<version>_amd64.deb`, `localhost-app-<version>-1.x86_64.rpm` and `localhost-app_<version>_amd64.AppImage`, unsigned. For Windows it builds `localhostd` static for Linux (`x86_64-unknown-linux-musl`), then the same app on Windows into the per-user NSIS installer `localhost_<version>_x64-setup.exe`, with `localhostd` installed beside `localhost-app.exe` for the WSL distros. The installer is signed when a certificate exists (below). Then it drafts one GitHub Release with all of them, a SHA-256 for each, and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
 
 There is no in-app update check: users download new versions from Releases.
 
@@ -22,7 +22,7 @@ Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*`
    ```
 
 3. Wait for the **Release** workflow (Actions tab). It ends with a draft release named "localhost 0.3.0".
-4. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears.
+4. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears. On Windows 11 with Ubuntu in WSL 2, run the installer and check that a Project in the distro starts, opens in the browser, and stops when localhost quits.
 5. Click **Publish release**.
 
 A fix is a normal change: branch → PR → merge → a patch tag (`v0.3.1`).
@@ -39,7 +39,7 @@ git tag -d v0.3.0
 
 ## Signing
 
-The workflow signs with the best identity it has secrets for. All three modes produce the same app; only the signature and the first-launch experience differ.
+The workflow signs the macOS app with the best identity it has secrets for. All three modes produce the same app; only the signature and the first-launch experience differ.
 
 | Mode | Secrets | What users see |
 |---|---|---|
@@ -85,6 +85,17 @@ To check which certificate a build was signed with, compare `codesign -dvv local
    ```
 
 The next tag is signed with Developer ID and notarized. Users get one Keychain prompt per Secret on that update (the identity changed), then none. Update the README's install section: the first-launch steps are no longer needed. Keep the self-signed secrets until then; afterwards they are unused and can be deleted.
+
+### Windows (Authenticode)
+
+The Windows installer, and the app inside it, are signed when the `WINDOWS_CERTIFICATE_PFX` (the `.pfx` in base64) and `WINDOWS_CERTIFICATE_PASSWORD` secrets exist. The workflow imports the certificate into the runner's store, and Tauri signs with `signtool`, SHA-256 and a DigiCert timestamp. The release notes then say "Signed." Without the secrets, the installer is unsigned: SmartScreen asks first, and the README's [Windows](README.md#windows) section has the steps.
+
+```sh
+base64 -i localhost-windows.pfx | gh secret set WINDOWS_CERTIFICATE_PFX
+gh secret set WINDOWS_CERTIFICATE_PASSWORD
+```
+
+Use a code signing certificate from a certificate authority: SmartScreen gives a self-signed one no trust, so it does nothing for users. An OV certificate still builds reputation with each download; EV certificates usually live on hardware tokens, which this workflow can't use.
 
 ## Building a release locally
 
