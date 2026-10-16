@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-// Shortcuts use Ctrl on Linux and ⌘ on macOS, where the app runs for
-// development; Alt stands in for ⌥. Keys are matched by `event.code`, so
+// Shortcuts use Ctrl on Linux and Windows, and ⌘ on macOS, where the app runs
+// for development; Alt stands in for ⌥. Keys are matched by `event.code`, so
 // Ctrl+Alt+1 is found whatever character Alt makes the key type.
 
 const isMac = typeof navigator !== "undefined" && navigator.platform.startsWith("Mac");
@@ -21,7 +21,7 @@ function keyName(code: string): string {
   return keyNames[code] ?? code.replace(/^(Key|Digit)/, "");
 }
 
-/** e.g. "Ctrl+Shift+N" on Linux, "⇧⌘N" on macOS. */
+/** e.g. "Ctrl+Shift+N" on Linux and Windows, "⇧⌘N" on macOS. */
 export function shortcutLabel({ code, shift, alt }: Shortcut): string {
   if (isMac) return `${alt ? "⌥" : ""}${shift ? "⇧" : ""}⌘${keyName(code)}`;
   return `Ctrl+${alt ? "Alt+" : ""}${shift ? "Shift+" : ""}${keyName(code)}`;

@@ -1,4 +1,4 @@
-//! The Tauri app for Linux (and later Windows): a thin shell that hosts the
+//! The Tauri app for Linux and Windows: a thin shell that hosts the
 //! Rust core in-process and bridges it to the React UI (ADR-0009). Commands
 //! and events are typed: `src/bindings.ts` is generated from this crate.
 //!
@@ -181,6 +181,9 @@ pub fn run() {
                 settings,
                 perf,
             });
+            if let Some(window) = app.get_webview_window(lifecycle::MAIN_WINDOW) {
+                lifecycle::prepare(&window);
+            }
             tray::install(app)?;
             launch::watch_found_orphans(app.handle());
             Ok(())
