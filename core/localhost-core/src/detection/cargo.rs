@@ -1,4 +1,4 @@
-use super::manifest::{TomlDocument, shell_quoted};
+use super::manifest::TomlDocument;
 use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
 
 /// Suggests `cargo run` for a Cargo package with a binary, and `cargo run
@@ -62,7 +62,11 @@ impl ServiceDetector for CargoDetector {
         }
         for (index, binary) in unique.iter().enumerate() {
             let is_only_binary = !has_main_binary && index == 0;
-            suggestions.push(suggestion(binary, format!("cargo run --bin {}", shell_quoted(binary)), is_only_binary));
+            suggestions.push(suggestion(
+                binary,
+                format!("cargo run --bin {}", directory.syntax.quoted(binary)),
+                is_only_binary,
+            ));
         }
         suggestions
     }

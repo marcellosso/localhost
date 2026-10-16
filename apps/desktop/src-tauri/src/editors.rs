@@ -323,7 +323,7 @@ pub fn edit_service(state: tauri::State<'_, AppState>, service_id: Id, service: 
     Ok(())
 }
 
-/// Whether the command line mentions `$PORT`, so a moved port reaches it.
+/// Whether the command line mentions `$PORT` (`%PORT%` on Windows), so a moved port reaches it.
 #[tauri::command]
 #[specta::specta]
 pub fn command_line_uses_port(command_line: String) -> bool {

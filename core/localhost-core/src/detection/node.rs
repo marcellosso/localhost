@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use super::manifest::shell_quoted;
-use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
+use super::{CommandSyntax, ScannedDirectory, ServiceDetector, ServiceSuggestion};
 use crate::yaml::YamlLines;
 
 /// Suggests a Service for each `package.json` script, run with the package
@@ -12,8 +11,9 @@ use crate::yaml::YamlLines;
 /// workspace monorepo the packages are checked rather than the root's
 /// orchestrating scripts (`turbo dev`), since localhost runs each package as
 /// its own Service. When the script runs a known dev server, its default port
-/// is suggested and, if the tool takes a port flag, `$PORT` is passed to it
-/// (ADR-0006).
+/// is suggested and, if the tool takes a port flag, `$PORT` (`%PORT%` on
+/// Windows) is passed to it (ADR-0006). On Windows cmd finds the package
+/// managers' `.cmd` shims, so the command lines are otherwise the same.
 pub struct NodeDetector;
 
 impl ServiceDetector for NodeDetector {
@@ -52,9 +52,10 @@ impl ServiceDetector for NodeDetector {
                     (_, None) => script.name.clone(),
                 };
                 let server = DevServer::recognize(&script.body);
-                let mut command_line = package_manager.run(&script.name);
+                let mut command_line = package_manager.run(&script.name, directory.syntax);
                 if let Some(flag) = server.as_ref().and_then(|server| server.port_flag) {
-                    command_line += &format!("{} {flag} $PORT", package_manager.forwarding_arguments());
+                    command_line +=
+                        &format!("{} {flag} {}", package_manager.forwarding_arguments(), directory.syntax.port());
                 }
                 let mut suggestion = ServiceSuggestion::new(
                     name,
@@ -279,8 +280,8 @@ impl PackageManager {
         PackageManager::Npm
     }
 
-    fn run(&self, script: &str) -> String {
-        format!("{} run {}", self.name(), shell_quoted(script))
+    fn run(&self, script: &str, syntax: CommandSyntax) -> String {
+        format!("{} run {}", self.name(), syntax.quoted(script))
     }
 
     /// What separates the script from extra arguments: npm needs `--`.

@@ -11,6 +11,7 @@ mod compose;
 mod manifest;
 mod node;
 mod python;
+mod syntax;
 
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
@@ -22,6 +23,7 @@ pub use cargo::CargoDetector;
 pub use compose::ComposeDetector;
 pub use node::NodeDetector;
 pub use python::PythonDetector;
+pub use syntax::CommandSyntax;
 
 use crate::paths::{expand_tilde, standardize};
 use crate::{Key, NewService, Project};
@@ -138,6 +140,7 @@ const MAXIMUM_DIRECTORY_COUNT: usize = 400;
 
 pub struct ProjectScanner {
     detectors: Vec<Box<dyn ServiceDetector>>,
+    syntax: CommandSyntax,
 }
 
 impl Default for ProjectScanner {
@@ -154,7 +157,13 @@ impl Default for ProjectScanner {
 
 impl ProjectScanner {
     pub fn new(detectors: Vec<Box<dyn ServiceDetector>>) -> ProjectScanner {
-        ProjectScanner { detectors }
+        ProjectScanner { detectors, syntax: CommandSyntax::HERE }
+    }
+
+    /// Suggests command lines for another shell than this machine's.
+    pub fn with_syntax(mut self, syntax: CommandSyntax) -> ProjectScanner {
+        self.syntax = syntax;
+        self
     }
 
     /// Suggestions for the Project folder at `path`, folder by folder (root
@@ -183,7 +192,11 @@ impl ProjectScanner {
     }
 
     fn suggestions_for_folder(&self, path: &str) -> Vec<ServiceSuggestion> {
-        let root = ScannedDirectory { root: standardize(Path::new(&expand_tilde(path))), path: ".".into() };
+        let root = ScannedDirectory {
+            root: standardize(Path::new(&expand_tilde(path))),
+            path: ".".into(),
+            syntax: self.syntax,
+        };
         let mut suggestions = Vec::new();
         for directory in self.directories(&root) {
             for detector in &self.detectors {
@@ -217,7 +230,7 @@ impl ProjectScanner {
             paths
                 .into_iter()
                 .take(MAXIMUM_DIRECTORY_COUNT)
-                .map(|path| ScannedDirectory { root: root.root.clone(), path })
+                .map(|path| ScannedDirectory { root: root.root.clone(), path, syntax: root.syntax })
                 .filter(ScannedDirectory::exists),
         );
         directories
@@ -266,6 +279,8 @@ pub struct ScannedDirectory {
     pub root: PathBuf,
     /// Relative to the root; `.` is the root itself.
     pub path: String,
+    /// The shell the suggested command lines are written for.
+    pub syntax: CommandSyntax,
 }
 
 /// Files larger than this are treated as unreadable.
@@ -295,7 +310,7 @@ impl ScannedDirectory {
     }
 
     pub fn subdirectory(&self, name: &str) -> ScannedDirectory {
-        ScannedDirectory { root: self.root.clone(), path: self.relative_path(name) }
+        ScannedDirectory { root: self.root.clone(), path: self.relative_path(name), syntax: self.syntax }
     }
 
     /// The folder this one is in, `None` for the root.
@@ -304,7 +319,7 @@ impl ScannedDirectory {
             return None;
         }
         let path = self.path.rsplit_once('/').map_or(".", |(parent, _)| parent);
-        Some(ScannedDirectory { root: self.root.clone(), path: path.to_string() })
+        Some(ScannedDirectory { root: self.root.clone(), path: path.to_string(), syntax: self.syntax })
     }
 
     /// This folder and every folder above it, up to the root.

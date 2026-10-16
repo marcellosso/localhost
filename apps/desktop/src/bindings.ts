@@ -271,7 +271,7 @@ async addServices(projectId: Id, services: SuggestionEdit[]) : Promise<Result<Se
 }
 },
 /**
- * Whether the command line mentions `$PORT`, so a moved port reaches it.
+ * Whether the command line mentions `$PORT` (`%PORT%` on Windows), so a moved port reaches it.
  */
 async commandLineUsesPort(commandLine: string) : Promise<boolean> {
     return await TAURI_INVOKE("command_line_uses_port", { commandLine });

@@ -116,15 +116,6 @@ pub(crate) fn quoted_strings(text: &str) -> Vec<String> {
     strings
 }
 
-/// Quotes a word for the login shell when it isn't plainly safe.
-pub(crate) fn shell_quoted(word: &str) -> String {
-    let is_safe = |c: char| c.is_ascii_alphanumeric() || "@%+=:,./_-".contains(c);
-    if !word.is_empty() && word.chars().all(is_safe) {
-        return word.to_string();
-    }
-    format!("'{}'", word.replace('\'', r"'\''"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,13 +132,5 @@ mod tests {
             document.tables_named("bin").filter_map(|table| TomlDocument::string(table.values.get("name"))).collect();
         assert_eq!(bins, ["a", "b"]);
         assert_eq!(TomlDocument::strings(document.table("workspace").unwrap().values.get("members")), ["one", "two/*"]);
-    }
-
-    #[test]
-    fn quotes_only_what_needs_it() {
-        assert_eq!(shell_quoted("dev:web"), "dev:web");
-        assert_eq!(shell_quoted("do it"), "'do it'");
-        assert_eq!(shell_quoted("it's"), r"'it'\''s'");
-        assert_eq!(shell_quoted(""), "''");
     }
 }

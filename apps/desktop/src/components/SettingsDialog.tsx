@@ -200,7 +200,7 @@ function PortsSettings() {
       <SectionHeader title="Ports" subtitle="What happens when a service’s port is already taken." />
       <SettingsRow
         title="Start on a free port when a service’s port is in use"
-        detail="The service gets the next free port as $PORT for that run; its configured port is kept. Services others depend on, or whose port can’t change, are never moved."
+        detail="The service gets the next free port as its PORT variable for that run; its configured port is kept. Services others depend on, or whose port can’t change, are never moved."
       >
         <Switch
           label="Start on a free port"

@@ -16,6 +16,11 @@ export function isNativeWindows(target: ExecutionTarget): boolean {
   return isWindows && target.kind === "thisMachine";
 }
 
+/** How a command line on the target reads the Port: cmd's `%PORT%` on Windows (ADR-0010). */
+export function portVariable(target: ExecutionTarget): string {
+  return isNativeWindows(target) ? "%PORT%" : "$PORT";
+}
+
 /** The Project's folder, on the target it runs on. */
 export function projectFolder(project: Project): ProjectFolder {
   return { target: project.executionTarget ?? thisMachine, path: project.path };
