@@ -144,6 +144,9 @@ impl LocalhostError {
             }
             PortConflict { port, owner: None } => format!("Port {port} is in use by another process."),
             ListenerIsLocalhost => "localhost can't stop itself.".into(),
+            ListenerIsLaunchdJob { label } if cfg!(windows) => format!(
+                "It is managed by Windows ({label}), which would start it again. Stop it in Services or with the tool that started it."
+            ),
             ListenerIsLaunchdJob { label } => format!(
                 "It is managed by launchd ({label}), which would start it again. Stop it with the tool that started it."
             ),

@@ -5,6 +5,17 @@ import type { ExecutionTarget, Project, ProjectFolder } from "./bindings";
 
 export const thisMachine: ExecutionTarget = { kind: "thisMachine" };
 
+const isWindows = typeof navigator !== "undefined" && navigator.platform.startsWith("Win");
+
+/**
+ * Whether the target is Windows itself, where a process can't be asked to
+ * quit (no signals; Ctrl-Break only reaches localhost's own console): one
+ * localhost didn't start is ended at once, and is its own process group.
+ */
+export function isNativeWindows(target: ExecutionTarget): boolean {
+  return isWindows && target.kind === "thisMachine";
+}
+
 /** The Project's folder, on the target it runs on. */
 export function projectFolder(project: Project): ProjectFolder {
   return { target: project.executionTarget ?? thisMachine, path: project.path };

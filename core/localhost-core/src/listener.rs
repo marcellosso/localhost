@@ -30,7 +30,8 @@ pub struct Listener {
     pub working_directory: Option<String>,
     pub owner: ListenerOwner,
     /// The label of the launchd job it belongs to, if any (e.g. a Homebrew
-    /// service or an app). localhost never stops those.
+    /// service or an app). localhost never stops those. On Windows, the
+    /// Windows services in its process, or the name of a process in session 0.
     pub launchd_label: Option<String>,
     pub kind: ListenerKind,
     pub(crate) start_time: ProcessStartTime,
@@ -153,8 +154,20 @@ impl ListenerKind {
             return ListenerKind::Development;
         }
         let path = executable_path.unwrap_or_default();
-        let file_name = path.rsplit('/').next().unwrap_or_default();
-        if cfg!(target_os = "macos") {
+        let file_name = path.rsplit(['/', '\\']).next().unwrap_or_default();
+        if cfg!(windows) {
+            if file_name.to_lowercase().starts_with("com.docker.") {
+                return ListenerKind::Docker;
+            }
+            // Services and session 0, and Windows' own programs (WSL's port relay included).
+            let windows_folder = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+            if launchd_label.is_some()
+                || path.to_lowercase().starts_with(&format!("{}\\", windows_folder.to_lowercase()))
+                || file_name.eq_ignore_ascii_case("wslrelay.exe")
+            {
+                return ListenerKind::System;
+            }
+        } else if cfg!(target_os = "macos") {
             if path.contains("/Docker.app/") && file_name.starts_with("com.docker.") {
                 return ListenerKind::Docker;
             }
@@ -196,6 +209,8 @@ pub(crate) fn scan() -> (Vec<platform::ListeningProcess>, HashMap<i32, String>) 
 }
 
 /// Stops a Listener localhost didn't start: SIGINT, then SIGTERM, then SIGKILL.
+/// On Windows there is no graceful step (Ctrl-Break can't reach another
+/// console): the process and its descendants are terminated.
 ///
 /// Signals the Listener's process group, unless the group's leader is a
 /// session leader (e.g. a terminal's shell) or the group is localhost's own:
@@ -212,6 +227,9 @@ pub(crate) async fn stop_listener(listener: &Listener, policy: StopPolicy) {
     let steps =
         [(SIGINT, policy.interrupt_timeout), (SIGTERM, policy.terminate_timeout), (SIGKILL, Duration::from_secs(5))];
     for (signal, timeout) in steps {
+        if cfg!(windows) && signal == SIGINT {
+            continue;
+        }
         target.include_descendants();
         if !target.is_alive() {
             return;
@@ -375,7 +393,6 @@ mod tests {
         assert!(!crate::port_probe::is_accepting(port).await);
     }
 
-    #[cfg(unix)]
     fn kind(path: &str, label: Option<&str>) -> ListenerKind {
         ListenerKind::of(Some(path), label, ListenerOwner::Unmanaged)
     }
@@ -429,6 +446,23 @@ mod tests {
             ("/snap/spotify/80/usr/share/spotify/spotify", App),
         ] {
             assert_eq!(kind(path, None), expected, "{path}");
+        }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn tells_development_servers_from_docker_and_windows() {
+        use ListenerKind::*;
+        for (path, label, expected) in [
+            (r"C:\Program Files\nodejs\node.exe", None, Development),
+            (r"C:\Users\dev\AppData\Local\Programs\Python\Python313\python.exe", None, Development),
+            (r"C:\Program Files\Docker\Docker\resources\com.docker.backend.exe", None, Docker),
+            (r"C:\Windows\System32\svchost.exe", Some("Dnscache"), System),
+            (r"C:\WINDOWS\system32\lsass.exe", None, System),
+            (r"C:\Program Files\WSL\wslrelay.exe", None, System),
+            (r"C:\Program Files\PostgreSQL\17\bin\postgres.exe", Some("postgresql-x64-17"), System),
+        ] {
+            assert_eq!(kind(path, label), expected, "{path}");
         }
     }
 
@@ -514,5 +548,111 @@ mod tests {
         let warnings = port_warnings(&projects, &[running], &[held]);
         assert_eq!(warnings.iter().map(|warning| warning.service_id).collect::<Vec<_>>(), [api]);
         assert!(port_warnings(&projects, &[], &[ours]).is_empty());
+    }
+
+    /// Real processes on Windows: Python scripts, as `tests/process_tree_windows.rs` uses.
+    #[cfg(windows)]
+    mod windows {
+        use super::*;
+        use crate::{LaunchConfiguration, ProcessTree};
+
+        /// Listens on a free port, prints it, and starts a child that also
+        /// lives until it is killed.
+        const SERVER: &str = r#"
+import socket, subprocess, sys, time
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(1000)"])
+server = socket.socket()
+server.bind(("127.0.0.1", 0))
+server.listen()
+print("port", server.getsockname()[1], "child", child.pid, flush=True)
+time.sleep(1000)
+"#;
+
+        fn quick_stop() -> StopPolicy {
+            StopPolicy { interrupt_timeout: Duration::from_millis(500), terminate_timeout: Duration::from_millis(500) }
+        }
+
+        /// Runs `SERVER` in a folder of its own, and returns its port, its child's pid and its Listener process.
+        async fn serve() -> (tempfile::TempDir, ProcessTree, u16, i32, platform::ListeningProcess) {
+            let folder = tempfile::tempdir().unwrap();
+            std::fs::write(folder.path().join("server.py"), SERVER).unwrap();
+            let configuration = LaunchConfiguration::new("python server.py", folder.path(), std::env::vars().collect());
+            let tree = ProcessTree::launch(&configuration, quick_stop()).unwrap();
+            let line = tokio::time::timeout(Duration::from_secs(30), async {
+                loop {
+                    let batch = tree.next_output().await.expect("the server prints its port");
+                    if let Some(line) = batch.into_iter().find(|line| line.text.starts_with("port ")) {
+                        return line.text;
+                    }
+                }
+            })
+            .await
+            .expect("the port within 30s");
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            let (port, child) = (fields[1].parse().unwrap(), fields[3].parse().unwrap());
+            let (processes, _) = scan();
+            let process = processes.into_iter().find(|process| process.ports.contains(&port)).expect("its Listener");
+            (folder, tree, port, child, process)
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn discovers_a_listener_and_the_run_it_belongs_to() {
+            let (folder, tree, port, _, process) = serve().await;
+            assert_eq!(process.name.to_lowercase(), "python.exe");
+            assert!(process.command.contains("server.py"), "{}", process.command);
+            assert_eq!(process.ports, [port]);
+            assert!(process.executable_path.as_deref().is_some_and(|path| path.to_lowercase().ends_with("python.exe")));
+            let folder = platform::resolved_path(&folder.path().to_string_lossy());
+            let directory = process.working_directory.clone().expect("its working directory");
+            assert!(
+                platform::is_inside(&directory, &folder) && platform::is_inside(&folder, &directory),
+                "{directory}"
+            );
+            assert!(tree.contains(&process));
+
+            let other = ProcessTree::launch(
+                &LaunchConfiguration::new("ping -n 30 127.0.0.1", std::env::temp_dir(), std::env::vars().collect()),
+                quick_stop(),
+            )
+            .unwrap();
+            assert!(!other.contains(&process));
+            other.stop().await;
+            tree.stop().await;
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn stops_a_listener_and_its_descendants() {
+            let (_folder, tree, port, child, process) = serve().await;
+            let listener = Listener {
+                pid: process.pid,
+                process_group_id: process.process_group_id,
+                name: process.name,
+                command: process.command,
+                executable_path: process.executable_path,
+                ports: process.ports,
+                working_directory: process.working_directory,
+                owner: ListenerOwner::Unmanaged,
+                launchd_label: None,
+                kind: ListenerKind::Development,
+                start_time: process.start_time,
+            };
+
+            // No graceful step to wait out: well within the interrupt timeout plus termination.
+            let started = Instant::now();
+            stop_listener(&listener, StopPolicy { interrupt_timeout: Duration::from_secs(30), ..quick_stop() }).await;
+            assert!(started.elapsed() < Duration::from_secs(10));
+
+            assert!(ProcessStartTime::of(listener.pid).is_none());
+            assert!(ProcessStartTime::of(child).is_none());
+            assert!(!crate::port_probe::is_accepting(port).await);
+            tree.wait_for_exit().await;
+        }
+
+        #[test]
+        fn knows_the_windows_services() {
+            let (_, jobs) = scan();
+            // Every Windows has its RPC endpoint mapper running.
+            assert!(jobs.values().any(|label| label.split(", ").any(|name| name == "RpcSs")), "{jobs:?}");
+        }
     }
 }

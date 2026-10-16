@@ -8,7 +8,7 @@ use tokio::sync::oneshot;
 use super::{LaunchConfiguration, spawn};
 use crate::LocalhostError;
 use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
-use crate::platform::{self, Pid};
+use crate::platform::{self, ListeningProcess, Pid};
 use crate::process::Termination;
 
 /// The signals a stop escalates through, in order.
@@ -32,6 +32,12 @@ impl Group {
 
     pub(super) fn send(&self, signal: i32) {
         platform::signal_process_group(self.0, signal)
+    }
+
+    /// Whether the process is in the Run's session or process group: the
+    /// shell leads both (ADR-0003).
+    pub(super) fn contains(&self, process: &ListeningProcess) -> bool {
+        process.session_id == self.0 || process.process_group_id == self.0
     }
 }
 

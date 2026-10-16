@@ -4,7 +4,7 @@ import { commands, type ExecutionTarget, type ListenerDetails } from "../binding
 import { type CoreView, findService } from "../core";
 import { listenerKey, listenerSubtitle, portsText } from "../listeners";
 import { spoken } from "../status";
-import { distroOf, targetId } from "../targets";
+import { distroOf, isNativeWindows, targetId } from "../targets";
 import { useUi } from "../ui";
 import { EmptyState } from "./EmptyState";
 import { ChevronIcon, NetworkIcon } from "./Icons";
@@ -19,7 +19,7 @@ type Group = { target: ExecutionTarget; development: ListenerDetails[]; others: 
 
 /**
  * This machine's Listeners, then each WSL distro's (Windows only; this
- * machine's are left out while Windows itself can't be scanned and has none).
+ * machine's are left out when it has none).
  */
 function grouped(all: ListenerDetails[]): Group[] {
   const groups = new Map<string, Group>([["thisMachine", { target: { kind: "thisMachine" }, development: [], others: [] }]]);
@@ -242,16 +242,17 @@ function StopButton({ details, isStopping }: { details: ListenerDetails; isStopp
 
 function ListenerDetail({ details, isStopping }: { details: ListenerDetails; isStopping: boolean }) {
   const { listener, owner } = details;
+  const isWindows = isNativeWindows(details.target);
   const fields: [string, string | null, boolean][] = [
     ["Ports", listener.ports.join(", "), true],
     ["Command", listener.command, true],
     ["Executable", listener.executablePath, true],
     ["Distro", distroOf(details.target), false],
     ["PID", String(listener.pid), true],
-    ["Process Group", String(listener.processGroupId), true],
+    ["Process Group", isWindows ? null : String(listener.processGroupId), true],
     ["Working Directory", listener.workingDirectory ?? "Unknown", true],
     ["Belongs To", owner, false],
-    ["launchd Job", listener.launchdLabel, true],
+    [isWindows ? "Managed by Windows" : "launchd Job", listener.launchdLabel, true],
   ];
   return (
     <section className={styles.detail} aria-label={`${listener.name} process`} data-column="detail">

@@ -11,6 +11,7 @@ import { removeProject, removeService } from "../editors";
 import { type CoreView, findService } from "../core";
 import { processDescription } from "../listeners";
 import { formatList } from "../status";
+import { isNativeWindows } from "../targets";
 import { type Alert, alertKey, dismissAlert, useUi } from "../ui";
 import { Dialog } from "./Dialog";
 import { ChooseEditorDialog, SettingsDialog } from "./SettingsDialog";
@@ -110,6 +111,9 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
           }
         >
           <p className="mono">{processDescription(listener)}</p>
+          {isNativeWindows(details.target) && (
+            <p>Windows can’t ask it to quit: it and the processes it started end at once, without saving anything.</p>
+          )}
         </Dialog>
       );
     }

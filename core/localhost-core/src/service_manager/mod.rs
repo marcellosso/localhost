@@ -429,30 +429,26 @@ impl Inner {
             .into_iter()
             .map(|project| (project.id, platform::resolved_path(&project.path)))
             .collect();
-        // Each Run's shell leads its own session and process group (ADR-0003).
-        let runs_by_session: HashMap<i32, (Id, Id)> = self.lock_and(|_, state| {
+        let runs: Vec<(ProcessTree, Id, Id)> = self.lock_and(|_, state| {
             state
                 .trees
                 .iter()
                 .filter_map(|(service_id, tree)| {
                     let run_id = state.statuses.get(service_id)?.run.as_ref()?.id;
-                    Some((tree.pid(), (*service_id, run_id)))
+                    Some((tree.clone(), *service_id, run_id))
                 })
                 .collect()
         });
         let mut listeners: Vec<Listener> = processes
             .into_iter()
             .map(|process| {
-                let run =
-                    runs_by_session.get(&process.session_id).or_else(|| runs_by_session.get(&process.process_group_id));
-                let owner = if let Some(&(service_id, run_id)) = run {
+                let run = runs.iter().find(|(tree, _, _)| tree.contains(&process));
+                let owner = if let Some(&(_, service_id, run_id)) = run {
                     ListenerOwner::Run { service_id, run_id }
                 } else if let Some((project_id, _)) = process.working_directory.as_deref().and_then(|directory| {
                     project_folders
                         .iter()
-                        .filter(|(_, folder)| {
-                            directory == folder || directory.starts_with(&format!("{}/", folder.trim_end_matches('/')))
-                        })
+                        .filter(|(_, folder)| platform::is_inside(directory, folder))
                         .max_by_key(|(_, folder)| folder.len())
                 }) {
                     ListenerOwner::Project { project_id: *project_id }
