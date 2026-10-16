@@ -1,33 +1,41 @@
 //! The process tree of one Run: `<shell> -l -c <command line>` launched in
 //! its own session, so the shell's pid is also the id of the process group
-//! that holds everything it spawns (ADR-0003).
+//! that holds everything it spawns (ADR-0003). On Windows, `cmd.exe /s /c
+//! <command line>` in its own Job Object (ADR-0010, ADR-0011), which is what
+//! "the group" means there.
 //!
 //! The tree has ended once the shell has exited *and* no process is left in
 //! its group. Processes still in the group when the shell exits on its own
-//! are stopped (starting at SIGTERM: background jobs of a non-interactive
-//! shell ignore SIGINT), so a Run never leaves anything behind.
+//! are stopped (on Unix starting at SIGTERM: background jobs of a
+//! non-interactive shell ignore SIGINT), so a Run never leaves anything behind.
 
-#[cfg(unix)]
 mod reader;
 #[cfg(unix)]
 mod spawn;
 mod termination;
+#[cfg(unix)]
+mod unix;
+#[cfg(windows)]
+mod windows;
+
+#[cfg(unix)]
+use unix as imp;
+#[cfg(windows)]
+use windows as imp;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-#[cfg(unix)]
-use tokio::sync::oneshot;
-use tokio::sync::{Mutex as AsyncMutex, Semaphore, mpsc, watch};
+use tokio::sync::{Mutex as AsyncMutex, Semaphore, mpsc, oneshot, watch};
 use tokio::time::Instant;
 
 pub use termination::{ProcessTreeExit, StopPolicy, Termination, signal_name};
 
-use crate::output::OutputLine;
-use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
-use crate::platform::{self, Pid, process_group_exists};
+use crate::output::{OutputChannel, OutputLine};
+use crate::platform::Pid;
+use crate::platform::signal::{SIGINT, SIGTERM};
 use crate::{LocalhostError, RunEnvironment};
 
 /// Everything needed to launch one Run's process tree.
@@ -37,12 +45,13 @@ pub struct LaunchConfiguration {
     pub working_directory: PathBuf,
     /// The complete environment of the Run (see `RunEnvironment::merged`).
     pub environment: BTreeMap<String, String>,
-    /// The shell the command line runs through, as `<shell> -l -c <command line>`.
+    /// The shell the command line runs through, as `<shell> -l -c <command
+    /// line>` (on Windows, `cmd.exe`, as `<shell> /s /c "<command line>"`).
     pub shell: String,
 }
 
 impl LaunchConfiguration {
-    /// A configuration whose shell is the environment's `$SHELL`.
+    /// A configuration whose shell is the environment's `$SHELL` (`%ComSpec%` on Windows).
     pub fn new(
         command_line: impl Into<String>,
         working_directory: impl Into<PathBuf>,
@@ -66,7 +75,6 @@ pub const MAX_LINE_LENGTH: usize = 64 * 1024;
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// How long to wait for the pipes to drain once the group is gone. A process
 /// that left the group may still hold them open.
-#[cfg(unix)]
 const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// A running (or ended) process tree. Cheap to clone; every clone is the same tree.
@@ -79,6 +87,7 @@ pub struct ProcessTree {
 
 struct Inner {
     pid: Pid,
+    group: imp::Group,
     stop_policy: StopPolicy,
     output: AsyncMutex<mpsc::UnboundedReceiver<Vec<OutputLine>>>,
     flow: Arc<Semaphore>,
@@ -97,22 +106,6 @@ impl ProcessTree {
     /// Launches the command line. Fails before anything runs if the working
     /// directory or the shell is missing.
     pub fn launch(configuration: &LaunchConfiguration, stop_policy: StopPolicy) -> Result<ProcessTree, LocalhostError> {
-        #[cfg(not(unix))]
-        {
-            let _ = (configuration, stop_policy);
-            Err(LocalhostError::ExecutionUnavailable)
-        }
-        #[cfg(unix)]
-        Self::launch_on_unix(configuration, stop_policy)
-    }
-
-    #[cfg(unix)]
-    fn launch_on_unix(
-        configuration: &LaunchConfiguration,
-        stop_policy: StopPolicy,
-    ) -> Result<ProcessTree, LocalhostError> {
-        use crate::output::OutputChannel;
-
         if !configuration.working_directory.is_dir() {
             return Err(LocalhostError::WorkingDirectoryMissing(
                 configuration.working_directory.to_string_lossy().into_owned(),
@@ -122,24 +115,32 @@ impl ProcessTree {
             return Err(LocalhostError::ShellNotFound(configuration.shell.clone()));
         }
 
-        let stdout = spawn::pipe()?;
-        let stderr = spawn::pipe()?;
-        let pid = spawn::spawn(configuration, &stdout.write, &stderr.write)?;
-        // Our copies of the write ends must close, or the pipes never end.
-        drop((stdout.write, stderr.write));
-
+        let launched = imp::launch(configuration)?;
         let (batches, output) = mpsc::unbounded_channel();
         let flow = Arc::new(Semaphore::new(reader::PENDING_BATCHES));
         let (cancel, cancelled) = watch::channel(false);
-        let readers =
-            [(stdout.read, OutputChannel::Stdout), (stderr.read, OutputChannel::Stderr)].map(|(fd, channel)| {
-                tokio::spawn(reader::read_lines(fd, channel, batches.clone(), flow.clone(), cancelled.clone()))
-            });
+        let readers = [
+            tokio::spawn(reader::read_lines(
+                launched.stdout,
+                OutputChannel::Stdout,
+                batches.clone(),
+                flow.clone(),
+                cancelled.clone(),
+            )),
+            tokio::spawn(reader::read_lines(
+                launched.stderr,
+                OutputChannel::Stderr,
+                batches.clone(),
+                flow.clone(),
+                cancelled.clone(),
+            )),
+        ];
         drop(batches);
 
         let tree = ProcessTree {
             inner: Arc::new(Inner {
-                pid,
+                pid: launched.pid,
+                group: launched.group,
                 stop_policy,
                 output: AsyncMutex::new(output),
                 flow,
@@ -148,12 +149,11 @@ impl ProcessTree {
                 escalation: Mutex::new(Escalation::default()),
             }),
         };
-        let shell_status = wait_for_shell(pid);
-        tokio::spawn(tree.clone().monitor(shell_status, readers, cancel));
+        tokio::spawn(tree.clone().monitor(launched.shell_termination, readers, cancel));
         Ok(tree)
     }
 
-    /// The shell's pid, which is also the process group and session id.
+    /// The shell's pid, which is also the process group (and on Unix the session) id.
     pub fn pid(&self) -> Pid {
         self.inner.pid
     }
@@ -191,8 +191,9 @@ impl ProcessTree {
     }
 
     /// Stops the whole process group: SIGINT, then SIGTERM, then SIGKILL, each
-    /// sent only if the group outlives the previous one's timeout. Returns
-    /// once the tree has ended. Safe to call repeatedly and concurrently.
+    /// sent only if the group outlives the previous one's timeout (on Windows,
+    /// Ctrl-Break, then terminating the job). Returns once the tree has ended.
+    /// Safe to call repeatedly and concurrently.
     pub async fn stop(&self) -> ProcessTreeExit {
         if let Some(exit) = self.exit() {
             return exit;
@@ -201,22 +202,20 @@ impl ProcessTree {
         self.wait_for_exit().await
     }
 
-    #[cfg(unix)]
     async fn monitor(
         self,
-        shell_status: oneshot::Receiver<i32>,
+        shell_termination: oneshot::Receiver<Termination>,
         readers: [tokio::task::JoinHandle<()>; 2],
         cancel: watch::Sender<bool>,
     ) {
-        let status = shell_status.await.unwrap_or(0);
-        let termination = Termination::from_wait_status(status);
+        let termination = shell_termination.await.unwrap_or(Termination::Exited { code: 0 });
         self.inner.shell_termination.send_replace(Some(termination));
 
         // Anything still in the group is left over from the shell: stop it.
-        if process_group_exists(self.inner.pid) {
-            self.escalate(SIGTERM).await;
+        if !self.wait_for_process_group_to_end(Some(imp::LEFTOVER_GRACE)).await {
+            self.escalate(imp::LEFTOVER_SIGNAL).await;
         }
-        while process_group_exists(self.inner.pid) {
+        while self.inner.group.exists() {
             tokio::time::sleep(POLL_INTERVAL).await;
         }
         // Wait for both pipes to end, cancelling the readers after the timeout.
@@ -247,14 +246,17 @@ impl ProcessTree {
             escalation.is_escalating = true;
         }
         let policy = self.inner.stop_policy;
-        let steps =
-            [(SIGINT, Some(policy.interrupt_timeout)), (SIGTERM, Some(policy.terminate_timeout)), (SIGKILL, None)];
-        for (signal, timeout) in steps.into_iter().skip_while(|(signal, _)| *signal != first_signal) {
-            if !process_group_exists(self.inner.pid) {
+        for signal in imp::STOP_SIGNALS.into_iter().skip_while(|signal| *signal != first_signal) {
+            if !self.inner.group.exists() {
                 return;
             }
+            let timeout = match signal {
+                SIGINT => Some(policy.interrupt_timeout),
+                SIGTERM => Some(policy.terminate_timeout),
+                _ => None,
+            };
             self.inner.escalation.lock().unwrap().strongest_signal_sent = Some(signal);
-            platform::signal_process_group(self.inner.pid, signal);
+            self.inner.group.send(signal);
             if self.wait_for_process_group_to_end(timeout).await {
                 return;
             }
@@ -264,7 +266,7 @@ impl ProcessTree {
     /// Whether the group ended within `timeout` (`None` waits forever).
     async fn wait_for_process_group_to_end(&self, timeout: Option<Duration>) -> bool {
         let deadline = timeout.map(|timeout| Instant::now() + timeout);
-        while process_group_exists(self.inner.pid) {
+        while self.inner.group.exists() {
             if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
                 return false;
             }
@@ -272,19 +274,4 @@ impl ProcessTree {
         }
         true
     }
-}
-
-#[cfg(unix)]
-/// Blocks a thread in `waitpid` until the shell exits, and reaps it.
-fn wait_for_shell(pid: Pid) -> oneshot::Receiver<i32> {
-    let (sender, receiver) = oneshot::channel();
-    std::thread::Builder::new()
-        .name(format!("localhost-wait-{pid}"))
-        .spawn(move || {
-            let mut status = 0;
-            while unsafe { libc::waitpid(pid, &mut status, 0) } == -1 && spawn::errno() == libc::EINTR {}
-            let _ = sender.send(status);
-        })
-        .expect("a thread to wait for the shell");
-    receiver
 }

@@ -255,10 +255,12 @@ mod tests {
         assert_eq!(fs::read_dir(root.path().join("runs")).unwrap().count(), 0);
     }
 
+    #[cfg(unix)]
     fn quick_stop() -> StopPolicy {
         StopPolicy { interrupt_timeout: Duration::from_millis(300), terminate_timeout: Duration::from_millis(300) }
     }
 
+    #[cfg(unix)]
     fn launch(root: &Path, command_line: &str, policy: StopPolicy) -> crate::ProcessTree {
         let configuration = crate::LaunchConfiguration {
             command_line: command_line.into(),
@@ -269,6 +271,7 @@ mod tests {
         crate::ProcessTree::launch(&configuration, policy).unwrap()
     }
 
+    #[cfg(unix)]
     /// Records a tree as a previous session's Run.
     fn record(root: &Path, tree: &crate::ProcessTree) -> Id {
         let run_id = Id::new();
@@ -278,6 +281,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn a_new_session_finds_the_previous_sessions_surviving_runs_but_not_its_own() {
         let root = tempfile::tempdir().unwrap();
         let tree = launch(root.path(), "sleep 1000", quick_stop());
@@ -294,6 +298,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn a_reused_pid_with_a_different_start_time_is_not_an_orphan_and_is_removed() {
         let root = tempfile::tempdir().unwrap();
         // A live process-group leader that is not the recorded one.
@@ -308,6 +313,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn a_group_whose_leader_exited_is_still_an_orphan() {
         let root = tempfile::tempdir().unwrap();
         // The shell exits; a leftover stays in its group, as if localhost
@@ -333,6 +339,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn stopping_orphans_kills_their_whole_trees_in_parallel_and_forgets_them() {
         let root = tempfile::tempdir().unwrap();
         let first = launch(root.path(), "sleep 1000 & sleep 1000 & wait", quick_stop());
@@ -357,6 +364,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn leaving_orphans_forgets_them_without_touching_their_processes() {
         let root = tempfile::tempdir().unwrap();
         let tree = launch(root.path(), "sleep 1000", quick_stop());
