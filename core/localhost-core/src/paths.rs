@@ -106,6 +106,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn expands_a_leading_tilde_only() {
         let home = home_directory().to_string_lossy().into_owned();
         assert_eq!(expand_tilde("~/Code/a"), format!("{home}/Code/a"));
@@ -115,6 +116,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn abbreviates_the_home_folder_only() {
         let home = home_directory().to_string_lossy().into_owned();
         assert_eq!(abbreviate_tilde(&format!("{home}/Code/a")), "~/Code/a");

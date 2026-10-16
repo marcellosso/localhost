@@ -96,10 +96,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn project_paths_are_absolute_and_only_this_machines_expand_a_tilde() {
+    fn a_distros_project_paths_are_absolute_posix_paths_without_a_tilde() {
         let wsl = ExecutionTarget::Wsl { distro: "Ubuntu".into() };
         assert_eq!(project_path(" /home/me/app/../shop/ ", &wsl), Ok("/home/me/shop".into()));
         assert_eq!(project_path("~/shop", &wsl), Err(LocalhostError::InvalidProjectPath("~/shop".into())));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn this_machines_project_paths_are_absolute_and_expand_a_tilde() {
         assert!(project_path("~/shop", &ExecutionTarget::ThisMachine).unwrap().ends_with("/shop"));
         assert!(project_path("shop", &ExecutionTarget::ThisMachine).is_err());
     }

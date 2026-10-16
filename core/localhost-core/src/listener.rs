@@ -281,16 +281,20 @@ impl Target {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use crate::{LaunchConfiguration, ProcessTree};
 
+    #[cfg(unix)]
     fn free_port() -> u16 {
         std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
     }
 
+    #[cfg(unix)]
     fn quick_stop() -> StopPolicy {
         StopPolicy { interrupt_timeout: Duration::from_millis(500), terminate_timeout: Duration::from_millis(500) }
     }
 
+    #[cfg(unix)]
     /// Starts a process tree that listens on `port`, and waits for its Listener.
     async fn listen(port: u16, command_line: &str) -> (ProcessTree, Listener) {
         let configuration = LaunchConfiguration {
@@ -323,6 +327,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn discovers_a_listeners_command_and_ports() {
         let port = free_port();
         let (tree, listener) = listen(port, &format!("exec nc -lk {port}")).await;
@@ -339,6 +344,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn stops_a_listeners_own_process_group() {
         let port = free_port();
         // nc leads a process group of its own, inside the tree's session. (Not
@@ -355,6 +361,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(unix)]
     async fn stops_a_session_leader_listener_and_its_descendants_not_its_whole_session() {
         let port = free_port();
         // nc leads its session and group; the sleep it inherits is its child.
