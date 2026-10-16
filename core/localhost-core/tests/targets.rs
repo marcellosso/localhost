@@ -172,8 +172,10 @@ async fn a_start_right_after_an_edit_runs_what_was_saved() {
     // Edited and started at once: the start waits for the Projects to arrive.
     let changes = ServiceChanges { command_line: Some("echo v3; sleep 30".into()), ..Default::default() };
     setup.library.edit_service(service.id, changes, Origin::MainWindow).unwrap();
-    setup.targets.restart(service.id, Origin::MainWindow).await.unwrap();
-    let run_id = setup.targets.status(service.id).run.unwrap().id;
+    // The restart's own status: the merged one may still hold the Run it ended
+    // until the distro's events arrive.
+    let restarted = setup.targets.restart(service.id, Origin::MainWindow).await.unwrap();
+    let run_id = restarted.run.unwrap().id;
     let (lines, mut more) = setup.targets.subscribe_to_run(run_id).await.unwrap();
     if !lines.iter().any(|line| line.text == "v3") {
         until(&mut more, |line| line.text == "v3").await;
