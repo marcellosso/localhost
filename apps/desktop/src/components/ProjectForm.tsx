@@ -18,9 +18,10 @@ type Props = {
  * When adding, the folder is scanned as soon as it is chosen and the
  * Suggestions are reviewed in the same sheet, then saved with the Project.
  *
- * On Windows it also says which WSL distro the Project runs in (the
- * default one, for a new Project). A folder picked inside a distro runs
- * there; one on a Windows drive, in the chosen distro through its mount.
+ * On Windows it also says where the Project runs: on Windows itself (the
+ * default for a new Project) or in a WSL distro. A folder picked inside a
+ * distro runs there; one on a Windows drive, on Windows itself, or in the
+ * chosen distro through its mount.
  */
 export function ProjectForm({ editing, onAdded }: Props) {
   const [folder, setFolder] = useState<ProjectFolder | null>(editing ? projectFolder(editing) : null);
@@ -39,12 +40,8 @@ export function ProjectForm({ editing, onAdded }: Props) {
   const scannedFolder = useRef("");
 
   useEffect(() => {
-    void commands.wslDistros().then((names) => {
-      setDistros(names);
-      // Windows itself can't run Services yet: a new Project runs in the default distro.
-      if (!editing && names.length > 0) setTarget((target) => (target.kind === "thisMachine" ? { kind: "wsl", distro: names[0] } : target));
-    });
-  }, [editing]);
+    void commands.wslDistros().then(setDistros);
+  }, []);
 
   const changeName = (value: string) => {
     setName(value);

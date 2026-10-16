@@ -101,7 +101,7 @@ describe("Sheets", () => {
     expect(selected.project).toHaveBeenCalledWith("new");
   });
 
-  it("adds a Project in the default WSL distro, or where its folder is", async () => {
+  it("adds a Project on this computer, or where its folder is", async () => {
     commands.wslDistros.mockResolvedValue(["Ubuntu", "Debian"]);
     const inDebian = { target: { kind: "wsl", distro: "Debian" }, path: "/home/me/shop" } as const;
     commands.chooseFolder.mockResolvedValue(inDebian);
@@ -111,12 +111,13 @@ describe("Sheets", () => {
     act(() => showSheet({ kind: "addProject" }));
 
     const runsIn = (await screen.findByLabelText("Runs in")) as HTMLSelectElement;
-    await waitFor(() => expect(runsIn.selectedOptions[0].textContent).toBe("Ubuntu (WSL)"));
-    expect([...runsIn.options].map((option) => option.textContent)).toEqual(["Ubuntu (WSL)", "Debian (WSL)"]);
+    await waitFor(() => expect(runsIn.options).toHaveLength(3));
+    expect([...runsIn.options].map((option) => option.textContent)).toEqual(["This computer", "Ubuntu (WSL)", "Debian (WSL)"]);
+    expect(runsIn.selectedOptions[0].textContent).toBe("This computer");
 
-    // Picked inside another distro's folders: the Project runs there.
+    // Picked inside a distro's folders: the Project runs there.
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
-    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "wsl", distro: "Ubuntu" }, null);
+    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "thisMachine" }, null);
     expect(runsIn.selectedOptions[0].textContent).toBe("Debian (WSL)");
     expect(screen.getByRole("button", { name: "Folder" }).textContent).toContain("Debian/home/me/shop");
     expect(commands.scanFolder).toHaveBeenCalledWith(inDebian);

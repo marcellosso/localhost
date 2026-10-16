@@ -181,13 +181,12 @@ type TargetProps = {
 };
 
 /**
- * Where a Project runs: one of the WSL distros, on Windows (where Windows
- * itself can't run Services until XP5). Elsewhere it only shows for a
- * Project imported from Windows, which can move to this computer.
+ * Where a Project runs: this computer or, on Windows, one of the WSL
+ * distros. Elsewhere it only shows for a Project imported from Windows,
+ * which can move to this computer.
  */
 export function TargetField({ id, target, distros, onChange }: TargetProps) {
-  const options: ExecutionTarget[] = distros.length > 0 ? [] : [thisMachine];
-  options.push(...distros.map((distro) => ({ kind: "wsl" as const, distro })));
+  const options: ExecutionTarget[] = [thisMachine, ...distros.map((distro) => ({ kind: "wsl" as const, distro }))];
   // A distro that is no longer installed stays shown while it is the Project's.
   if (!options.some((option) => isSameTarget(option, target))) options.push(target);
   const label = (option: ExecutionTarget) => (option.kind === "wsl" ? `${option.distro} (WSL)` : "This computer");

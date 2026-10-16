@@ -220,7 +220,6 @@ pub fn add_project(
     folder: ProjectFolder,
     services: Vec<SuggestionEdit>,
 ) -> CommandResult<Project> {
-    runs_here(&folder)?;
     let services = new_services(services)?;
     let library = &state.core()?.library;
     Ok(library.add_project_on(folder.target, &name, parse_key(&key)?, &folder.path, services, ORIGIN)?)
@@ -241,7 +240,6 @@ pub async fn edit_project(
     let project = core.library.project(project_id)?;
     let moves = project.execution_target != folder.target;
     if moves {
-        runs_here(&folder)?;
         for service in &project.services {
             core.targets.stop(service.id, ORIGIN).await?;
         }
@@ -481,7 +479,6 @@ pub async fn import_project(
     folder: ProjectFolder,
     choice: Option<ImportChoice>,
 ) -> CommandResult<Project> {
-    runs_here(&folder)?;
     let core = state.core()?;
     let mut document = read_document(&file)?;
     document.set_path(folder.path);
@@ -627,15 +624,6 @@ fn environment_summary(document: &ProjectDocument) -> Option<String> {
 }
 
 // MARK: Parsing
-
-/// On Windows a Project runs in a WSL distro until native execution (XP5),
-/// rather than failing at its first start.
-fn runs_here(folder: &ProjectFolder) -> Result<(), LocalhostError> {
-    if cfg!(windows) && folder.target.is_this_machine() {
-        return Err(LocalhostError::ExecutionUnavailable);
-    }
-    Ok(())
-}
 
 fn parse_key(raw: &str) -> Result<Key, LocalhostError> {
     Key::new(raw.trim())

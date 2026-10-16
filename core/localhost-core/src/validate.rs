@@ -1,7 +1,7 @@
 //! Field validation and normalization shared by Project and Service edits
 //! and Project files.
 
-use crate::paths::{expand_tilde, standardize_posix};
+use crate::paths::{expand_tilde, standardize_posix, standardize_windows};
 use crate::{ExecutionTarget, LocalhostError};
 
 pub(crate) fn name(raw: &str) -> Result<String, LocalhostError> {
@@ -12,17 +12,22 @@ pub(crate) fn name(raw: &str) -> Result<String, LocalhostError> {
     Ok(name.to_string())
 }
 
-/// An absolute path on the target, standardized. A leading `~` is expanded
-/// on this machine only: a distro's home folder isn't known here.
+/// An absolute path on the target, standardized: POSIX, or on Windows
+/// itself a drive's or a share's (`C:\Code\shop`). A leading `~` is
+/// expanded on this machine only: a distro's home folder isn't known here.
 pub(crate) fn project_path(raw: &str, target: &ExecutionTarget) -> Result<String, LocalhostError> {
-    let expanded = match target {
-        ExecutionTarget::ThisMachine => expand_tilde(raw.trim()),
-        ExecutionTarget::Wsl { .. } => raw.trim().to_string(),
-    };
-    if !expanded.starts_with('/') {
-        return Err(LocalhostError::InvalidProjectPath(raw.to_string()));
+    let invalid = || LocalhostError::InvalidProjectPath(raw.to_string());
+    match target {
+        ExecutionTarget::ThisMachine if cfg!(windows) => {
+            standardize_windows(&expand_tilde(raw.trim())).ok_or_else(invalid)
+        }
+        ExecutionTarget::ThisMachine => posix_path(&expand_tilde(raw.trim())).ok_or_else(invalid),
+        ExecutionTarget::Wsl { .. } => posix_path(raw.trim()).ok_or_else(invalid),
     }
-    Ok(standardize_posix(&expanded))
+}
+
+fn posix_path(path: &str) -> Option<String> {
+    path.starts_with('/').then(|| standardize_posix(path))
 }
 
 /// The target with its distro name trimmed. WSL distro names are letters,
@@ -43,9 +48,16 @@ pub(crate) fn execution_target(target: ExecutionTarget) -> Result<ExecutionTarge
 }
 
 /// A path relative to the Project, e.g. `web` or `../shared`; empty means `.`.
+/// Kept with `/`, which Windows takes too; there `web\api` is `web/api`.
 pub(crate) fn working_directory(raw: &str) -> Result<String, LocalhostError> {
-    let trimmed = raw.trim();
-    if trimmed.starts_with('/') || trimmed.starts_with('~') {
+    working_directory_on(raw, cfg!(windows))
+}
+
+fn working_directory_on(raw: &str, windows: bool) -> Result<String, LocalhostError> {
+    let trimmed = if windows { raw.trim().replace('\\', "/") } else { raw.trim().to_string() };
+    // On Windows, `C:` starts a path on a drive: `C:web` too.
+    let is_on_a_drive = windows && trimmed.get(1..2) == Some(":");
+    if trimmed.starts_with('/') || trimmed.starts_with('~') || is_on_a_drive {
         return Err(LocalhostError::InvalidWorkingDirectory(raw.to_string()));
     }
     let components: Vec<&str> = trimmed.split('/').filter(|c| !c.is_empty() && *c != ".").collect();
@@ -107,6 +119,37 @@ mod tests {
     fn this_machines_project_paths_are_absolute_and_expand_a_tilde() {
         assert!(project_path("~/shop", &ExecutionTarget::ThisMachine).unwrap().ends_with("/shop"));
         assert!(project_path("shop", &ExecutionTarget::ThisMachine).is_err());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn this_machines_project_paths_are_on_a_drive_or_a_share_and_expand_a_tilde() {
+        let this_machine = ExecutionTarget::ThisMachine;
+        assert_eq!(project_path(r" c:\Code\app\..\shop\ ", &this_machine), Ok(r"C:\Code\shop".into()));
+        assert_eq!(project_path(r"\\server\share\shop", &this_machine), Ok(r"\\server\share\shop".into()));
+        let home = crate::paths::home_directory().to_string_lossy().into_owned();
+        assert_eq!(project_path(r"~\shop", &this_machine), Ok(format!(r"{home}\shop")));
+        assert_eq!(project_path("~/shop", &this_machine), Ok(format!(r"{home}\shop")));
+        for invalid in ["shop", "/home/me/shop", r"C:shop"] {
+            assert_eq!(project_path(invalid, &this_machine), Err(LocalhostError::InvalidProjectPath(invalid.into())));
+        }
+    }
+
+    #[test]
+    fn working_directories_are_relative() {
+        for windows in [false, true] {
+            assert_eq!(working_directory_on(" ./apps//web/ ", windows), Ok("apps/web".into()));
+            assert_eq!(working_directory_on("", windows), Ok(".".into()));
+            assert_eq!(working_directory_on("../shared", windows), Ok("../shared".into()));
+            for invalid in ["/srv/web", "~/web"] {
+                assert!(working_directory_on(invalid, windows).is_err(), "{invalid}");
+            }
+        }
+        assert_eq!(working_directory_on(r"apps\web", true), Ok("apps/web".into()));
+        assert_eq!(working_directory_on(r"apps\web", false), Ok(r"apps\web".into()));
+        for invalid in [r"\web", r"C:\web", "C:web"] {
+            assert!(working_directory_on(invalid, true).is_err(), "{invalid}");
+        }
     }
 
     #[test]

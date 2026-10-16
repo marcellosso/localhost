@@ -67,7 +67,7 @@ rustup target add x86_64-pc-windows-msvc
 cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
 ```
 
-On Windows, Services run in a WSL distro (ADR-0008), so the core's process layer is Unix-only there: a Run on Windows itself fails with `ExecutionUnavailable` until native execution (XP5).
+On Windows, a Project runs either on Windows itself, in a Job Object through `cmd.exe` (ADR-0010, ADR-0011), or in a WSL distro (ADR-0008). Windows CI runs the lib tests and `tests/process_tree_windows.rs` against real processes.
 
 The Swift layer has its own tests, which need the library built first:
 
