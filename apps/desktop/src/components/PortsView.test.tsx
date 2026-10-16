@@ -67,7 +67,7 @@ describe("PortsView", () => {
 
   it("groups each WSL distro's Listeners under it, telling a pid used in both apart", async () => {
     const inUbuntu = (details: ListenerDetails): ListenerDetails => ({ ...details, target: { kind: "wsl", distro: "Ubuntu" } });
-    // Windows itself has none: it isn't scanned yet.
+    // Windows itself has none here, so its group is left out.
     commands.listeners.mockResolvedValue({ status: "ok", data: [inUbuntu(runs), inUbuntu(stray), inUbuntu(app)] });
     commands.stopListener.mockResolvedValue({ status: "ok", data: null });
     const { unmount } = render(<PortsView view={view} />);

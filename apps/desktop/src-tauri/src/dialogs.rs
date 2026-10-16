@@ -75,7 +75,8 @@ pub async fn choose_folder(
 }
 
 /// A folder for a Service's working directory, relative to the Project's
-/// folder, e.g. `web` or `../shared`. `None` if it isn't where the Project runs.
+/// folder, e.g. `web` or `../shared`. `None` if it isn't where the Project
+/// runs, or is on another drive.
 #[tauri::command]
 #[specta::specta]
 pub async fn choose_working_directory(window: WebviewWindow, project: ProjectFolder) -> Option<String> {
@@ -85,7 +86,10 @@ pub async fn choose_working_directory(window: WebviewWindow, project: ProjectFol
     }
     let folder = pick(|send| dialog.pick_folder(send)).await?;
     let picked = ProjectFolder::picked(&folder.to_string_lossy(), &project.target);
-    (picked.target == project.target).then(|| relative_path(Path::new(&picked.path), Path::new(&project.path)))
+    if picked.target != project.target {
+        return None;
+    }
+    relative_path(Path::new(&picked.path), Path::new(&project.path))
 }
 
 /// A Project file to import.
@@ -127,8 +131,16 @@ async fn pick(open: impl FnOnce(Box<dyn FnOnce(Option<FilePath>) + Send>)) -> Op
     receiver.await.ok().flatten()?.into_path().ok()
 }
 
-/// `path` relative to `base`, e.g. `web` or `../shared`; `.` for `base` itself.
-fn relative_path(path: &Path, base: &Path) -> String {
+/// `path` relative to `base`, e.g. `web` or `../shared`; `.` for `base`
+/// itself. `None` on another Windows drive or share, which no relative path reaches.
+fn relative_path(path: &Path, base: &Path) -> Option<String> {
+    let prefix = |path: &Path| match path.components().next() {
+        Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_lowercase()),
+        _ => None,
+    };
+    if prefix(path) != prefix(base) {
+        return None;
+    }
     let components = |path: &Path| -> Vec<String> {
         let mut parts: Vec<String> = Vec::new();
         for component in path.components() {
@@ -146,7 +158,7 @@ fn relative_path(path: &Path, base: &Path) -> String {
     let common = target.iter().zip(&root).take_while(|(a, b)| a == b).count();
     let parts: Vec<String> =
         std::iter::repeat_n("..".to_string(), root.len() - common).chain(target[common..].iter().cloned()).collect();
-    if parts.is_empty() { ".".into() } else { parts.join("/") }
+    Some(if parts.is_empty() { ".".into() } else { parts.join("/") })
 }
 
 #[cfg(test)]
@@ -173,9 +185,22 @@ mod tests {
     #[test]
     fn makes_folders_relative_to_the_project() {
         let project = Path::new("/home/me/shop");
-        assert_eq!(relative_path(Path::new("/home/me/shop"), project), ".");
-        assert_eq!(relative_path(Path::new("/home/me/shop/apps/web"), project), "apps/web");
-        assert_eq!(relative_path(Path::new("/home/me/shared"), project), "../shared");
-        assert_eq!(relative_path(Path::new("/home/me/shop/./web/"), Path::new("/home/me/shop/")), "web");
+        let relative = |path: &str| relative_path(Path::new(path), project);
+        assert_eq!(relative("/home/me/shop").as_deref(), Some("."));
+        assert_eq!(relative("/home/me/shop/apps/web").as_deref(), Some("apps/web"));
+        assert_eq!(relative("/home/me/shared").as_deref(), Some("../shared"));
+        assert_eq!(
+            relative_path(Path::new("/home/me/shop/./web/"), Path::new("/home/me/shop/")).as_deref(),
+            Some("web")
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn makes_folders_relative_to_a_project_on_the_same_drive_only() {
+        let project = Path::new(r"C:\Code\shop");
+        assert_eq!(relative_path(Path::new(r"C:\Code\shop\web"), project).as_deref(), Some("web"));
+        assert_eq!(relative_path(Path::new(r"c:\Code\shared"), project).as_deref(), Some("../shared"));
+        assert_eq!(relative_path(Path::new(r"D:\shop\web"), project), None);
     }
 }

@@ -398,7 +398,8 @@ async chooseFolder(target: ExecutionTarget, start: string | null) : Promise<Proj
 },
 /**
  * A folder for a Service's working directory, relative to the Project's
- * folder, e.g. `web` or `../shared`. `None` if it isn't where the Project runs.
+ * folder, e.g. `web` or `../shared`. `None` if it isn't where the Project
+ * runs, or is on another drive.
  */
 async chooseWorkingDirectory(project: ProjectFolder) : Promise<string | null> {
     return await TAURI_INVOKE("choose_working_directory", { project });
@@ -772,11 +773,6 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  * distro) can't be reached, or the connection to it was lost.
  */
 { kind: "targetUnavailable"; detail: string } | 
-/**
- * Services can't run on this machine itself: on Windows they run in a
- * WSL distro until native execution (XP5).
- */
-{ kind: "executionUnavailable" } | 
 /**
  * Something already listens on the port; `owner` is that Listener, if
  * localhost can see it (processes of other users can't be inspected).

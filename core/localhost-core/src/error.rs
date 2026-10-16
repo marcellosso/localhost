@@ -55,9 +55,6 @@ pub enum LocalhostError {
     /// The core on the Project's Execution Target (`localhostd` in a WSL
     /// distro) can't be reached, or the connection to it was lost.
     TargetUnavailable(String),
-    /// Services can't run on this machine itself: on Windows they run in a
-    /// WSL distro until native execution (XP5).
-    ExecutionUnavailable,
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -136,9 +133,6 @@ impl LocalhostError {
                     .into()
             }
             TargetUnavailable(reason) => format!("localhost can’t reach the WSL distro: {reason}."),
-            ExecutionUnavailable => {
-                "Services can’t run on Windows itself yet. Run this project in a WSL distro.".into()
-            }
             PortConflict { port, owner: Some(owner) } => {
                 format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
             }
