@@ -1,6 +1,6 @@
 # Cross-platform plan
 
-localhost goes from a macOS app to macOS, Linux and Windows. There is real demand for both Linux and Windows, so `localhost-v1.md` §16 and `localhost-v2.md` §15 ("only with demand") no longer hold back this work. Where this file disagrees with `docs/v1-decisions.md`, **this file wins** for anything it covers. Vocabulary is in `GLOSSARY.md`; the hard-to-reverse choices are ADR-0007 to ADR-0009.
+localhost goes from a macOS app to macOS, Linux and Windows. There is real demand for both Linux and Windows, so `localhost-v1.md` §16 and `localhost-v2.md` §15 ("only with demand") no longer hold back this work. Where this file disagrees with `docs/v1-decisions.md`, **this file wins** for anything it covers. Vocabulary is in `GLOSSARY.md`; the hard-to-reverse choices are ADR-0007 to ADR-0011.
 
 ## Shape
 
@@ -31,14 +31,20 @@ localhost goes from a macOS app to macOS, Linux and Windows. There is real deman
 | Concern | macOS | Linux | Windows (native) |
 |---|---|---|---|
 | Storage | `~/Library/Application Support/localhost` | `$XDG_DATA_HOME/localhost` (`~/.local/share/localhost`) | `%APPDATA%\localhost` |
-| Command | `$SHELL -l -c` (ADR-0003) | `$SHELL -l -c` | Decided in XP5 (pwsh / cmd, PATH from the registry) |
-| Process tree | new session, signal the process group | same | Job Object (kill-on-close), `CTRL_BREAK_EVENT`, then terminate the job |
-| Listeners | libproc | `/proc/net/tcp{,6}` + `/proc/<pid>/fd`, `cwd` | `GetExtendedTcpTable` |
+| Command | `$SHELL -l -c` (ADR-0003) | `$SHELL -l -c` | `cmd.exe /s /c`, environment from `CreateEnvironmentBlock` (ADR-0010) |
+| Process tree | new session, signal the process group | same | Job Object (kill-on-close), `CTRL_BREAK_EVENT`, then terminate the job (ADR-0011) |
+| Listeners | libproc | `/proc/net/tcp{,6}` + `/proc/<pid>/fd`, `cwd` | `GetExtendedTcpTable`, cwd read from the process's PEB |
 | Secrets | Keychain | Secret Service (libsecret) | Credential Manager |
 | Tray | menu bar extra | AppIndicator (GNOME needs the extension) | notification area |
 | Distribution | DMG (`RELEASING.md`) | `.deb`, `.rpm`, AppImage. **Not Flatpak or Snap**: their sandboxes can't spawn host commands, the same reason as ADR-0002 | NSIS/MSI installer, Authenticode signing when a certificate exists |
 
 Platform-specific code sits behind small traits in the core (process launching and stopping, Listener scanning, process info for Orphans, the secret store, storage paths, the login environment), with one implementation per OS. Everything else is shared and tested once.
+
+### Native Windows
+
+- **Listener attribution**: owned by a Run (the process is in the Run's Job Object) → inside a Project (its working directory, read from its PEB as psutil does, is under the Project path) → Unmanaged Listener. When the working directory can't be read (an elevated or protected process), the Listener is Unmanaged.
+- **Stopping a Listener we don't run**: Ctrl-Break only reaches processes on our own console, so after the usual confirmation the process and its descendants (by parent pid) are terminated, with no graceful step. The confirmation says so. localhost itself, processes in session 0 (Windows services) and protected processes are refused, as launchd jobs are on macOS.
+- **Process start time** (Orphans, PID reuse): the creation time from `GetProcessTimes`.
 
 ## Order
 
