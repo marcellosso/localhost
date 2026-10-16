@@ -93,7 +93,9 @@ pub(crate) fn spawn(
         libc::posix_spawn_file_actions_adddup2(&mut actions, stdout.as_raw_fd(), 1);
         libc::posix_spawn_file_actions_adddup2(&mut actions, stderr.as_raw_fd(), 2);
         // Linux has no CLOEXEC_DEFAULT: close everything else explicitly.
-        #[cfg(target_os = "linux")]
+        // musl (the static `localhostd` in WSL) has no `addclosefrom_np`:
+        // there Rust and tokio open every descriptor close-on-exec already.
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
         libc::posix_spawn_file_actions_addclosefrom_np(&mut actions, 3);
         libc::posix_spawn_file_actions_addchdir_np(&mut actions, directory.as_ptr());
 

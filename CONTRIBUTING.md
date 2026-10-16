@@ -78,7 +78,7 @@ cd apps/macos/LocalhostCoreFFI && swift test
 
 ### The Linux app
 
-`apps/desktop/` is a Tauri 2 app (ADR-0009): a Rust shell in `src-tauri/` that hosts the core, and a React + TypeScript UI in `src/`. It runs on macOS too for development, but only ships for Linux (#48). On Linux, first install the webview and tray libraries ([Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/)), e.g. on Ubuntu:
+`apps/desktop/` is a Tauri 2 app (ADR-0009): a Rust shell in `src-tauri/` that hosts the core, and a React + TypeScript UI in `src/`. It runs on macOS too for development, but only ships for Linux (#48) and Windows (#49). On Linux, first install the webview and tray libraries ([Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/)), e.g. on Ubuntu:
 
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
