@@ -345,7 +345,7 @@ async fn a_taken_port_moves_the_run_to_the_next_free_port_saying_why() {
 
     let status = s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
     let run = status.run.unwrap();
-    let moved = run.port.unwrap();
+    let moved = run.port.unwrap_or_else(|| panic!("the start should move, got {:?} {run:?}", status.state));
     assert!(moved > port && moved <= port + 100);
     let Some(PortChange { configured_port, reason: PortChangeReason::PortInUse { holder: Some(reported) } }) =
         &run.port_change
