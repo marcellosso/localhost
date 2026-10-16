@@ -112,13 +112,16 @@ async fn captures_the_exit_code() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn an_unknown_command_is_command_not_found() {
+async fn an_unknown_command_exits_with_1_and_says_so_on_stderr() {
     let tree = launch("definitely-not-a-command-localhost");
     let lines = all_lines(&tree).await;
     let exit = tree.wait_for_exit().await;
-    assert_eq!(exit.termination, Termination::Exited { code: 9009 });
-    assert_eq!(exit.termination.launch_error(), Some(LocalhostError::CommandNotFound));
-    assert!(lines.iter().any(|line| line.channel == OutputChannel::Stderr), "{lines:?}");
+    assert_eq!(exit.termination, Termination::Exited { code: 1 });
+    assert!(
+        lines.iter().any(|line| line.channel == OutputChannel::Stderr
+            && line.text.contains("is not recognized as an internal or external command")),
+        "{lines:?}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

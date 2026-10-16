@@ -41,6 +41,20 @@ use crate::{Id, Key, LocalhostError, Origin, Project, ProjectLibrary, ProjectLib
 const DOCKER_DAEMON_ERROR_TEXTS: [&str; 2] =
     ["Cannot connect to the Docker daemon", "failed to connect to the docker API"];
 
+/// What `cmd.exe` prints to stderr for a command it can't find. `cmd /c`
+/// then exits with 1, so the message is the only sign (English Windows only).
+const COMMAND_NOT_RECOGNIZED_TEXT: &str = "is not recognized as an internal or external command";
+
+/// The failure a Run's output line diagnoses, if any.
+fn diagnosis(line: &OutputLine) -> Option<LocalhostError> {
+    if DOCKER_DAEMON_ERROR_TEXTS.iter().any(|text| line.text.contains(text)) {
+        return Some(LocalhostError::DockerDaemonUnavailable);
+    }
+    let is_not_recognized =
+        cfg!(windows) && line.channel == OutputChannel::Stderr && line.text.contains(COMMAND_NOT_RECOGNIZED_TEXT);
+    is_not_recognized.then_some(LocalhostError::CommandNotFound)
+}
+
 /// How a ServiceManager runs Services.
 #[derive(Clone, Debug)]
 pub struct ServiceManagerOptions {
@@ -110,7 +124,8 @@ struct State {
     /// hashed (it includes Secret values, so it is never stored or sent).
     launch_fingerprints: HashMap<Id, u64>,
     /// Live Runs that printed Docker's "daemon not running" error.
-    runs_with_docker_daemon_error: HashSet<Id>,
+    /// Failures diagnosed from a Run's output (`diagnosis`), the first per Run.
+    diagnosed_failures: HashMap<Id, LocalhostError>,
 }
 
 #[derive(Clone)]
@@ -841,10 +856,10 @@ impl Inner {
         self.status(service_id)
     }
 
-    /// Logs the Run's output, watching it for a local URL and Docker's
-    /// "daemon not running" error, then how it ended.
+    /// Logs the Run's output, watching it for a local URL and for errors that
+    /// explain a failure (`diagnosis`), then how it ended.
     async fn follow_output(self: Arc<Self>, service_id: Id, run_id: Id, tree: ProcessTree) {
-        let (mut has_detected_url, mut has_detected_docker_error) = (false, false);
+        let (mut has_detected_url, mut has_diagnosed_failure) = (false, false);
         while let Some(lines) = tree.next_output().await {
             self.logs.append(&lines, run_id);
             for line in lines.iter().filter(|line| line.channel != OutputChannel::Localhost) {
@@ -855,9 +870,9 @@ impl Inner {
                     has_detected_url = true;
                     self.url_detected(url, service_id, run_id);
                 }
-                if !has_detected_docker_error && DOCKER_DAEMON_ERROR_TEXTS.iter().any(|text| line.text.contains(text)) {
-                    has_detected_docker_error = true;
-                    self.docker_daemon_error_detected(service_id, run_id);
+                if !has_diagnosed_failure && let Some(failure) = diagnosis(line) {
+                    has_diagnosed_failure = true;
+                    self.failure_diagnosed(service_id, run_id, failure);
                 }
             }
         }
@@ -999,9 +1014,9 @@ impl Inner {
         });
     }
 
-    /// The Run printed Docker's "daemon not running" error. If it fails (or
-    /// already has), that is the reason given.
-    fn docker_daemon_error_detected(&self, service_id: Id, run_id: Id) {
+    /// The Run printed an error that explains a failure (e.g. Docker's "daemon
+    /// not running"). If it fails (or already has), that is the reason given.
+    fn failure_diagnosed(&self, service_id: Id, run_id: Id, failure: LocalhostError) {
         self.lock_and(|_, state| {
             let mut status = status_in(state, service_id);
             let Some(run) = &mut status.run else { return };
@@ -1009,12 +1024,12 @@ impl Inner {
                 return;
             }
             if run.ended_at.is_none() {
-                state.runs_with_docker_daemon_error.insert(run_id);
+                state.diagnosed_failures.insert(run_id, failure.clone());
             }
             if status.state != ServiceState::Failed || run.failure.is_some() {
                 return;
             }
-            run.failure = Some(LocalhostError::DockerDaemonUnavailable);
+            run.failure = Some(failure);
             update(state, status);
         });
     }
@@ -1058,7 +1073,7 @@ impl Inner {
             } else {
                 exit.termination.launch_error()
             };
-            state.runs_with_docker_daemon_error.remove(&run_id);
+            state.diagnosed_failures.remove(&run_id);
             status.run = Some(run.clone());
             state.trees.remove(&service_id);
             state.run_ports.remove(&service_id);
@@ -1140,9 +1155,9 @@ fn record_failed_launch(state: &mut State, service_id: Id, origin: Origin, failu
 
 /// Why a Run that ended with `termination` failed, if there is a typed reason.
 fn failure_of(state: &State, run_id: Id, termination: Option<Termination>) -> Option<LocalhostError> {
-    termination.and_then(|termination| termination.launch_error()).or_else(|| {
-        state.runs_with_docker_daemon_error.contains(&run_id).then_some(LocalhostError::DockerDaemonUnavailable)
-    })
+    termination
+        .and_then(|termination| termination.launch_error())
+        .or_else(|| state.diagnosed_failures.get(&run_id).cloned())
 }
 
 /// The state a Service moves to when its command ends while in `state`.

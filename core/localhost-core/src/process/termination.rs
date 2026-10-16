@@ -37,11 +37,11 @@ impl Termination {
         }
     }
 
-    /// The launch failure this termination stands for, by shell convention
-    /// (cmd's on Windows: 9009 when the command isn't recognised).
+    /// The launch failure this termination stands for, by shell convention.
+    /// cmd has none (an unknown command exits with 1): on Windows the Run's
+    /// output tells instead.
     pub fn launch_error(&self) -> Option<LocalhostError> {
         match self {
-            Termination::Exited { code: 9009 } if cfg!(windows) => Some(LocalhostError::CommandNotFound),
             Termination::Exited { code: 127 } if cfg!(unix) => Some(LocalhostError::CommandNotFound),
             Termination::Exited { code: 126 } if cfg!(unix) => Some(LocalhostError::CommandNotExecutable),
             _ => None,
@@ -114,11 +114,10 @@ mod tests {
 
     #[test]
     #[cfg(windows)]
-    fn cmds_unrecognised_command_is_command_not_found() {
-        assert_eq!(Termination::Exited { code: 0 }.launch_error(), None);
-        assert_eq!(Termination::Exited { code: 1 }.launch_error(), None);
-        assert_eq!(Termination::Exited { code: 127 }.launch_error(), None);
-        assert_eq!(Termination::Exited { code: 9009 }.launch_error(), Some(LocalhostError::CommandNotFound));
+    fn cmds_exit_codes_are_not_launch_errors() {
+        for code in [0, 1, 126, 127, 9009] {
+            assert_eq!(Termination::Exited { code }.launch_error(), None);
+        }
     }
 
     #[test]
