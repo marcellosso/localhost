@@ -94,7 +94,8 @@ async fn wait_until_dead(pid: u32) {
 const IGNORES_CTRL_BREAK: &str = r#"
 import os, signal, subprocess, sys, time
 signal.signal(signal.SIGBREAK, signal.SIG_IGN)
-child = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGBREAK, signal.SIG_IGN); time.sleep(1000)"])
+child = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGBREAK, signal.SIG_IGN); open('ready', 'w').close(); time.sleep(1000)"])
+while not os.path.exists("ready"): time.sleep(0.01)
 print("pid", os.getpid(), flush=True)
 print("grandchild", child.pid, flush=True)
 time.sleep(1000)
@@ -181,7 +182,9 @@ async fn ctrl_break_stops_a_command_and_its_grandchildren() {
     let folder = python(
         r#"
 import os, subprocess, sys, time
-child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(1000)"])
+# The grandchild says it's ready once it runs, so Ctrl-Break can't arrive while it is starting.
+child = subprocess.Popen([sys.executable, "-c", "open('ready', 'w').close(); import time; time.sleep(1000)"])
+while not os.path.exists("ready"): time.sleep(0.01)
 print("grandchild", child.pid, flush=True)
 time.sleep(1000)
 "#,

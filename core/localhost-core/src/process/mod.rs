@@ -212,7 +212,7 @@ impl ProcessTree {
         self.inner.shell_termination.send_replace(Some(termination));
 
         // Anything still in the group is left over from the shell: stop it.
-        if self.inner.group.exists() {
+        if !self.wait_for_process_group_to_end(Some(imp::LEFTOVER_GRACE)).await {
             self.escalate(imp::LEFTOVER_SIGNAL).await;
         }
         while self.inner.group.exists() {

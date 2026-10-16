@@ -46,6 +46,10 @@ pub(super) const STOP_SIGNALS: [i32; 2] = [SIGINT, SIGKILL];
 /// What the shell left behind is terminated: Ctrl-Break is only sent while
 /// the shell, whose pid names the process group, is still running.
 pub(super) const LEFTOVER_SIGNAL: i32 = SIGKILL;
+/// How long the job may take to empty after the shell exits before what is
+/// in it counts as left over: Windows counts an exited process out of its
+/// job slightly after the process is signalled.
+pub(super) const LEFTOVER_GRACE: Duration = Duration::from_millis(200);
 /// The exit code of processes ended by terminating the job.
 const TERMINATED_EXIT_CODE: u32 = 1;
 

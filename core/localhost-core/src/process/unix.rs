@@ -1,5 +1,7 @@
 //! Launching and signalling a Run's process group on macOS and Linux.
 
+use std::time::Duration;
+
 use tokio::net::unix::pipe;
 use tokio::sync::oneshot;
 
@@ -14,6 +16,10 @@ pub(super) const STOP_SIGNALS: [i32; 3] = [SIGINT, SIGTERM, SIGKILL];
 /// Where stopping what the shell left behind starts: background jobs of a
 /// non-interactive shell ignore SIGINT.
 pub(super) const LEFTOVER_SIGNAL: i32 = SIGTERM;
+/// How long the group may take to empty after the shell exits before what
+/// is in it counts as left over: the kernel reports a reaped shell's group
+/// at once.
+pub(super) const LEFTOVER_GRACE: Duration = Duration::ZERO;
 
 /// The Run's process group, whose id is the shell's pid.
 pub(super) struct Group(Pid);
