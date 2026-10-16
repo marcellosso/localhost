@@ -130,7 +130,7 @@ pub(super) fn scan_listeners() -> Vec<ListeningProcess> {
                 executable_path,
                 ports: normalized(ports),
                 // Long names and links resolved, as Project folders are: a
-                // process started in `C:\\Users\\RUNNER~1` is in `C:\\Users\\runneradmin`.
+                // process started in `C:\Users\RUNNER~1` is in `C:\Users\runneradmin`.
                 working_directory: working_directory
                     .map(|directory| super::resolved_path(&without_trailing_separator(&directory))),
                 start_time,
