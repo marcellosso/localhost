@@ -398,7 +398,8 @@ async chooseFolder(target: ExecutionTarget, start: string | null) : Promise<Proj
 },
 /**
  * A folder for a Service's working directory, relative to the Project's
- * folder, e.g. `web` or `../shared`. `None` if it isn't where the Project runs.
+ * folder, e.g. `web` or `../shared`. `None` if it isn't where the Project
+ * runs, or is on another drive.
  */
 async chooseWorkingDirectory(project: ProjectFolder) : Promise<string | null> {
     return await TAURI_INVOKE("choose_working_directory", { project });
