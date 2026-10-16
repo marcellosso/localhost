@@ -2,7 +2,7 @@ import { type CSSProperties, type Dispatch, type SetStateAction, useEffect, useR
 import { commands, type Project, type ProjectFolder } from "../bindings";
 import { directoryLabel, type SuggestionDraft, suggestionDrafts, suggestionEdits } from "../editors";
 import { tildePath } from "../paths";
-import { projectFolder } from "../targets";
+import { portVariable, projectFolder } from "../targets";
 import { closeSheet } from "../ui";
 import { CommandField, Field, FieldHint, FieldRow, FormCard, FormSheet, SwitchRow, TextField, Working, cardRow } from "./Form";
 import { ChevronIcon, DetectIcon } from "./Icons";
@@ -191,7 +191,7 @@ function SuggestionRow({ draft, color, project, isExpanded, onToggleExpanded, on
               title="Port can change"
               detail={
                 draft.portCanChange
-                  ? "If the port is in use, a run may start on the next free one (passed as $PORT)."
+                  ? `If the port is in use, a run may start on the next free one (passed as ${portVariable(project.target)}).`
                   : "The port is fixed by the command or a Compose file, so it can’t move."
               }
               isOn={draft.portCanChange}

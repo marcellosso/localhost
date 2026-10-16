@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
 use super::manifest::TomlDocument;
-use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
+use super::{CommandSyntax, ScannedDirectory, ServiceDetector, ServiceSuggestion};
 
 /// Suggests Services for a Python project (a folder with `pyproject.toml`,
 /// `requirements.txt`, `setup.py`, `Pipfile` or `manage.py`): a Django
 /// `runserver`, a FastAPI app under uvicorn, a Flask app, and the scripts
 /// `pyproject.toml` declares. Commands run through the project's tool (uv,
-/// Poetry, Pipenv), its `.venv`, or `python3`.
+/// Poetry, Pipenv), its `.venv`, or `python3` (`py`, the Python launcher, on
+/// Windows).
 pub struct PythonDetector;
 
 const MARKERS: [&str; 5] = ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile", "manage.py"];
@@ -19,6 +20,7 @@ impl ServiceDetector for PythonDetector {
         }
         let pyproject = directory.read("pyproject.toml").map(|text| TomlDocument::parse(&text));
         let runner = PythonRunner::detect(directory, pyproject.as_ref());
+        let port = directory.syntax.port();
         let base_name = pyproject.as_ref().and_then(project_name).unwrap_or_else(|| directory.name());
         let mut suggestions = Vec::new();
         let mut suggest = |name: String,
@@ -40,14 +42,14 @@ impl ServiceDetector for PythonDetector {
         };
 
         if directory.contains("manage.py") {
-            let command_line = format!("{} manage.py runserver $PORT", runner.python());
+            let command_line = format!("{} manage.py runserver {port}", runner.python());
             suggest(base_name.clone(), command_line, Some(8000), true, "manage.py", "Django".into());
         } else if let Some(app) = find_app(directory) {
             match app.framework {
                 Framework::FastApi => {
                     let app_directory = if app.is_in_source_folder { " --app-dir src" } else { "" };
                     let command_line = format!(
-                        "{} {}:{} --reload{app_directory} --port $PORT",
+                        "{} {}:{} --reload{app_directory} --port {port}",
                         runner.tool("uvicorn"),
                         app.module,
                         app.variable
@@ -57,7 +59,7 @@ impl ServiceDetector for PythonDetector {
                 }
                 Framework::Flask => {
                     let command_line = format!(
-                        "{} --app {}:{} run --debug --port $PORT",
+                        "{} --app {}:{} run --debug --port {port}",
                         runner.tool("flask"),
                         app.module,
                         app.variable
@@ -68,7 +70,7 @@ impl ServiceDetector for PythonDetector {
             }
         }
 
-        if runner != PythonRunner::System
+        if !matches!(runner, PythonRunner::System(_))
             && let Some(pyproject) = &pyproject
         {
             let mut scripts: BTreeMap<&String, &String> = BTreeMap::new();
@@ -232,15 +234,16 @@ enum PythonRunner {
     Poetry,
     Pipenv,
     /// A virtual environment folder inside the project, e.g. `.venv`.
-    VirtualEnvironment(&'static str),
-    /// `python3` from the login shell's `PATH`.
-    System,
+    VirtualEnvironment(&'static str, CommandSyntax),
+    /// `python3` from the login shell's `PATH`, or `py` on Windows.
+    System(CommandSyntax),
 }
 
 impl PythonRunner {
     /// uv or Poetry from a lockfile (walking up to the Project root, for
     /// workspaces) or `pyproject.toml`; Pipenv from a `Pipfile`; else a
-    /// `.venv`/`venv` with a Python in it; else the system Python.
+    /// `.venv`/`venv` with a Python in it (in `Scripts\` on Windows); else
+    /// the system Python.
     fn detect(directory: &ScannedDirectory, pyproject: Option<&TomlDocument>) -> PythonRunner {
         for folder in directory.self_and_ancestors() {
             if folder.contains("uv.lock") {
@@ -259,19 +262,40 @@ impl PythonRunner {
         if pyproject.is_some_and(|p| p.tables.iter().any(|t| t.name == "tool.uv" || t.name.starts_with("tool.uv."))) {
             return PythonRunner::Uv;
         }
+        let syntax = directory.syntax;
+        let python = match syntax {
+            CommandSyntax::Posix => "bin/python",
+            CommandSyntax::Cmd => "Scripts/python.exe",
+        };
         if let Some(folder) =
-            [".venv", "venv"].into_iter().find(|folder| directory.contains(&format!("{folder}/bin/python")))
+            [".venv", "venv"].into_iter().find(|folder| directory.contains(&format!("{folder}/{python}")))
         {
-            return PythonRunner::VirtualEnvironment(folder);
+            return PythonRunner::VirtualEnvironment(folder, syntax);
         }
-        PythonRunner::System
+        PythonRunner::System(syntax)
+    }
+
+    fn system_python(syntax: CommandSyntax) -> &'static str {
+        match syntax {
+            CommandSyntax::Posix => "python3",
+            CommandSyntax::Cmd => "py",
+        }
+    }
+
+    /// A program in a virtual environment, e.g. `.venv/bin/uvicorn`.
+    fn installed(folder: &str, syntax: CommandSyntax, name: &str) -> String {
+        let programs = match syntax {
+            CommandSyntax::Posix => "bin",
+            CommandSyntax::Cmd => "Scripts",
+        };
+        syntax.program_path(&[folder, programs, name])
     }
 
     fn python(&self) -> String {
         match self {
             PythonRunner::Uv | PythonRunner::Poetry | PythonRunner::Pipenv => self.run("python"),
-            PythonRunner::VirtualEnvironment(folder) => format!("{folder}/bin/python"),
-            PythonRunner::System => "python3".into(),
+            PythonRunner::VirtualEnvironment(folder, syntax) => PythonRunner::installed(folder, *syntax, "python"),
+            PythonRunner::System(syntax) => PythonRunner::system_python(*syntax).into(),
         }
     }
 
@@ -279,8 +303,8 @@ impl PythonRunner {
     fn tool(&self, name: &str) -> String {
         match self {
             PythonRunner::Uv | PythonRunner::Poetry | PythonRunner::Pipenv => self.run(name),
-            PythonRunner::VirtualEnvironment(folder) => format!("{folder}/bin/{name}"),
-            PythonRunner::System => format!("python3 -m {name}"),
+            PythonRunner::VirtualEnvironment(folder, syntax) => PythonRunner::installed(folder, *syntax, name),
+            PythonRunner::System(syntax) => format!("{} -m {name}", PythonRunner::system_python(*syntax)),
         }
     }
 
@@ -289,8 +313,8 @@ impl PythonRunner {
             PythonRunner::Uv => format!("uv run {command}"),
             PythonRunner::Poetry => format!("poetry run {command}"),
             PythonRunner::Pipenv => format!("pipenv run {command}"),
-            PythonRunner::VirtualEnvironment(folder) => format!("{folder}/bin/{command}"),
-            PythonRunner::System => command.to_string(),
+            PythonRunner::VirtualEnvironment(folder, syntax) => PythonRunner::installed(folder, *syntax, command),
+            PythonRunner::System(_) => command.to_string(),
         }
     }
 }

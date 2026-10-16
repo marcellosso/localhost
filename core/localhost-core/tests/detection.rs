@@ -1,21 +1,26 @@
 //! Ported from `DetectionTests.swift`: scanning against fixture folders.
 //! Each test writes a small Project folder, file by file, and checks the
-//! suggested Services.
+//! suggested Services. They expect the login shell's syntax on every
+//! platform; the Windows section checks cmd's.
 
 mod common;
 
 use common::{Fixture, key};
-use localhost_core::{NewService, Origin, ProjectScanner, ServiceSuggestion};
+use localhost_core::{CommandSyntax, NewService, Origin, ProjectScanner, ServiceSuggestion};
 
 /// Writes `files` (relative path → contents) into a fresh Project folder and scans it.
 fn scan(files: &[(&str, &str)]) -> (tempfile::TempDir, Vec<ServiceSuggestion>) {
+    scan_for(files, CommandSyntax::Posix)
+}
+
+fn scan_for(files: &[(&str, &str)], syntax: CommandSyntax) -> (tempfile::TempDir, Vec<ServiceSuggestion>) {
     let root = tempfile::tempdir().unwrap();
     for (path, contents) in files {
         let path = root.path().join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, contents).unwrap();
     }
-    let suggestions = ProjectScanner::default().scan_folder(root.path().to_str().unwrap());
+    let suggestions = ProjectScanner::default().with_syntax(syntax).scan_folder(root.path().to_str().unwrap());
     (root, suggestions)
 }
 
@@ -87,7 +92,7 @@ fn rescanning_a_project_hides_what_its_services_cover_and_avoids_their_keys() {
         )
         .unwrap();
 
-    let found = ProjectScanner::default().scan_project(&project);
+    let found = ProjectScanner::default().with_syntax(CommandSyntax::Posix).scan_project(&project);
     assert_eq!(field(&found, |s| s.command_line.clone()), ["npm run dev -- --port $PORT", "npm run build"]);
     assert_eq!(field(&found, |s| s.key.to_string()), ["web-2", "web-build"]);
 }
@@ -395,6 +400,41 @@ fn without_a_tool_or_environment_the_system_python3_runs_it() {
 #[test]
 fn python_files_without_a_project_file_are_ignored() {
     assert!(suggestions(&[("scripts/main.py", "app = FastAPI()\n")]).is_empty());
+}
+
+// MARK: Windows (cmd.exe, ADR-0010)
+
+fn windows_suggestions(files: &[(&str, &str)]) -> Vec<ServiceSuggestion> {
+    scan_for(files, CommandSyntax::Cmd).1
+}
+
+#[test]
+fn on_windows_scripts_get_percent_port_and_double_quotes() {
+    let found = windows_suggestions(&[("package.json", &scripts(&[("dev", "vite"), ("do it", "node x.js")]))]);
+    assert_eq!(field(&found, |s| s.command_line.clone()), ["npm run dev -- --port %PORT%", "npm run \"do it\""]);
+    let found = windows_suggestions(&[("manage.py", ""), ("poetry.lock", "")]);
+    assert_eq!(found[0].command_line, "poetry run python manage.py runserver %PORT%");
+}
+
+#[test]
+fn on_windows_a_virtual_environment_runs_from_scripts() {
+    let flask = [("requirements.txt", "flask\n"), ("app.py", "from flask import Flask\napp = Flask(__name__)\n")];
+    let found = windows_suggestions(&[flask[0], flask[1], (".venv/Scripts/python.exe", "")]);
+    assert_eq!(found[0].command_line, r".venv\Scripts\flask --app app:app run --debug --port %PORT%");
+    let found = windows_suggestions(&[flask[0], flask[1], (".venv/bin/python", "")]);
+    assert_eq!(
+        found[0].command_line, "py -m flask --app app:app run --debug --port %PORT%",
+        "a WSL venv can't run here"
+    );
+}
+
+#[test]
+fn on_windows_the_python_launcher_runs_it() {
+    let found = windows_suggestions(&[
+        ("requirements.txt", "fastapi\nuvicorn\n"),
+        ("main.py", "from fastapi import FastAPI\nserver = FastAPI()\n"),
+    ]);
+    assert_eq!(found[0].command_line, "py -m uvicorn main:server --reload --port %PORT%");
 }
 
 // MARK: Cargo

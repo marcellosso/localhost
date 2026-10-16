@@ -3,7 +3,7 @@ import { commands, type Project, type Service, type ServiceRelations } from "../
 import { serviceVariables, type VariableDraft, variableDrafts, variableEdits } from "../editors";
 import { tildePath } from "../paths";
 import { formatList } from "../status";
-import { projectFolder } from "../targets";
+import { portVariable, projectFolder } from "../targets";
 import { closeSheet } from "../ui";
 import {
   ChipList,
@@ -74,11 +74,11 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
 
   const portFooter = (() => {
     if (!trimmedPort) return "Optional. With a port, the service counts as running once the port accepts connections.";
-    let footer =
-      "The command gets the port as $PORT, e.g. “next dev -p $PORT”. It counts as running once the port accepts connections.";
+    const variable = portVariable(projectFolder(project).target);
+    let footer = `The command gets the port as ${variable}, e.g. “next dev -p ${variable}”. It counts as running once the port accepts connections.`;
     if (variables.some((variable) => variable.name === "PORT")) footer += " The PORT variable below is replaced by this port.";
     if (portCanChange && !usesPort) {
-      footer += " The command doesn’t mention $PORT: if it ignores PORT, turn off “Port can change”.";
+      footer += ` The command doesn’t mention ${variable}: if it ignores PORT, turn off “Port can change”.`;
     }
     return footer;
   })();

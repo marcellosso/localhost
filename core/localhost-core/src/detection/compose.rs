@@ -1,4 +1,3 @@
-use super::manifest::shell_quoted;
 use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
 use crate::yaml::{YamlLine, YamlLines, unquoted};
 
@@ -25,7 +24,7 @@ impl ServiceDetector for ComposeDetector {
                 let mut suggestion = ServiceSuggestion::new(
                     service.name.clone(),
                     &directory.path,
-                    format!("docker compose up {}", shell_quoted(&service.name)),
+                    format!("docker compose up {}", directory.syntax.quoted(&service.name)),
                     true,
                     directory.relative_path(file_name),
                     detail,

@@ -204,9 +204,12 @@ impl Service {
         self.secret_names = variables.secret_names;
     }
 
-    /// Whether a command line mentions `$PORT`, so a moved port reaches it.
+    /// Whether a command line mentions `$PORT` (or cmd's `%PORT%`, in any
+    /// case, ADR-0010), so a moved port reaches it.
     pub fn command_line_uses_port(command_line: &str) -> bool {
-        command_line.contains("$PORT") || command_line.contains("${PORT")
+        command_line.contains("$PORT")
+            || command_line.contains("${PORT")
+            || command_line.to_ascii_uppercase().contains("%PORT%")
     }
 }
 
@@ -388,6 +391,8 @@ mod tests {
     fn knows_whether_a_command_line_uses_port() {
         assert!(Service::command_line_uses_port("next dev -p $PORT"));
         assert!(Service::command_line_uses_port("vite --port ${PORT:-5173}"));
+        assert!(Service::command_line_uses_port("npm run dev -- --port %PORT%"));
+        assert!(Service::command_line_uses_port("py manage.py runserver %port%"));
         assert!(!Service::command_line_uses_port("docker compose up postgres"));
     }
 
