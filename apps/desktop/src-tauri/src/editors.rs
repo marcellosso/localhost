@@ -8,13 +8,14 @@
 use std::collections::HashSet;
 
 use localhost_core::{
-    ExecutionTarget, Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileChanges, Project, ProjectChanges,
-    ProjectDocument, Service, ServiceChanges, ServiceSuggestion, VariableInput, VariableLayer,
+    Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileChanges, Project, ProjectChanges, ProjectDocument,
+    Service, ServiceChanges, ServiceSuggestion, VariableInput, VariableLayer,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::bridge::{CommandError, CommandResult};
+use crate::dialogs::ProjectFolder;
 use crate::{AppState, Core};
 
 const ORIGIN: Origin = Origin::MainWindow;
@@ -126,7 +127,7 @@ pub struct ImportPreview {
     name: String,
     key: Key,
     /// The folder the file names; it may not exist here.
-    path: String,
+    folder: ProjectFolder,
     folder_exists: bool,
     services: Vec<ImportedService>,
     /// e.g. "2 project variables · profiles Development (active), Testing".
@@ -216,25 +217,48 @@ pub fn add_project(
     state: tauri::State<'_, AppState>,
     name: String,
     key: String,
-    path: String,
+    folder: ProjectFolder,
     services: Vec<SuggestionEdit>,
 ) -> CommandResult<Project> {
+    runs_here(&folder)?;
     let services = new_services(services)?;
-    Ok(state.core()?.library.add_project(&name, parse_key(&key)?, &path, services, ORIGIN)?)
+    let library = &state.core()?.library;
+    Ok(library.add_project_on(folder.target, &name, parse_key(&key)?, &folder.path, services, ORIGIN)?)
 }
 
+/// Saves the Project's editor. A Project moved to another Execution Target
+/// has its Services stopped first, and their logs on the old one removed.
 #[tauri::command]
 #[specta::specta]
-pub fn edit_project(
+pub async fn edit_project(
     state: tauri::State<'_, AppState>,
     project_id: Id,
     name: String,
     key: String,
-    path: String,
+    folder: ProjectFolder,
 ) -> CommandResult {
-    let changes =
-        ProjectChanges { name: Some(name), key: Some(parse_key(&key)?), path: Some(path), ..Default::default() };
-    state.core()?.library.edit_project(project_id, changes, ORIGIN)?;
+    let core = state.core()?;
+    let project = core.library.project(project_id)?;
+    let moves = project.execution_target != folder.target;
+    if moves {
+        runs_here(&folder)?;
+        for service in &project.services {
+            core.targets.stop(service.id, ORIGIN).await?;
+        }
+    }
+    let changes = ProjectChanges {
+        name: Some(name),
+        key: Some(parse_key(&key)?),
+        path: Some(folder.path),
+        execution_target: Some(folder.target),
+        ..Default::default()
+    };
+    core.library.edit_project(project_id, changes, ORIGIN)?;
+    if moves {
+        for service in &project.services {
+            core.targets.remove_logs(&project.execution_target, service.id).await?;
+        }
+    }
     Ok(())
 }
 
@@ -356,11 +380,15 @@ fn relations(project: &Project, service_id: Id) -> ServiceRelations {
 
 // MARK: Detection
 
-/// Suggestions for a folder being added as a Project, on this machine.
+/// Suggestions for a folder being added as a Project, scanned where it
+/// will run: in a distro, by its `localhostd`.
 #[tauri::command]
 #[specta::specta]
-pub async fn scan_folder(state: tauri::State<'_, AppState>, path: String) -> CommandResult<Vec<ServiceSuggestion>> {
-    Ok(state.core()?.targets.scan_folder(&ExecutionTarget::ThisMachine, &path).await?)
+pub async fn scan_folder(
+    state: tauri::State<'_, AppState>,
+    folder: ProjectFolder,
+) -> CommandResult<Vec<ServiceSuggestion>> {
+    Ok(state.core()?.targets.scan_folder(&folder.target, &folder.path).await?)
 }
 
 /// Suggestions for an existing Project, where it runs, without what its
@@ -443,18 +471,21 @@ pub fn read_project_file(state: tauri::State<'_, AppState>, file: String) -> Com
 }
 
 /// Imports the Project file into `folder`. On Replace, Services the file no
-/// longer has are stopped first, and their logs removed after.
+/// longer has are stopped first, and their logs removed after; all of them
+/// if the Project moves to another Execution Target.
 #[tauri::command]
 #[specta::specta]
 pub async fn import_project(
     state: tauri::State<'_, AppState>,
     file: String,
-    folder: String,
+    folder: ProjectFolder,
     choice: Option<ImportChoice>,
 ) -> CommandResult<Project> {
+    runs_here(&folder)?;
     let core = state.core()?;
     let mut document = read_document(&file)?;
-    document.set_path(folder);
+    document.set_path(folder.path);
+    document.set_execution_target(folder.target);
     let on_key_clash = choice.map(|choice| match choice {
         ImportChoice::KeepBoth => KeyClash::KeepBoth,
         ImportChoice::Replace => KeyClash::Replace,
@@ -463,14 +494,21 @@ pub async fn import_project(
         Some(KeyClash::Replace) => clashing(core, &document),
         _ => None,
     };
+    let moves = |existing: &Project| existing.execution_target != *document.execution_target();
     if let Some(existing) = &replaced {
-        for service in removed_by(existing, &document) {
+        let stopped: Vec<&Service> = if moves(existing) {
+            existing.services.iter().collect()
+        } else {
+            removed_by(existing, &document).collect()
+        };
+        for service in stopped {
             core.targets.stop(service.id, ORIGIN).await?;
         }
     }
     let project = core.library.import_project(&document, on_key_clash, ORIGIN)?;
     if let Some(existing) = &replaced {
-        for service in existing.services.iter().filter(|service| project.service(service.id).is_none()) {
+        let gone = |service: &&Service| moves(existing) || project.service(service.id).is_none();
+        for service in existing.services.iter().filter(gone) {
             core.targets.remove_logs(&existing.execution_target, service.id).await?;
         }
     }
@@ -548,13 +586,13 @@ fn preview(core: &Core, document: &ProjectDocument, file_name: String) -> Import
                 profile.variables.secret_names.iter().map(|name| secret(name, format!("profile {}", profile.name)))
             }))
             .collect();
-    let path = document.path().to_string();
+    let folder = ProjectFolder { target: document.execution_target().clone(), path: document.path().to_string() };
     ImportPreview {
         file_name,
         name: document.name().to_string(),
         key: document.key().clone(),
-        folder_exists: std::path::Path::new(&path).is_dir(),
-        path,
+        folder_exists: folder.exists(),
+        folder,
         services,
         environment: environment_summary(document),
         secrets,
@@ -589,6 +627,15 @@ fn environment_summary(document: &ProjectDocument) -> Option<String> {
 }
 
 // MARK: Parsing
+
+/// On Windows a Project runs in a WSL distro until native execution (XP5),
+/// rather than failing at its first start.
+fn runs_here(folder: &ProjectFolder) -> Result<(), LocalhostError> {
+    if cfg!(windows) && folder.target.is_this_machine() {
+        return Err(LocalhostError::ExecutionUnavailable);
+    }
+    Ok(())
+}
 
 fn parse_key(raw: &str) -> Result<Key, LocalhostError> {
     Key::new(raw.trim())

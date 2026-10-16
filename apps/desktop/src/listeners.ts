@@ -1,4 +1,10 @@
-import type { Listener } from "./bindings";
+import type { Listener, ListenerDetails } from "./bindings";
+import { targetId } from "./targets";
+
+/** Tells Listeners apart: pids repeat across WSL distros and this machine. */
+export function listenerKey({ target, listener }: ListenerDetails): string {
+  return `${targetId(target)}:${listener.pid}`;
+}
 
 /** e.g. "python3 -m http.server 3000\nPID 123 · /home/me/site" */
 export function processDescription(listener: Listener): string {

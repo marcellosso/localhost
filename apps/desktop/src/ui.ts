@@ -38,7 +38,8 @@ export type UiState = {
   /** Something slow the window waits for, e.g. "Stopping services from the last session…". */
   progress: string | null;
   /** The pids of Listeners being stopped. */
-  stoppingListeners: ReadonlySet<number>;
+  /** By `listenerKey`. */
+  stoppingListeners: ReadonlySet<string>;
   sheet: Sheet | null;
   /** Whether the command palette (Ctrl+K) is open. */
   isPaletteOpen: boolean;
@@ -102,10 +103,10 @@ export function setProgress(progress: string | null) {
   update({ progress });
 }
 
-export function setStoppingListener(pid: number, isStopping: boolean) {
+export function setStoppingListener(key: string, isStopping: boolean) {
   const stoppingListeners = new Set(state.stoppingListeners);
-  if (isStopping) stoppingListeners.add(pid);
-  else stoppingListeners.delete(pid);
+  if (isStopping) stoppingListeners.add(key);
+  else stoppingListeners.delete(key);
   update({ stoppingListeners });
 }
 

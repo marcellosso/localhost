@@ -3,6 +3,7 @@ import { commands, type Project, type Service, type ServiceRelations } from "../
 import { serviceVariables, type VariableDraft, variableDrafts, variableEdits } from "../editors";
 import { tildePath } from "../paths";
 import { formatList } from "../status";
+import { projectFolder } from "../targets";
 import { closeSheet } from "../ui";
 import {
   ChipList,
@@ -96,7 +97,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
   };
 
   const chooseDirectory = async () => {
-    const chosen = await commands.chooseWorkingDirectory(project.path);
+    const chosen = await commands.chooseWorkingDirectory(projectFolder(project));
     if (chosen !== null) setWorkingDirectory(chosen);
   };
 

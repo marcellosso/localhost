@@ -108,6 +108,21 @@ The app reaches every Service through `Targets` (below). On Windows a WSL Projec
 LOCALHOST_DEV_LOCALHOSTD=$PWD/../../core/target/debug/localhostd pnpm tauri dev
 ```
 
+On Windows the app lists the WSL distros (`wsl.exe --list`), and Add Project asks which one a Project runs in; a folder picked under `\\wsl.localhost\<distro>` runs in that distro. The first time a distro is needed, the app copies its `localhostd`, a Linux build, into `~/.local/share/localhost/windows/` there, named after the app's version and a hash of the binary, and runs it with `wsl.exe`. That folder also keeps the distro's logs and Run records. A release has `localhostd` beside the app. In development, build it in a distro and point `LOCALHOST_WSL_LOCALHOSTD` at it (static, so any distro can run it):
+
+```sh
+# in WSL, in the repository's core/ (needs `rustup target add x86_64-unknown-linux-musl` and musl-tools)
+cargo build -p localhost-daemon --target x86_64-unknown-linux-musl
+```
+
+```powershell
+# in PowerShell, in apps\desktop
+$env:LOCALHOST_WSL_LOCALHOSTD = "\\wsl.localhost\Ubuntu\home\me\localhost\core\target\x86_64-unknown-linux-musl\debug\localhostd"
+pnpm tauri dev
+```
+
+Checking the app for Windows from macOS or Linux works like the core's check above, run in `src-tauri/`. It also needs `llvm-rc`, LLVM's resource compiler, on the `PATH`: Tauri's build script compiles the Windows icon with it.
+
 ## Architecture
 
 localhost is two parts: a core that does everything, and an app that shows it.

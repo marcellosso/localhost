@@ -1,7 +1,8 @@
 import { type CSSProperties, type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
-import { commands, type Project } from "../bindings";
+import { commands, type Project, type ProjectFolder } from "../bindings";
 import { directoryLabel, type SuggestionDraft, suggestionDrafts, suggestionEdits } from "../editors";
 import { tildePath } from "../paths";
+import { projectFolder } from "../targets";
 import { closeSheet } from "../ui";
 import { CommandField, Field, FieldHint, FieldRow, FormCard, FormSheet, SwitchRow, TextField, Working, cardRow } from "./Form";
 import { ChevronIcon, DetectIcon } from "./Icons";
@@ -13,7 +14,8 @@ type Props = {
   setDrafts: Dispatch<SetStateAction<SuggestionDraft[]>>;
   isScanning: boolean;
   /** The Project folder, for choosing working directories. */
-  projectPath: string;
+  /** The Project's folder, where working directories are chosen. */
+  project: ProjectFolder;
   /** How many Services the Project already has, so new ones show the colours they'll keep. */
   existingServiceCount?: number;
   emptyMessage: string;
@@ -24,7 +26,7 @@ type Props = {
  * Services (checked) and, folded away, the rest of what was found. Each row
  * can be checked, unchecked, and opened to edit it. Nothing is saved here.
  */
-export function SuggestionReview({ drafts, setDrafts, isScanning, projectPath, existingServiceCount = 0, emptyMessage }: Props) {
+export function SuggestionReview({ drafts, setDrafts, isScanning, project, existingServiceCount = 0, emptyMessage }: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isShowingOthers, setIsShowingOthers] = useState(false);
   const checked = drafts.filter((draft) => draft.isChecked);
@@ -46,7 +48,7 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, projectPath, e
           key={draft.id}
           draft={draft}
           color={color(draft)}
-          projectPath={projectPath}
+          project={project}
           isExpanded={expandedId === draft.id}
           onToggleExpanded={() => setExpandedId(expandedId === draft.id ? null : draft.id)}
           onChange={(change) => update(draft.id, change)}
@@ -93,14 +95,14 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, projectPath, e
 type RowProps = {
   draft: SuggestionDraft;
   color: string;
-  projectPath: string;
+  project: ProjectFolder;
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onChange: (change: Partial<SuggestionDraft>) => void;
 };
 
 /** One Suggestion: a checkbox, its name, Key, command and Port, and when opened, fields to edit it and where it was found. */
-function SuggestionRow({ draft, color, projectPath, isExpanded, onToggleExpanded, onChange }: RowProps) {
+function SuggestionRow({ draft, color, project, isExpanded, onToggleExpanded, onChange }: RowProps) {
   const port = /^\d+$/.test(draft.port.trim()) ? draft.port.trim() : null;
   const latestName = useRef(draft.name);
   const setName = (name: string) => {
@@ -113,7 +115,7 @@ function SuggestionRow({ draft, color, projectPath, isExpanded, onToggleExpanded
     }
   };
   const chooseDirectory = async () => {
-    const workingDirectory = await commands.chooseWorkingDirectory(projectPath);
+    const workingDirectory = await commands.chooseWorkingDirectory(project);
     if (workingDirectory !== null) onChange({ workingDirectory });
   };
   return (
@@ -256,7 +258,7 @@ export function DetectServicesForm({ project, onAdded }: { project: Project; onA
         drafts={drafts}
         setDrafts={setDrafts}
         isScanning={isScanning}
-        projectPath={project.path}
+        project={projectFolder(project)}
         existingServiceCount={project.services.length}
         emptyMessage="Nothing new found. Services this project already runs aren’t suggested again."
       />

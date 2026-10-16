@@ -20,6 +20,7 @@ mod services;
 mod settings;
 mod targets;
 mod tray;
+mod wsl;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -129,6 +130,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             dialogs::choose_working_directory,
             dialogs::choose_project_file,
             dialogs::choose_export_file,
+            wsl::wsl_distros,
             settings::settings,
             settings::save_settings,
             logs::open_log,

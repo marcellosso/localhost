@@ -1,5 +1,7 @@
 import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
+import type { ExecutionTarget } from "../bindings";
 import { tildePath } from "../paths";
+import { distroOf, isSameTarget, targetId, thisMachine } from "../targets";
 import { useModal } from "./Dialog";
 import { CheckIcon, ChevronIcon, FolderIcon } from "./Icons";
 import styles from "./Form.module.css";
@@ -153,16 +155,55 @@ export function TextField({ id, value, onChange, placeholder, isMonospaced, labe
 }
 
 /** A folder's path in a field box; choosing opens the folder picker. */
-export function FolderField({ id, path, onChoose }: { id?: string; path: string; onChoose: () => void }) {
+type FolderProps = { id?: string; path: string; target?: ExecutionTarget; onChoose: () => void };
+
+/** A Project's folder, after its distro's name when it runs in WSL. */
+export function FolderField({ id, path, target, onChoose }: FolderProps) {
+  const distro = distroOf(target);
   return (
     <button type="button" id={id} className={`${styles.box} ${styles.folder}`} onClick={onChoose}>
       <FolderIcon size={14} className="secondary" />
+      {path && distro && <span className={styles.distro}>{distro}</span>}
       <span className={`${styles.folderPath} mono ${path ? "" : "secondary"}`}>
         {/* Truncated at the start, so the folder's name shows; `ltr` keeps the path's own order. */}
-        <span dir="ltr">{path ? tildePath(path) : "Choose a folder…"}</span>
+        <span dir="ltr">{!path ? "Choose a folder…" : distro ? path : tildePath(path)}</span>
       </span>
       <span className={`${styles.choose} secondary`}>Choose…</span>
     </button>
+  );
+}
+
+type TargetProps = {
+  id?: string;
+  target: ExecutionTarget;
+  distros: string[];
+  onChange: (target: ExecutionTarget) => void;
+};
+
+/**
+ * Where a Project runs: one of the WSL distros, on Windows (where Windows
+ * itself can't run Services until XP5). Elsewhere it only shows for a
+ * Project imported from Windows, which can move to this computer.
+ */
+export function TargetField({ id, target, distros, onChange }: TargetProps) {
+  const options: ExecutionTarget[] = distros.length > 0 ? [] : [thisMachine];
+  options.push(...distros.map((distro) => ({ kind: "wsl" as const, distro })));
+  // A distro that is no longer installed stays shown while it is the Project's.
+  if (!options.some((option) => isSameTarget(option, target))) options.push(target);
+  const label = (option: ExecutionTarget) => (option.kind === "wsl" ? `${option.distro} (WSL)` : "This computer");
+  return (
+    <select
+      id={id}
+      className={`${styles.box} ${styles.select}`}
+      value={targetId(target)}
+      onChange={(event) => onChange(options.find((option) => targetId(option) === event.target.value) ?? target)}
+    >
+      {options.map((option) => (
+        <option key={targetId(option)} value={targetId(option)}>
+          {label(option)}
+        </option>
+      ))}
+    </select>
   );
 }
 

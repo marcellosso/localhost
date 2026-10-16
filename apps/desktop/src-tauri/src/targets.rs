@@ -1,6 +1,6 @@
 //! How the app reaches each Execution Target (`localhost_core::Targets`).
 //! This machine runs in this process. A WSL distro is reached through the
-//! `localhostd` inside it (ADR-0008), which only the Windows app starts.
+//! `localhostd` inside it (ADR-0008, `wsl`), which only the Windows app starts.
 //!
 //! For development on Linux and macOS, `LOCALHOST_DEV_LOCALHOSTD=<path to
 //! localhostd>` reaches every target, this machine included, through a
@@ -29,11 +29,12 @@ fn launcher_with(storage_root: &Path, localhostd: Option<PathBuf>) -> Launcher {
             Link::Remote(Box::pin(Remote::spawn(command)))
         }
         (None, ExecutionTarget::ThisMachine) => Link::InProcess,
-        (None, ExecutionTarget::Wsl { distro }) => Link::Unavailable(if cfg!(windows) {
-            format!("this build can’t start localhost in “{distro}” yet")
-        } else {
-            format!("“{distro}” is reached only from the Windows app")
-        }),
+        #[cfg(windows)]
+        (None, ExecutionTarget::Wsl { distro }) => Link::Remote(Box::pin(crate::wsl::connect(distro.clone()))),
+        #[cfg(not(windows))]
+        (None, ExecutionTarget::Wsl { distro }) => {
+            Link::Unavailable(format!("“{distro}” is reached only from the Windows app"))
+        }
     })
 }
 
