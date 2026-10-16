@@ -57,10 +57,7 @@ jobs:
         with:
           python-version: "3.13"
       # Native execution (XP5): the tests ported so far, against real processes.
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test windows_diagnostics --no-run
-      # Temporary: what Windows itself does, for diagnosing the tests below.
-      - run: cargo test -p localhost-core --test windows_diagnostics -- --nocapture
-        timeout-minutes: 2
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --no-run
       - run: cargo test -p localhost-core --lib --test process_tree_windows
         timeout-minutes: 5
 
