@@ -684,7 +684,8 @@ ports: number[];
 workingDirectory: string | null; owner: ListenerOwner; 
 /**
  * The label of the launchd job it belongs to, if any (e.g. a Homebrew
- * service or an app). localhost never stops those.
+ * service or an app). localhost never stops those. On Windows, the
+ * Windows services in its process, or the name of a process in session 0.
  */
 launchdLabel: string | null; kind: ListenerKind; startTime: ProcessStartTime }
 /**

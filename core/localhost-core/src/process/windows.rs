@@ -26,18 +26,18 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
 };
 use windows_sys::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,
     JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows_sys::Win32::System::Threading::{
-    CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW, CREATE_SUSPENDED, OpenThread, ResumeThread, THREAD_SUSPEND_RESUME,
-    WaitForSingleObject,
+    CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW, CREATE_SUSPENDED, OpenProcess, OpenThread,
+    PROCESS_QUERY_LIMITED_INFORMATION, ResumeThread, THREAD_SUSPEND_RESUME, WaitForSingleObject,
 };
 
 use super::LaunchConfiguration;
-use crate::platform::Pid;
 use crate::platform::signal::{SIGINT, SIGKILL};
+use crate::platform::{ListeningProcess, Pid};
 use crate::process::Termination;
 use crate::{LocalhostError, RunEnvironment};
 
@@ -75,6 +75,18 @@ impl Group {
             )
         };
         succeeded == 0 || information.ActiveProcesses > 0
+    }
+
+    /// Whether the process is in the job. A process ends up in it through
+    /// the shell only, so this is exact.
+    pub(super) fn contains(&self, process: &ListeningProcess) -> bool {
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process.pid as u32) };
+        if handle.is_null() {
+            return false;
+        }
+        let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
+        let mut is_in_job = 0;
+        unsafe { IsProcessInJob(raw(&handle), raw(&self.job), &mut is_in_job) != 0 && is_in_job != 0 }
     }
 
     /// SIGINT sends Ctrl-Break to the process group, anything else terminates the job.

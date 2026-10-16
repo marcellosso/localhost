@@ -34,8 +34,8 @@ use tokio::time::Instant;
 pub use termination::{ProcessTreeExit, StopPolicy, Termination, signal_name};
 
 use crate::output::{OutputChannel, OutputLine};
-use crate::platform::Pid;
 use crate::platform::signal::{SIGINT, SIGTERM};
+use crate::platform::{ListeningProcess, Pid};
 use crate::{LocalhostError, RunEnvironment};
 
 /// Everything needed to launch one Run's process tree.
@@ -156,6 +156,11 @@ impl ProcessTree {
     /// The shell's pid, which is also the process group (and on Unix the session) id.
     pub fn pid(&self) -> Pid {
         self.inner.pid
+    }
+
+    /// Whether a listening process belongs to this tree.
+    pub(crate) fn contains(&self, process: &ListeningProcess) -> bool {
+        self.inner.group.contains(process)
     }
 
     /// The next batch of output lines, in arrival order, as read from the

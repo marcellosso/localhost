@@ -86,7 +86,9 @@ impl ProcessStartTime {
 #[derive(Clone, Debug)]
 pub(crate) struct ListeningProcess {
     pub pid: Pid,
+    /// On Windows the pid itself: localhost's "group" is a process and its descendants.
     pub process_group_id: Pid,
+    #[cfg(unix)]
     pub session_id: Pid,
     pub name: String,
     pub command: String,
@@ -138,23 +140,61 @@ pub(crate) fn leads_session(group: Pid) -> bool {
 }
 
 /// `path` with symlinks resolved, as the kernel reports working directories.
+/// On Windows without the `\\?\` prefix canonicalizing adds, as a process's
+/// working directory has none.
 pub(crate) fn resolved_path(path: &str) -> String {
-    std::fs::canonicalize(path).map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| path.to_string())
+    let resolved =
+        std::fs::canonicalize(path).map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| path.to_string());
+    if cfg!(windows)
+        && let Some(drive_path) = resolved.strip_prefix(r"\\?\").filter(|rest| rest.get(1..2) == Some(":"))
+    {
+        return drive_path.to_string();
+    }
+    resolved
+}
+
+/// Whether the working directory `directory` is `folder` or inside it. On
+/// Windows paths compare case-insensitively, with either separator.
+pub(crate) fn is_inside(directory: &str, folder: &str) -> bool {
+    is_inside_on(directory, folder, cfg!(windows))
+}
+
+fn is_inside_on(directory: &str, folder: &str, windows: bool) -> bool {
+    if windows {
+        let comparable = |path: &str| path.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+        let (directory, folder) = (comparable(directory), comparable(folder));
+        directory == folder || directory.starts_with(&format!("{folder}\\"))
+    } else {
+        directory == folder || directory.starts_with(&format!("{}/", folder.trim_end_matches('/')))
+    }
 }
 
 /// Sorts and deduplicates ports.
-#[cfg(unix)]
 fn normalized(mut ports: Vec<u16>) -> Vec<u16> {
     ports.sort_unstable();
     ports.dedup();
     ports
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn tells_whether_a_directory_is_inside_a_folder() {
+        assert!(is_inside_on("/work/app", "/work/app", false));
+        assert!(is_inside_on("/work/app/web", "/work/app/", false));
+        assert!(!is_inside_on("/work/application", "/work/app", false));
+        assert!(!is_inside_on("/WORK/app", "/work/app", false));
+
+        assert!(is_inside_on(r"C:\Work\App", r"c:\work\app\", true));
+        assert!(is_inside_on(r"C:\Work\App\web", "C:/Work/App", true));
+        assert!(!is_inside_on(r"C:\Work\Application", r"C:\Work\App", true));
+        assert!(is_inside_on(r"C:\Work", r"C:\", true));
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn reads_a_processs_start_time() {
         let mine = ProcessStartTime::of(std::process::id() as i32).unwrap();
         let parent = ProcessStartTime::of(unsafe { libc::getppid() }).unwrap();
@@ -175,6 +215,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn knows_this_processs_parent() {
         let me = std::process::id() as i32;
         assert_eq!(parents().get(&me), Some(&unsafe { libc::getppid() }));
