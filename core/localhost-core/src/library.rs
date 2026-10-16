@@ -863,8 +863,9 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let secrets = Arc::new(MemorySecretStore::new());
         let library = ProjectLibrary::open(root.path(), secrets.clone()).unwrap();
-        let project =
-            library.add_project("App", Key::new("app").unwrap(), "/tmp/app", vec![], Origin::MainWindow).unwrap();
+        // An absolute path on this platform; the folder doesn't need to exist.
+        let path = if cfg!(windows) { r"C:\app" } else { "/tmp/app" };
+        let project = library.add_project("App", Key::new("app").unwrap(), path, vec![], Origin::MainWindow).unwrap();
         let mut project_variables = plain(&[("A", "project"), ("B", "project"), ("C", "project")]);
         project_variables.push(VariableInput::secret("TOKEN", "project-secret"));
         let changes = ProjectChanges { variables: Some(project_variables), ..Default::default() };
