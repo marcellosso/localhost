@@ -2,7 +2,7 @@ import LocalhostCore
 import SwiftUI
 
 /// How stats are sampled: only while a stats popover is open, every 1.5
-/// seconds, and the sparklines keep the last minute (ADR-0012).
+/// seconds, and the sparklines keep the last minute.
 enum StatsSampling {
     static let interval = Duration.milliseconds(1500)
     static let historyLength = 40

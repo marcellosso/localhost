@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::process::Termination;
 use crate::{Id, Listener, LocalhostError, Origin, Service};
 
-/// The single, unambiguous status of a Service (see `GLOSSARY.md`).
+/// The single, unambiguous status of a Service.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
@@ -96,7 +96,7 @@ impl Run {
 }
 
 /// A Run started on another port than its Service's Port. The Project
-/// Configuration keeps the Port; the change lasts for that Run (ADR-0006).
+/// Configuration keeps the Port; the change lasts for that Run.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]

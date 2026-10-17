@@ -1,5 +1,5 @@
-//! The tray icon and its menu: the macOS menu bar companion's content
-//! (`docs/localhost-v1.md` §8) as a native menu, since an AppIndicator can
+//! The tray icon and its menu: the macOS menu bar companion's content as a
+//! native menu, since an AppIndicator can
 //! only show a menu. Projects with any active or Failed Service, plus
 //! favourites; Start / Stop / Restart and Open in Browser per Service, Start
 //! All / Stop All per Project; warnings about Unmanaged Listeners holding a

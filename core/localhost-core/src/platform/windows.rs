@@ -2,8 +2,7 @@
 //! is here serves everything else that names a process by its pid: Orphans
 //! and Listeners. Windows has no process-group signals and Ctrl-Break only
 //! reaches processes on localhost's own console, so a "group" here is a
-//! process and its descendants, and only terminating them stops them
-//! (`docs/cross-platform.md`, Native Windows).
+//! process and its descendants, and only terminating them stops them.
 //!
 //! Listeners come from `GetExtendedTcpTable`. A process's command line and
 //! working directory are read from its PEB, as psutil does; that needs the

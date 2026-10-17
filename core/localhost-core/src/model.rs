@@ -114,7 +114,7 @@ impl Project {
 }
 
 /// Where a Project's Services run: this machine, or a WSL distro, where
-/// `localhostd` runs them (ADR-0008).
+/// `localhostd` runs them.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
@@ -150,7 +150,7 @@ pub fn service_label(projects: &[Project], service_id: Id) -> Option<String> {
 
 /// One independently manageable long-running command belonging to a Project.
 ///
-/// The command line is run through the user's login shell (ADR-0003), so
+/// The command line is run through the user's login shell, so
 /// there is no separate arguments field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -176,14 +176,14 @@ pub struct Service {
     #[serde(default)]
     pub is_excluded_from_start_all: bool,
     /// The TCP port the Service listens on: it is Running once the Port
-    /// accepts connections, and its command gets it as `PORT` (ADR-0006).
+    /// accepts connections, and its command gets it as `PORT`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
     /// Where to open the Service, e.g. `http://localhost:3000/admin`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Whether a Run may use another port when the Port is taken. Off for
-    /// commands that ignore `$PORT` (ADR-0006).
+    /// commands that ignore `$PORT`.
     #[serde(default = "default_true")]
     pub port_can_change: bool,
 }
@@ -204,7 +204,7 @@ impl Service {
     }
 
     /// Whether a command line mentions `$PORT` (or cmd's `%PORT%`, in any
-    /// case, ADR-0010), so a moved port reaches it.
+    /// case), so a moved port reaches it.
     pub fn command_line_uses_port(command_line: &str) -> bool {
         command_line.contains("$PORT")
             || command_line.contains("${PORT")

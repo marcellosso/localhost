@@ -3,12 +3,12 @@ use std::collections::BTreeMap;
 /// Builds the environment of a Run. Later layers override earlier ones:
 /// base (the app's environment) → variables (Project → Service → active
 /// Environment Profile) → `PORT`, plus output hints that keep colour and
-/// unbuffered output when writing to pipes (ADR-0005).
+/// unbuffered output when writing to pipes.
 ///
 /// The command runs through a login shell, so the user's login profile is
-/// applied on top when the shell starts (ADR-0003). On Windows, where no
+/// applied on top when the shell starts. On Windows, where no
 /// shell does that, the base is the user's environment read fresh from the
-/// registry at every start (ADR-0010), and names match regardless of case.
+/// registry at every start, and names match regardless of case.
 pub struct RunEnvironment;
 
 impl RunEnvironment {
@@ -100,7 +100,7 @@ impl RunEnvironment {
     }
 
     /// The user's shell: `$SHELL`, or the platform's default (zsh on macOS, sh
-    /// elsewhere). On Windows, always `cmd.exe` (ADR-0010): `%ComSpec%`, else
+    /// elsewhere). On Windows, always `cmd.exe`: `%ComSpec%`, else
     /// the one in `%SystemRoot%\System32`.
     pub fn shell(environment: &BTreeMap<String, String>) -> String {
         if cfg!(windows) {

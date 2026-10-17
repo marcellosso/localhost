@@ -1,5 +1,5 @@
 //! The core reads and writes the storage of earlier (Swift) versions of
-//! localhost (ADR-0007): updating must not lose a Project or a Secret.
+//! localhost: updating must not lose a Project or a Secret.
 
 mod common;
 

@@ -44,7 +44,7 @@ mod commands {
     pub const PORT: &str = "$PORT";
 }
 
-/// The tests' command lines for cmd.exe (ADR-0010), with `fixtures/listen.py`
+/// The tests' command lines for cmd.exe, with `fixtures/listen.py`
 /// standing in for `nc`. cmd stays the tree's root process, so the Listener
 /// is its child, `python.exe`.
 #[cfg(windows)]

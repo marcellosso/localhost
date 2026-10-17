@@ -10,7 +10,7 @@ use crate::process::StopPolicy;
 use crate::{Id, LocalhostError, Project, ServiceStatus, service_label};
 
 /// A process listening on one or more TCP ports on this machine, whoever
-/// started it (see `GLOSSARY.md`).
+/// started it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]

@@ -1,6 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
-/// Where localhost keeps its data on this platform (`docs/cross-platform.md`):
+/// Where localhost keeps its data on this platform:
 /// `~/Library/Application Support/localhost` on macOS, `%APPDATA%\localhost`
 /// on Windows, and `$XDG_DATA_HOME/localhost` (by default
 /// `~/.local/share/localhost`) elsewhere.

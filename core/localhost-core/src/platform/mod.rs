@@ -4,9 +4,9 @@
 //! One implementation per platform; everything above this module is shared.
 //!
 //! On Windows there are no process groups or signals: Runs live in Job
-//! Objects (ADR-0011), and the signals here stand for what localhost does
+//! Objects, and the signals here stand for what localhost does
 //! instead (`windows.rs`). Pids and signals of WSL Projects come from the
-//! distro's Linux (ADR-0008).
+//! distro's Linux.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -122,7 +122,7 @@ pub(crate) struct ProcessUsage {
     /// Its memory, counting shared pages once where the platform can: the
     /// physical footprint on macOS (Activity Monitor's "Memory"), the
     /// proportional set size on Linux (the resident set where that can't be
-    /// read), private bytes on Windows (ADR-0012).
+    /// read), private bytes on Windows.
     pub memory_bytes: u64,
 }
 
@@ -150,7 +150,7 @@ pub(crate) fn relations() -> Vec<ProcessRelations> {
 
 /// The live processes of the tree a session leader started: those in its
 /// session or its process group, and its descendants, which may have left
-/// both with `setsid` (ADR-0012). Includes the leader, if alive.
+/// both with `setsid`. Includes the leader, if alive.
 #[cfg(unix)]
 pub(crate) fn tree_members(leader: Pid, relations: &[ProcessRelations]) -> Vec<Pid> {
     let mut members: Vec<Pid> = relations

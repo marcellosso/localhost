@@ -12,7 +12,7 @@ use crate::yaml::YamlLines;
 /// orchestrating scripts (`turbo dev`), since localhost runs each package as
 /// its own Service. When the script runs a known dev server, its default port
 /// is suggested and, if the tool takes a port flag, `$PORT` (`%PORT%` on
-/// Windows) is passed to it (ADR-0006). On Windows cmd finds the package
+/// Windows) is passed to it. On Windows cmd finds the package
 /// managers' `.cmd` shims, so the command lines are otherwise the same.
 pub struct NodeDetector;
 

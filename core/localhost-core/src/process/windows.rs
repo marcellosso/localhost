@@ -1,6 +1,6 @@
 //! Launching and stopping a Run on Windows: `cmd.exe /s /c "<command line>"`
 //! in a new process group, inside its own kill-on-close Job Object
-//! (ADR-0010, ADR-0011). The job is the Run's group: membership is exact,
+//!. The job is the Run's group: membership is exact,
 //! nothing can break away, and when localhost's process ends (crash and
 //! force-kill included) Windows kills every Run's tree.
 //!

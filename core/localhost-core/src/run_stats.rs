@@ -1,5 +1,5 @@
 //! What a Run's process tree uses: its CPU, memory and processes, for a
-//! quick look at which Service is busy (ADR-0012).
+//! quick look at which Service is busy.
 
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};

@@ -128,7 +128,7 @@ impl ProjectLibrary {
 
     /// A library that stores nothing and holds the Projects another
     /// localhost gives it with `mirror`: `localhostd`'s, inside a WSL distro,
-    /// where the Project Configuration isn't kept (ADR-0008).
+    /// where the Project Configuration isn't kept.
     pub fn mirror(secrets: Arc<dyn SecretStore>) -> ProjectLibrary {
         ProjectLibrary {
             storage: None,

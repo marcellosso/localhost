@@ -1,5 +1,5 @@
 //! What the user must hear about at launch: Project files that couldn't be
-//! loaded, then Orphans of an earlier session (`docs/v1-decisions.md`).
+//! loaded, then Orphans of an earlier session.
 //! This machine's Orphans are looked for once, before anything is started;
 //! a WSL distro's when it is first connected, which `OrphansFound` tells
 //! the window. Both questions stay pending until answered, so reloading

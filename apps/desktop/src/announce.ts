@@ -3,7 +3,7 @@ import type { CoreView } from "./core";
 import { findService } from "./core";
 import { isActive, spokenSummary } from "./status";
 
-// What a screen reader is told as Services settle (docs/v1-decisions.md,
+// What a screen reader is told as Services settle (AGENTS.md,
 // Accessibility): Running, Exited, Failed and Stopped, not Starting or
 // Stopping, so a Start All isn't a stream of speech.
 

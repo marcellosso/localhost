@@ -78,7 +78,7 @@ async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
 /**
  * What the Service's active Run uses now, measured where it runs; `None`
  * without one. Given the previous sample of the same Run, it says the CPU
- * use since then (ADR-0012).
+ * use since then.
  */
 async runStats(serviceId: Id, previous: RunStats | null) : Promise<Result<RunStats | null, CommandError>> {
     try {
@@ -584,7 +584,7 @@ export type Cycle = { serviceId: Id; message: string }
 export type EnvironmentProfile = { id: Id; name: string; variables: Variables }
 /**
  * Where a Project's Services run: this machine, or a WSL distro, where
- * `localhostd` runs them (ADR-0008).
+ * `localhostd` runs them.
  */
 export type ExecutionTarget = { kind: "thisMachine" } | 
 /**
@@ -673,7 +673,7 @@ unreadableFiles: string[];
 orphans: string[] }
 /**
  * A process listening on one or more TCP ports on this machine, whoever
- * started it (see `GLOSSARY.md`).
+ * started it.
  */
 export type Listener = { pid: number; processGroupId: number; 
 /**
@@ -881,7 +881,7 @@ longFrames: number }
 export type PerfSettings = { services: number; linesPerSecond: number; seconds: number }
 /**
  * A Run started on another port than its Service's Port. The Project
- * Configuration keeps the Port; the change lasts for that Run (ADR-0006).
+ * Configuration keeps the Port; the change lasts for that Run.
  */
 export type PortChange = { configuredPort: number; reason: PortChangeReason }
 export type PortChangeReason = 
@@ -1049,7 +1049,7 @@ cpuPercent: number | null }
 /**
  * One independently manageable long-running command belonging to a Project.
  * 
- * The command line is run through the user's login shell (ADR-0003), so
+ * The command line is run through the user's login shell, so
  * there is no separate arguments field.
  */
 export type Service = { id: Id; name: string; key: Key; 
@@ -1075,7 +1075,7 @@ dependencies?: Id[];
 isExcludedFromStartAll?: boolean; 
 /**
  * The TCP port the Service listens on: it is Running once the Port
- * accepts connections, and its command gets it as `PORT` (ADR-0006).
+ * accepts connections, and its command gets it as `PORT`.
  */
 port?: number | null; 
 /**
@@ -1084,7 +1084,7 @@ port?: number | null;
 url?: string | null; 
 /**
  * Whether a Run may use another port when the Port is taken. Off for
- * commands that ignore `$PORT` (ADR-0006).
+ * commands that ignore `$PORT`.
  */
 portCanChange?: boolean }
 /**
@@ -1113,7 +1113,7 @@ cycles: Cycle[];
  */
 dependents: string[] }
 /**
- * The single, unambiguous status of a Service (see `GLOSSARY.md`).
+ * The single, unambiguous status of a Service.
  */
 export type ServiceState = 
 /**

@@ -1,6 +1,6 @@
 //! A Run's process tree on Windows: `cmd.exe /s /c` in a kill-on-close Job
-//! Object, stopped with Ctrl-Break and then by terminating the job (ADR-0010,
-//! ADR-0011). These tests launch real processes; Python scripts are the
+//! Object, stopped with Ctrl-Break and then by terminating the job. These
+//! tests launch real processes; Python scripts are the
 //! fixtures that trap Ctrl-Break and spawn grandchildren.
 #![cfg(windows)]
 
