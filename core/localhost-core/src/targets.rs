@@ -14,6 +14,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::task::Poll;
 use std::time::SystemTime;
 
 use tokio::sync::mpsc;
@@ -63,6 +64,8 @@ struct Inner {
     launcher: Launcher,
     local: Local,
     slots: Mutex<HashMap<ExecutionTarget, Arc<Slot>>>,
+    /// Locked before `hub` whenever both are.
+    feeds: Mutex<Vec<Feed>>,
     hub: Mutex<Hub>,
     automatic_port_move: AtomicBool,
     next_source: AtomicU64,
@@ -91,6 +94,14 @@ impl Slot {
         let remote = self.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         remote.as_ref().filter(|remote| remote.is_connected()).cloned()
     }
+}
+
+/// A target's events on their way to the hub. A task moves them as they
+/// come, and every read of the hub takes those already delivered, so it
+/// reflects what a target had sent by the time a call to it returned.
+struct Feed {
+    source: u64,
+    events: mpsc::UnboundedReceiver<ServiceEvent>,
 }
 
 /// The merged statuses, and who hears about them.
@@ -131,6 +142,7 @@ impl Targets {
             launcher,
             local: Local { manager, logs, runs },
             slots: Mutex::new(HashMap::new()),
+            feeds: Mutex::new(Vec::new()),
             hub: Mutex::new(Hub::default()),
             automatic_port_move,
             next_source: AtomicU64::new(0),
@@ -160,14 +172,14 @@ impl Targets {
     // MARK: Observing
 
     pub fn status(&self, service_id: Id) -> ServiceStatus {
-        let hub = self.inner.hub();
+        let hub = self.inner.current_hub();
         hub.statuses.get(&service_id).cloned().unwrap_or_else(|| ServiceStatus::never_run(service_id))
     }
 
     /// The status of every Service that has run on any target, plus a stream
     /// of every change after that snapshot.
     pub fn subscribe(&self) -> (HashMap<Id, ServiceStatus>, mpsc::UnboundedReceiver<ServiceEvent>) {
-        let mut hub = self.inner.hub();
+        let mut hub = self.inner.current_hub();
         let (sender, receiver) = mpsc::unbounded_channel();
         hub.subscribers.push(sender);
         (hub.statuses.clone(), receiver)
@@ -366,7 +378,7 @@ impl Targets {
         run_id: Id,
     ) -> Result<(Vec<OutputLine>, mpsc::UnboundedReceiver<OutputLine>), LocalhostError> {
         let service_id = {
-            let hub = self.inner.hub();
+            let hub = self.inner.current_hub();
             hub.statuses
                 .values()
                 .find(|status| status.run.as_ref().is_some_and(|run| run.id == run_id))
@@ -454,6 +466,22 @@ impl Inner {
         self.hub.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// The hub, with every event the targets have delivered so far.
+    fn current_hub(&self) -> MutexGuard<'_, Hub> {
+        let mut feeds = self.feeds();
+        let mut hub = self.hub();
+        for feed in feeds.iter_mut() {
+            while let Ok(event) = feed.events.try_recv() {
+                hub.publish(event, feed.source);
+            }
+        }
+        hub
+    }
+
+    fn feeds(&self) -> MutexGuard<'_, Vec<Feed>> {
+        self.feeds.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     fn slot(&self, target: &ExecutionTarget) -> Arc<Slot> {
         let mut slots = self.slots.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         slots.entry(target.clone()).or_default().clone()
@@ -525,23 +553,38 @@ impl Inner {
     /// Failed, as nothing can be known of them any more.
     fn attach(
         self: &Arc<Self>,
-        (statuses, mut events): (HashMap<Id, ServiceStatus>, mpsc::UnboundedReceiver<ServiceEvent>),
+        (statuses, events): (HashMap<Id, ServiceStatus>, mpsc::UnboundedReceiver<ServiceEvent>),
         is_remote: bool,
     ) {
         let source = self.next_source.fetch_add(1, Ordering::Relaxed);
         {
+            let mut feeds = self.feeds();
             let mut hub = self.hub();
             for status in statuses.into_values() {
                 hub.publish(ServiceEvent::ServiceStateChanged(status), source);
             }
+            feeds.push(Feed { source, events });
         }
         let weak: Weak<Inner> = Arc::downgrade(self);
         tokio::spawn(async move {
-            while let Some(event) = events.recv().await {
-                let Some(inner) = weak.upgrade() else { return };
-                inner.hub().publish(event, source);
+            let has_ended = std::future::poll_fn(|task| {
+                let Some(inner) = weak.upgrade() else { return Poll::Ready(false) };
+                let mut feeds = inner.feeds();
+                let Some(feed) = feeds.iter_mut().find(|feed| feed.source == source) else { return Poll::Ready(false) };
+                let mut hub = inner.hub();
+                while let Poll::Ready(event) = feed.events.poll_recv(task) {
+                    let Some(event) = event else { return Poll::Ready(true) };
+                    hub.publish(event, source);
+                }
+                Poll::Pending
+            })
+            .await;
+            let Some(inner) = weak.upgrade().filter(|_| has_ended) else { return };
+            let mut feeds = inner.feeds();
+            feeds.retain(|feed| feed.source != source);
+            if !is_remote {
+                return;
             }
-            let Some(inner) = weak.upgrade().filter(|_| is_remote) else { return };
             let mut hub = inner.hub();
             let lost: Vec<ServiceStatus> = hub
                 .statuses

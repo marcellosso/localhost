@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::task::Poll;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -13,8 +14,8 @@ use tokio::task::JoinHandle;
 
 use super::{Call, Hello, Message, Request};
 use crate::{
-    LocalhostError, LogStore, MemorySecretStore, Origin, ProjectLibrary, ProjectScanner, RunRegistry, ServiceManager,
-    ServiceManagerOptions, StopPolicy,
+    LocalhostError, LogStore, MemorySecretStore, Origin, ProjectLibrary, ProjectScanner, RunRegistry, ServiceEvent,
+    ServiceManager, ServiceManagerOptions, StopPolicy,
 };
 
 /// How often log lines cross, at most: once per frame.
@@ -28,6 +29,9 @@ struct Context {
     manager: ServiceManager,
     stop_policy: StopPolicy,
     output: mpsc::UnboundedSender<Message>,
+    /// The Service manager's events not sent yet. Every reply sends them
+    /// first, so the app has a call's events by the time it has its reply.
+    events: Mutex<Option<mpsc::UnboundedReceiver<ServiceEvent>>>,
     log_streams: Mutex<HashMap<u64, JoinHandle<()>>>,
 }
 
@@ -57,6 +61,7 @@ where
         manager,
         stop_policy,
         output: sender,
+        events: Mutex::new(None),
         log_streams: Mutex::new(HashMap::new()),
     });
 
@@ -66,8 +71,12 @@ where
             Ok(Call { id, request }) => {
                 let context = context.clone();
                 tokio::spawn(async move {
-                    let result = context.handle(request).await;
-                    let _ = context.output.send(Message::Reply { id, result });
+                    if let Request::Subscribe = request {
+                        context.subscribe(id);
+                    } else {
+                        let result = context.handle(request).await;
+                        context.reply(id, result);
+                    }
                 });
             }
             Err(error) => eprintln!("localhostd: ignoring a request it can't read: {error}"),
@@ -106,24 +115,11 @@ impl Context {
     async fn handle(self: &Arc<Self>, request: Request) -> Result<serde_json::Value, LocalhostError> {
         let manager = &self.manager;
         match request {
+            Request::Subscribe => unreachable!("answered by `subscribe`"),
             Request::SetProjects { projects, secrets } => {
                 self.secrets.replace_all(secrets);
                 self.library.replace_projects(projects, Origin::MainWindow);
                 done()
-            }
-            Request::Subscribe => {
-                let (statuses, mut events) = manager.subscribe();
-                // Sent before any event: both go through the same queue.
-                let reply = value(statuses);
-                let output = self.output.clone();
-                tokio::spawn(async move {
-                    while let Some(event) = events.recv().await {
-                        if output.send(Message::Event { event }).is_err() {
-                            return;
-                        }
-                    }
-                });
-                reply
             }
             Request::Start { service_id, on_port, origin } => value(manager.start(service_id, on_port, origin).await?),
             Request::Stop { service_id, origin } => value(manager.stop(service_id, origin).await?),
@@ -196,6 +192,40 @@ impl Context {
                 value(scan.await.unwrap_or_default())
             }
         }
+    }
+
+    /// Replies with the statuses, then sends every event after them.
+    fn subscribe(self: &Arc<Self>, id: u64) {
+        let mut events = self.events.lock().unwrap();
+        let (statuses, receiver) = self.manager.subscribe();
+        let _ = self.output.send(Message::Reply { id, result: value(statuses) });
+        *events = Some(receiver);
+        drop(events);
+        let context = Arc::downgrade(self);
+        tokio::spawn(std::future::poll_fn(move |task| {
+            let Some(context) = context.upgrade() else { return Poll::Ready(()) };
+            let mut events = context.events.lock().unwrap();
+            let Some(receiver) = events.as_mut() else { return Poll::Ready(()) };
+            // Sent while holding `events`, so no reply overtakes them.
+            while let Poll::Ready(event) = receiver.poll_recv(task) {
+                let Some(event) = event else { return Poll::Ready(()) };
+                if context.output.send(Message::Event { event }).is_err() {
+                    return Poll::Ready(());
+                }
+            }
+            Poll::Pending
+        }));
+    }
+
+    /// Sends the events published so far, then the reply.
+    fn reply(&self, id: u64, result: Result<serde_json::Value, LocalhostError>) {
+        let mut events = self.events.lock().unwrap();
+        if let Some(receiver) = events.as_mut() {
+            while let Ok(event) = receiver.try_recv() {
+                let _ = self.output.send(Message::Event { event });
+            }
+        }
+        let _ = self.output.send(Message::Reply { id, result });
     }
 
     fn open_stream(self: &Arc<Self>, stream: u64, forward: impl Future<Output = ()> + Send + 'static) {
