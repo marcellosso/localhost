@@ -1,0 +1,128 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { releases } from '../lib/site';
+
+const entries = await Promise.all(
+  (await getCollection('changelog'))
+    .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+    .map(async (entry) => ({ ...entry.data, id: entry.id, Content: (await render(entry)).Content })),
+);
+const formatted = (date: Date) => date.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+---
+
+<Base title="Changelog" description="What changed in each release of localhost.">
+  <div class="container page">
+    <header>
+      <p class="figure-label">Changelog</p>
+      <h1 class="display">What’s new in localhost</h1>
+      <p class="lede">Every release, newest first. Downloads are on <a href={releases}>GitHub Releases</a>.</p>
+    </header>
+    {
+      entries.map((entry) => (
+        <section class="entry" id={entry.version}>
+          <div class="meta">
+            <time datetime={entry.date.toISOString().slice(0, 10)}>{formatted(entry.date)}</time>
+            <span class:list={['version', { upcoming: !entry.released }]}>{entry.released ? `v${entry.version}` : 'Unreleased'}</span>
+          </div>
+          <div class="body">
+            <h2>{entry.title}</h2>
+            <entry.Content />
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: 960px;
+    padding-top: 72px;
+  }
+  header {
+    margin-bottom: 64px;
+  }
+  h1 {
+    font-size: clamp(36px, 5vw, 52px);
+  }
+  .lede {
+    margin-top: 16px;
+  }
+  .lede a {
+    color: var(--accent-text);
+    text-underline-offset: 3px;
+  }
+  .entry {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 40px;
+    padding: 40px 0;
+    border-top: 1px solid var(--separator);
+  }
+  .meta {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  time {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .version {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent-text);
+    font: 500 12px/1.5 var(--font-mono);
+  }
+  .version.upcoming {
+    background: var(--fill);
+    color: var(--text-secondary);
+  }
+  h2 {
+    margin: 0 0 16px;
+    font-size: 26px;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  .body {
+    min-width: 0;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .body :global(p) {
+    margin: 0 0 16px;
+  }
+  .body :global(ul) {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .body :global(li) {
+    margin-bottom: 8px;
+  }
+  .body :global(strong) {
+    color: var(--text);
+  }
+  .body :global(code) {
+    font-size: 0.88em;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+  }
+  @media (max-width: 720px) {
+    .entry {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .meta {
+      position: static;
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+</style>

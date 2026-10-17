@@ -1,0 +1,24 @@
+---
+import { releases } from '../lib/site';
+
+interface Props {
+  size?: 'small' | 'large';
+}
+const { size = 'large' } = Astro.props;
+---
+
+<a class:list={['button', 'button-primary', { 'button-small': size === 'small' }]} href={releases} data-download>
+  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"></path>
+  </svg>
+  <span data-download-label>{size === 'small' ? 'Download' : 'Download for macOS'}</span>
+</a>
+
+<script>
+  // The page is static, so the visitor's platform is only known here.
+  const platform = (navigator as Navigator & { userAgentData?: { platform: string } }).userAgentData?.platform ?? navigator.userAgent;
+  const name = /win/i.test(platform) ? 'Windows' : /linux|x11|cros/i.test(platform) && !/android/i.test(platform) ? 'Linux' : 'macOS';
+  for (const label of document.querySelectorAll<HTMLElement>('[data-download-label]')) {
+    if (label.textContent !== 'Download') label.textContent = `Download for ${name}`;
+  }
+</script>
