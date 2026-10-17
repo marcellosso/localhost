@@ -1,15 +1,16 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { openUrl, start } from "../actions";
+import { openUrl, start, startAll } from "../actions";
 import { commands, type Id, type LogSource, type Project, type Run } from "../bindings";
 import { type CoreView, serviceStatus } from "../core";
 import type { LogBuffer } from "../log/buffer";
-import { shortcutLabel } from "../keyboard";
+import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { lineMatches } from "../log/segments";
 import { useLog } from "../log/useLog";
 import type { ServiceSelection } from "../selection";
 import { logRowHeight, useSettings } from "../settings";
 import { hasPortWarning, isActive, lineText, portChangeExplanation, statusSummary } from "../status";
 import { showAlert } from "../ui";
+import { KeyTip } from "./EmptyState";
 import { FailedBanner } from "./FailedBanner";
 import { ArrowUpRightIcon, ClearIcon, FilterIcon, PlayIcon } from "./Icons";
 import { type LogPrefix, LogView } from "./LogView";
@@ -47,6 +48,7 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
   }
   const buffer = useLog(key, source);
   const linePrefixes = service ? undefined : prefixes(project);
+  const isAnyActive = project.services.some((s) => isActive(serviceStatus(view, s.id).state));
 
   const clearLogs = async () => {
     const result = await commands.clearLogs(serviceIds);
@@ -138,10 +140,23 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
             <div className={styles.empty}>
               <p className="secondary">No output yet.</p>
               {service && status?.state === "stopped" && (
-                <button className="button accent" title="Start" onClick={() => void start(service.id)}>
-                  <PlayIcon size={11} />
-                  Start {service.name}
-                </button>
+                <>
+                  <button className="button accent" title="Start" onClick={() => void start(service.id)}>
+                    <PlayIcon size={11} />
+                    Start {service.name}
+                  </button>
+                  <KeyTip before="or press" keys={shortcutLabel(SHORTCUTS.startOrRestart)} />
+                </>
+              )}
+              {!service && project.services.length > 0 && !isAnyActive && (
+                <>
+                  <p className="secondary">Every service’s output shows here, each line marked with its service.</p>
+                  <button className="button accent" title="Start All" onClick={() => void startAll(project.id)}>
+                    <PlayIcon size={11} />
+                    Start All
+                  </button>
+                  <KeyTip before="or press" keys={shortcutLabel(SHORTCUTS.startAll)} />
+                </>
               )}
             </div>
           )}

@@ -2,11 +2,12 @@ import { type CSSProperties, Fragment, useEffect, useId, useState } from "react"
 import { requestStopListener } from "../actions";
 import { commands, type ExecutionTarget, type ListenerDetails } from "../bindings";
 import { type CoreView, findService } from "../core";
+import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { listenerKey, listenerSubtitle, portsText } from "../listeners";
 import { spoken } from "../status";
 import { distroOf, isNativeWindows, targetId } from "../targets";
 import { useUi } from "../ui";
-import { EmptyState } from "./EmptyState";
+import { EmptyState, KeyTip } from "./EmptyState";
 import { ChevronIcon, NetworkIcon } from "./Icons";
 import { serviceColor } from "./ServicesColumn";
 import styles from "./PortsView.module.css";
@@ -102,7 +103,8 @@ export function PortsView({ view }: { view: CoreView }) {
           <EmptyState
             icon={<NetworkIcon size={40} />}
             title="No Listeners"
-            description="Nothing of yours is listening on a TCP port."
+            description="Nothing of yours is listening on a TCP port. Services you start show up here with their ports, and so does anything else that listens."
+            tip={<KeyTip before="Come back with" keys={shortcutLabel(SHORTCUTS.ports)} after="from anywhere." />}
           />
         ) : (
           <ul

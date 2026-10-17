@@ -2,7 +2,7 @@ import LocalhostCore
 import SwiftUI
 
 /// The app's name, project search with Add Project, Ports and the Projects,
-/// and a footer with Settings and how many Services are running.
+/// and a footer with Settings, Keyboard Shortcuts and how many Services are running.
 struct ProjectSidebar: View {
     @Environment(AppModel.self) private var model
 
@@ -114,7 +114,7 @@ private struct SidebarHeader: View {
     }
 }
 
-/// Settings, and how many Services are running across every Project.
+/// Settings and Keyboard Shortcuts, and how many Services are running across every Project.
 private struct SidebarFooter: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -125,6 +125,10 @@ private struct SidebarFooter: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(SquareIconButtonStyle())
                 .help("Settings (⌘,)")
+            Button("Keyboard Shortcuts", systemImage: "keyboard") { model.toggleKeyboardShortcuts() }
+                .labelStyle(.iconOnly)
+                .buttonStyle(SquareIconButtonStyle())
+                .help("Keyboard Shortcuts (⌘/)")
             Spacer()
             let running = model.activeServiceCount
             if running > 0 {

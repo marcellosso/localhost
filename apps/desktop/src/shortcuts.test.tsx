@@ -2,11 +2,14 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./components/CommandPalette";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { viewFromSnapshot } from "./core";
 import type { ServiceSelection } from "./selection";
 import { adjacentRow, useWindowShortcuts } from "./shortcuts";
 import { project, service, status } from "./test/fixtures";
-import { currentUi, resetUi, showSheet, useUi } from "./ui";
+import { SHORTCUTS, shortcutLabel } from "./keyboard";
+import { shortcutGuide } from "./shortcutGuide";
+import { currentUi, dismissAlert, resetUi, showSheet, useUi } from "./ui";
 
 const commands = vi.hoisted(() => ({
   startService: vi.fn(),
@@ -124,6 +127,8 @@ describe("window shortcuts", () => {
     expect(adjacentRow(shop, { kind: "all" }, 1)).toEqual({ kind: "service", serviceId: web.id });
     expect(adjacentRow(shop, { kind: "all" }, -1)).toEqual({ kind: "all" });
     expect(adjacentRow(shop, { kind: "service", serviceId: api.id }, 1)).toEqual({ kind: "service", serviceId: api.id });
+    expect(adjacentRow(shop, { kind: "none" }, 1)).toEqual({ kind: "all" });
+    expect(adjacentRow(shop, { kind: "none" }, -1)).toEqual({ kind: "service", serviceId: api.id });
   });
 
   it("opens the palette with Ctrl+K, runs the chosen item, and gives focus back", async () => {
@@ -150,5 +155,32 @@ describe("window shortcuts", () => {
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
     expect(currentUi().isPaletteOpen).toBe(false);
     expect(navigator.selectProject).not.toHaveBeenCalled();
+  });
+
+  it("lists every shortcut in the Keyboard Shortcuts dialog, opened with Ctrl+/", () => {
+    render(<Window initial={{ kind: "all" }} />);
+    press({ code: "Slash", key: "/", ctrlKey: true });
+    expect(currentUi().alerts).toEqual([{ kind: "keyboardShortcuts" }]);
+
+    const listed = shortcutGuide().flat().flatMap((group) => group.entries.flatMap((entry) => entry.keys));
+    for (const shortcut of Object.values(SHORTCUTS)) expect(listed).toContain(shortcutLabel(shortcut));
+  });
+
+  it("closes the Keyboard Shortcuts dialog with Escape and with Ctrl+/ again", () => {
+    function Shown() {
+      const { alerts } = useUi();
+      return alerts[0] ? <KeyboardShortcutsDialog onClose={() => dismissAlert(alerts[0])} /> : null;
+    }
+    render(
+      <>
+        <Window initial={{ kind: "all" }} />
+        <Shown />
+      </>,
+    );
+    for (const close of [{ key: "Escape" }, { code: "Slash", key: "/", ctrlKey: true }]) {
+      press({ code: "Slash", key: "/", ctrlKey: true });
+      fireEvent.keyDown(screen.getByRole("dialog", { name: "Keyboard Shortcuts" }), close);
+      expect(currentUi().alerts).toEqual([]);
+    }
   });
 });

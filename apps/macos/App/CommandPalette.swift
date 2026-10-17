@@ -52,6 +52,10 @@ extension AppModel {
                     self?.presentedSheet = .addProject
             })
         }
+        items.append(PaletteItem(id: "keyboard-shortcuts", title: "Keyboard Shortcuts", icon: .symbol("keyboard"),
+                                 shortcut: "⌘/", keywords: "help keys cheat sheet") { [weak self] in
+            self?.presentedSheet = .keyboardShortcuts
+        })
         // Only reachable by typing: other Projects' actions and Services.
         for project in projects where project.id != selected?.id {
             items += project.services.enumerated().map { serviceJump($1, in: project, index: $0, isInSelectedProject: false) }

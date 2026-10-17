@@ -10,6 +10,7 @@ import {
   ChevronIcon,
   FolderIcon,
   GlobeIcon,
+  KeyboardIcon,
   PlayIcon,
   PlusIcon,
   SearchIcon,
@@ -177,6 +178,8 @@ function ItemIcon({ icon }: { icon: PaletteIcon }) {
       return <GlobeIcon size={13} />;
     case "new":
       return <PlusIcon size={12} />;
+    case "keyboard":
+      return <KeyboardIcon size={13} />;
     case "play":
     case "restart":
       return <PlayIcon size={11} />;

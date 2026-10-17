@@ -23,6 +23,8 @@ final class AppModel {
         case projectEnvironment(UUID)
         /// The review step of an import, before anything is saved.
         case importProject(ProjectDocument, fileName: String)
+        /// Every shortcut, grouped (⌘/).
+        case keyboardShortcuts
 
         var id: Self { self }
     }
@@ -273,6 +275,17 @@ final class AppModel {
     func openURL(of serviceID: UUID) {
         guard let (_, service) = service(serviceID), let url = urlToOpen(service) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Shows the Keyboard Shortcuts sheet (⌘/), or closes it. It doesn't
+    /// replace another sheet, which may hold unsaved edits.
+    func toggleKeyboardShortcuts() {
+        if presentedSheet == .keyboardShortcuts {
+            presentedSheet = nil
+        } else if presentedSheet == nil {
+            isShowingPalette = false
+            presentedSheet = .keyboardShortcuts
+        }
     }
 
     // MARK: Logs

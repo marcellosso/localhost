@@ -3,9 +3,10 @@ import type { Project } from "../bindings";
 import { type CoreView, serviceState } from "../core";
 import type { SidebarSelection } from "../selection";
 import { importProject } from "../editors";
+import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { isActive, projectServicesSummary } from "../status";
 import { showAlert, showSheet } from "../ui";
-import { ClearIcon, GearIcon, GlobeIcon, PlusIcon, SearchIcon } from "./Icons";
+import { ClearIcon, GearIcon, GlobeIcon, KeyboardIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
@@ -113,14 +114,24 @@ export function Sidebar({ view, selection, onSelect }: Props) {
         )}
       </ul>
       <footer className={styles.footer}>
-        <button
-          className="iconButton"
-          aria-label="Settings"
-          title="Settings"
-          onClick={() => showAlert({ kind: "settings" })}
-        >
-          <GearIcon size={15} />
-        </button>
+        <div className={styles.footerButtons}>
+          <button
+            className="iconButton"
+            aria-label="Settings"
+            title={`Settings (${shortcutLabel(SHORTCUTS.settings)})`}
+            onClick={() => showAlert({ kind: "settings" })}
+          >
+            <GearIcon size={15} />
+          </button>
+          <button
+            className="iconButton"
+            aria-label="Keyboard Shortcuts"
+            title={`Keyboard Shortcuts (${shortcutLabel(SHORTCUTS.keyboardShortcuts)})`}
+            onClick={() => showAlert({ kind: "keyboardShortcuts" })}
+          >
+            <KeyboardIcon size={15} />
+          </button>
+        </div>
         {running > 0 && <span className={`${styles.running} mono secondary`}>{running} running</span>}
       </footer>
     </nav>

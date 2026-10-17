@@ -4,7 +4,7 @@ import { commands, events, type Reveal } from "./bindings";
 import { Alerts } from "./components/Alerts";
 import { Announcer } from "./components/Announcer";
 import { CommandPalette } from "./components/CommandPalette";
-import { EmptyState } from "./components/EmptyState";
+import { EmptyState, KeyTip } from "./components/EmptyState";
 import { Sheets } from "./components/Sheets";
 import { FolderIcon, LinesIcon } from "./components/Icons";
 import { LogPane } from "./components/LogPane";
@@ -13,9 +13,10 @@ import { ProjectActions, ServicesColumn } from "./components/ServicesColumn";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { importProject } from "./editors";
+import { SHORTCUTS, serviceShortcut, shortcutLabel } from "./keyboard";
 import { loadHome, tildePath } from "./paths";
 import { runPerfMeasurement } from "./perf";
-import { allServices, type ServiceSelection, type SidebarSelection } from "./selection";
+import { noService, type ServiceSelection, type SidebarSelection } from "./selection";
 import { loadSettings } from "./settings";
 import type { CoreView } from "./core";
 import type { Navigator } from "./palette";
@@ -60,7 +61,7 @@ export function App() {
 /** Sidebar → Services (or Ports) → log, the sheets and alerts over them, and the keyboard. */
 function MainWindow({ view }: { view: CoreView }) {
   const [sidebarSelection, setSidebarSelection] = useState<SidebarSelection | null>(null);
-  const [selection, setSelection] = useState<ServiceSelection>(allServices);
+  const [selection, setSelection] = useState<ServiceSelection>(noService);
   const { isPaletteOpen, sheet, alerts } = useUi();
   // Under a sheet, an alert or the palette, the window behind can't be reached, by screen readers either.
   const isBehindModal = isPaletteOpen || sheet !== null || alerts.length > 0;
@@ -70,17 +71,17 @@ function MainWindow({ view }: { view: CoreView }) {
   const selected = isPorts ? undefined : (view.projects.find((project) => project.id === selectedId) ?? view.projects[0]);
   const select = (next: SidebarSelection) => {
     setSidebarSelection(next);
-    setSelection(allServices);
+    setSelection(noService);
   };
   const navigator = useMemo<Navigator>(
     () => ({
       selectPorts: () => {
         setSidebarSelection({ kind: "ports" });
-        setSelection(allServices);
+        setSelection(noService);
       },
       selectProject: (projectId) => {
         setSidebarSelection({ kind: "project", projectId });
-        setSelection(allServices);
+        setSelection(noService);
       },
       selectService: (projectId, serviceId) => {
         setSidebarSelection({ kind: "project", projectId });
@@ -113,13 +114,39 @@ function MainWindow({ view }: { view: CoreView }) {
               actions={<ProjectActions project={selected} view={view} />}
             />
             <ServicesColumn project={selected} view={view} selection={selection} onSelect={setSelection} />
-            <LogPane project={selected} view={view} selection={selection} />
+            {selection.kind === "none" ? (
+              <section className="emptyLog" data-column="detail">
+                <EmptyState
+                  icon={<LinesIcon size={40} />}
+                  title="No Service Selected"
+                  description="Select a service to see its output."
+                  tip={
+                    selected.services.length > 0 && (
+                      <KeyTip before="or press" keys={`${shortcutLabel(serviceShortcut(0)!)}–9`} />
+                    )
+                  }
+                />
+              </section>
+            ) : (
+              <LogPane project={selected} view={view} selection={selection} />
+            )}
           </>
         ) : (
           <>
             <Toolbar title="localhost" />
             <section className="emptyColumn" data-column="list">
-              <EmptyState icon={<FolderIcon size={40} />} title="No Projects" description="Add a project folder to get started.">
+              <EmptyState
+                icon={<FolderIcon size={40} />}
+                title="No Projects"
+                description="Add a project folder to get started."
+                tip={
+                  <KeyTip
+                    before="Press"
+                    keys={shortcutLabel(SHORTCUTS.keyboardShortcuts)}
+                    after="to see every keyboard shortcut."
+                  />
+                }
+              >
                 <button className="button accent" onClick={() => showSheet({ kind: "addProject" })}>
                   Add Project…
                 </button>
