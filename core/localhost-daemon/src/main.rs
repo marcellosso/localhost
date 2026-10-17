@@ -1,6 +1,6 @@
 //! `localhostd --stdio`: the core, driven by the Windows app over this
 //! process's standard input and output (`localhost_core::remote`). The app
-//! starts it inside a WSL distro, one per distro in use (ADR-0008).
+//! starts it inside a WSL distro, one per distro in use.
 //!
 //! Standard output carries the protocol only; diagnostics go to standard
 //! error. When standard input closes, every Run is stopped and it exits.

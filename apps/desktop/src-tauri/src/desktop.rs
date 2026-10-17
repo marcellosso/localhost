@@ -4,7 +4,7 @@
 //! On Linux, URLs and folders go to `xdg-open`. The terminal is `$TERMINAL`,
 //! else `xdg-terminal-exec`, else the first well-known one installed. The
 //! editor is a command the user picks once (no default), run through the
-//! login shell like a Service's command (ADR-0003), so it finds what the
+//! login shell like a Service's command, so it finds what the
 //! user's shell finds. macOS (development builds only) uses `open`.
 //!
 //! On Windows, URLs and folders go to Explorer, and the terminal is Windows

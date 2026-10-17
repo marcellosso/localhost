@@ -56,7 +56,7 @@ pub async fn restart_service(state: tauri::State<'_, AppState>, service_id: Id) 
 
 /// What the Service's active Run uses now, measured where it runs; `None`
 /// without one. Given the previous sample of the same Run, it says the CPU
-/// use since then (ADR-0012).
+/// use since then.
 #[tauri::command]
 #[specta::specta]
 pub async fn run_stats(

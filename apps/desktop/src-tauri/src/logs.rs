@@ -1,6 +1,6 @@
 //! Log output for the UI. Lines never cross one at a time: they are parsed
 //! for ANSI styles here and sent in batches at most once per frame
-//! (`docs/cross-platform.md`, Tauri UI notes). The buffers stay in the core.
+//! (`AGENTS.md`, Performance). The buffers stay in the core.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;

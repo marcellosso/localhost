@@ -6,7 +6,7 @@ import { GaugeIcon } from "./Icons";
 import { serviceColor } from "./ServicesColumn";
 import styles from "./Stats.module.css";
 
-/** Stats are sampled only while a stats popover is open, this often (ADR-0012). */
+/** Stats are sampled only while a stats popover is open, this often. */
 export const STATS_INTERVAL = 1_500;
 /** How many samples the sparklines keep: the last minute. */
 export const HISTORY_LENGTH = 40;

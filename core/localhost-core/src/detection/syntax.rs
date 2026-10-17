@@ -1,5 +1,5 @@
 /// The shell a suggested command line is written for: the login shell on
-/// macOS and Linux (ADR-0003), `cmd.exe` on Windows (ADR-0010).
+/// macOS and Linux, `cmd.exe` on Windows.
 ///
 /// Scanning runs where the Project runs (a WSL Project is scanned by the core
 /// inside the distro), so the syntax is this build's.
@@ -13,7 +13,7 @@ impl CommandSyntax {
     /// This machine's shell.
     pub const HERE: CommandSyntax = if cfg!(windows) { CommandSyntax::Cmd } else { CommandSyntax::Posix };
 
-    /// The Port variable (ADR-0006): `$PORT`, or `%PORT%` for cmd.
+    /// The Port variable: `$PORT`, or `%PORT%` for cmd.
     pub fn port(self) -> &'static str {
         match self {
             CommandSyntax::Posix => "$PORT",

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds the Rust core (core/localhost-ffi) for the macOS app and generates
-# its Swift bindings (ADR-0007). Xcode and CI both call this.
+# its Swift bindings. Xcode and CI both call this.
 #
 #   scripts/build-core.sh [debug|release]   build (default: release)
 #   scripts/build-core.sh --check           fail if the output is missing or

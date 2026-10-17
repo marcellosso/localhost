@@ -2,7 +2,7 @@
 
 import PackageDescription
 
-// The Rust core (core/, ADR-0007) as the `LocalhostCore` module the app
+// The Rust core (core/) as the `LocalhostCore` module the app
 // imports. Run scripts/build-core.sh first: it builds the xcframework and the
 // generated Swift this package compiles.
 let package = Package(

@@ -1,4 +1,4 @@
-/* "Graded glass" tokens (docs/v1-decisions.md, UI direction), the same
+/* "Graded glass" tokens (AGENTS.md, Design), the same
  * values as the macOS app's Theme (apps/macos/App/Views/Theme.swift): keep them in step.
  * Green, orange and red are for Service State only; the accent marks primary
  * actions. Text colours reach WCAG AA (4.5:1) on the surfaces below, glyphs 3:1,

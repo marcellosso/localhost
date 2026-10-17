@@ -1,4 +1,4 @@
-//! WSL distros, as the Windows app reaches them (ADR-0008): their names,
+//! WSL distros, as the Windows app reaches them: their names,
 //! the paths Windows sees their folders at, and the `localhostd` each one
 //! runs.
 //!
