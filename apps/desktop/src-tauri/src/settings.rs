@@ -1,6 +1,6 @@
 //! The app's own settings, kept in its config folder
-//! (`~/.config/com.sixpetals.localhost.desktop/settings.json`, on Windows
-//! `%APPDATA%\com.sixpetals.localhost.desktop\settings.json`). They are app
+//! (`~/.config/io.github.marcellosso.localhost.desktop/settings.json`, on Windows
+//! `%APPDATA%\io.github.marcellosso.localhost.desktop\settings.json`). They are app
 //! state, not part of the core.
 
 use std::path::PathBuf;

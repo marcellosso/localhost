@@ -173,7 +173,7 @@ Unsigned releases make SmartScreen say “Windows protected your PC”. Click **
 Secret values live in your login Keychain. macOS lets the app that saved them read them without asking, and recognises “the same app” by its code signature:
 
 - **Release builds** are signed with the same certificate every time, so updating keeps access: no prompts.
-- **Builds signed ad hoc** (including ones you build yourself) look like a new app after every update. The first time each Secret is used, macOS asks “localhost wants to use your confidential information stored in “com.sixpetals.localhost.secret” in your keychain”. Enter your login password and click **Always Allow**.
+- **Builds signed ad hoc** (including ones you build yourself) look like a new app after every update. The first time each Secret is used, macOS asks “localhost wants to use your confidential information stored in “io.github.marcellosso.localhost.secret” in your keychain”. Enter your login password and click **Always Allow**.
 - **When the signing identity changes** (for example once releases are notarized), macOS asks once for each Secret on that one update.
 
 **Deny** isn't remembered: Services that use that Secret fail to start, and the next start asks again.
@@ -204,9 +204,9 @@ Uninstall from **Settings › Apps › Installed apps**, then remove the copies 
 
 | | Configuration, logs and Run records | Secret values |
 |---|---|---|
-| macOS | `~/Library/Application Support/localhost` | login Keychain, service `com.sixpetals.localhost.secret` |
-| Linux | `~/.local/share/localhost` (or `$XDG_DATA_HOME/localhost`) | Secret Service, attributes `service` = `com.sixpetals.localhost.secret` and `account` |
-| Windows | `%APPDATA%\localhost`; a WSL Project's logs and Run records stay in its distro, under `~/.local/share/localhost/windows/` | Credential Manager, generic credentials `com.sixpetals.localhost.secret/<account>` |
+| macOS | `~/Library/Application Support/localhost` | login Keychain, service `io.github.marcellosso.localhost.secret` |
+| Linux | `~/.local/share/localhost` (or `$XDG_DATA_HOME/localhost`) | Secret Service, attributes `service` = `io.github.marcellosso.localhost.secret` and `account` |
+| Windows | `%APPDATA%\localhost`; a WSL Project's logs and Run records stay in its distro, under `~/.local/share/localhost/windows/` | Credential Manager, generic credentials `io.github.marcellosso.localhost.secret/<account>` |
 
 Inside that folder:
 
@@ -214,7 +214,7 @@ Inside that folder:
 - `logs/`: each Run's output, the last 5 Runs per Service.
 - `runs/`: the Runs active right now, to find leftovers after a crash.
 
-The Linux and Windows app keeps its settings in `~/.config/com.sixpetals.localhost.desktop` or `%APPDATA%\com.sixpetals.localhost.desktop`. Set `LOCALHOST_STORAGE_ROOT` to use another folder, e.g. to try a build without touching your data.
+The Linux and Windows app keeps its settings in `~/.config/io.github.marcellosso.localhost.desktop` or `%APPDATA%\io.github.marcellosso.localhost.desktop`. Set `LOCALHOST_STORAGE_ROOT` to use another folder, e.g. to try a build without touching your data.
 
 ## The command line
 

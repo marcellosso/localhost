@@ -38,7 +38,7 @@ To try a build without touching your real data in `~/Library/Application Support
 open -n --env LOCALHOST_STORAGE_ROOT=/tmp/localhost-dev build/Build/Products/Debug/localhost.app
 ```
 
-Secrets still go to your login Keychain, under the service `com.sixpetals.localhost.secret`.
+Secrets still go to your login Keychain, under the service `io.github.marcellosso.localhost.secret`.
 
 ### The core
 

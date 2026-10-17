@@ -14,7 +14,7 @@ pub trait SecretStore: Send + Sync {
 
 /// The service every Secret item is stored under, in the Keychain and the
 /// Secret Service alike. Never change it: existing items would be lost.
-pub const SERVICE: &str = "com.sixpetals.localhost.secret";
+pub const SERVICE: &str = "io.github.marcellosso.localhost.secret";
 const LABEL: &str = "localhost secret";
 
 #[cfg(target_os = "macos")]
