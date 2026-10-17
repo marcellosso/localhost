@@ -59,6 +59,7 @@ struct LogPane: View {
                                     Button("Start \(service.name)", systemImage: "play.fill") { model.start(service.id) }
                                         .buttonStyle(AccentButtonStyle())
                                         .help("Start (⌘R)")
+                                    KeyTip(before: "or press", keys: "⌘R")
                                 }
                             }
                         }
@@ -112,6 +113,23 @@ struct CombinedLogPane: View {
             if let logs = model.core?.logs {
                 LogView(source: .services(Self.prefixes(of: project)), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: 0)
+                    .overlay {
+                        if !project.services.isEmpty, project.services.allSatisfy({ model.status(of: $0).run == nil }) {
+                            VStack(spacing: 10) {
+                                Text("No output yet.")
+                                    .foregroundStyle(.secondary)
+                                Text("Every service’s output shows here, each line marked with its service.")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id) }
+                                    .buttonStyle(AccentButtonStyle())
+                                    .help("Start All (⇧⌘R)")
+                                KeyTip(before: "or press", keys: "⇧⌘R")
+                            }
+                            .padding()
+                        }
+                    }
             }
         }
         .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])

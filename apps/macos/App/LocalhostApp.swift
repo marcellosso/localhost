@@ -84,6 +84,13 @@ struct AppCommands: Commands {
             Button("Settings…") { openWindow(id: "settings") }
                 .keyboardShortcut(",")
         }
+        CommandGroup(replacing: .help) {
+            Button("Keyboard Shortcuts") {
+                openWindow(id: "main")
+                model.toggleKeyboardShortcuts()
+            }
+            .keyboardShortcut("/")
+        }
         CommandGroup(before: .windowList) {
             Button("Main Window") { openWindow(id: "main") }
             Button("Ports") {

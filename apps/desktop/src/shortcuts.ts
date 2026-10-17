@@ -35,7 +35,7 @@ export type ShortcutContext = {
  *   selected Project's Services, Ctrl+[ / Ctrl+] the previous / next row.
  * - Ctrl+R starts (or restarts) the selected Service, Ctrl+. stops it,
  *   Ctrl+Shift+O opens its URL; Ctrl+Shift+R / Ctrl+Shift+. Start / Stop All.
- * - Ctrl+N New Project, Ctrl+Shift+N New Service, Ctrl+, Settings.
+ * - Ctrl+N New Project, Ctrl+Shift+N New Service, Ctrl+, Settings, Ctrl+/ Keyboard Shortcuts.
  * - Ctrl+W closes the window (Services keep running), Ctrl+Q quits; these
  *   work under sheets and alerts too.
  * - Across the columns (sidebar → Services → log): → (and ↩ in the sidebar)
@@ -91,6 +91,7 @@ function runShortcut(event: KeyboardEvent, { view, selected, selection, setSelec
   if (is(SHORTCUTS.palette)) setPaletteOpen(true);
   else if (is(SHORTCUTS.ports)) navigator.selectPorts();
   else if (is(SHORTCUTS.settings)) showAlert({ kind: "settings" });
+  else if (is(SHORTCUTS.keyboardShortcuts)) showAlert({ kind: "keyboardShortcuts" });
   else if (is(SHORTCUTS.newProject)) showSheet({ kind: "addProject" });
   else if (is(SHORTCUTS.newService)) {
     if (selected) showSheet({ kind: "addService", projectId: selected.id });
@@ -124,17 +125,19 @@ function runShortcut(event: KeyboardEvent, { view, selected, selection, setSelec
 
 /**
  * The row `offset` rows away in the Project's list ("All services", then its
- * Services), stopping at either end.
+ * Services), stopping at either end. With none selected, steps in from the
+ * first or last.
  */
 export function adjacentRow(project: Project, selection: ServiceSelection, offset: number): ServiceSelection {
-  const rows: ServiceSelection[] = [
+  const rows: Exclude<ServiceSelection, { kind: "none" }>[] = [
     { kind: "all" },
     ...project.services.map((service) => ({ kind: "service", serviceId: service.id }) as const),
   ];
   const current = rows.findIndex((row) =>
     row.kind === "all" ? selection.kind === "all" : selection.kind === "service" && selection.serviceId === row.serviceId,
   );
-  return rows[Math.min(Math.max((current < 0 ? 0 : current) + offset, 0), rows.length - 1)];
+  if (current < 0) return offset > 0 ? rows[0] : rows[rows.length - 1];
+  return rows[Math.min(Math.max(current + offset, 0), rows.length - 1)];
 }
 
 /** Arrow keys, ↩ and Escape across and within the columns. */

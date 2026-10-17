@@ -54,8 +54,12 @@ struct PortsView: View {
         .columnGlass()
         .overlay {
             if model.listeners.isEmpty {
-                ContentUnavailableView("No Listeners", systemImage: "network",
-                                       description: Text("Nothing of yours is listening on a TCP port."))
+                ContentUnavailableView {
+                    Label("No Listeners", systemImage: "network")
+                } description: {
+                    Text("Nothing of yours is listening on a TCP port. Services you start show up here with their ports, and so does anything else that listens.")
+                    KeyTip(before: "Come back with", keys: "⌘0", after: "from anywhere.")
+                }
             }
         }
         .navigationTitle("Ports")

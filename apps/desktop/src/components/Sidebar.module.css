@@ -135,6 +135,11 @@
   border-top: 1px solid var(--separator);
 }
 
+.footerButtons {
+  display: flex;
+  gap: 2px;
+}
+
 .running {
   font-size: 11px;
 }

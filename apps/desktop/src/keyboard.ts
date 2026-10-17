@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 // for development; Alt stands in for ⌥. Keys are matched by `event.code`, so
 // Ctrl+Alt+1 is found whatever character Alt makes the key type.
 
-const isMac = typeof navigator !== "undefined" && navigator.platform.startsWith("Mac");
+export const isMac = typeof navigator !== "undefined" && navigator.platform.startsWith("Mac");
 
 /** A shortcut: the primary modifier (Ctrl, or ⌘), plus Shift or Alt, and a key. */
 export type Shortcut = {
@@ -14,7 +14,7 @@ export type Shortcut = {
   alt?: boolean;
 };
 
-const keyNames: Record<string, string> = { Period: ".", Comma: ",", BracketLeft: "[", BracketRight: "]" };
+const keyNames: Record<string, string> = { Period: ".", Comma: ",", Slash: "/", BracketLeft: "[", BracketRight: "]" };
 
 /** How the key is written, e.g. "K", "1", ".". */
 function keyName(code: string): string {
@@ -63,6 +63,7 @@ export const SHORTCUTS = {
   previousService: { code: "BracketLeft" },
   nextService: { code: "BracketRight" },
   settings: { code: "Comma" },
+  keyboardShortcuts: { code: "Slash" },
   closeWindow: { code: "KeyW" },
   quit: { code: "KeyQ" },
 } satisfies Record<string, Shortcut>;

@@ -22,9 +22,22 @@ struct MainView: View {
                         Label(model.projects.isEmpty ? "No Projects" : "No Project Selected", systemImage: "folder")
                     } description: {
                         Text(model.projects.isEmpty ? "Add a project folder to get started." : "Select a project in the sidebar.")
+                        if !model.projects.isEmpty {
+                            KeyTip(before: "or press", keys: "⌘1–9")
+                        }
                     } actions: {
-                        if model.projects.isEmpty, model.core != nil {
-                            Button("Add Project…") { model.presentedSheet = .addProject }
+                        if model.projects.isEmpty {
+                            VStack(spacing: 12) {
+                                if model.core != nil {
+                                    HStack(spacing: 8) {
+                                        Button("Add Project…") { model.presentedSheet = .addProject }
+                                            .buttonStyle(AccentButtonStyle())
+                                        Button("Import Project…") { model.isChoosingImportFile = true }
+                                            .buttonStyle(PillButtonStyle())
+                                    }
+                                }
+                                KeyTip(before: "Press", keys: "⌘/", after: "to see every keyboard shortcut.")
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -38,8 +51,12 @@ struct MainView: View {
                     if let listener = model.selectedListenerID.flatMap(model.listener) {
                         ListenerDetailView(listener: listener)
                     } else {
-                        ContentUnavailableView("No Listener Selected", systemImage: "network",
-                                               description: Text("Select a listener to see its process."))
+                        ContentUnavailableView {
+                            Label("No Listener Selected", systemImage: "network")
+                        } description: {
+                            Text("Select a listener to see its process.")
+                            KeyTip(before: "Then", keys: "⌘.", after: "stops it.")
+                        }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
                     }
@@ -48,8 +65,14 @@ struct MainView: View {
                 } else if let service = model.selectedService {
                     LogPane(service: service)
                 } else {
-                    ContentUnavailableView("No Service Selected", systemImage: "text.alignleft",
-                                           description: Text("Select a service to see its output."))
+                    ContentUnavailableView {
+                        Label("No Service Selected", systemImage: "text.alignleft")
+                    } description: {
+                        Text("Select a service to see its output.")
+                        if model.selectedProject?.services.isEmpty == false {
+                            KeyTip(before: "or press", keys: "⌥⌘1–9")
+                        }
+                    }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color(nsColor: Theme.logBackground), ignoresSafeAreaEdges: [])
                 }
@@ -86,6 +109,8 @@ struct MainView: View {
                 if let project = model.project(id) { EnvironmentForm(project: project) }
             case .importProject(let document, let fileName):
                 ImportProjectForm(document: document, fileName: fileName)
+            case .keyboardShortcuts:
+                KeyboardShortcutsView()
             }
         }
         .fileImporter(isPresented: $model.isChoosingImportFile, allowedContentTypes: [.yaml]) { result in

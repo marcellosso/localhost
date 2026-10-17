@@ -14,6 +14,7 @@ import { formatList } from "../status";
 import { isNativeWindows } from "../targets";
 import { type Alert, alertKey, dismissAlert, useUi } from "../ui";
 import { Dialog } from "./Dialog";
+import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { ChooseEditorDialog, SettingsDialog } from "./SettingsDialog";
 
 /** The alert on top of the queue, and the progress note while something slow runs. */
@@ -221,6 +222,9 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
       ) : (
         <SettingsDialog onClose={close} />
       );
+
+    case "keyboardShortcuts":
+      return <KeyboardShortcutsDialog onClose={close} />;
   }
 }
 

@@ -238,3 +238,11 @@ export const CheckIcon = (props: Props) => (
     <path d="m3.5 8.3 3 3 6-6.6" />
   </Icon>
 );
+
+/** `keyboard`: Keyboard Shortcuts. */
+export const KeyboardIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.2}>
+    <rect x="1.5" y="4" width="13" height="8.5" rx="1.6" />
+    <path d="M4 6.6h.01M6.3 6.6h.01M8.6 6.6h.01M10.9 6.6h.01M4 8.6h.01M12 6.6h.01M12 8.6h.01M5.2 10.4h5.6" />
+  </Icon>
+);

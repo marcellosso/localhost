@@ -15,6 +15,8 @@ export type Alert =
   | { kind: "orphans"; orphans: string[] }
   /** Settings; `forEditor` when Open in Editor needs one picked first, then retried. */
   | { kind: "settings"; forEditor?: () => void }
+  /** Every shortcut, grouped (Ctrl+/). */
+  | { kind: "keyboardShortcuts" }
   /** Removing a Project or Service, which stops it first. */
   | { kind: "removeProject"; projectId: Id }
   | { kind: "removeService"; serviceId: Id; dependents: string[] }

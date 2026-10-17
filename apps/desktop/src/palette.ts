@@ -5,7 +5,7 @@ import { projectShortcut, SHORTCUTS, type Shortcut, serviceShortcut, shortcutLab
 import { tildePath } from "./paths";
 import type { ServiceSelection } from "./selection";
 import { isActive } from "./status";
-import { showSheet } from "./ui";
+import { showAlert, showSheet } from "./ui";
 
 // What the command palette (Ctrl+K) offers, after the macOS app's
 // CommandPalette.swift: jumps to Projects and Services, and actions on them.
@@ -18,7 +18,7 @@ export type Navigator = {
 };
 
 export type PaletteIcon =
-  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" }
+  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" | "keyboard" }
   /** A Service: its colour (by position) and state glyph. */
   | { kind: "service"; index: number; state: ServiceState };
 
@@ -81,6 +81,14 @@ export function paletteItems(
     shortcut: label(SHORTCUTS.newProject),
     keywords: "add",
     run: () => showSheet({ kind: "addProject" }),
+  });
+  items.push({
+    id: "keyboard-shortcuts",
+    title: "Keyboard Shortcuts",
+    icon: { kind: "symbol", name: "keyboard" },
+    shortcut: label(SHORTCUTS.keyboardShortcuts),
+    keywords: "help keys cheat sheet",
+    run: () => showAlert({ kind: "keyboardShortcuts" }),
   });
   // Only reachable by typing: other Projects' Services and actions.
   for (const project of view.projects) {

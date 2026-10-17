@@ -53,7 +53,7 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
   const selectedKey =
     selection.kind === "all"
       ? "all"
-      : project.services.some((service) => service.id === selection.serviceId)
+      : selection.kind === "service" && project.services.some((service) => service.id === selection.serviceId)
         ? selection.serviceId
         : null;
   return (

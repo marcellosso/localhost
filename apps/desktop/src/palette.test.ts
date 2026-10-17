@@ -33,6 +33,7 @@ describe("palette", () => {
       ["Blog", "Ctrl+2"],
       ["Ports", "Ctrl+0"],
       ["New Project…", "Ctrl+N"],
+      ["Keyboard Shortcuts", "Ctrl+/"],
     ]);
     expect(items.some((item) => item.title === "Start Hugo" && item.id.startsWith("other:"))).toBe(true);
   });
