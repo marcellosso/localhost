@@ -7,6 +7,12 @@
 
 <p align="center">Every local project, one place to run it. A native macOS app, and an app for Linux and Windows.</p>
 
+<p align="center">
+  <a href="https://github.com/marcellosso/localhost/releases/latest"><img src="https://img.shields.io/github/v/release/marcellosso/localhost" alt="Latest release"></a>
+  <a href="https://github.com/marcellosso/localhost/actions/workflows/ci.yml"><img src="https://github.com/marcellosso/localhost/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/marcellosso/localhost" alt="MIT license"></a>
+</p>
+
 ![The localhost window: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
 A native macOS app that remembers how each of your local development projects runs, and lets you start, stop and watch all of its Services from one place.
@@ -229,7 +235,7 @@ Secret values are in your login Keychain, under the service `com.sixpetals.local
 
 ## Building from source and contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue, see [SECURITY.md](SECURITY.md).
 
 ## License
 
