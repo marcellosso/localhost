@@ -1,0 +1,144 @@
+---
+import Wordmark from './Wordmark.astro';
+import DownloadButton from './DownloadButton.astro';
+import { href, repository } from '../lib/site';
+
+const path = Astro.url.pathname;
+const current = (section: string) => path.startsWith(href(section));
+---
+
+<header class="header" data-header>
+  <div class="container inner">
+    <a class="home" href={href('/')} aria-label="localhost home">
+      <img src={href('favicon.svg')} width="24" height="24" alt="" />
+      <Wordmark size={16} />
+    </a>
+    <nav aria-label="Site">
+      <a href={href('docs')} aria-current={current('docs') ? 'page' : undefined}>Docs</a>
+      <a href={href('changelog')} aria-current={current('changelog') ? 'page' : undefined}>Changelog</a>
+      <a href={repository} class="github">GitHub</a>
+    </nav>
+    <div class="actions">
+      <button class="theme" type="button" data-theme-toggle aria-label="Switch to light appearance">
+        <svg class="sun" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="8" cy="8" r="3"></circle>
+          <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"></path>
+        </svg>
+        <svg class="moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"></path>
+        </svg>
+      </button>
+      <DownloadButton size="small" />
+    </div>
+  </div>
+</header>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>('[data-theme-toggle]')!;
+  const label = () => {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    toggle.setAttribute('aria-label', dark ? 'Switch to light appearance' : 'Switch to dark appearance');
+  };
+  label();
+  toggle.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+    label();
+  });
+
+  const header = document.querySelector<HTMLElement>('[data-header]')!;
+  const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+</script>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--page) 78%, transparent);
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    border-bottom: 1px solid transparent;
+    transition: border-color 200ms ease;
+  }
+  .header:global(.scrolled) {
+    border-bottom-color: var(--separator);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .header {
+      background: var(--page);
+    }
+  }
+  .inner {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  nav {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+  nav a {
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease;
+  }
+  nav a:hover,
+  nav a[aria-current='page'] {
+    color: var(--text);
+    background: var(--fill);
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .theme {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .theme:hover {
+    background: var(--fill);
+    color: var(--text);
+  }
+  :global([data-theme='dark']) .moon,
+  :global([data-theme='light']) .sun {
+    display: none;
+  }
+  @media (max-width: 640px) {
+    .inner {
+      gap: 12px;
+    }
+    .github {
+      display: none;
+    }
+    .home :global(.wordmark) {
+      display: none;
+    }
+  }
+</style>

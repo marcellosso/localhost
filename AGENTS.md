@@ -37,6 +37,7 @@ apps/macos/              the macOS app
 apps/desktop/            the Linux and Windows app (Tauri 2)
   src/                   React + TypeScript UI; src/bindings.ts is generated, never edited
   src-tauri/             Rust shell hosting the core
+site/                    the website (Astro): landing page, docs, changelog; reads docs/ and the desktop tokens
 scripts/                 build-core.sh, build-release.sh, signing and installer artwork
 docs/configuration.md    the Project file format (user-facing)
 ```

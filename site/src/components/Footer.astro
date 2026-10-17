@@ -1,0 +1,76 @@
+---
+import Wordmark from './Wordmark.astro';
+import { href, releases, repository } from '../lib/site';
+---
+
+<footer class="footer">
+  <div class="container inner">
+    <div class="brand">
+      <Wordmark size={15} />
+      <p>Every local project, one place to run it. MIT licensed, made by Marcel Losso.</p>
+    </div>
+    <nav aria-label="Footer">
+      <div>
+        <h2>Product</h2>
+        <a href={releases}>Download</a>
+        <a href={href('changelog')}>Changelog</a>
+        <a href={href('docs/install')}>Install</a>
+      </div>
+      <div>
+        <h2>Docs</h2>
+        <a href={href('docs/quick-start')}>Quick start</a>
+        <a href={href('docs/project-files')}>Project files</a>
+        <a href={href('docs/cli')}>Command line</a>
+      </div>
+      <div>
+        <h2>Open source</h2>
+        <a href={repository}>GitHub</a>
+        <a href={`${repository}/issues`}>Issues</a>
+        <a href={`${repository}/blob/main/SECURITY.md`}>Security</a>
+      </div>
+    </nav>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--separator);
+    margin-top: 96px;
+    padding: 48px 0 64px;
+    font-size: 14px;
+  }
+  .inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 48px;
+    flex-wrap: wrap;
+  }
+  .brand p {
+    margin: 12px 0 0;
+    max-width: 300px;
+    color: var(--text-secondary);
+  }
+  nav {
+    display: flex;
+    gap: 64px;
+    flex-wrap: wrap;
+  }
+  nav div {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  h2 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  a {
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--text);
+  }
+</style>
