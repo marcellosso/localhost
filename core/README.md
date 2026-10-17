@@ -1,9 +1,9 @@
 # localhost core (Rust)
 
 The core every localhost client shares: Projects, Services, Runs, logs,
-environment and Secrets (ADR-0007, `docs/cross-platform.md`). It replaced the
-Swift package the macOS app was first built on; the macOS app now runs on it
-(below), as does the `localhost` command.
+environment and Secrets. The macOS app, the Linux and Windows app, the
+`localhost` command and `localhostd` all run on it. How it is organised and
+the rules it keeps are in [AGENTS.md](../AGENTS.md#architecture).
 
 ```sh
 cd core
@@ -31,8 +31,8 @@ Projects and Services are named by Key, name, or letters of either in order
 ## localhostd
 
 `localhost-daemon` builds `localhostd`, the core driven over its standard
-input and output. The Windows app runs it inside each WSL distro it uses
-(ADR-0008). The protocol is in `localhost-core/src/remote/`: JSON lines, a
+input and output. The Windows app runs it inside each WSL distro it uses.
+The protocol is in `localhost-core/src/remote/`: JSON lines, a
 `Hello` first, then requests with ids, replies, Service events and log
 batches. `Remote` is the app's side of it.
 
@@ -59,5 +59,5 @@ scripts/build-core.sh debug      # this Mac's architecture only, faster
 scripts/build-core.sh --check    # fails if the output is older than core/
 ```
 
-`localhost-core/tests/fixtures/swift-schema-1/` holds files written by the
-Swift core; the Rust core must keep reading them.
+`localhost-core/tests/fixtures/swift-schema-1/` holds files written by earlier
+(Swift) versions of localhost; the core must keep reading them.

@@ -1,6 +1,6 @@
-//! The app's lifetime (`docs/v1-decisions.md`, App lifetime): closing the
-//! window keeps the app and its Services running; quitting asks first if
-//! anything is running, then stops everything.
+//! The app's lifetime: closing the window keeps the app and its Services
+//! running; quitting asks first if anything is running, then stops
+//! everything.
 //!
 //! A closed window is destroyed, not hidden, so a day in the tray doesn't
 //! keep a webview (and its log streams) alive. The tray's Open localhost,

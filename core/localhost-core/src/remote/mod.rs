@@ -1,6 +1,6 @@
 //! Driving a localhost core that runs somewhere else, over a byte stream:
 //! the Windows app drives `localhostd --stdio` inside a WSL distro, where
-//! the distro's Services, Listeners and Orphans are (ADR-0008).
+//! the distro's Services, Listeners and Orphans are.
 //!
 //! The protocol is JSON, one message per line. `localhostd` opens with a
 //! [`Hello`]. Then the app sends requests, each with an id, and `localhostd`

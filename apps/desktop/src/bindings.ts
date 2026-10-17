@@ -78,7 +78,7 @@ async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
 /**
  * What the Service's active Run uses now, measured where it runs; `None`
  * without one. Given the previous sample of the same Run, it says the CPU
- * use since then (ADR-0012).
+ * use since then.
  */
 async runStats(serviceId: Id, previous: RunStats | null) : Promise<Result<RunStats | null, CommandError>> {
     try {
@@ -584,7 +584,7 @@ export type Cycle = { serviceId: Id; message: string }
 export type EnvironmentProfile = { id: Id; name: string; variables: Variables }
 /**
  * Where a Project's Services run: this machine, or a WSL distro, where
- * `localhostd` runs them (ADR-0008).
+ * `localhostd` runs them.
  */
 export type ExecutionTarget = { kind: "thisMachine" } | 
 /**
@@ -607,7 +607,7 @@ export type FolderApp = "fileManager" | "terminal" | "editor"
 /**
  * The identity of a Project, Service, Profile or Run.
  * 
- * Written uppercase, as the Swift core wrote UUIDs: in file names, in JSON
+ * Written uppercase, as earlier (Swift) versions wrote UUIDs: in file names, in JSON
  * and in the Secret accounts (`<ID>/<NAME>`), so existing data keeps working.
  */
 export type Id = string
@@ -673,7 +673,7 @@ unreadableFiles: string[];
 orphans: string[] }
 /**
  * A process listening on one or more TCP ports on this machine, whoever
- * started it (see `GLOSSARY.md`).
+ * started it.
  */
 export type Listener = { pid: number; processGroupId: number; 
 /**
@@ -881,7 +881,7 @@ longFrames: number }
 export type PerfSettings = { services: number; linesPerSecond: number; seconds: number }
 /**
  * A Run started on another port than its Service's Port. The Project
- * Configuration keeps the Port; the change lasts for that Run (ADR-0006).
+ * Configuration keeps the Port; the change lasts for that Run.
  */
 export type PortChange = { configuredPort: number; reason: PortChangeReason }
 export type PortChangeReason = 
@@ -898,7 +898,7 @@ export type PortChangeReason =
  * When a process started, as the kernel reports it. Together with a pid it
  * identifies one process, even after the pid has been reused.
  * 
- * On macOS it is the wall-clock start time (as the Swift core recorded it);
+ * On macOS it is the wall-clock start time;
  * on Linux, the time since boot. Only equality matters.
  */
 export type ProcessStartTime = { seconds: number; microseconds: number }
@@ -916,8 +916,7 @@ export type Project = { id: Id; name: string; key: Key;
  */
 path: string; 
 /**
- * Where its Services run. Left out for this machine, so files of
- * Projects on this machine are unchanged since before Execution Targets.
+ * Where its Services run. Left out of the file for this machine.
  */
 executionTarget?: ExecutionTarget; sortOrder: number; isFavorite: boolean; services: Service[]; 
 /**
@@ -984,11 +983,7 @@ export type Reveal =
 /**
  * One execution of a Service, from launch until its process tree has fully ended.
  */
-export type Run = { id: Id; serviceId: Id; 
-/**
- * Who started the Run.
- */
-origin: Origin; startedAt: SystemTime; 
+export type Run = { id: Id; serviceId: Id; origin: Origin; startedAt: SystemTime; 
 /**
  * When the process tree fully ended; `None` while it is still alive.
  */
@@ -1000,11 +995,7 @@ termination: Termination | null;
 /**
  * Why the Run could not launch or run its command (e.g. `CommandNotFound`).
  */
-failure: LocalhostError | null; 
-/**
- * Who asked the Run to stop, if anyone did.
- */
-stopOrigin: Origin | null; 
+failure: LocalhostError | null; stopOrigin: Origin | null; 
 /**
  * Whether the process group had to be killed with SIGKILL.
  */
@@ -1058,7 +1049,7 @@ cpuPercent: number | null }
 /**
  * One independently manageable long-running command belonging to a Project.
  * 
- * The command line is run through the user's login shell (ADR-0003), so
+ * The command line is run through the user's login shell, so
  * there is no separate arguments field.
  */
 export type Service = { id: Id; name: string; key: Key; 
@@ -1084,7 +1075,7 @@ dependencies?: Id[];
 isExcludedFromStartAll?: boolean; 
 /**
  * The TCP port the Service listens on: it is Running once the Port
- * accepts connections, and its command gets it as `PORT` (ADR-0006).
+ * accepts connections, and its command gets it as `PORT`.
  */
 port?: number | null; 
 /**
@@ -1093,7 +1084,7 @@ port?: number | null;
 url?: string | null; 
 /**
  * Whether a Run may use another port when the Port is taken. Off for
- * commands that ignore `$PORT` (ADR-0006).
+ * commands that ignore `$PORT`.
  */
 portCanChange?: boolean }
 /**
@@ -1122,7 +1113,7 @@ cycles: Cycle[];
  */
 dependents: string[] }
 /**
- * The single, unambiguous status of a Service (see `GLOSSARY.md`).
+ * The single, unambiguous status of a Service.
  */
 export type ServiceState = 
 /**

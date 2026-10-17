@@ -1,5 +1,5 @@
 //! Reads and writes Project Configuration: one JSON file per Project at
-//! `<root>/projects/<PROJECT-ID>.json` (ADR-0004), in schema 1, as earlier
+//! `<root>/projects/<PROJECT-ID>.json`, in schema 1, as earlier
 //! (Swift) versions of localhost wrote them.
 
 use std::fs;

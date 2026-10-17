@@ -82,7 +82,7 @@ export function rowSummary(project: Project, service: Service, status: StatusVie
   return statusSummary(status);
 }
 
-// MARK: Screen readers (docs/v1-decisions.md, Accessibility)
+// MARK: Screen readers (AGENTS.md, Accessibility)
 
 /**
  * The text as a screen reader should say it: "Running · port 3000" →

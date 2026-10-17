@@ -1,10 +1,10 @@
 //! The Tauri app for Linux and Windows: a thin shell that hosts the
-//! Rust core in-process and bridges it to the React UI (ADR-0009). Commands
+//! Rust core in-process and bridges it to the React UI. Commands
 //! and events are typed: `src/bindings.ts` is generated from this crate.
 //!
 //! Services are reached through `Targets`, whatever their Project's
 //! Execution Target: this machine in-process, a WSL distro through its
-//! `localhostd` (ADR-0008, `targets`).
+//! `localhostd` (`targets`).
 
 mod bridge;
 mod desktop;

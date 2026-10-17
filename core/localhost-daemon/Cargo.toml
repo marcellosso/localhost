@@ -1,6 +1,6 @@
 [package]
 name = "localhost-daemon"
-description = "localhostd: the core driven over its standard input and output, inside a WSL distro (ADR-0008)."
+description = "localhostd: the core driven over its standard input and output, inside a WSL distro."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

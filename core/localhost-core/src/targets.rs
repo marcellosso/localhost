@@ -1,4 +1,4 @@
-//! Where each Project's Services run (ADR-0008), behind one interface. This
+//! Where each Project's Services run, behind one interface. This
 //! machine is a Service manager in this process; any other Execution Target
 //! (a WSL distro) is a `localhostd` driven through a [`Remote`], connected
 //! the first time something needs it. A client reaches them all the same way.
@@ -294,7 +294,7 @@ impl Targets {
 
     /// What the Service's active Run uses, as `ServiceManager::run_stats`,
     /// measured where it runs: a WSL distro's processes only its own
-    /// `localhostd` can see (ADR-0008).
+    /// `localhostd` can see.
     pub async fn run_stats(
         &self,
         service_id: Id,

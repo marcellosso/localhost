@@ -1,7 +1,7 @@
 //! The process tree of one Run: `<shell> -l -c <command line>` launched in
 //! its own session, so the shell's pid is also the id of the process group
-//! that holds everything it spawns (ADR-0003). On Windows, `cmd.exe /s /c
-//! <command line>` in its own Job Object (ADR-0010, ADR-0011), which is what
+//! that holds everything it spawns. On Windows, `cmd.exe /s /c
+//! <command line>` in its own Job Object, which is what
 //! "the group" means there.
 //!
 //! The tree has ended once the shell has exited *and* no process is left in
@@ -77,7 +77,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// that left the group may still hold them open.
 const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(500);
 
-/// What a Run's process tree uses at one moment (ADR-0012).
+/// What a Run's process tree uses at one moment.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct TreeUsage {
     /// The tree's live processes.

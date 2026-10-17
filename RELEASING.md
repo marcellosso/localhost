@@ -88,7 +88,7 @@ The next tag is signed with Developer ID and notarized. Users get one Keychain p
 
 ### Windows (Authenticode)
 
-The Windows installer, and the app inside it, are signed when the `WINDOWS_CERTIFICATE_PFX` (the `.pfx` in base64) and `WINDOWS_CERTIFICATE_PASSWORD` secrets exist. The workflow imports the certificate into the runner's store, and Tauri signs with `signtool`, SHA-256 and a DigiCert timestamp. The release notes then say "Signed." Without the secrets, the installer is unsigned: SmartScreen asks first, and the README's [Windows](README.md#windows) section has the steps.
+The Windows installer, and the app inside it, are signed when the `WINDOWS_CERTIFICATE_PFX` (the `.pfx` in base64) and `WINDOWS_CERTIFICATE_PASSWORD` secrets exist. The workflow imports the certificate into the runner's store, and Tauri signs with `signtool`, SHA-256 and a DigiCert timestamp. The release notes then say "Signed." Without the secrets, the installer is unsigned: SmartScreen asks first, and the README's [Windows](README.md#windows-smartscreen) section has the steps.
 
 ```sh
 base64 -i localhost-windows.pfx | gh secret set WINDOWS_CERTIFICATE_PFX

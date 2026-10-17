@@ -1,4 +1,4 @@
-//! What a Run's process tree uses (ADR-0012), against real processes: a busy
+//! What a Run's process tree uses, against real processes: a busy
 //! loop for CPU, and on Unix a child that left the Run's session.
 
 mod common;

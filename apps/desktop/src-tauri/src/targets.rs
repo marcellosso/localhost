@@ -1,6 +1,6 @@
 //! How the app reaches each Execution Target (`localhost_core::Targets`).
 //! This machine runs in this process. A WSL distro is reached through the
-//! `localhostd` inside it (ADR-0008, `wsl`), which only the Windows app starts.
+//! `localhostd` inside it (`wsl`), which only the Windows app starts.
 //!
 //! For development on Linux and macOS, `LOCALHOST_DEV_LOCALHOSTD=<path to
 //! localhostd>` reaches every target, this machine included, through a

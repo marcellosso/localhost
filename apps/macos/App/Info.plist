@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Keep the pre-Liquid Glass appearance on macOS 26 (docs/v1-decisions.md: no Liquid Glass). -->
+	<!-- Keep the pre-Liquid Glass appearance on macOS 26 (AGENTS.md, Design: no Liquid Glass). -->
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 </dict>

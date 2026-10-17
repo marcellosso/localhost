@@ -401,7 +401,7 @@ fn python_files_without_a_project_file_are_ignored() {
     assert!(suggestions(&[("scripts/main.py", "app = FastAPI()\n")]).is_empty());
 }
 
-// MARK: Windows (cmd.exe, ADR-0010)
+// MARK: Windows (cmd.exe)
 
 fn windows_suggestions(files: &[(&str, &str)]) -> Vec<ServiceSuggestion> {
     scan_for(files, CommandSyntax::Cmd).1

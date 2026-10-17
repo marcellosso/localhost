@@ -1,4 +1,4 @@
-//! UniFFI bindings for the macOS app (ADR-0007), built with the `ffi` feature.
+//! UniFFI bindings for the macOS app, built with the `ffi` feature.
 //!
 //! The data types derive their UniFFI traits where they are defined. This
 //! module adds what the derives can't express: custom types, and the objects

@@ -1,4 +1,4 @@
-//! localhost-core: the UI-free core of localhost (ADR-0001, ADR-0007).
+//! localhost-core: the UI-free core of localhost.
 //!
 //! Every client (the macOS app, the Windows/Linux app, the CLI) is a client of
 //! this crate. It never depends on a UI toolkit. State-changing calls take an
