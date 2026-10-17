@@ -6,6 +6,9 @@
 //! keep a webview (and its log streams) alive. The tray's Open localhost,
 //! and launching the app again (single instance), bring it back. Without a
 //! tray (GNOME without the AppIndicator extension) launching again is the way.
+//! The first close says so once (`close_requested`): on Windows the tray
+//! icon starts hidden in the notification area's overflow, so nothing on
+//! screen shows that localhost is still running.
 //!
 //! On Windows the window is a WebView2, which acts as a browser unless told
 //! otherwise: `prepare` turns its browser keys off.
@@ -16,7 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use localhost_core::{Id, Origin};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, CloseRequestApi, Manager, WebviewWindow, WebviewWindowBuilder, Window};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_specta::Event;
 
@@ -43,6 +46,8 @@ pub struct Lifecycle {
     is_exiting: AtomicBool,
     /// The quit question is on screen, so asking again does nothing.
     is_asking: AtomicBool,
+    /// The first close's note is on screen; the window closes once it is dismissed.
+    is_explaining_close: AtomicBool,
     /// Where a window being created should go once its UI has started.
     pending_reveal: Mutex<Option<Reveal>>,
 }
@@ -174,6 +179,46 @@ fn exit(app: &AppHandle, origin: Origin) {
         }
         app.exit(0);
     });
+}
+
+/// What the first close says: where localhost is now, and how to quit it.
+#[cfg(windows)]
+const CLOSE_NOTE: &str = "Its services keep running. Open localhost or quit it from its icon in the notification area \
+     on the taskbar, which may be hidden under ^.";
+#[cfg(not(windows))]
+const CLOSE_NOTE: &str =
+    "Its services keep running. Open localhost or quit it from its tray icon, or launch localhost again to open it.";
+
+/// The first time the main window is closed, holds the close and says
+/// that localhost keeps running, once. The window closes when the note is
+/// dismissed. Not on macOS, whose menu bar shows the icon.
+pub fn close_requested(window: &Window, api: &CloseRequestApi) {
+    if cfg!(target_os = "macos") || window.label() != MAIN_WINDOW {
+        return;
+    }
+    let state = window.state::<AppState>();
+    let lifecycle = &state.lifecycle;
+    if lifecycle.is_exiting.load(Ordering::SeqCst) || state.settings.has_explained_close() {
+        return;
+    }
+    api.prevent_close();
+    if lifecycle.is_explaining_close.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let window = window.clone();
+    window
+        .dialog()
+        .message(CLOSE_NOTE)
+        .title("localhost is still running")
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::Ok)
+        .parent(&window)
+        .show(move |_| {
+            let state = window.state::<AppState>();
+            state.settings.set_explained_close();
+            state.lifecycle.is_explaining_close.store(false, Ordering::SeqCst);
+            let _ = window.destroy();
+        });
 }
 
 /// Exits now, e.g. once a performance run has reported.

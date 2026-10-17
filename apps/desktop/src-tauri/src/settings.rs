@@ -45,28 +45,58 @@ impl Default for Settings {
     }
 }
 
+/// What the file holds: the settings, and what the app has told the user
+/// once, which isn't a setting.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Stored {
+    #[serde(flatten)]
+    settings: Settings,
+    /// Whether closing the window has said that localhost keeps running (`lifecycle`).
+    #[serde(default)]
+    has_explained_close: bool,
+}
+
 pub struct SettingsStore {
     /// `None` when there is no config folder: settings then last for the session.
     path: Option<PathBuf>,
-    settings: Mutex<Settings>,
+    stored: Mutex<Stored>,
 }
 
 impl SettingsStore {
     /// The settings in `path`; the defaults if it is missing or unreadable.
     pub fn open(path: Option<PathBuf>) -> SettingsStore {
-        let settings = path
+        let stored = path
             .as_ref()
             .and_then(|path| std::fs::read(path).ok())
             .and_then(|data| serde_json::from_slice(&data).ok())
             .unwrap_or_default();
-        SettingsStore { path, settings: Mutex::new(settings) }
+        SettingsStore { path, stored: Mutex::new(stored) }
     }
 
     pub fn get(&self) -> Settings {
-        self.settings.lock().unwrap().clone()
+        self.stored.lock().unwrap().settings.clone()
     }
 
     fn save(&self, settings: Settings) -> Result<(), LocalhostError> {
+        let stored = Stored { settings, ..self.stored.lock().unwrap().clone() };
+        self.write(stored)
+    }
+
+    pub fn has_explained_close(&self) -> bool {
+        self.stored.lock().unwrap().has_explained_close
+    }
+
+    /// Remembers that closing the window has said so; for this session
+    /// only if the file can't be written.
+    pub fn set_explained_close(&self) {
+        let stored = Stored { has_explained_close: true, ..self.stored.lock().unwrap().clone() };
+        if self.write(stored).is_err() {
+            self.stored.lock().unwrap().has_explained_close = true;
+        }
+    }
+
+    fn write(&self, stored: Stored) -> Result<(), LocalhostError> {
         if let Some(path) = &self.path {
             let failed = |error: std::io::Error| LocalhostError::PersistenceFailed {
                 path: path.display().to_string(),
@@ -76,11 +106,11 @@ impl SettingsStore {
                 std::fs::create_dir_all(folder).map_err(failed)?;
             }
             let temporary = path.with_extension("json.tmp");
-            let data = serde_json::to_vec_pretty(&settings).expect("settings serialize");
+            let data = serde_json::to_vec_pretty(&stored).expect("settings serialize");
             std::fs::write(&temporary, data).map_err(failed)?;
             std::fs::rename(&temporary, path).map_err(failed)?;
         }
-        *self.settings.lock().unwrap() = settings;
+        *self.stored.lock().unwrap() = stored;
         Ok(())
     }
 }
@@ -128,6 +158,22 @@ mod tests {
         };
         store.save(changed.clone()).unwrap();
         assert_eq!(SettingsStore::open(Some(path)).get(), changed);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn remembers_explaining_the_close_apart_from_the_settings() {
+        let folder = std::env::temp_dir().join(format!("localhost-settings-close-{}", std::process::id()));
+        let path = folder.join("settings.json");
+        let store = SettingsStore::open(Some(path.clone()));
+        assert!(!store.has_explained_close());
+
+        store.set_explained_close();
+        let changed = Settings { editor_command: Some("code".into()), ..Settings::default() };
+        store.save(changed.clone()).unwrap();
+        let reopened = SettingsStore::open(Some(path));
+        assert!(reopened.has_explained_close());
+        assert_eq!(reopened.get(), changed);
         let _ = std::fs::remove_dir_all(folder);
     }
 
