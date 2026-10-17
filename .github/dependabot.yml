@@ -1,0 +1,25 @@
+# Weekly, one grouped PR per ecosystem, so updates stay reviewable. New
+# dependencies still need an issue first (CONTRIBUTING.md).
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories: ["/core", "/apps/desktop/src-tauri"]
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /apps/desktop
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
