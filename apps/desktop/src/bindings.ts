@@ -607,7 +607,7 @@ export type FolderApp = "fileManager" | "terminal" | "editor"
 /**
  * The identity of a Project, Service, Profile or Run.
  * 
- * Written uppercase, as the Swift core wrote UUIDs: in file names, in JSON
+ * Written uppercase, as earlier (Swift) versions wrote UUIDs: in file names, in JSON
  * and in the Secret accounts (`<ID>/<NAME>`), so existing data keeps working.
  */
 export type Id = string
@@ -898,7 +898,7 @@ export type PortChangeReason =
  * When a process started, as the kernel reports it. Together with a pid it
  * identifies one process, even after the pid has been reused.
  * 
- * On macOS it is the wall-clock start time (as the Swift core recorded it);
+ * On macOS it is the wall-clock start time;
  * on Linux, the time since boot. Only equality matters.
  */
 export type ProcessStartTime = { seconds: number; microseconds: number }
@@ -916,8 +916,7 @@ export type Project = { id: Id; name: string; key: Key;
  */
 path: string; 
 /**
- * Where its Services run. Left out for this machine, so files of
- * Projects on this machine are unchanged since before Execution Targets.
+ * Where its Services run. Left out of the file for this machine.
  */
 executionTarget?: ExecutionTarget; sortOrder: number; isFavorite: boolean; services: Service[]; 
 /**
@@ -984,11 +983,7 @@ export type Reveal =
 /**
  * One execution of a Service, from launch until its process tree has fully ended.
  */
-export type Run = { id: Id; serviceId: Id; 
-/**
- * Who started the Run.
- */
-origin: Origin; startedAt: SystemTime; 
+export type Run = { id: Id; serviceId: Id; origin: Origin; startedAt: SystemTime; 
 /**
  * When the process tree fully ended; `None` while it is still alive.
  */
@@ -1000,11 +995,7 @@ termination: Termination | null;
 /**
  * Why the Run could not launch or run its command (e.g. `CommandNotFound`).
  */
-failure: LocalhostError | null; 
-/**
- * Who asked the Run to stop, if anyone did.
- */
-stopOrigin: Origin | null; 
+failure: LocalhostError | null; stopOrigin: Origin | null; 
 /**
  * Whether the process group had to be killed with SIGKILL.
  */
