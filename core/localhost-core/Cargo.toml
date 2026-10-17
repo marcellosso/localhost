@@ -16,7 +16,7 @@ unicode-normalization = "0.1.25"
 url = "2.5.8"
 uuid = { version = "1.28.0", features = ["v4", "serde"] }
 uniffi = { version = "0.32.2", optional = true }
-specta = { version = "=2.0.0-rc.22", features = ["derive", "uuid"], optional = true }
+specta = { version = "=2.0.0-rc.25", features = ["derive", "uuid"], optional = true }
 
 [features]
 # UniFFI bindings for the macOS app. Off by default: the CLI and the
