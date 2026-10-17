@@ -49,7 +49,7 @@ The workflow signs the macOS app with the best identity it has secrets for. All 
 
 Developer ID wins when all five of its secrets exist, then self-signed; otherwise ad hoc. Moving from one mode to another needs no workflow change.
 
-Why the certificate matters: macOS lets an app read the Keychain items it saved when the reading app satisfies the saver's *designated requirement*. For a self-signed build that is "bundle id `com.sixpetals.localhost`, signed by this exact certificate", so every release signed with the same certificate is the same app to the Keychain. An ad hoc signature's requirement is the hash of that one build, which changes every release. A change of identity (a new self-signed certificate, or self-signed → Developer ID) makes every user's Mac ask once more for each Secret, on that one update. So create the certificate once and keep it.
+Why the certificate matters: macOS lets an app read the Keychain items it saved when the reading app satisfies the saver's *designated requirement*. For a self-signed build that is "bundle id `io.github.marcellosso.localhost`, signed by this exact certificate", so every release signed with the same certificate is the same app to the Keychain. An ad hoc signature's requirement is the hash of that one build, which changes every release. A change of identity (a new self-signed certificate, or self-signed → Developer ID) makes every user's Mac ask once more for each Secret, on that one update. So create the certificate once and keep it.
 
 ### The self-signed certificate (one-time setup)
 

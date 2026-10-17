@@ -177,7 +177,7 @@ All state, process management, logs and persistence live in the core, which neve
 | Storage | `~/Library/Application Support/localhost` | `$XDG_DATA_HOME/localhost` | `%APPDATA%\localhost` |
 | Tray | menu bar extra | AppIndicator | notification area |
 
-The Keychain service and Secret account names (`com.sixpetals.localhost.secret`, `<OWNER-ID>/<NAME>`), the storage layout and the JSON schema must never change: existing users' data depends on them, and `core/localhost-core/tests/swift_compatibility.rs` checks files written by earlier versions.
+The Keychain service and Secret account names (`io.github.marcellosso.localhost.secret`, `<OWNER-ID>/<NAME>`), the storage layout and the JSON schema must never change: existing users' data depends on them, and `core/localhost-core/tests/swift_compatibility.rs` checks files written by earlier versions.
 
 ## Decisions
 
