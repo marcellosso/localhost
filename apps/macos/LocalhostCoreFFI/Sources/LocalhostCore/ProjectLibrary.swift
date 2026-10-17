@@ -1,8 +1,8 @@
 import Foundation
 
 // Every Project, stored as one JSON file each, with Secrets in the Keychain.
-// The core validates and saves; these keep the Swift core's labels, Int
-// ports and typed errors.
+// The core validates and saves; these add Swift labels, Int ports and typed
+// errors.
 
 extension ProjectLibrary {
     public typealias KeyClash = LocalhostCore.KeyClash

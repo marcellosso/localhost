@@ -27,7 +27,6 @@ impl OutputChannel {
     }
 }
 
-/// One line of a Run's output.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "specta", derive(specta::Type))]

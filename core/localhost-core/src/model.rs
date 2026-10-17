@@ -1,5 +1,5 @@
 //! The Project Configuration: Projects, Services, variables and Environment
-//! Profiles. Serialized exactly as the Swift core stored them (schema 1).
+//! Profiles, serialized as storage schema 1.
 //!
 //! Fields are public to read. Values are created and changed only through
 //! [`ProjectLibrary`](crate::ProjectLibrary), which validates them, so every
@@ -26,8 +26,7 @@ pub struct Project {
     pub key: Key,
     /// Absolute path of the Project's root folder, on its Execution Target.
     pub path: String,
-    /// Where its Services run. Left out for this machine, so files of
-    /// Projects on this machine are unchanged since before Execution Targets.
+    /// Where its Services run. Left out of the file for this machine.
     // `default` last: specta reads it as optional, and the other attribute as not.
     #[serde(skip_serializing_if = "ExecutionTarget::is_this_machine", default)]
     pub execution_target: ExecutionTarget,

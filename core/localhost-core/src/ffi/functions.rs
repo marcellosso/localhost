@@ -1,6 +1,5 @@
-//! Free functions for what the Swift core had as methods on value types.
-//! UniFFI records carry data only, so the Swift layer wraps these in
-//! extensions (`error.message`, `project.dependents(of:)`, …).
+//! Free functions over the core's value types. UniFFI records carry data
+//! only, so the Swift layer wraps these in extensions (`error.message`, `project.dependents(of:)`, …).
 
 use crate::{
     Ansi, FuzzyMatch, Id, Key, Listener, LocalUrl, LocalhostError, Orphan, PortWarning, Project, ProjectFileProblem,
@@ -45,7 +44,6 @@ pub fn signal_name(signal: i32) -> String {
 
 // MARK: Keys
 
-/// `raw` as a Key, or `InvalidKey`.
 #[uniffi::export]
 pub fn key_new(raw: String) -> Result<Key, LocalhostError> {
     Key::new(raw)

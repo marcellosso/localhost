@@ -1,7 +1,7 @@
 import Foundation
 
 // A Project file (YAML) read or about to be written. The core holds the
-// document; this keeps the Swift core's value-type API over it.
+// document; this gives it a value-type API.
 
 extension ProjectDocument {
     public typealias Service = DocumentService

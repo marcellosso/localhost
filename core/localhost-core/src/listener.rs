@@ -38,7 +38,6 @@ pub struct Listener {
 }
 
 impl Listener {
-    /// Whether it belongs to no Run and no Project.
     pub fn is_unmanaged(&self) -> bool {
         self.owner == ListenerOwner::Unmanaged
     }
@@ -148,7 +147,6 @@ pub enum ListenerKind {
 }
 
 impl ListenerKind {
-    /// Classifies by owner, executable path and launchd label.
     pub fn of(executable_path: Option<&str>, launchd_label: Option<&str>, owner: ListenerOwner) -> ListenerKind {
         if owner != ListenerOwner::Unmanaged {
             return ListenerKind::Development;

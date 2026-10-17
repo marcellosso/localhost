@@ -1,5 +1,5 @@
 #!/bin/bash
-# Measures the log view under a very chatty Project (#48): builds the app,
+# Measures the log view under a very chatty Project: builds the app,
 # runs it in its measurement mode (src-tauri/src/perf.rs), and prints the
 # frame times the UI recorded with the memory of the app's process tree.
 #

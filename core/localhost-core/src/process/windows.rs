@@ -98,7 +98,6 @@ impl Group {
         (succeeded != 0).then_some(information)
     }
 
-    /// The pids of the processes in the job.
     fn process_ids(&self) -> Vec<Pid> {
         // The list's two counts, then the ids; grown if the job holds more.
         let header = mem::offset_of!(JOBOBJECT_BASIC_PROCESS_ID_LIST, ProcessIdList) / size_of::<usize>();

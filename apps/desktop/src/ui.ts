@@ -39,8 +39,7 @@ export type UiState = {
   alerts: readonly Alert[];
   /** Something slow the window waits for, e.g. "Stopping services from the last session…". */
   progress: string | null;
-  /** The pids of Listeners being stopped. */
-  /** By `listenerKey`. */
+  /** Listeners being stopped, by `listenerKey`. */
   stoppingListeners: ReadonlySet<string>;
   sheet: Sheet | null;
   /** Whether the command palette (Ctrl+K) is open. */

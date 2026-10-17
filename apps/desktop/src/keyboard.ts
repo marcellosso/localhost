@@ -49,7 +49,7 @@ export function isTextField(element: Element | null): boolean {
   );
 }
 
-/** The window's shortcuts, after the macOS menus; the palette shows them too. */
+/** The window's shortcuts; the palette shows them too. */
 export const SHORTCUTS = {
   palette: { code: "KeyK" },
   ports: { code: "Digit0" },

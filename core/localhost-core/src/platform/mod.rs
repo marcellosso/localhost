@@ -67,7 +67,7 @@ pub mod signal {
 /// When a process started, as the kernel reports it. Together with a pid it
 /// identifies one process, even after the pid has been reused.
 ///
-/// On macOS it is the wall-clock start time (as the Swift core recorded it);
+/// On macOS it is the wall-clock start time;
 /// on Linux, the time since boot. Only equality matters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
@@ -190,7 +190,6 @@ pub(crate) fn signal_process(pid: Pid, signal: i32) {
     groups::signal_process(pid, signal)
 }
 
-/// The process group localhost itself is in.
 pub(crate) fn own_process_group() -> Pid {
     groups::own_process_group()
 }
@@ -230,7 +229,6 @@ fn is_inside_on(directory: &str, folder: &str, windows: bool) -> bool {
     }
 }
 
-/// Sorts and deduplicates ports.
 fn normalized(mut ports: Vec<u16>) -> Vec<u16> {
     ports.sort_unstable();
     ports.dedup();

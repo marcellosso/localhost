@@ -1,4 +1,4 @@
-//! Ported from `ProjectDocumentTests.swift`: Project files, writing, reading
+//! Project files: writing, reading
 //! with errors that name the line and field, and importing into the library
 //! (Replace / Keep both).
 

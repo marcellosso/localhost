@@ -7,7 +7,7 @@
   background: rgb(0 0 0 / 0.2);
 }
 
-/* 640 wide, as the macOS sheet: a header, two columns of groups, a footer with Done. */
+/* 640 wide: a header, two columns of groups, a footer with Done. */
 .panel {
   display: flex;
   flex-direction: column;

@@ -15,7 +15,6 @@ use crate::{
 
 /// A change to the Project Configuration, tagged with the Origin that caused it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-// Its fields are single words, so they need no renaming.
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -207,7 +206,6 @@ impl ProjectLibrary {
         self.secrets.value(&layer.secret_account(name))
     }
 
-    /// Whether a Secret has a stored value.
     pub fn is_secret_set(&self, name: &str, layer: VariableLayer) -> Result<bool, LocalhostError> {
         Ok(self.secret_value(name, layer)?.is_some())
     }
@@ -242,7 +240,6 @@ impl ProjectLibrary {
         (sorted(&state.projects), receiver)
     }
 
-    /// A stream of every change made after subscribing.
     pub fn events(&self) -> mpsc::UnboundedReceiver<ProjectLibraryEvent> {
         self.subscribe().1
     }

@@ -1,7 +1,7 @@
 import Foundation
 
-// Identity, Foundation types and the methods the Swift core had on its value
-// types. Logic stays in the core; these forward to its exported functions.
+// Identity, Foundation types and methods on the core's value types. Logic
+// stays in the core; these forward to its exported functions.
 
 // MARK: Projects
 

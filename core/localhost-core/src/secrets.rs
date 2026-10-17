@@ -13,11 +13,10 @@ pub trait SecretStore: Send + Sync {
 }
 
 /// The service every Secret item is stored under, in the Keychain and the
-/// Secret Service alike. The same as the Swift app's, so its items are found.
+/// Secret Service alike. Never change it: existing items would be lost.
 pub const SERVICE: &str = "com.sixpetals.localhost.secret";
 const LABEL: &str = "localhost secret";
 
-/// The store the platform keeps Secrets in.
 #[cfg(target_os = "macos")]
 pub type SystemSecretStore = keychain::KeychainSecretStore;
 #[cfg(target_os = "linux")]

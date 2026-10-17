@@ -211,14 +211,12 @@ impl ProcessTree {
         termination.expect("waited for Some")
     }
 
-    /// Waits until the tree has ended.
     pub async fn wait_for_exit(&self) -> ProcessTreeExit {
         let mut receiver = self.inner.exit.subscribe();
         let exit = receiver.wait_for(Option::is_some).await.expect("the tree owns the sender");
         exit.expect("waited for Some")
     }
 
-    /// The exit, if the tree has ended.
     pub fn exit(&self) -> Option<ProcessTreeExit> {
         *self.inner.exit.borrow()
     }

@@ -144,7 +144,6 @@ pub struct ProjectScanner {
 }
 
 impl Default for ProjectScanner {
-    /// Compose, Node, Python and Cargo.
     fn default() -> Self {
         ProjectScanner::new(vec![
             Box::new(ComposeDetector),
@@ -275,7 +274,6 @@ fn normalized(path: &str) -> Option<String> {
 /// One folder of a Project being scanned, with read-only access to its files.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScannedDirectory {
-    /// The Project's root folder.
     pub root: PathBuf,
     /// Relative to the root; `.` is the root itself.
     pub path: String,

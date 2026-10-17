@@ -208,7 +208,7 @@ fn resident_set_size(pid: libc::pid_t) -> Option<u64> {
     Some(pages * page_size)
 }
 
-/// Linux has no launchd; systemd units are left to future work.
+/// Linux has no launchd; systemd units aren't detected.
 pub(super) fn managed_jobs() -> HashMap<libc::pid_t, String> {
     HashMap::new()
 }

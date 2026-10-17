@@ -29,7 +29,7 @@ body {
   color: var(--text-secondary);
 }
 
-/* Sidebar → Services (or Ports) → log, as on macOS. The toolbar is one strip
+/* Sidebar → Services (or Ports) → log. The toolbar is one strip
  * across the last two: its title over the Services column, its actions over the log. */
 .app {
   --sidebar-width: 220px;
@@ -44,7 +44,7 @@ body {
   grid-row: span 2;
 }
 
-/* Buttons, after AccentButtonStyle, PillButtonStyle and SquareIconButtonStyle. */
+/* Buttons. */
 button {
   font: inherit;
   color: inherit;

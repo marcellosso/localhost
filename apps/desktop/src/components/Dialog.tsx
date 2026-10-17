@@ -16,8 +16,8 @@ type Props = {
 
 /**
  * A modal over the main window; focus stays inside until it closes, then goes
- * back. Questions and reports look like macOS's alerts: the app's icon, the
- * title and message centred, the buttons below.
+ * back. Questions and reports show the app's icon, the title and message
+ * centred, and the buttons below.
  */
 export function Dialog({ title, children, actions, onCancel, role = "alertdialog" }: Props) {
   const panel = useRef<HTMLDivElement>(null);

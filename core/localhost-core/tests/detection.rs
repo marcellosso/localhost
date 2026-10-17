@@ -1,5 +1,4 @@
-//! Ported from `DetectionTests.swift`: scanning against fixture folders.
-//! Each test writes a small Project folder, file by file, and checks the
+//! Scanning against fixture folders. Each test writes a small Project folder, file by file, and checks the
 //! suggested Services. They expect the login shell's syntax on every
 //! platform; the Windows section checks cmd's.
 
@@ -472,7 +471,7 @@ fn a_cargo_library_or_virtual_workspace_root_gets_nothing_its_members_do() {
 
 // MARK: Acceptance
 
-/// The M2 acceptance Project: a pnpm monorepo with a Vite web app, a FastAPI
+/// A typical Project: a pnpm monorepo with a Vite web app, a FastAPI
 /// API managed by uv and Postgres in Compose.
 #[test]
 fn a_pnpm_fastapi_compose_monorepo_yields_ready_to_start_suggestions() {

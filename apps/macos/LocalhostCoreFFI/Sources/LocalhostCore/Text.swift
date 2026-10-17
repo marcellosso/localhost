@@ -1,6 +1,6 @@
 import Foundation
 
-// Namespaces for the core's text functions, as the Swift core had them.
+// Namespaces for the core's text functions.
 
 public typealias ANSIColor = AnsiColor
 

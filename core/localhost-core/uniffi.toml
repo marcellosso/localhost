@@ -1,4 +1,4 @@
-# Swift bindings for the macOS app (XP2, scripts/build-core.sh).
+# Swift bindings for the macOS app (scripts/build-core.sh).
 
 [bindings.swift]
 # The generated Swift is compiled into the `LocalhostCore` module; the C
@@ -12,8 +12,8 @@ imports = ["Foundation"]
 lift = "UUID(uuidString: {})!"
 lower = "{}.uuidString"
 
-# A Swift struct with the old `rawValue` API (apps/macos/LocalhostCoreFFI). The
-# core only ever hands out valid Keys.
+# A Swift struct with a `rawValue` API (apps/macos/LocalhostCoreFFI). The core
+# only ever hands out valid Keys.
 [bindings.swift.custom_types.CoreKey]
 type_name = "Key"
 lift = "Key(validatedRawValue: {})"

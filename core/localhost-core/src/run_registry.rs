@@ -1,7 +1,6 @@
 //! Records every active Run on disk, one file per Run at
 //! `<root>/runs/<RUN-ID>.json`, so that a later session can find its Orphans.
-//! The record format is the Swift core's, so a session of either finds the
-//! other's Orphans.
+//! The record format is the one earlier (Swift) versions of localhost wrote.
 
 use std::collections::HashSet;
 use std::fs;
@@ -18,8 +17,8 @@ use crate::process::StopPolicy;
 use crate::{Id, Project, service_label};
 
 const SCHEMA_VERSION: i64 = 1;
-/// Seconds from the Unix epoch to 2001-01-01, the reference date the Swift
-/// core encoded `startedAt` against.
+/// Seconds from the Unix epoch to 2001-01-01, the reference date `startedAt`
+/// is encoded against.
 const REFERENCE_DATE_OFFSET: f64 = 978_307_200.0;
 
 /// A process tree left over from a Run whose localhost session ended
@@ -160,7 +159,6 @@ impl RunRegistry {
         futures_join_all(stops).await;
     }
 
-    /// Forgets the Orphans, leaving their processes running.
     pub fn leave_orphans(&self, orphans: &[Orphan]) {
         for orphan in orphans {
             self.remove(orphan.run_id);

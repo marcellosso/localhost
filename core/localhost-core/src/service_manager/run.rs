@@ -51,7 +51,6 @@ impl ServiceState {
 pub struct Run {
     pub id: Id,
     pub service_id: Id,
-    /// Who started the Run.
     pub origin: Origin,
     #[cfg_attr(feature = "specta", specta(type = crate::SerdeSystemTime))]
     pub started_at: SystemTime,
@@ -62,7 +61,6 @@ pub struct Run {
     pub termination: Option<Termination>,
     /// Why the Run could not launch or run its command (e.g. `CommandNotFound`).
     pub failure: Option<LocalhostError>,
-    /// Who asked the Run to stop, if anyone did.
     pub stop_origin: Option<Origin>,
     /// Whether the process group had to be killed with SIGKILL.
     pub was_force_killed: bool,

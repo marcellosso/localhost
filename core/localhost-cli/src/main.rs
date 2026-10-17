@@ -1,4 +1,4 @@
-//! `localhost`: the core without a UI (#46). It reads the same storage as the
+//! `localhost`: the core without a UI. It reads the same storage as the
 //! app, so it lists the same Projects, and runs Services in the foreground.
 
 mod arguments;

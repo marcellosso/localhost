@@ -212,7 +212,7 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
-      # Static, so it runs in any distro whatever its glibc (#49).
+      # Static, so it runs in any distro whatever its glibc.
       - name: Build localhostd (static, musl)
         run: cargo build -p localhost-daemon --release --target x86_64-unknown-linux-musl
       - name: Check that it is static and runs

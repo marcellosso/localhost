@@ -11,7 +11,7 @@ export async function loadHome() {
   }
 }
 
-/** The path with the home folder as `~`, as macOS abbreviates it. */
+/** The path with the home folder as `~`. */
 export function tildePath(path: string): string {
   if (home && (path === home || path.startsWith(`${home}/`))) return `~${path.slice(home.length)}`;
   return path;

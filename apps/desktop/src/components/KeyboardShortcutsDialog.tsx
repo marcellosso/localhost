@@ -7,8 +7,7 @@ import styles from "./KeyboardShortcutsDialog.module.css";
 
 /**
  * Every keyboard shortcut, grouped (Ctrl+/, the sidebar's keyboard button or
- * the palette), after the macOS app's Keyboard Shortcuts sheet. Escape,
- * Done or Ctrl+/ again closes it.
+ * the palette). Escape, Done or Ctrl+/ again closes it.
  */
 export function KeyboardShortcutsDialog({ onClose }: { onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);

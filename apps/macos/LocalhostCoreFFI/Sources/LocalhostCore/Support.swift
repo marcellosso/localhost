@@ -3,7 +3,7 @@ import Foundation
 // The thin Swift layer over the generated bindings (Generated/, written by
 // scripts/build-core.sh). The generated types are the model; this layer adds
 // what Swift clients expect of them: typed errors, `AsyncStream`s, Foundation
-// types, and the methods the Swift core used to have.
+// types, and methods.
 
 // MARK: Typed errors
 

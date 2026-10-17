@@ -1,5 +1,5 @@
-//! The Rust core reads and writes the Swift core's storage (XP1, ADR-0007):
-//! updating the macOS app to the Rust core must not lose a Project or a Secret.
+//! The core reads and writes the storage of earlier (Swift) versions of
+//! localhost (ADR-0007): updating must not lose a Project or a Secret.
 
 mod common;
 
@@ -89,7 +89,7 @@ fn writes_files_the_swift_core_can_read_back_unchanged() {
     let file = root.path().join("projects/CB62D167-59CC-426A-9C05-BAC3C869DBCA.json");
     let original: serde_json::Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
 
-    // A change and its undo rewrite the file through the Rust core.
+    // A change and its undo rewrite the file.
     library
         .edit_project(
             shop_id,

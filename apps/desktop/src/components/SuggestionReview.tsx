@@ -13,7 +13,6 @@ type Props = {
   drafts: SuggestionDraft[];
   setDrafts: Dispatch<SetStateAction<SuggestionDraft[]>>;
   isScanning: boolean;
-  /** The Project folder, for choosing working directories. */
   /** The Project's folder, where working directories are chosen. */
   project: ProjectFolder;
   /** How many Services the Project already has, so new ones show the colours they'll keep. */

@@ -1,4 +1,4 @@
-//! Ported from `DependencyTests.swift`: the Dependency graph and how the
+//! The Dependency graph and how the
 //! library validates and maintains it.
 
 mod common;

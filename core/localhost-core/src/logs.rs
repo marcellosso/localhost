@@ -2,8 +2,7 @@
 //! the viewer, and a file per Run at `<root>/logs/<SERVICE-ID>/<RUN-ID>.log`.
 //!
 //! Each file line is `<ISO 8601 timestamp> <stdout|stderr|localhost> <text>`,
-//! with the text as written (ANSI sequences included), exactly as the Swift
-//! core wrote it.
+//! with the text as written (ANSI sequences included).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
@@ -48,12 +47,10 @@ impl LogBuffer {
         self.dropped_count
     }
 
-    /// All buffered lines, oldest first.
     pub fn lines(&self) -> Vec<OutputLine> {
         self.lines.iter().cloned().collect()
     }
 
-    /// The last `limit` lines, oldest first.
     pub fn recent_lines(&self, limit: usize) -> Vec<OutputLine> {
         self.lines.iter().skip(self.lines.len().saturating_sub(limit)).cloned().collect()
     }
@@ -141,7 +138,6 @@ impl LogStore {
         self.state().buffers.get(&run_id).map(LogBuffer::lines).unwrap_or_default()
     }
 
-    /// The last `limit` buffered lines of a Run.
     pub fn recent_lines(&self, run_id: Id, limit: usize) -> Vec<OutputLine> {
         self.state().buffers.get(&run_id).map(|buffer| buffer.recent_lines(limit)).unwrap_or_default()
     }

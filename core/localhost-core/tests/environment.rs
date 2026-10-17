@@ -1,6 +1,5 @@
-//! The library half of `EnvironmentTests.swift`: Project variables,
-//! Environment Profiles and Secrets. The Run half (what a started Service
-//! sees, "Restart to apply") moves over with the ServiceManager.
+//! Project variables, Environment Profiles and Secrets in the library. What
+//! a started Service sees, and "Restart to apply", are in `runs.rs`.
 
 mod common;
 

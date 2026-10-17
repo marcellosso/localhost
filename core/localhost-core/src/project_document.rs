@@ -10,7 +10,7 @@ use crate::yaml::{YamlEntry, YamlKind, YamlValue, write_scalar};
 use crate::{ExecutionTarget, Id, Key, LocalhostError, Project, Service, Variables, validate};
 
 /// A Project's Configuration as a Project file, so it can move between
-/// machines (and later into a repo or a CLI). It has no ids, sort order or
+/// machines. It has no ids, sort order or
 /// favourite, and Secrets are listed by name only: their values never leave
 /// the `SecretStore`.
 ///

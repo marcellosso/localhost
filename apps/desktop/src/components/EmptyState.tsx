@@ -11,7 +11,7 @@ type Props = {
   tip?: ReactNode;
 };
 
-/** A column with nothing to show, after macOS's ContentUnavailableView: an icon, a title, a line and actions. */
+/** A column with nothing to show: an icon, a title, a line and actions. */
 export function EmptyState({ icon, title, description, children, tip }: Props) {
   return (
     <div className={styles.empty}>
