@@ -15,6 +15,7 @@ import { ArrowUpRightIcon, ClearIcon, FilterIcon, PlayIcon } from "./Icons";
 import { type LogPrefix, LogView } from "./LogView";
 import { Menu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
+import { ServiceStatsButton } from "./Stats";
 import { serviceColor } from "./ServicesColumn";
 import styles from "./LogPane.module.css";
 
@@ -85,9 +86,12 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
           aria-label={`Open ${status.urlToOpen} in Browser`}
           onClick={() => void openUrl(service.id)}
         >
-          {status.urlToOpen.replace(/^http:\/\//, "")}
+          <span>{status.urlToOpen.replace(/^http:\/\//, "")}</span>
           <ArrowUpRightIcon size={9} />
         </button>
+      )}
+      {(status.state === "starting" || status.state === "running") && status.run && !status.run.endedAt && (
+        <ServiceStatsButton service={service} index={index} />
       )}
     </>
   ) : (

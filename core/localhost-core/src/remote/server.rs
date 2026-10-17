@@ -140,6 +140,7 @@ impl Context {
             }
             Request::Listeners => value(manager.listeners().await),
             Request::StopListener { listener, origin } => value(manager.stop_listener(&listener, origin).await?),
+            Request::RunStats { service_id, previous } => value(manager.run_stats(service_id, previous).await?),
             Request::NextFreePort { service_id } => value(manager.next_free_port(service_id).await?),
             Request::Orphans => value(self.runs.orphans()),
             Request::StopOrphans { orphans } => {

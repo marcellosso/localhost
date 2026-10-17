@@ -33,6 +33,7 @@ use crate::output::{OutputChannel, OutputLine};
 use crate::platform::{self, ProcessStartTime};
 use crate::process::{LaunchConfiguration, ProcessTree, ProcessTreeExit, StopPolicy, Termination};
 use crate::run_registry::RunRegistry;
+use crate::run_stats::{self, RunStats};
 use crate::{Id, Key, LocalhostError, Origin, Project, ProjectLibrary, ProjectLibraryEvent, RunEnvironment, Service};
 
 /// What Docker's CLI prints when its daemon isn't running: older versions,
@@ -355,6 +356,30 @@ impl ServiceManager {
         }
         listener::stop_listener(listener, self.inner.options.stop_policy).await;
         Ok(())
+    }
+
+    // MARK: Stats
+
+    /// What the Service's active Run uses now: its processes, memory and,
+    /// given the previous sample of the same Run, its CPU use since then.
+    /// `None` if the Service has no active Run. Nothing is sampled between
+    /// calls: a client asks again (every second or two) while it shows them.
+    pub async fn run_stats(
+        &self,
+        service_id: Id,
+        previous: Option<RunStats>,
+    ) -> Result<Option<RunStats>, LocalhostError> {
+        self.inner.library.service(service_id)?;
+        let active = self.inner.lock_and(|_, state| {
+            let run = state.statuses.get(&service_id)?.run.as_ref().filter(|run| run.ended_at.is_none())?;
+            let tree = state.trees.get(&service_id).filter(|tree| tree.exit().is_none())?;
+            Some((run.id, tree.clone()))
+        });
+        let Some((run_id, tree)) = active else { return Ok(None) };
+        let (usage, sampled_at) = tokio::task::spawn_blocking(move || (tree.usage(), run_stats::sampling_clock()))
+            .await
+            .expect("sampling a process tree panicked");
+        Ok(Some(RunStats::new(run_id, usage, sampled_at, previous.as_ref())))
     }
 
     /// The port a start of the Service would move to if its Port were taken:

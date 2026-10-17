@@ -1,0 +1,132 @@
+.anchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 250px;
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  color: var(--text-base);
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.popover:focus {
+  outline: none;
+}
+
+.content {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.title {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stat {
+  display: grid;
+  gap: 4px;
+}
+
+.statLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.value {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  background: var(--fill);
+}
+
+.line {
+  fill: none;
+  stroke: var(--service);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.area {
+  fill: var(--service);
+  fill-opacity: 0.15;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 3px 0;
+  font-weight: normal;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th:first-child {
+  padding-right: 14px;
+  text-align: left;
+}
+
+.table td {
+  padding-left: 14px;
+}
+
+.table thead tr,
+.table tfoot tr {
+  border-bottom: 1px solid var(--separator);
+}
+
+.table tfoot tr {
+  border-top: 1px solid var(--separator);
+  border-bottom: none;
+}
+
+.table tfoot th {
+  font-weight: 500;
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--service);
+}

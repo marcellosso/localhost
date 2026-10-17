@@ -108,6 +108,15 @@ export const ArrowUpRightIcon = (props: Props) => (
   </Icon>
 );
 
+/** `gauge.medium`: a running Service's CPU and memory. */
+export const GaugeIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M2.3 11.5a6.3 6.3 0 1 1 11.4 0" />
+    <path d="M8 9.5 10.6 6" />
+    <circle cx="8" cy="10" r="0.6" fill="currentColor" />
+  </Icon>
+);
+
 /** `folder`: no Projects. */
 export const FolderIcon = (props: Props) => (
   <Icon {...props} strokeWidth={1.1}>

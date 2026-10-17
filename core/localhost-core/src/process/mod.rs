@@ -77,6 +77,27 @@ const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// that left the group may still hold them open.
 const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(500);
 
+/// What a Run's process tree uses at one moment (ADR-0012).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct TreeUsage {
+    /// The tree's live processes.
+    pub process_count: u32,
+    /// CPU time used by the tree so far. On Windows the job's total; on
+    /// macOS and Linux the live processes' own and that of the children
+    /// they have waited for.
+    pub cpu_time: Duration,
+    /// The memory of the live processes (see `platform::ProcessUsage`).
+    pub memory_bytes: u64,
+}
+
+impl TreeUsage {
+    fn add(&mut self, process: crate::platform::ProcessUsage) {
+        self.process_count += 1;
+        self.cpu_time += process.cpu_time;
+        self.memory_bytes += process.memory_bytes;
+    }
+}
+
 /// A running (or ended) process tree. Cheap to clone; every clone is the same tree.
 ///
 /// Must be launched inside a multi-threaded tokio runtime.
@@ -161,6 +182,13 @@ impl ProcessTree {
     /// Whether a listening process belongs to this tree.
     pub(crate) fn contains(&self, process: &ListeningProcess) -> bool {
         self.inner.group.contains(process)
+    }
+
+    /// What the tree's live processes use now: every process in the Run's
+    /// session or process group and their descendants (on Windows, its Job
+    /// Object). Blocking.
+    pub(crate) fn usage(&self) -> TreeUsage {
+        self.inner.group.usage()
     }
 
     /// The next batch of output lines, in arrival order, as read from the

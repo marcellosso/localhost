@@ -96,6 +96,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             services::stop_holder_and_start,
             services::start_all,
             services::stop_all,
+            services::run_stats,
             listeners::listeners,
             listeners::stop_listener,
             launch::launch_checks,

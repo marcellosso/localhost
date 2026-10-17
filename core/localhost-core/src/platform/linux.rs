@@ -5,14 +5,20 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::time::Duration;
 
-use super::{ListeningProcess, ProcessStartTime, normalized};
+use super::{ListeningProcess, ProcessRelations, ProcessStartTime, ProcessUsage, normalized};
 
 /// The fields of `/proc/<pid>/stat` localhost uses.
 struct Stat {
+    /// `Z` once the process has ended and waits to be reaped.
+    state: char,
     parent: libc::pid_t,
     process_group: libc::pid_t,
     session: libc::pid_t,
+    /// User and system CPU time of the process and of its children it has
+    /// waited for, in clock ticks.
+    cpu_ticks: u64,
     /// Clock ticks since boot.
     start_ticks: u64,
 }
@@ -24,10 +30,14 @@ fn parse_stat(text: &str) -> Option<Stat> {
     // Field 3 (state) is the first one after the name.
     let fields: Vec<&str> = after_name.split_whitespace().collect();
     let field = |number: usize| fields.get(number - 3).copied();
+    let ticks = |number: usize| field(number)?.parse::<i64>().ok();
     Some(Stat {
+        state: field(3)?.chars().next()?,
         parent: field(4)?.parse().ok()?,
         process_group: field(5)?.parse().ok()?,
         session: field(6)?.parse().ok()?,
+        // utime, stime, cutime, cstime.
+        cpu_ticks: (ticks(14)? + ticks(15)? + ticks(16)? + ticks(17)?).max(0) as u64,
         start_ticks: field(22)?.parse().ok()?,
     })
 }
@@ -151,6 +161,53 @@ pub(super) fn parents() -> HashMap<libc::pid_t, libc::pid_t> {
     all_pids().into_iter().filter_map(|pid| Some((pid, stat(pid)?.parent))).collect()
 }
 
+pub(super) fn relations() -> Vec<ProcessRelations> {
+    all_pids()
+        .into_iter()
+        .filter_map(|pid| {
+            let stat = stat(pid).filter(|stat| stat.state != 'Z')?;
+            Some(ProcessRelations {
+                pid,
+                parent: stat.parent,
+                process_group: stat.process_group,
+                session: stat.session,
+            })
+        })
+        .collect()
+}
+
+pub(super) fn usage(pid: libc::pid_t) -> Option<ProcessUsage> {
+    let stat = stat(pid).filter(|stat| stat.state != 'Z')?;
+    let hz = ticks_per_second();
+    let cpu_time =
+        Duration::from_secs(stat.cpu_ticks / hz) + Duration::from_nanos(stat.cpu_ticks % hz * 1_000_000_000 / hz);
+    Some(ProcessUsage { cpu_time, memory_bytes: proportional_set_size(pid).or_else(|| resident_set_size(pid))? })
+}
+
+/// The process's share of the memory it maps: its private pages plus each
+/// shared page divided by the number of processes sharing it, from
+/// `/proc/<pid>/smaps_rollup` (Linux 4.14 and later).
+fn proportional_set_size(pid: libc::pid_t) -> Option<u64> {
+    parse_proportional_set_size(&fs::read_to_string(format!("/proc/{pid}/smaps_rollup")).ok()?)
+}
+
+fn parse_proportional_set_size(text: &str) -> Option<u64> {
+    let line = text.lines().find_map(|line| line.strip_prefix("Pss:"))?;
+    let kilobytes: u64 = line.trim().strip_suffix("kB")?.trim().parse().ok()?;
+    Some(kilobytes * 1024)
+}
+
+/// The resident set from `/proc/<pid>/statm`, its second field, in pages.
+fn resident_set_size(pid: libc::pid_t) -> Option<u64> {
+    let text = fs::read_to_string(format!("/proc/{pid}/statm")).ok()?;
+    let pages: u64 = text.split_whitespace().nth(1)?.parse().ok()?;
+    let page_size = match unsafe { libc::sysconf(libc::_SC_PAGESIZE) } {
+        size if size > 0 => size as u64,
+        _ => 4096,
+    };
+    Some(pages * page_size)
+}
+
 /// Linux has no launchd; systemd units are left to future work.
 pub(super) fn managed_jobs() -> HashMap<libc::pid_t, String> {
     HashMap::new()
@@ -165,6 +222,17 @@ mod tests {
         let text = "4242 (my (weird) name) S 1 4242 4242 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 987654 0 0";
         let stat = parse_stat(text).unwrap();
         assert_eq!((stat.parent, stat.process_group, stat.session, stat.start_ticks), (1, 4242, 4242, 987654));
+        assert_eq!((stat.state, stat.cpu_ticks), ('S', 3));
+    }
+
+    #[test]
+    fn parses_the_proportional_set_size() {
+        let text = "5581f000-7ffd8a1f3000 ---p 00000000 00:00 0                          [rollup]\n\
+                    Rss:               12340 kB\n\
+                    Pss:                8192 kB\n\
+                    Pss_Anon:           4096 kB\n";
+        assert_eq!(parse_proportional_set_size(text), Some(8192 * 1024));
+        assert_eq!(parse_proportional_set_size("Rss: 1 kB\n"), None);
     }
 
     #[test]

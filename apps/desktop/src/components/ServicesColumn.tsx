@@ -1,4 +1,4 @@
-import { type CSSProperties, useId } from "react";
+import { type CSSProperties, useId, useState } from "react";
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "../actions";
 import type { Folder, Project, Service, StatusView } from "../bindings";
 import { exportProject, requestRemoveService, setActiveProfile, setFavorite } from "../editors";
@@ -13,6 +13,7 @@ import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
 import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph } from "./StateGlyph";
+import { ProjectStats } from "./Stats";
 import styles from "./ServicesColumn.module.css";
 
 type Props = {
@@ -109,6 +110,7 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
 /** The selected Project's toolbar actions: its Environment Profile once it has one, Start All, Stop All, and the rest in `⋯`. */
 export function ProjectActions({ project, view }: { project: Project; view: CoreView }) {
   const anyActive = project.services.some((service) => isActive(serviceStatus(view, service.id).state));
+  const [showsStats, setShowsStats] = useState(false);
   return (
     <>
       {(project.profiles ?? []).length > 0 && <ProfileMenu project={project} />}
@@ -125,7 +127,13 @@ export function ProjectActions({ project, view }: { project: Project; view: Core
         <StopIcon size={11} />
         Stop All
       </button>
-      <Menu label={`More actions for ${project.name}`} items={projectMenuItems(project, true)} />
+      <span className={styles.statsAnchor}>
+        <Menu
+          label={`More actions for ${project.name}`}
+          items={[{ label: "Stats…", onSelect: () => setShowsStats(true) }, "separator", ...projectMenuItems(project, true)]}
+        />
+        {showsStats && <ProjectStats project={project} view={view} onClose={() => setShowsStats(false)} />}
+      </span>
     </>
   );
 }

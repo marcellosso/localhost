@@ -27,17 +27,18 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,
-    JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_BASIC_PROCESS_ID_LIST, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JobObjectBasicAccountingInformation, JobObjectBasicProcessIdList, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows_sys::Win32::System::Threading::{
     CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW, CREATE_SUSPENDED, OpenProcess, OpenThread,
     PROCESS_QUERY_LIMITED_INFORMATION, ResumeThread, THREAD_SUSPEND_RESUME, WaitForSingleObject,
 };
 
-use super::LaunchConfiguration;
+use super::{LaunchConfiguration, TreeUsage};
 use crate::platform::signal::{SIGINT, SIGKILL};
-use crate::platform::{ListeningProcess, Pid};
+use crate::platform::{self, ListeningProcess, Pid};
 use crate::process::Termination;
 use crate::{LocalhostError, RunEnvironment};
 
@@ -64,6 +65,26 @@ pub(super) struct Group {
 impl Group {
     /// Whether any process is left in the job.
     pub(super) fn exists(&self) -> bool {
+        self.accounting().is_none_or(|accounting| accounting.ActiveProcesses > 0)
+    }
+
+    /// The job's CPU time (every process it has held, ended ones included)
+    /// and its live processes' private bytes.
+    pub(super) fn usage(&self) -> TreeUsage {
+        let mut usage = TreeUsage::default();
+        for pid in self.process_ids() {
+            if let Some(process) = platform::usage(pid) {
+                usage.add(process);
+            }
+        }
+        if let Some(accounting) = self.accounting() {
+            let ticks = (accounting.TotalUserTime + accounting.TotalKernelTime).max(0) as u64;
+            usage.cpu_time = Duration::from_nanos(ticks.saturating_mul(100));
+        }
+        usage
+    }
+
+    fn accounting(&self) -> Option<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION> {
         let mut information: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { mem::zeroed() };
         let succeeded = unsafe {
             QueryInformationJobObject(
@@ -74,7 +95,35 @@ impl Group {
                 ptr::null_mut(),
             )
         };
-        succeeded == 0 || information.ActiveProcesses > 0
+        (succeeded != 0).then_some(information)
+    }
+
+    /// The pids of the processes in the job.
+    fn process_ids(&self) -> Vec<Pid> {
+        // The list's two counts, then the ids; grown if the job holds more.
+        let header = mem::offset_of!(JOBOBJECT_BASIC_PROCESS_ID_LIST, ProcessIdList) / size_of::<usize>();
+        let mut capacity = 64;
+        loop {
+            let mut buffer = vec![0usize; header + capacity];
+            let succeeded = unsafe {
+                QueryInformationJobObject(
+                    raw(&self.job),
+                    JobObjectBasicProcessIdList,
+                    buffer.as_mut_ptr().cast(),
+                    (buffer.len() * size_of::<usize>()) as u32,
+                    ptr::null_mut(),
+                )
+            };
+            let list = unsafe { &*buffer.as_ptr().cast::<JOBOBJECT_BASIC_PROCESS_ID_LIST>() };
+            let (assigned, listed) = (list.NumberOfAssignedProcesses as usize, list.NumberOfProcessIdsInList as usize);
+            if succeeded == 0 && assigned <= capacity {
+                return Vec::new();
+            }
+            if succeeded != 0 && listed >= assigned {
+                return buffer[header..header + listed.min(capacity)].iter().map(|&pid| pid as Pid).collect();
+            }
+            capacity = assigned.max(capacity * 2);
+        }
     }
 
     /// Whether the process is in the job. A process ends up in it through

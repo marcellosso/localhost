@@ -12,8 +12,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::{Call, Hello, Message, PROTOCOL_VERSION, Request};
 use crate::{
-    Id, Listener, LocalhostError, Origin, Orphan, OutputLine, Project, ServiceEvent, ServiceOutputLine, ServiceStatus,
-    ServiceSuggestion,
+    Id, Listener, LocalhostError, Origin, Orphan, OutputLine, Project, RunStats, ServiceEvent, ServiceOutputLine,
+    ServiceStatus, ServiceSuggestion,
 };
 
 /// A connection to `localhostd`. Cheap to clone; every clone is the same
@@ -309,6 +309,14 @@ impl Remote {
 
     pub async fn next_free_port(&self, service_id: Id) -> Result<Option<u16>, LocalhostError> {
         self.call(Request::NextFreePort { service_id }).await
+    }
+
+    pub async fn run_stats(
+        &self,
+        service_id: Id,
+        previous: Option<RunStats>,
+    ) -> Result<Option<RunStats>, LocalhostError> {
+        self.call(Request::RunStats { service_id, previous }).await
     }
 
     // MARK: Orphans, as `RunRegistry`

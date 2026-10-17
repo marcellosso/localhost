@@ -34,6 +34,7 @@ localhost goes from a macOS app to macOS, Linux and Windows. There is real deman
 | Command | `$SHELL -l -c` (ADR-0003) | `$SHELL -l -c` | `cmd.exe /s /c`, environment from `CreateEnvironmentBlock` (ADR-0010) |
 | Process tree | new session, signal the process group | same | Job Object (kill-on-close), `CTRL_BREAK_EVENT`, then terminate the job (ADR-0011) |
 | Listeners | libproc | `/proc/net/tcp{,6}` + `/proc/<pid>/fd`, `cwd` | `GetExtendedTcpTable`, cwd read from the process's PEB |
+| Run stats (ADR-0012) | `proc_pid_rusage`: CPU time, physical footprint | `/proc/<pid>/stat` CPU time, PSS from `smaps_rollup` | the Job Object's CPU time, private bytes |
 | Secrets | Keychain | Secret Service (libsecret) | Credential Manager |
 | Tray | menu bar extra | AppIndicator (GNOME needs the extension) | notification area |
 | Distribution | DMG (`RELEASING.md`) | `.deb`, `.rpm`, AppImage. **Not Flatpak or Snap**: their sandboxes can't spawn host commands, the same reason as ADR-0002 | NSIS/MSI installer, Authenticode signing when a certificate exists |

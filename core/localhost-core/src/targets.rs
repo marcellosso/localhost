@@ -22,8 +22,8 @@ use tokio::task::JoinSet;
 use crate::remote::Remote;
 use crate::{
     ExecutionTarget, Id, Listener, LocalhostError, LogStore, Origin, Orphan, OutputLine, Project, ProjectLibrary,
-    ProjectScanner, RunRegistry, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceState,
-    ServiceStatus, ServiceSuggestion,
+    ProjectScanner, RunRegistry, RunStats, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceOutputLine,
+    ServiceState, ServiceStatus, ServiceSuggestion,
 };
 
 /// A connection being made to a `localhostd`, e.g. `Remote::spawn(…)`.
@@ -288,6 +288,22 @@ impl Targets {
         match self.inner.reach_service(service_id, false).await? {
             Reached::Local(local) => local.manager.next_free_port(service_id).await,
             Reached::Remote(remote) => remote.next_free_port(service_id).await,
+        }
+    }
+
+    // MARK: Stats
+
+    /// What the Service's active Run uses, as `ServiceManager::run_stats`,
+    /// measured where it runs: a WSL distro's processes only its own
+    /// `localhostd` can see (ADR-0008).
+    pub async fn run_stats(
+        &self,
+        service_id: Id,
+        previous: Option<RunStats>,
+    ) -> Result<Option<RunStats>, LocalhostError> {
+        match self.inner.reach_service(service_id, false).await? {
+            Reached::Local(local) => local.manager.run_stats(service_id, previous).await,
+            Reached::Remote(remote) => remote.run_stats(service_id, previous).await,
         }
     }
 

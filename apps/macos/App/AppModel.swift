@@ -86,6 +86,8 @@ final class AppModel {
     /// Incremented once log buffers were cleared, so log views start over.
     private(set) var logClearCount = 0
     var presentedSheet: Sheet?
+    /// The Project whose stats popover (Stats… in its `⋯` menu) is open.
+    var statsProjectID: UUID?
     /// Whether the command palette (⌘K) is open over the main window.
     var isShowingPalette = false
     /// The latest request to move keyboard focus to a column of the main window.

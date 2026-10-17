@@ -38,8 +38,10 @@
   white-space: nowrap;
 }
 
+/* Without room, the run time gives way first, then the URL, then the
+   filter; the stats button and the `⋯` always stay in view. */
 .runTime {
-  flex: none;
+  flex: 0 1000 auto;
 }
 
 .failed {
@@ -52,7 +54,8 @@
 
 .url {
   display: inline-flex;
-  flex: none;
+  flex: 0 10 auto;
+  min-width: 0;
   align-items: center;
   gap: 2px;
   padding: 0;
@@ -63,6 +66,15 @@
   white-space: nowrap;
 }
 
+.url > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url > svg {
+  flex: none;
+}
+
 .spacer {
   flex: 1;
   min-width: 8px;
@@ -70,10 +82,10 @@
 
 .filter {
   display: flex;
-  flex: none;
+  flex: 0 1 170px;
   align-items: center;
   gap: 5px;
-  width: 170px;
+  min-width: 96px;
   height: 24px;
   padding: 0 7px;
   border-radius: 6px;

@@ -85,4 +85,10 @@ extension ServiceManager {
     public func nextFreePort(for serviceID: UUID) async throws(LocalhostError) -> Int? {
         try await core { try await ffiNextFreePort(serviceId: serviceID) }.map(Int.init)
     }
+
+    /// What the Service's active Run uses now, `nil` without one. Pass the
+    /// previous sample of the same Run to get its CPU use since then.
+    public func runStats(for serviceID: UUID, previous: RunStats? = nil) async throws(LocalhostError) -> RunStats? {
+        try await core { try await ffiRunStats(serviceId: serviceID, previous: previous) }
+    }
 }
