@@ -13,12 +13,12 @@ const sections: { id: Section; title: string; icon: ReactNode }[] = [
   { id: "ports", title: "Ports", icon: <GlobeIcon size={13} /> },
 ];
 
-/** The log font sizes offered, as on macOS (settings.rs keeps the same list). */
+/** The log font sizes offered; settings.rs keeps the same list. */
 const LOG_FONT_SIZES = [10, 11, 12, 13, 14, 16];
 
 /**
- * Settings, after the macOS Settings window: a rail of sections and the
- * selected one beside it. Changes apply at once.
+ * Settings: a rail of sections and the selected one beside it. Changes
+ * apply at once.
  */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("appearance");

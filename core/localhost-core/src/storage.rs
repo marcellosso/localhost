@@ -1,6 +1,6 @@
 //! Reads and writes Project Configuration: one JSON file per Project at
-//! `<root>/projects/<PROJECT-ID>.json` (ADR-0004), in the Swift core's
-//! schema 1, so either can read what the other wrote.
+//! `<root>/projects/<PROJECT-ID>.json` (ADR-0004), in schema 1, as earlier
+//! (Swift) versions of localhost wrote them.
 
 use std::fs;
 use std::io::{self, Write};
@@ -150,7 +150,7 @@ impl ProjectStorage {
         let failure =
             |error: io::Error| LocalhostError::PersistenceFailed { path: display(&path), reason: error.to_string() };
         let file = FileRef { schema_version: SCHEMA_VERSION, project };
-        // `Value` objects keep their keys sorted, like the Swift core's files.
+        // `Value` objects keep their keys sorted, as schema 1 files have them.
         let value = serde_json::to_value(&file).expect("a Project always encodes");
         let mut data = serde_json::to_vec_pretty(&value).expect("a Value always encodes");
         data.push(b'\n');

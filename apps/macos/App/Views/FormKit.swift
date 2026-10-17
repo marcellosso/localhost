@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The pieces every sheet is built from (#26, round 2): a header with an icon,
+// The pieces every sheet is built from: a header with an icon,
 // labels above fields, boxed fields with an accent focus ring, cards, chips,
 // switches, and a footer with one accent button.
 

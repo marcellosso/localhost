@@ -70,7 +70,6 @@ struct Inner {
     runtime: tokio::runtime::Handle,
 }
 
-/// This machine, in this process.
 struct Local {
     manager: ServiceManager,
     logs: Arc<LogStore>,
@@ -502,7 +501,6 @@ impl Inner {
         Ok(Reached::Remote(remote))
     }
 
-    /// The targets connected now.
     fn connected(&self) -> Vec<(ExecutionTarget, Remote)> {
         let slots = self.slots.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         slots.iter().filter_map(|(target, slot)| Some((target.clone(), slot.connected()?))).collect()

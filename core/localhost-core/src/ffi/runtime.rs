@@ -15,7 +15,6 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
         .expect("the core's runtime starts")
 });
 
-/// Runs `future` on the core's runtime.
 pub(super) async fn on_runtime<F>(future: F) -> F::Output
 where
     F: Future + Send + 'static,

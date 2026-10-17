@@ -1,4 +1,4 @@
-//! Ported from `ProjectLibraryTests.swift`.
+//! The Project library: Projects, Services, persistence and events.
 
 mod common;
 

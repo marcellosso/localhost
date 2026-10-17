@@ -29,7 +29,7 @@ export type ShortcutContext = {
 };
 
 /**
- * The main window's keyboard, after the macOS menus and ColumnNavigation:
+ * The main window's keyboard:
  *
  * - Ctrl+K the palette, Ctrl+0 Ports, Ctrl+1–9 Projects, Ctrl+Alt+1–9 the
  *   selected Project's Services, Ctrl+[ / Ctrl+] the previous / next row.

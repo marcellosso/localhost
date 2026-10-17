@@ -7,7 +7,7 @@
   background: rgb(0 0 0 / 0.2);
 }
 
-/* 640 × 440, as the macOS Settings window: the rail in the sidebar's glass, the section in the column's. */
+/* 640 × 440: the rail in the sidebar's glass, the section in the column's. */
 .window {
   position: relative;
   display: grid;

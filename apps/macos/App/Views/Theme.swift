@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The app's colours and surfaces ("Graded glass", #26), each resolved for the
+/// The app's colours and surfaces ("Graded glass"), each resolved for the
 /// light or dark appearance. Green, orange and red are kept for Service State;
 /// the accent marks only primary actions.
 ///

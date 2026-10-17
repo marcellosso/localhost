@@ -1,5 +1,5 @@
-//! Ported from `ProcessTreeTests.swift`. These tests launch real processes;
-//! each command line is a fixture.
+//! A Run's process tree on macOS and Linux. These tests launch real
+//! processes; each command line is a fixture.
 #![cfg(unix)]
 
 use std::collections::BTreeMap;

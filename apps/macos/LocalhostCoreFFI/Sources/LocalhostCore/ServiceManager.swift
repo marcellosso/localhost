@@ -1,8 +1,8 @@
 import Foundation
 
 // Starts and stops Services (Runs), tracks their States, moves Ports and
-// lists Listeners. The core does the work; these keep the Swift core's
-// labels, Int ports and typed errors.
+// lists Listeners. The core does the work; these add Swift labels, Int ports
+// and typed errors.
 
 extension ServiceManager {
     public convenience init(

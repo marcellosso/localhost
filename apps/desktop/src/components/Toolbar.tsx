@@ -10,7 +10,7 @@ type Props = {
 
 /**
  * The window's toolbar: one strip across the Services column and the log,
- * its title over the column and its actions over the log, as on macOS.
+ * its title over the column and its actions over the log.
  */
 export function Toolbar({ title, subtitle, actions }: Props) {
   return (

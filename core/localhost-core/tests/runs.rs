@@ -1,7 +1,6 @@
-//! What a Run does beyond its lifecycle, against real processes. Ported
-//! from the Run half of `EnvironmentTests.swift` (what a started Service
-//! sees, "Restart to apply"), `ServiceLogTests.swift`, and the parts of
-//! `OrphanTests.swift` that need a ServiceManager.
+//! What a Run does beyond its lifecycle, against real processes: what a
+//! started Service sees, "Restart to apply", its logs, and Orphans across
+//! sessions.
 
 mod common;
 
@@ -323,7 +322,7 @@ async fn a_new_session_finds_the_previous_sessions_surviving_runs_and_never_read
     let orphans = registry.orphans();
     assert_eq!(orphans.iter().map(|o| o.run_id).collect::<Vec<_>>(), [run.id]);
     assert_eq!(orphans[0].service_id, service.id);
-    // Recorded as seconds in an f64, as the Swift core did: equal to well within a millisecond.
+    // Recorded as seconds in an f64: equal to well within a millisecond.
     let difference =
         orphans[0].started_at.duration_since(run.started_at).or_else(|e| Ok::<_, ()>(e.duration())).unwrap();
     assert!(difference < Duration::from_millis(1), "{difference:?}");

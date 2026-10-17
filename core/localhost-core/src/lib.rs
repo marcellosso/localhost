@@ -87,5 +87,5 @@ pub(crate) struct SerdeSystemTime {
     nanos_since_epoch: u32,
 }
 
-/// Version of the core, surfaced by clients (and later the CLI/MCP).
+/// Version of the core, surfaced by clients.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -1,4 +1,4 @@
-//! Ported from `HardeningTests.swift`: lifecycle edge cases against real
+//! Lifecycle edge cases against real
 //! processes. Storms of starts and stops, restarts during Starting, output
 //! floods, huge lines and bytes that aren't UTF-8. Each command line ends
 //! with a unique marker so a test can check that nothing it launched is left

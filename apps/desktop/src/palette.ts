@@ -7,8 +7,8 @@ import type { ServiceSelection } from "./selection";
 import { isActive } from "./status";
 import { showAlert, showSheet } from "./ui";
 
-// What the command palette (Ctrl+K) offers, after the macOS app's
-// CommandPalette.swift: jumps to Projects and Services, and actions on them.
+// What the command palette (Ctrl+K) offers: jumps to Projects and Services,
+// and actions on them.
 
 /** Where the palette's jumps go; the window's selection lives in App. */
 export type Navigator = {

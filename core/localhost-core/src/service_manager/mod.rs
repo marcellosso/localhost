@@ -5,8 +5,8 @@
 //! returns the Service's status once it has taken effect.
 //!
 //! State lives behind a mutex that is only ever held for short synchronous
-//! sections, never across an `.await`: like the Swift actor it replaces,
-//! state may change while an operation waits.
+//! sections, never across an `.await`, so state may change while an
+//! operation waits.
 
 mod run;
 
@@ -124,7 +124,6 @@ struct State {
     /// The launch configuration each Service's latest Run was started with,
     /// hashed (it includes Secret values, so it is never stored or sent).
     launch_fingerprints: HashMap<Id, u64>,
-    /// Live Runs that printed Docker's "daemon not running" error.
     /// Failures diagnosed from a Run's output (`diagnosis`), the first per Run.
     diagnosed_failures: HashMap<Id, LocalhostError>,
 }
@@ -548,7 +547,7 @@ impl Inner {
     }
 
     /// Never when it is off, for this Service or app-wide; when dependents may
-    /// expect the Port (#15); or when the holder is inside the same Project,
+    /// expect the Port; or when the holder is inside the same Project,
     /// likely its own leftover.
     fn can_move_automatically(&self, service: &Service, project: &Project, holder: Option<&Listener>) -> bool {
         if !self.automatic_port_move.load(Ordering::Relaxed)
@@ -589,7 +588,6 @@ impl Inner {
 
     // MARK: Dependencies
 
-    /// `start` for a Service with Dependencies.
     fn start_with_dependencies(
         self: Arc<Self>,
         service_id: Id,

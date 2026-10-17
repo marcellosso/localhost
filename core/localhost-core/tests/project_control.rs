@@ -1,4 +1,4 @@
-//! Ported from `ProjectControlTests.swift`: Dependencies, Start All and Stop
+//! Dependencies, Start All and Stop
 //! All against real processes.
 
 mod common;

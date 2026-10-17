@@ -7,7 +7,7 @@ import styles from "./LogView.module.css";
 
 /** Rows drawn above and below the visible ones, for smooth scrolling. */
 const OVERSCAN = 20;
-/** Space above the first line, as the macOS log's inset. */
+/** Space above the first line. */
 const TOP_INSET = 8;
 
 /** Which Service a line of a combined stream came from. */
@@ -130,7 +130,7 @@ const Row = memo(function Row(props: { line: LogLine; top: number; prefix?: LogP
         </span>
       )}
       {segments(line, filter).map((segment, index) => {
-        // Links take the link colour, as on macOS, over their ANSI one.
+        // Links take the link colour over their ANSI one.
         const style = isNote || segment.url ? undefined : spanStyle(segment.style);
         const className = segment.isMatch ? styles.match : undefined;
         return segment.url ? (

@@ -1,7 +1,7 @@
 import { isMac, projectShortcut, SHORTCUTS, type Shortcut, serviceShortcut, shortcutLabel } from "./keyboard";
 
-// The Keyboard Shortcuts dialog's content (Ctrl+/), after the macOS app's
-// KeyboardShortcutsView.swift: what this window's keyboard does, grouped.
+// The Keyboard Shortcuts dialog's content (Ctrl+/): what this window's
+// keyboard does, grouped.
 
 export type GuideEntry = {
   title: string;

@@ -3,7 +3,7 @@
 //!
 //! The UI sends what the user typed; this module parses it into the core's
 //! types (Keys, Ports, variables), so a mistake comes back in the core's
-//! words. Removing stops what is running first, as in the macOS app.
+//! words. Removing stops what is running first.
 
 use std::collections::HashSet;
 

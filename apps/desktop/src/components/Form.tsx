@@ -6,8 +6,7 @@ import { useModal } from "./Dialog";
 import { CheckIcon, ChevronIcon, FolderIcon } from "./Icons";
 import styles from "./Form.module.css";
 
-// The pieces every editor sheet is built from, after the macOS FormKit: a
-// header with an icon, labels above fields, boxed fields with an accent focus
+// The pieces every editor sheet is built from: a header with an icon, labels above fields, boxed fields with an accent focus
 // ring, cards, chips, switches, and a footer with one accent button.
 
 type SheetProps = {

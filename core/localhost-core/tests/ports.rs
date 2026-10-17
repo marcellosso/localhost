@@ -1,8 +1,7 @@
-//! Ported from `PortTests.swift` and `ListenerTests.swift`: readiness on a
-//! Port, `PORT`, detected URLs, Listener attribution, port conflicts and
-//! automatic moves, against real processes. Listeners not started by
-//! localhost are process trees launched directly with `ProcessTree`. The
-//! listening process is `nc`, or a Python fixture on Windows (see `commands`).
+//! Readiness on a Port, `PORT`, detected URLs, Listener attribution, port
+//! conflicts and automatic moves, against real processes. Listeners not
+//! started by localhost are process trees launched directly with
+//! `ProcessTree`. The listening process is `nc`, or a Python fixture on Windows (see `commands`).
 
 mod common;
 

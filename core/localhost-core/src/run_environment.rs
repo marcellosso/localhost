@@ -123,7 +123,6 @@ fn same_name(a: &str, b: &str) -> bool {
     if cfg!(windows) { a.eq_ignore_ascii_case(b) } else { a == b }
 }
 
-/// Sets a variable, replacing any of the same name.
 fn set(environment: &mut BTreeMap<String, String>, name: &str, value: String) {
     if cfg!(windows) {
         environment.retain(|existing, _| !same_name(existing, name));
