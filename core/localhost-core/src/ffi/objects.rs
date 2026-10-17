@@ -12,9 +12,9 @@ use super::runtime::{blocking, on_runtime};
 use super::subscriptions::{LibraryEvents, OutputLines, ServiceEvents, ServiceOutputLines};
 use crate::{
     EnvironmentProfile, Id, Key, KeyClash, Listener, LocalhostError, LogStore, NewService, Origin, Orphan, OutputLine,
-    ProfileChanges, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, Service, ServiceChanges,
-    ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore,
-    UnreadableProjectFile, VariableInput, VariableLayer,
+    ProfileChanges, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service,
+    ServiceChanges, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy,
+    SystemSecretStore, UnreadableProjectFile, VariableInput, VariableLayer,
 };
 
 // MARK: ProjectLibrary
@@ -392,6 +392,15 @@ impl ServiceManager {
     #[uniffi::method]
     pub async fn ffi_next_free_port(self: Arc<Self>, service_id: Id) -> Result<Option<u16>, LocalhostError> {
         on_runtime(async move { self.next_free_port(service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_run_stats(
+        self: Arc<Self>,
+        service_id: Id,
+        previous: Option<RunStats>,
+    ) -> Result<Option<RunStats>, LocalhostError> {
+        on_runtime(async move { self.run_stats(service_id, previous).await }).await
     }
 }
 

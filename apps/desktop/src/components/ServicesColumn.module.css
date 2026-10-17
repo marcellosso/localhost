@@ -123,3 +123,10 @@
 .addServiceTitle {
   flex: 1;
 }
+
+/* Where the Project's stats popover hangs, below its `⋯`. */
+.statsAnchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}

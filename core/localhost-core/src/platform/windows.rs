@@ -25,6 +25,7 @@ use windows_sys::Win32::System::Diagnostics::Debug::ReadProcessMemory;
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
 };
+use windows_sys::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS_EX};
 use windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows_sys::Win32::System::Services::{
     CloseServiceHandle, ENUM_SERVICE_STATUS_PROCESSW, EnumServicesStatusExW, OpenSCManagerW, SC_ENUM_PROCESS_INFO,
@@ -37,7 +38,7 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use super::signal::SIGINT;
-use super::{ListeningProcess, Pid, ProcessStartTime, normalized};
+use super::{ListeningProcess, Pid, ProcessStartTime, ProcessUsage, normalized};
 
 /// 100-nanosecond intervals from 1601-01-01 (`FILETIME`'s epoch) to 1970-01-01.
 const UNIX_EPOCH_IN_FILETIME: u64 = 116_444_736_000_000_000;
@@ -49,17 +50,44 @@ fn open(pid: Pid, access: u32) -> Option<OwnedHandle> {
     (!handle.is_null()).then(|| unsafe { OwnedHandle::from_raw_handle(handle) })
 }
 
-/// The process's creation time, as wall-clock time.
-pub(super) fn start_time(pid: Pid) -> Option<ProcessStartTime> {
-    let process = open(pid, PROCESS_QUERY_LIMITED_INFORMATION)?;
+/// A process's `GetProcessTimes`: creation, exit, kernel and user time.
+fn times(process: &OwnedHandle) -> Option<[u64; 4]> {
     let zero = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
     let (mut creation, mut exit, mut kernel, mut user) = (zero, zero, zero, zero);
     if unsafe { GetProcessTimes(process.as_raw_handle(), &mut creation, &mut exit, &mut kernel, &mut user) } == 0 {
         return None;
     }
-    let ticks =
-        ((creation.dwHighDateTime as u64) << 32 | creation.dwLowDateTime as u64).saturating_sub(UNIX_EPOCH_IN_FILETIME);
+    Some([creation, exit, kernel, user].map(|time| (time.dwHighDateTime as u64) << 32 | time.dwLowDateTime as u64))
+}
+
+/// The process's creation time, as wall-clock time.
+pub(super) fn start_time(pid: Pid) -> Option<ProcessStartTime> {
+    let [creation, ..] = times(&open(pid, PROCESS_QUERY_LIMITED_INFORMATION)?)?;
+    let ticks = creation.saturating_sub(UNIX_EPOCH_IN_FILETIME);
     Some(ProcessStartTime { seconds: ticks / 10_000_000, microseconds: ticks % 10_000_000 / 10 })
+}
+
+/// The process's CPU time (Windows doesn't add its children's) and private bytes.
+pub(super) fn usage(pid: Pid) -> Option<ProcessUsage> {
+    let process = open(pid, PROCESS_QUERY_LIMITED_INFORMATION)?;
+    let [_, exit, kernel, user] = times(&process)?;
+    // A handle may outlive the process; its exit time is set once it has ended.
+    if exit != 0 {
+        return None;
+    }
+    let mut counters: PROCESS_MEMORY_COUNTERS_EX = unsafe { std::mem::zeroed() };
+    counters.cb = size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
+    let succeeded =
+        unsafe { GetProcessMemoryInfo(process.as_raw_handle(), (&raw mut counters).cast(), counters.cb) } != 0;
+    Some(ProcessUsage {
+        cpu_time: hundred_nanoseconds(kernel + user),
+        memory_bytes: if succeeded { counters.PrivateUsage as u64 } else { 0 },
+    })
+}
+
+/// A duration in `FILETIME`'s 100-nanosecond units.
+fn hundred_nanoseconds(ticks: u64) -> std::time::Duration {
+    std::time::Duration::from_nanos(ticks.saturating_mul(100))
 }
 
 /// A process in a Toolhelp snapshot.

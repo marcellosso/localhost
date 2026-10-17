@@ -1,5 +1,6 @@
 //! What the operating system tells about processes: who is listening on
-//! which TCP port, when a process started, its parent, and signalling them.
+//! which TCP port, when a process started, its parent, what it uses, and
+//! signalling them.
 //! One implementation per platform; everything above this module is shared.
 //!
 //! On Windows there are no process groups or signals: Runs live in Job
@@ -8,6 +9,7 @@
 //! distro's Linux (ADR-0008).
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -108,6 +110,65 @@ pub(crate) fn scan_listeners() -> Vec<ListeningProcess> {
 /// The parent of every process, for finding descendants. Blocking.
 pub(crate) fn parents() -> HashMap<Pid, Pid> {
     imp::parents()
+}
+
+/// What one process uses, as the kernel reports it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessUsage {
+    /// User and system CPU time of the process. On macOS and Linux it
+    /// includes the children it has waited for, so the time of a process
+    /// that ended in a Run's tree isn't lost once its parent reaps it.
+    pub cpu_time: Duration,
+    /// Its memory, counting shared pages once where the platform can: the
+    /// physical footprint on macOS (Activity Monitor's "Memory"), the
+    /// proportional set size on Linux (the resident set where that can't be
+    /// read), private bytes on Windows (ADR-0012).
+    pub memory_bytes: u64,
+}
+
+/// What a live process of this user uses, `None` if there is none with that
+/// pid (or it has ended and waits to be reaped). Blocking.
+pub(crate) fn usage(pid: Pid) -> Option<ProcessUsage> {
+    imp::usage(pid)
+}
+
+/// Where a process sits among the others.
+#[cfg(unix)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ProcessRelations {
+    pub pid: Pid,
+    pub parent: Pid,
+    pub process_group: Pid,
+    pub session: Pid,
+}
+
+/// The relations of every live process; zombies are left out. Blocking.
+#[cfg(unix)]
+pub(crate) fn relations() -> Vec<ProcessRelations> {
+    imp::relations()
+}
+
+/// The live processes of the tree a session leader started: those in its
+/// session or its process group, and its descendants, which may have left
+/// both with `setsid` (ADR-0012). Includes the leader, if alive.
+#[cfg(unix)]
+pub(crate) fn tree_members(leader: Pid, relations: &[ProcessRelations]) -> Vec<Pid> {
+    let mut members: Vec<Pid> = relations
+        .iter()
+        .filter(|process| process.pid == leader || process.session == leader || process.process_group == leader)
+        .map(|process| process.pid)
+        .collect();
+    let mut index = 0;
+    while index < members.len() {
+        let parent = members[index];
+        index += 1;
+        for process in relations {
+            if process.parent == parent && process.pid != parent && !members.contains(&process.pid) {
+                members.push(process.pid);
+            }
+        }
+    }
+    members
 }
 
 /// The pids of the user's running service-manager jobs (launchd on macOS),
@@ -212,6 +273,58 @@ mod tests {
         assert_eq!(found.start_time, ProcessStartTime::of(me).unwrap());
         assert!(found.executable_path.is_some());
         assert_eq!(found.working_directory.as_deref(), Some(resolved_path(".").as_str()));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn finds_a_trees_members_by_session_group_and_parent() {
+        let process = |pid, parent, process_group, session| ProcessRelations { pid, parent, process_group, session };
+        let relations = [
+            process(1, 0, 1, 1),
+            // The Run's shell leads its session and group.
+            process(10, 1, 10, 10),
+            process(11, 10, 10, 10),
+            // Left the group but not the session.
+            process(12, 11, 12, 10),
+            // Left both with setsid, and its child.
+            process(13, 11, 13, 13),
+            process(14, 13, 13, 13),
+            // Reparented to init but still in the group.
+            process(15, 1, 10, 10),
+            // Someone else's.
+            process(20, 1, 20, 20),
+            process(21, 20, 20, 20),
+        ];
+        let mut members = tree_members(10, &relations);
+        members.sort();
+        assert_eq!(members, [10, 11, 12, 13, 14, 15]);
+        assert_eq!(tree_members(99, &relations), Vec::<Pid>::new());
+    }
+
+    #[test]
+    fn reads_what_this_process_uses() {
+        let me = std::process::id() as i32;
+        let before = usage(me).expect("this process is alive");
+        // Burn some CPU time.
+        let started = std::time::Instant::now();
+        let mut counter = 0u64;
+        while started.elapsed() < Duration::from_millis(100) {
+            counter = std::hint::black_box(counter.wrapping_add(1));
+        }
+        let after = usage(me).unwrap();
+        assert!(after.cpu_time > before.cpu_time, "{before:?} → {after:?}");
+        assert!(after.memory_bytes > 1024 * 1024, "{after:?}");
+        assert_eq!(usage(99_999_999), None);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn knows_this_processs_relations() {
+        let me = std::process::id() as i32;
+        let mine = relations().into_iter().find(|process| process.pid == me).expect("this process is listed");
+        assert_eq!(mine.parent, unsafe { libc::getppid() });
+        assert_eq!(mine.process_group, unsafe { libc::getpgrp() });
+        assert_eq!(mine.session, unsafe { libc::getsid(0) });
     }
 
     #[test]

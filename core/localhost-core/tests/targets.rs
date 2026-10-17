@@ -148,9 +148,19 @@ async fn runs_each_project_where_it_belongs_and_merges_their_statuses() {
     let listeners = setup.targets.listeners().await;
     assert!(listeners.iter().all(|(target, _)| *target == ExecutionTarget::ThisMachine || *target == distro("Test")));
 
+    // Stats are measured where each Run is, the previous sample sent along.
+    for service_id in [local.id, distant.id] {
+        let first = setup.targets.run_stats(service_id, None).await.unwrap().expect("the Run is active");
+        assert_eq!(first.run_id, setup.targets.status(service_id).run.unwrap().id);
+        assert!(first.process_count >= 1 && first.memory_bytes > 0, "{first:?}");
+        let second = setup.targets.run_stats(service_id, Some(first)).await.unwrap().unwrap();
+        assert!(second.cpu_percent.is_some(), "{second:?}");
+    }
+
     setup.targets.stop_every_run(Origin::MainWindow).await;
     assert_eq!(setup.targets.status(local.id).state, ServiceState::Stopped);
     assert_eq!(setup.targets.status(distant.id).state, ServiceState::Stopped);
+    assert_eq!(setup.targets.run_stats(distant.id, None).await.unwrap(), None);
 }
 
 #[tokio::test(flavor = "multi_thread")]

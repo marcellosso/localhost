@@ -158,9 +158,17 @@ private final class TemporaryRoot {
         #expect(printed == ["on 45678"])
         #expect(manager.status(of: service.id).run?.port == 45_678)
 
+        let first = try #require(try await manager.runStats(for: service.id))
+        #expect(first.runId == started.run?.id)
+        #expect(first.processCount >= 1)
+        #expect(first.cpuPercent == nil)
+        let second = try await manager.runStats(for: service.id, previous: first)
+        #expect(second?.cpuPercent != nil)
+
         let stopped = try await manager.stop(service.id, origin: .mainWindow)
         #expect(stopped.state == .stopped)
         #expect(stopped.run?.termination?.summary.isEmpty == false)
+        #expect(try await manager.runStats(for: service.id) == nil)
 
         // The store follows the manager's events on the main actor.
         for _ in 0..<50 where store.status(of: service.id).state != .stopped {

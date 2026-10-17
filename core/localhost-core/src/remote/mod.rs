@@ -24,10 +24,12 @@ pub use client::Remote;
 #[cfg(unix)]
 pub use server::serve;
 
-use crate::{Id, Listener, LocalhostError, Origin, Orphan, OutputLine, Project, ServiceEvent, ServiceOutputLine};
+use crate::{
+    Id, Listener, LocalhostError, Origin, Orphan, OutputLine, Project, RunStats, ServiceEvent, ServiceOutputLine,
+};
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// The first line `localhostd` writes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,6 +95,10 @@ pub(crate) enum Request {
     StopListener {
         listener: Listener,
         origin: Origin,
+    },
+    RunStats {
+        service_id: Id,
+        previous: Option<RunStats>,
     },
     NextFreePort {
         service_id: Id,

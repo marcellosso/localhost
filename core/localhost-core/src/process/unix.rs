@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::net::unix::pipe;
 use tokio::sync::oneshot;
 
-use super::{LaunchConfiguration, spawn};
+use super::{LaunchConfiguration, TreeUsage, spawn};
 use crate::LocalhostError;
 use crate::platform::signal::{SIGINT, SIGKILL, SIGTERM};
 use crate::platform::{self, ListeningProcess, Pid};
@@ -38,6 +38,18 @@ impl Group {
     /// shell leads both (ADR-0003).
     pub(super) fn contains(&self, process: &ListeningProcess) -> bool {
         process.session_id == self.0 || process.process_group_id == self.0
+    }
+
+    /// Adds up the processes in the session or group, and the shell's
+    /// descendants that left both (ADR-0012).
+    pub(super) fn usage(&self) -> TreeUsage {
+        let mut usage = TreeUsage::default();
+        for pid in platform::tree_members(self.0, &platform::relations()) {
+            if let Some(process) = platform::usage(pid) {
+                usage.add(process);
+            }
+        }
+        usage
     }
 }
 

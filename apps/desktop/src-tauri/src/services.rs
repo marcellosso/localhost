@@ -2,7 +2,7 @@
 //! missing command) is part of the Service's status, not an error here. A
 //! start blocked by a taken port also returns what the UI asks the user.
 
-use localhost_core::{Id, Listener, LocalhostError, Origin, ServiceState, ServiceStatus};
+use localhost_core::{Id, Listener, LocalhostError, Origin, RunStats, ServiceState, ServiceStatus};
 use serde::Serialize;
 use specta::Type;
 
@@ -52,6 +52,19 @@ pub async fn restart_service(state: tauri::State<'_, AppState>, service_id: Id) 
     let core = state.core()?;
     let status = core.targets.restart(service_id, Origin::MainWindow).await?;
     blocked_start(core, &status).await
+}
+
+/// What the Service's active Run uses now, measured where it runs; `None`
+/// without one. Given the previous sample of the same Run, it says the CPU
+/// use since then (ADR-0012).
+#[tauri::command]
+#[specta::specta]
+pub async fn run_stats(
+    state: tauri::State<'_, AppState>,
+    service_id: Id,
+    previous: Option<RunStats>,
+) -> CommandResult<Option<RunStats>> {
+    Ok(state.core()?.targets.run_stats(service_id, previous).await?)
 }
 
 /// "Stop it and start": stops whatever holds the port, then starts the Service.

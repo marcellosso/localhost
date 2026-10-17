@@ -115,6 +115,9 @@ struct ProjectToolbar: ToolbarContent {
                 .help("Stop All (⇧⌘.)")
                 .disabled(!project.services.contains { model.status(of: $0).state.isActive })
             MoreMenu(help: "More actions for this project") {
+                Button("Stats…") { model.statsProjectID = project.id }
+                    .disabled(!project.services.contains { model.status(of: $0).state.isActive })
+                Divider()
                 Button("Edit Project…") { model.presentedSheet = .editProject(project.id) }
                 Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id) }
                 Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
@@ -124,6 +127,14 @@ struct ProjectToolbar: ToolbarContent {
                 FolderActionButtons(folder: AppModel.folder(of: project))
                 Divider()
                 Button("Remove Project…", role: .destructive) { model.pendingRemoval = .project(project.id) }
+            }
+            .popover(isPresented: Binding {
+                model.statsProjectID == project.id
+            } set: { isPresented in
+                if !isPresented { model.statsProjectID = nil }
+            }, arrowEdge: .bottom) {
+                ProjectStatsView(project: project)
+                    .environment(model)
             }
         }
     }

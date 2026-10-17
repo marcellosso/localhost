@@ -36,6 +36,9 @@ struct LogPane: View {
                     url(status)
                     Color.clear.frame(width: 0, height: 0)
                 }
+                if status.state == .starting || status.state == .running, status.run?.endedAt == nil {
+                    ServiceStatsButton(service: service)
+                }
             }
 
             if let logs = model.core?.logs {

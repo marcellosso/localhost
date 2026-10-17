@@ -15,10 +15,12 @@
       {
         "label": "main",
         "title": "localhost",
-        "width": 1100,
-        "height": 700,
+        "width": 1280,
+        "height": 800,
         "minWidth": 720,
-        "minHeight": 420
+        "minHeight": 420,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {

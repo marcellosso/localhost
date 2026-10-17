@@ -33,6 +33,7 @@ mod project_document;
 pub mod remote;
 mod run_environment;
 mod run_registry;
+mod run_stats;
 mod secrets;
 mod service_manager;
 mod storage;
@@ -67,6 +68,7 @@ pub use process::{
 pub use project_document::{DocumentProfile, DocumentService, ProjectDocument, ProjectFileProblem, ValueKind};
 pub use run_environment::RunEnvironment;
 pub use run_registry::{Orphan, RunRegistry};
+pub use run_stats::RunStats;
 pub use secrets::{MemorySecretStore, SecretStore, SystemSecretStore};
 pub use service_manager::{
     PortChange, PortChangeReason, Run, ServiceEvent, ServiceManager, ServiceManagerOptions, ServiceState, ServiceStatus,

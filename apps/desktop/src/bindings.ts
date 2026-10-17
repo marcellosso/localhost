@@ -76,6 +76,19 @@ async stopAll(projectId: Id) : Promise<Result<null, CommandError>> {
 }
 },
 /**
+ * What the Service's active Run uses now, measured where it runs; `None`
+ * without one. Given the previous sample of the same Run, it says the CPU
+ * use since then (ADR-0012).
+ */
+async runStats(serviceId: Id, previous: RunStats | null) : Promise<Result<RunStats | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("run_stats", { serviceId, previous }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Every Listener on this machine and on the WSL distros in use, scanned
  * now. The Ports view polls this while it is visible.
  */
@@ -1013,6 +1026,35 @@ isPortUnresponsive: boolean;
  * The first local URL the Run printed (`0.0.0.0` shown as `localhost`).
  */
 detectedUrl: string | null }
+/**
+ * What a Run's process tree used at one moment. CPU use needs two samples,
+ * so each call to `ServiceManager::run_stats` is given the previous one.
+ */
+export type RunStats = { runId: Id; 
+/**
+ * The live processes in the Run's tree.
+ */
+processCount: number; 
+/**
+ * Their memory, counting pages they share once: the physical footprint
+ * on macOS (Activity Monitor's "Memory"), the proportional set size on
+ * Linux, private bytes on Windows.
+ */
+memoryBytes: number; 
+/**
+ * CPU time the tree has used, in microseconds.
+ */
+cpuTimeMicroseconds: number; 
+/**
+ * When the sample was taken, in microseconds on the sampling core's
+ * monotonic clock. Only for comparing samples.
+ */
+sampledAtMicroseconds: number; 
+/**
+ * CPU use since the previous sample, where 100 is one core fully busy.
+ * `None` without a previous sample of the same Run.
+ */
+cpuPercent: number | null }
 /**
  * One independently manageable long-running command belonging to a Project.
  * 

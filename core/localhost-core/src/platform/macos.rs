@@ -1,15 +1,28 @@
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::{MaybeUninit, size_of};
+use std::sync::OnceLock;
+use std::time::Duration;
 
-use super::{ListeningProcess, ProcessStartTime, normalized};
+use super::{ListeningProcess, ProcessRelations, ProcessStartTime, ProcessUsage, normalized};
 
 unsafe extern "C" {
     fn localhost_listening_ports(pid: libc::pid_t, ports: *mut u16, capacity: libc::c_int) -> libc::c_int;
+    // Declared here: the libc crate deprecates its own declaration.
+    fn mach_timebase_info(info: *mut MachTimebase) -> libc::c_int;
+}
+
+/// `mach_timebase_info_data_t`.
+#[repr(C)]
+struct MachTimebase {
+    numerator: u32,
+    denominator: u32,
 }
 
 /// `<sys/proc_info.h>`'s `PROC_ALL_PIDS`, which the libc crate lacks.
 const PROC_ALL_PIDS: u32 = 1;
+/// `<sys/proc.h>`'s `SZOMB`: the process has ended and waits to be reaped.
+const SZOMB: u32 = 5;
 
 fn bsd_info(pid: libc::pid_t) -> Option<libc::proc_bsdinfo> {
     let mut info = MaybeUninit::<libc::proc_bsdinfo>::zeroed();
@@ -128,6 +141,48 @@ pub(super) fn scan_listeners() -> Vec<ListeningProcess> {
 
 pub(super) fn parents() -> HashMap<libc::pid_t, libc::pid_t> {
     all_pids().into_iter().filter_map(|pid| Some((pid, bsd_info(pid)?.pbi_ppid as libc::pid_t))).collect()
+}
+
+pub(super) fn relations() -> Vec<ProcessRelations> {
+    all_pids()
+        .into_iter()
+        .filter_map(|pid| {
+            let info = bsd_info(pid).filter(|info| info.pbi_status != SZOMB)?;
+            Some(ProcessRelations {
+                pid,
+                parent: info.pbi_ppid as libc::pid_t,
+                process_group: info.pbi_pgid as libc::pid_t,
+                session: unsafe { libc::getsid(pid) },
+            })
+        })
+        .collect()
+}
+
+pub(super) fn usage(pid: libc::pid_t) -> Option<ProcessUsage> {
+    if bsd_info(pid)?.pbi_status == SZOMB {
+        return None;
+    }
+    let mut info = MaybeUninit::<libc::rusage_info_v2>::zeroed();
+    if unsafe { libc::proc_pid_rusage(pid, libc::RUSAGE_INFO_V2, info.as_mut_ptr().cast()) } != 0 {
+        return None;
+    }
+    let info = unsafe { info.assume_init() };
+    let ticks = info.ri_user_time + info.ri_system_time + info.ri_child_user_time + info.ri_child_system_time;
+    Some(ProcessUsage { cpu_time: mach_ticks(ticks), memory_bytes: info.ri_phys_footprint })
+}
+
+/// `rusage_info`'s times are in Mach absolute time units, which are
+/// nanoseconds on Intel but not on Apple silicon.
+fn mach_ticks(ticks: u64) -> Duration {
+    static TIMEBASE: OnceLock<(u64, u64)> = OnceLock::new();
+    let &(numerator, denominator) = TIMEBASE.get_or_init(|| {
+        let mut timebase = MachTimebase { numerator: 0, denominator: 0 };
+        match unsafe { mach_timebase_info(&mut timebase) } {
+            0 if timebase.denominator != 0 => (timebase.numerator as u64, timebase.denominator as u64),
+            _ => (1, 1),
+        }
+    });
+    Duration::from_nanos((ticks as u128 * numerator as u128 / denominator as u128) as u64)
 }
 
 pub(super) fn managed_jobs() -> HashMap<libc::pid_t, String> {

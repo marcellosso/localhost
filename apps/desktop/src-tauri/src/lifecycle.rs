@@ -70,11 +70,48 @@ pub fn show_window(app: &AppHandle, reveal: Option<Reveal>) {
     }
 }
 
-/// Readies a new main window. On Windows, in release builds, WebView2's
+/// The main window's size when it opens, as the macOS app's.
+const PREFERRED_SIZE: (f64, f64) = (1280.0, 800.0);
+/// Its smallest size, as `minWidth`/`minHeight` in `tauri.conf.json`.
+const MINIMUM_SIZE: (f64, f64) = (720.0, 420.0);
+/// How much of the screen's work area an opening window may cover at most.
+const MAXIMUM_SHARE: f64 = 0.92;
+
+/// The preferred size, made smaller where the work area (the screen without
+/// the taskbar or panels) can't hold it, but never below the minimum.
+/// Logical pixels.
+fn fitted_size(work_area: (f64, f64)) -> (f64, f64) {
+    let fit = |preferred: f64, available: f64, minimum: f64| preferred.min(available * MAXIMUM_SHARE).max(minimum);
+    (fit(PREFERRED_SIZE.0, work_area.0, MINIMUM_SIZE.0), fit(PREFERRED_SIZE.1, work_area.1, MINIMUM_SIZE.1))
+}
+
+/// Sizes the window to fit its screen's work area and centres it there.
+/// Windows and Linux don't keep a window on screen themselves, as macOS does.
+fn fit_to_screen(window: &WebviewWindow) {
+    let monitor = window.current_monitor().ok().flatten().or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let available = area.size.to_logical::<f64>(scale);
+    let (width, height) = fitted_size((available.width, available.height));
+    let size = tauri::LogicalSize::new(width, height).to_physical::<i32>(scale);
+    let _ = window.set_size(size);
+    // Wayland places windows itself and ignores this.
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        area.position.x + (area.size.width as i32 - size.width).max(0) / 2,
+        area.position.y + (area.size.height as i32 - size.height).max(0) / 2,
+    ));
+}
+
+/// Readies a new main window, sized to its screen, and shows it (it is
+/// created hidden, so it doesn't appear at one size and jump to another).
+/// On Windows, in release builds, WebView2's
 /// browser keys are turned off: F5 and Ctrl+R reload, Ctrl+P prints, Ctrl+F
 /// finds in the page, Alt+← goes back, F12 opens the developer tools.
 /// Debug builds keep them, for the developer tools.
 pub fn prepare(window: &WebviewWindow) {
+    fit_to_screen(window);
+    let _ = window.show();
     #[cfg(all(windows, not(debug_assertions)))]
     let _ = window.with_webview(|webview| {
         use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
@@ -174,4 +211,20 @@ pub fn quit_app(app: AppHandle) {
 #[specta::specta]
 pub fn take_reveal(state: tauri::State<'_, AppState>) -> Option<Reveal> {
     state.lifecycle.pending_reveal.lock().unwrap().take()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fitted_size;
+
+    #[test]
+    fn opens_at_the_macos_apps_size_or_smaller_on_a_small_screen() {
+        // 1920×1080 less a taskbar: room for the preferred size.
+        assert_eq!(fitted_size((1920.0, 1040.0)), (1280.0, 800.0));
+        // A 1366×768 laptop: 92% of the work area.
+        let (width, height) = fitted_size((1366.0, 728.0));
+        assert_eq!((width.round(), height.round()), (1257.0, 670.0));
+        // Never below the minimum size.
+        assert_eq!(fitted_size((640.0, 400.0)), (720.0, 420.0));
+    }
 }
