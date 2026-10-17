@@ -189,13 +189,15 @@ pub fn run() {
             launch::watch_found_orphans(app.handle());
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } => lifecycle::close_requested(window, api),
             // A closed window's streams have no one to send to.
-            if let WindowEvent::Destroyed = event {
+            WindowEvent::Destroyed => {
                 let state = window.state::<AppState>();
                 state.subscriptions.close_all();
                 state.logs.close_all();
             }
+            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("error while building localhost")
