@@ -25,10 +25,10 @@ const patterns = {
 
 let cached: Promise<Release> | undefined;
 
-/** The latest published release, read from GitHub once per build. The site
- * is rebuilt when a release is published (.github/workflows/site.yml), so the
- * links always name that release's files. Without one, or without network,
- * every link goes to the Releases page. */
+/** The latest published release, read from GitHub once per build. Publishing
+ * a release rebuilds the site through Vercel's deploy hook
+ * (.github/workflows/site.yml), so the links name that release's files.
+ * Without one, or without network, every link goes to the Releases page. */
 export function latestRelease(): Promise<Release> {
   cached ??= load();
   return cached;
