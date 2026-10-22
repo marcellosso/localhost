@@ -7,6 +7,8 @@
 
 <p align="center">Every local project, one place to run it. For macOS, Linux and Windows.</p>
 
+<p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
+
 <p align="center">
   <a href="https://github.com/marcellosso/localhost/releases/latest"><img src="https://img.shields.io/github/v/release/marcellosso/localhost" alt="Latest release"></a>
   <a href="https://github.com/marcellosso/localhost/actions/workflows/ci.yml"><img src="https://github.com/marcellosso/localhost/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>

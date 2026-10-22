@@ -14,7 +14,7 @@ const dropTitle = {
 
 export default defineConfig({
   // The public address: canonical links, the sitemap and social cards are built from it.
-  site: 'https://localhost.example',
+  site: 'https://www.getlocalhost.app',
   // Pages are written as `docs/install.html` and linked as `/docs/install`, so
   // each page has one address. Vercel serves that only with `cleanUrls`
   // (vercel.json), which also redirects `/docs/install.html` to it.

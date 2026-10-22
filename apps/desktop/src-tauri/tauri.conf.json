@@ -34,7 +34,7 @@
     "category": "DeveloperTool",
     "shortDescription": "Run your local projects' services from one window",
     "longDescription": "localhost remembers how each of your local development projects runs, and lets you start, stop and watch all of its services from one window.",
-    "homepage": "https://github.com/marcellosso/localhost",
+    "homepage": "https://www.getlocalhost.app",
     "publisher": "Marcel Losso",
     "copyright": "Copyright © 2026 Marcel Losso. MIT License.",
     "license": "MIT"
