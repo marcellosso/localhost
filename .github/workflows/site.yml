@@ -3,8 +3,12 @@ name: Site
 # Checks that the website in site/ builds. It reads the Project file reference
 # from docs/, the screenshots from .github/assets/ and the colours from the
 # desktop app's tokens, so changes there are checked too. Publishing is done by
-# the host serving the custom domain, which builds site/ itself.
+# Vercel, which builds site/ itself on every push to main. The download links
+# are read from the latest release at build time, so publishing a release asks
+# Vercel for a fresh build through its deploy hook.
 on:
+  release:
+    types: [published]
   push:
     branches: [main]
     paths: [site/**, docs/**, .github/assets/**, apps/desktop/src/styles/tokens.css, .github/workflows/site.yml]
@@ -39,3 +43,18 @@ jobs:
       - run: pnpm build
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  deploy:
+    name: Rebuild the site for the new release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel's deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [[ -z $VERCEL_DEPLOY_HOOK ]]; then
+            echo "::warning::No VERCEL_DEPLOY_HOOK secret: the site keeps the previous release's download links until the next push to main."
+            exit 0
+          fi
+          curl --fail --silent --show-error --retry 3 -X POST "$VERCEL_DEPLOY_HOOK"
