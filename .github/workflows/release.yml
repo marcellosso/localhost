@@ -335,12 +335,12 @@ jobs:
         run: |
           case $MODE in
             developer-id) install="Signed with Developer ID and notarized by Apple." ;;
-            self-signed) install="Not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, see [First launch](${{ github.server_url }}/${{ github.repository }}#first-launch-of-a-build-that-isnt-notarized) in the README." ;;
+            self-signed) install="Not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, see [First launch](${{ github.server_url }}/${{ github.repository }}#macos-a-build-that-isnt-notarized) in the README." ;;
             ad-hoc) install="Signed ad hoc and not notarized: the first launch needs **Open Anyway** in System Settings → Privacy & Security, and macOS asks again for Keychain access to each Secret after every update, see [the README](${{ github.server_url }}/${{ github.repository }}#install)." ;;
           esac
-          linux="**Linux** (x86_64): the \`.deb\` (Ubuntu 22.04 or later, Debian 12), the \`.rpm\` (Fedora) or the AppImage; not signed. Secrets need a Secret Service (GNOME Keyring, KWallet) and the tray on GNOME needs the AppIndicator extension, see [Linux](${{ github.server_url }}/${{ github.repository }}#linux) in the README."
+          linux="**Linux** (x86_64): the \`.deb\` (Ubuntu 22.04 or later, Debian 12), the \`.rpm\` (Fedora) or the AppImage; not signed. Secrets need a Secret Service (GNOME Keyring, KWallet) and the tray on GNOME needs the AppIndicator extension, see [Linux](${{ github.server_url }}/${{ github.repository }}#linux-a-secret-service) in the README."
           if [[ $WINDOWS_SIGNED == true ]]; then windows_signing="Signed."; else
-            windows_signing="Not signed: SmartScreen asks first, see [Windows](${{ github.server_url }}/${{ github.repository }}#windows) in the README."; fi
+            windows_signing="Not signed: SmartScreen asks first, see [Windows](${{ github.server_url }}/${{ github.repository }}#windows-smartscreen) in the README."; fi
           windows="**Windows** (x64): \`localhost_${VERSION}_x64-setup.exe\`, for Projects in a WSL 2 distro. $windows_signing"
           notes=$(printf '**macOS**: requires macOS 15 or later. %s\n\n%s\n\n%s' "$install" "$linux" "$windows")
           gh release create "$GITHUB_REF_NAME" assets/* \
