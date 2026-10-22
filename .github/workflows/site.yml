@@ -1,0 +1,41 @@
+name: Site
+
+# Checks that the website in site/ builds. It reads the Project file reference
+# from docs/, the screenshots from .github/assets/ and the colours from the
+# desktop app's tokens, so changes there are checked too. Publishing is done by
+# the host serving the custom domain, which builds site/ itself.
+on:
+  push:
+    branches: [main]
+    paths: [site/**, docs/**, .github/assets/**, apps/desktop/src/styles/tokens.css, .github/workflows/site.yml]
+  pull_request:
+    paths: [site/**, docs/**, .github/assets/**, apps/desktop/src/styles/tokens.css, .github/workflows/site.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

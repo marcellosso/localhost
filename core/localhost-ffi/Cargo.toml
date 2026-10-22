@@ -1,0 +1,19 @@
+[package]
+name = "localhost-ffi"
+description = "The static library the macOS app links: localhost-core with its UniFFI bindings."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["staticlib", "lib"]
+
+[dependencies]
+localhost-core = { path = "../localhost-core", features = ["ffi"] }
+uniffi = { version = "0.32.2", features = ["cli"] }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"

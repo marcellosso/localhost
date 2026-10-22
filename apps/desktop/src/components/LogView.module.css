@@ -1,0 +1,72 @@
+/* The log is always opaque, for legible text and exact ANSI colours. */
+.log {
+  position: relative;
+  overflow: auto;
+  height: 100%;
+  background: var(--surface-log);
+  font-family: var(--font-mono);
+  font-size: var(--log-font-size);
+  user-select: text;
+  cursor: text;
+  outline: none;
+}
+
+.log:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.content {
+  position: relative;
+  min-width: max-content;
+}
+
+.row {
+  position: absolute;
+  left: 6px;
+  padding-right: 16px;
+  white-space: pre;
+}
+
+/* The stream gutter, which isn't part of the output (or of a copy). */
+.stdout,
+.stderr,
+.localhost {
+  display: inline-block;
+  width: 2ch;
+  user-select: none;
+}
+
+.stderr::before {
+  content: "▍";
+  color: color-mix(in srgb, var(--state-failed) 70%, transparent);
+}
+
+.localhost::before {
+  content: "›";
+  color: var(--text-tertiary);
+}
+
+/* What localhost itself wrote, e.g. how the Run ended. */
+.note {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+/* The Service's Key in a combined stream: bold, in its colour. */
+.prefix {
+  margin-right: 1ch;
+  font-weight: 700;
+  user-select: none;
+}
+
+.link {
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.match {
+  border-radius: 2px;
+  background: var(--find-highlight);
+  color: #000;
+}

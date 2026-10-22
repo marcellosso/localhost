@@ -1,0 +1,952 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import AppWindow from '../components/AppWindow.astro';
+import DownloadButton from '../components/DownloadButton.astro';
+import { href, name, repository, tagline } from '../lib/site';
+import { latestRelease } from '../lib/release';
+
+const release = await latestRelease();
+const description =
+  'localhost remembers how each of your local projects runs. Start, stop and watch every Service from one place. Free and open source for macOS, Windows and Linux.';
+const structuredData = [
+  { '@type': 'WebSite', name, url: Astro.site!.toString(), description: tagline },
+  {
+    '@type': 'SoftwareApplication',
+    name,
+    description,
+    url: Astro.site!.toString(),
+    image: new URL('/og.png', Astro.site).toString(),
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'macOS 15 or later, Windows 10 or 11, Linux',
+    ...(release.version === '<version>' ? {} : { softwareVersion: release.version }),
+    downloadUrl: new URL('/docs/install', Astro.site).toString(),
+    license: 'https://opensource.org/licenses/MIT',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    codeRepository: repository,
+    author: { '@type': 'Person', name: 'Marcel Losso' },
+  },
+];
+
+const latest = (await getCollection('changelog'))
+  .filter((entry) => entry.data.released)
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())[0];
+
+const commands = [
+  { runtime: 'Node', command: 'pnpm dev' },
+  { runtime: 'Bun', command: 'bun run dev' },
+  { runtime: 'Python', command: 'uv run fastapi dev' },
+  { runtime: 'Rust', command: 'cargo run' },
+  { runtime: 'Compose', command: 'docker compose up postgres' },
+  { runtime: 'Anything', command: './bin/dev --port $PORT' },
+];
+
+const pillars = [
+  { title: 'No account', text: 'No sign-in and no backend. Works offline, on your machine only.' },
+  { title: 'Nothing in your repo', text: 'Configuration lives in localhost’s own storage. Export a Project file when you want to share one.' },
+  { title: 'Nothing silent', text: 'No automatic restarts, and no Suggestion applied until you check it.' },
+  { title: 'Native everywhere', text: 'SwiftUI on macOS, one light app for Linux and Windows, all on one Rust core.' },
+];
+---
+
+<Base title={name} {description} {structuredData}>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-copy">
+        {
+          latest && (
+            <a class="pill" href={href('changelog')}>
+              <span class="mono">v{latest.data.version}</span>
+              {latest.data.title}
+              <span aria-hidden="true">→</span>
+            </a>
+          )
+        }
+        <h1 class="display headline">Every local project,<br /> one place to run it.</h1>
+        <p class="lede hero-lede">
+          localhost remembers how each of your projects runs. Pick a Project, press Start All and watch every Service come up, instead of
+          keeping a row of terminal tabs alive.
+        </p>
+        <div class="ctas">
+          <DownloadButton />
+          <a class="button button-secondary" href={repository}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"></path></svg>
+            View on GitHub
+          </a>
+        </div>
+        <p class="platforms">
+          Free and open source for <a href={href('docs/install')}>macOS, Windows and Linux</a>
+        </p>
+      </div>
+      <div class="stage">
+        <div class="glow" aria-hidden="true"></div>
+        <AppWindow />
+        <p class="hint">It’s live: pick a Project, a Service or Ports, and start or stop anything.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container">
+      <div class="feature-head">
+        <p class="figure-label">Fig 01 · Commands</p>
+        <h2 class="display section-title">If it runs in your terminal, it runs here.</h2>
+        <p class="lede">
+          A Service is a folder, a command line and its environment. localhost runs it in your login shell, so your <code>PATH</code>,
+          version managers and profile all apply.
+        </p>
+      </div>
+      <div class="commands">
+        {
+          commands.map((item) => (
+            <div class="command-cell">
+              <span class="runtime">{item.runtime}</span>
+              <code>{item.command}</code>
+            </div>
+          ))
+        }
+      </div>
+      <ul class="checks">
+        <li>Runs as <code>$SHELL -l -c</code>, so pipes and <code>&amp;&amp;</code> work</li>
+        <li>Gets its Port as <code>$PORT</code>; command lines are never rewritten</li>
+        <li>Stop ends the whole process tree, every time</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split">
+      <div class="copy">
+        <p class="figure-label">Fig 02 · Ports</p>
+        <h2 class="display section-title">Know who’s on :3000.</h2>
+        <p class="lede">
+          A Service counts as Running once its Port accepts connections. If the Port is taken, localhost says by whom, and can start on
+          the next free one for that Run only.
+        </p>
+        <a class="more" href={href('docs/ports')}>How Ports work →</a>
+      </div>
+      <div class="mock-stack" aria-hidden="true">
+        <div class="mock ports">
+          <div class="mock-title">Ports <span>5 listening</span></div>
+          <div class="port-row"><code>:5432</code><span>postgres</span><span class="owner"><i style="--c: var(--service-0)"></i>Acme Shop › Database</span></div>
+          <div class="port-row"><code>:8000</code><span>python3</span><span class="owner"><i style="--c: var(--service-1)"></i>Acme Shop › API</span></div>
+          <div class="port-row"><code>:5173</code><span>node</span><span class="owner"><i style="--c: var(--service-2)"></i>Acme Shop › Web</span></div>
+          <div class="port-row"><code>:3000</code><span>node</span><span class="owner faint">~/Code/blog</span></div>
+          <div class="port-row"><code>:6379</code><span>redis-server</span><span class="owner faint">Unmanaged</span></div>
+        </div>
+        <div class="mock dialog">
+          <strong>Port 3000 is taken</strong>
+          <p><code>node</code> (pid 48211), running in <code>~/Code/blog</code>, is listening on it.</p>
+          <div class="dialog-actions">
+            <span class="fake secondary">Cancel</span>
+            <span class="fake secondary">Start on 3001</span>
+            <span class="fake primary">Stop it and start</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split reverse">
+      <div class="copy">
+        <p class="figure-label">Fig 03 · Environment</p>
+        <h2 class="display section-title">Environment without .env juggling.</h2>
+        <p class="lede">
+          Variables on the Project, on each Service and in Environment Profiles. Any of them can be a Secret, kept in Keychain, Secret
+          Service or Credential Manager, never in a file.
+        </p>
+        <a class="more" href={href('docs/environment')}>Environment and Secrets →</a>
+      </div>
+      <div class="mock env" aria-hidden="true">
+        <div class="mock-title">
+          API's environment
+          <span class="segmented"><b>Development</b><span>Testing</span></span>
+        </div>
+        <div class="env-row"><code>PATH</code><code class="value">~/.local/share/mise/shims:…</code><span class="from">login shell</span></div>
+        <div class="env-row"><code>LOG_LEVEL</code><code class="value">debug</code><span class="from">Project</span></div>
+        <div class="env-row"><code>DATABASE_URL</code><code class="value">postgres://localhost:5432/app</code><span class="from">Service</span></div>
+        <div class="env-row secret">
+          <code>STRIPE_KEY</code>
+          <code class="value">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm2 0h4V5a2 2 0 1 0-4 0v2Z"></path></svg>
+            ••••••••••••
+          </code>
+          <span class="from">Secret</span>
+        </div>
+        <div class="env-row"><code>NODE_ENV</code><code class="value">development</code><span class="from">Development</span></div>
+        <div class="env-row"><code>PORT</code><code class="value">8000</code><span class="from">Port</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split">
+      <div class="copy">
+        <p class="figure-label">Fig 04 · Suggestions</p>
+        <h2 class="display section-title">Point it at a folder.</h2>
+        <p class="lede">
+          localhost reads <code>package.json</code> scripts, Compose files, Python apps and Cargo binaries, then suggests Services. You
+          review every one, and nothing is applied silently.
+        </p>
+        <a class="more" href={href('docs/quick-start')}>Add your first Project →</a>
+      </div>
+      <div class="mock suggest" aria-hidden="true">
+        <div class="mock-title">Add Project <code>~/Code/acme-shop</code></div>
+        <div class="suggestion on"><span class="check"></span><b>Web</b><code>pnpm run dev</code><span class="src">web/package.json</span></div>
+        <div class="suggestion on"><span class="check"></span><b>API</b><code>uv run fastapi dev --port $PORT</code><span class="src">api/pyproject.toml</span></div>
+        <div class="suggestion on"><span class="check"></span><b>Database</b><code>docker compose up postgres</code><span class="src">compose.yaml</span></div>
+        <div class="suggestion on"><span class="check"></span><b>Worker</b><code>pnpm run worker</code><span class="src">worker/package.json</span></div>
+        <div class="folded">› 3 more found</div>
+        <div class="dialog-actions">
+          <span class="fake secondary">Cancel</span>
+          <span class="fake primary">Add Project</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split reverse">
+      <div class="copy">
+        <p class="figure-label">Fig 05 · Keyboard</p>
+        <h2 class="display section-title">Keyboard first.</h2>
+        <p class="lede">
+          <kbd data-other="Ctrl+K">⌘K</kbd> jumps to any Project or Service and runs any action. Every action has a shortcut, and the
+          arrow keys move across the window.
+        </p>
+        <a class="more" href={href('docs/keyboard')}>All shortcuts →</a>
+      </div>
+      <div class="mock palette" aria-hidden="true">
+        <div class="query">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3" stroke-linecap="round"></path></svg>
+          web<span class="caret"></span>
+        </div>
+        <div class="palette-group">Services</div>
+        <div class="palette-row selected"><span class="glyph-running"></span>Web<span class="faint">Acme Shop</span><kbd>↵</kbd></div>
+        <div class="palette-group">Actions</div>
+        <div class="palette-row">Restart Web<kbd data-other="Ctrl+R">⌘R</kbd></div>
+        <div class="palette-row">Stop Web<kbd data-other="Ctrl+.">⌘.</kbd></div>
+        <div class="palette-row">Open Web in Browser<kbd data-other="Ctrl+Shift+O">⇧⌘O</kbd></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container">
+      <div class="feature-head">
+        <p class="figure-label">Fig 06 · Local-first</p>
+        <h2 class="display section-title">Your machine, your rules.</h2>
+      </div>
+      <div class="pillars">
+        {
+          pillars.map((pillar) => (
+            <div class="pillar">
+              <h3>{pillar.title}</h3>
+              <p>{pillar.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split">
+      <div class="copy">
+        <p class="figure-label">Fig 07 · Command line</p>
+        <h2 class="display section-title">And from the terminal.</h2>
+        <p class="lede">
+          The <code>localhost</code> command runs on the same core and the same data: list Projects, see what is running, read the latest
+          logs, or run a Project until Ctrl-C.
+        </p>
+        <a class="more" href={href('docs/cli')}>The command line →</a>
+      </div>
+      <div class="terminal" aria-hidden="true">
+        <pre><span class="p">$</span> localhost status acme-shop
+<b>Acme Shop</b> <span class="d">(acme-shop) · ~/Code/acme-shop</span>
+SERVICE    NAME        STATE        PORT  PID    UP
+migrate    Migrations  not running
+api        API         running      8000  48211  2h 14m
+web        Web         running      5173  48230  2h 14m
+worker     Worker      running            48245  2h 14m
+storybook  Storybook   not running  6006
+
+<span class="p">$</span> localhost logs acme-shop web
+<span class="d">web |</span>   <span class="g">VITE</span> v6.2.0  ready in 412 ms
+<span class="d">web |</span>   <span class="g">➜</span>  Local:   http://localhost:5173/</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container">
+      <div class="platform-grid">
+        <a class="platform" href={href('docs/install')}>
+          <h3>macOS</h3>
+          <p>A native SwiftUI app with a menu bar companion.</p>
+          <span class="req">macOS 15 or later · Apple silicon or Intel</span>
+        </a>
+        <a class="platform" href={href('docs/windows')}>
+          <h3>Windows</h3>
+          <p>Projects on Windows itself, or inside a WSL distro.</p>
+          <span class="req">Windows 10 or 11 · x64</span>
+        </a>
+        <a class="platform" href={href('docs/linux')}>
+          <h3>Linux</h3>
+          <p><code>.deb</code>, <code>.rpm</code> and AppImage, with a tray icon.</p>
+          <span class="req">Ubuntu 22.04+ · Debian 12+ · Fedora</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="closing">
+    <div class="container">
+      <h2 class="display closing-title">Close the terminal tabs.</h2>
+      <p class="lede">Configure a Project once. From then on, it is one click away.</p>
+      <div class="ctas">
+        <DownloadButton />
+        <a class="button button-secondary" href={href('docs')}>Read the docs</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { detectPlatform } from '../lib/platform';
+
+  // The shortcuts are written for macOS; elsewhere they use Ctrl.
+  if (detectPlatform() !== 'macos') {
+    for (const key of document.querySelectorAll<HTMLElement>('kbd[data-other]')) key.textContent = key.dataset.other!;
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    padding: 72px 0 40px;
+    text-align: center;
+    overflow: hidden;
+  }
+  /* A faint grid behind the headline, fading out towards the window. */
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 760px;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    background-position: center -1px;
+    mask-image: radial-gradient(60% 70% at 50% 30%, #000 30%, transparent 100%);
+    -webkit-mask-image: radial-gradient(60% 70% at 50% 30%, #000 30%, transparent 100%);
+    pointer-events: none;
+  }
+  .hero > .container {
+    position: relative;
+  }
+  .hero-copy {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 0;
+  }
+  .headline {
+    font-size: clamp(42px, 7vw, 80px);
+    margin-top: 24px;
+    animation: focus-in 900ms var(--ease-out) both;
+  }
+  @keyframes focus-in {
+    from {
+      opacity: 0;
+      filter: blur(10px);
+      transform: translateY(6px);
+    }
+  }
+  .hero-lede {
+    max-width: 560px;
+    margin-top: 24px;
+    animation: focus-in 900ms 120ms var(--ease-out) both;
+  }
+  .ctas {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 36px;
+  }
+  .hero .ctas {
+    animation: focus-in 900ms 220ms var(--ease-out) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .headline,
+    .hero-lede,
+    .hero .ctas {
+      animation-name: fade-in;
+      animation-duration: 400ms;
+    }
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+      }
+    }
+  }
+  .platforms {
+    margin: 16px 0 0;
+    font-size: 14px;
+    color: var(--text-tertiary);
+  }
+  .platforms a {
+    color: var(--text-secondary);
+    text-underline-offset: 3px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 6px;
+    border-radius: 999px;
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+  .pill:hover {
+    color: var(--text);
+  }
+  .pill .mono {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent-text);
+    font-size: 12px;
+  }
+
+
+  .stage {
+    position: relative;
+    margin-top: 72px;
+  }
+  .glow {
+    position: absolute;
+    inset: -60px 5% auto;
+    height: 70%;
+    background:
+      radial-gradient(50% 60% at 30% 40%, var(--glow-a), transparent 70%),
+      radial-gradient(50% 60% at 70% 50%, var(--glow-b), transparent 70%);
+    filter: blur(40px);
+    pointer-events: none;
+  }
+  .stage :global(.figure) {
+    position: relative;
+  }
+  .hint {
+    margin: 16px 0 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+
+  .feature {
+    padding: 112px 0 0;
+  }
+  .feature-head {
+    max-width: 640px;
+  }
+  .section-title {
+    font-size: clamp(32px, 4.4vw, 48px);
+  }
+  .feature .lede {
+    margin-top: 16px;
+  }
+  .lede code,
+  .checks code,
+  .platform code {
+    font-size: 0.9em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+  }
+  .more {
+    display: inline-block;
+    margin-top: 20px;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+  .more:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .commands {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 48px;
+    border-radius: var(--radius);
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+  .command-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px 22px;
+    box-shadow:
+      1px 0 0 var(--separator),
+      0 1px 0 var(--separator);
+  }
+  .runtime {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .command-cell code {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 32px;
+    margin: 24px 0 0;
+    padding: 20px 0 0;
+    list-style: none;
+    border-top: 1px dashed var(--separator);
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .checks li::before {
+    content: '✓';
+    margin-right: 8px;
+    color: var(--state-running);
+  }
+  @media (max-width: 760px) {
+    .commands {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .split.reverse .copy {
+    order: 2;
+  }
+  @media (max-width: 900px) {
+    .split {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+    .split.reverse .copy {
+      order: 0;
+    }
+  }
+
+  /* Mocks of the app's views, in its own tokens. */
+  .mock {
+    border-radius: var(--radius);
+    background: var(--surface-log);
+    box-shadow: var(--shadow);
+    padding: 8px;
+    font-size: 13px;
+    text-align: left;
+  }
+  .mock code {
+    font-size: 12px;
+  }
+  .mock-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 12px;
+    font-weight: 600;
+  }
+  .mock-title > span:not(.segmented),
+  .mock-title code {
+    font-weight: 400;
+    color: var(--text-tertiary);
+  }
+  .mock-stack {
+    position: relative;
+    padding-bottom: 72px;
+  }
+  .port-row {
+    display: grid;
+    grid-template-columns: 64px 110px 1fr;
+    align-items: center;
+    height: 36px;
+    padding: 0 10px;
+    border-top: 1px solid var(--separator);
+  }
+  .port-row code {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .port-row span:nth-child(2) {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .owner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .owner i {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--c);
+  }
+  .faint {
+    color: var(--text-tertiary);
+  }
+  .dialog {
+    position: absolute;
+    right: -12px;
+    bottom: 0;
+    width: min(360px, 90%);
+    padding: 18px;
+    background: var(--surface-raised);
+  }
+  .dialog p {
+    margin: 6px 0 16px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .fake {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fake.primary {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .fake.secondary {
+    background: var(--fill-strong);
+  }
+  @media (max-width: 900px) {
+    .dialog {
+      right: 0;
+    }
+  }
+
+  .segmented {
+    margin-left: auto;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--fill);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .segmented > * {
+    padding: 3px 10px;
+    border-radius: 5px;
+    color: var(--text-secondary);
+  }
+  .segmented b {
+    background: var(--surface-raised);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+  }
+  .env-row {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    height: 38px;
+    padding: 0 10px;
+    border-top: 1px solid var(--separator);
+  }
+  .env-row .value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .env-row.secret .value {
+    color: var(--text-tertiary);
+    letter-spacing: 0.08em;
+  }
+  .from {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--fill);
+    color: var(--text-secondary);
+  }
+  .secret .from {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent-text);
+  }
+
+  .suggestion {
+    display: grid;
+    grid-template-columns: 16px 76px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    height: 40px;
+    padding: 0 10px;
+    border-top: 1px solid var(--separator);
+  }
+  .suggestion code {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .check {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+  }
+  .check::after {
+    content: '';
+    width: 7px;
+    height: 4px;
+    margin-top: -2px;
+    border: solid var(--on-accent);
+    border-width: 0 0 2px 2px;
+    transform: rotate(-45deg);
+  }
+  .src {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .folded {
+    padding: 10px;
+    border-top: 1px solid var(--separator);
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+  .suggest .dialog-actions {
+    padding: 8px 4px 4px;
+  }
+  @media (max-width: 560px) {
+    .src {
+      display: none;
+    }
+    .suggestion {
+      grid-template-columns: 16px 70px 1fr;
+    }
+  }
+
+  .palette {
+    max-width: 520px;
+    justify-self: center;
+    width: 100%;
+    padding: 6px;
+    background: var(--surface-raised);
+  }
+  .query {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--separator);
+    font-size: 15px;
+    color: var(--text);
+  }
+  .query svg {
+    color: var(--text-tertiary);
+  }
+  .caret {
+    width: 1.5px;
+    height: 18px;
+    margin-left: -8px;
+    background: var(--accent);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .caret {
+      animation: none;
+    }
+  }
+  .palette-group {
+    padding: 12px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+  }
+  .palette-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 7px;
+  }
+  .palette-row kbd {
+    margin-left: auto;
+  }
+  .palette-row.selected {
+    background: var(--selection);
+    color: var(--on-selection);
+  }
+  .palette-row.selected .faint {
+    color: color-mix(in srgb, var(--on-selection) 75%, transparent);
+  }
+  .palette-row.selected kbd {
+    background: rgb(255 255 255 / 0.2);
+    color: var(--on-selection);
+    box-shadow: none;
+  }
+  .glyph-running {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--state-running);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-running) 30%, transparent);
+  }
+
+  .pillars {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--separator);
+  }
+  .pillar {
+    padding: 28px 28px 0 0;
+  }
+  .pillar + .pillar {
+    padding-left: 28px;
+    border-left: 1px solid var(--separator);
+  }
+  .pillar h3 {
+    margin: 0;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .pillar p {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  @media (max-width: 900px) {
+    .pillars {
+      grid-template-columns: 1fr 1fr;
+      row-gap: 32px;
+    }
+    .pillar:nth-child(3) {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+  @media (max-width: 560px) {
+    .pillars {
+      grid-template-columns: 1fr;
+    }
+    .pillar + .pillar {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+
+  .terminal {
+    border-radius: var(--radius);
+    background: #0f0f12;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  .terminal pre {
+    margin: 0;
+    padding: 20px 22px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #e6edf3;
+  }
+  .terminal .p {
+    color: #ff5c8a;
+  }
+  .terminal .d {
+    color: #8b939c;
+  }
+  .terminal .g {
+    color: #3fb950;
+  }
+
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .platform {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    border-radius: var(--radius);
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+    text-decoration: none;
+    transition: box-shadow 200ms ease;
+  }
+  .platform:hover {
+    box-shadow: var(--ring-strong);
+  }
+  .platform h3 {
+    margin: 0;
+    font-size: 17px;
+  }
+  .platform p {
+    margin: 8px 0 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  .req {
+    margin-top: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  @media (max-width: 760px) {
+    .platform-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .closing {
+    padding: 144px 0 24px;
+    text-align: center;
+  }
+  .closing-title {
+    font-size: clamp(36px, 6vw, 64px);
+  }
+  .closing .lede {
+    margin-top: 16px;
+  }
+</style>

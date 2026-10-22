@@ -1,0 +1,58 @@
+.banner {
+  display: grid;
+  gap: 8px;
+  margin: 10px 12px 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--state-failed) 25%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--state-failed) 8%, transparent);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--state-failed);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duration {
+  flex: none;
+  font-size: 12px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.hide {
+  flex: none;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  line-height: 0;
+}
+
+.excerpt {
+  margin: 0;
+  padding-left: 10px;
+  overflow: hidden;
+  border-left: 2px solid color-mix(in srgb, var(--state-failed) 55%, transparent);
+  font: 11.5px/1.45 var(--font-mono);
+  user-select: text;
+}
+
+.excerpt div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}

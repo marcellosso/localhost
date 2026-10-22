@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# SwiftPM
+.build/
+.swiftpm/
+apps/macos/LocalhostCoreFFI/Package.resolved
+
+# Cargo
+core/target/
+
+# Rust core built for the app (scripts/build-core.sh)
+apps/macos/LocalhostCoreFFI/Generated/
+apps/macos/LocalhostCoreFFI/Sources/LocalhostCore/Generated/

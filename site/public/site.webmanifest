@@ -1,0 +1,12 @@
+{
+  "name": "localhost",
+  "short_name": "localhost",
+  "description": "Every local project, one place to run it.",
+  "icons": [
+    { "src": "/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "theme_color": "#0c0c0f",
+  "background_color": "#0c0c0f",
+  "display": "browser"
+}

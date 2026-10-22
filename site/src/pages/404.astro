@@ -1,0 +1,41 @@
+---
+import Base from '../layouts/Base.astro';
+import { href } from '../lib/site';
+---
+
+<Base title="Page not found" description="This page doesn’t exist." noindex>
+  <div class="container page">
+    <p class="code mono">404</p>
+    <h1 class="display">Nothing is listening here.</h1>
+    <p class="lede">This page doesn’t exist, or it moved. Try the docs, or start from the home page.</p>
+    <div class="actions">
+      <a class="button button-primary" href={href('/')}>Home</a>
+      <a class="button button-secondary" href={href('docs')}>Docs</a>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-top: 120px;
+    text-align: center;
+  }
+  .code {
+    margin: 0 0 16px;
+    color: var(--accent-text);
+    font-size: 14px;
+  }
+  h1 {
+    font-size: clamp(36px, 6vw, 56px);
+  }
+  .lede {
+    margin: 16px auto 0;
+    max-width: 480px;
+  }
+  .actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 32px;
+  }
+</style>

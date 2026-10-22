@@ -1,0 +1,145 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-sidebar);
+  border-right: 1px solid var(--separator);
+}
+
+.header {
+  display: grid;
+  /* One column that never grows past the sidebar, so the search row fits. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 10px 8px;
+}
+
+.wordmark {
+  padding-left: 6px;
+  font: 600 17px/1 var(--font-mono);
+  letter-spacing: -0.3px;
+}
+
+.colon {
+  color: var(--accent);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--fill);
+  color: var(--text-secondary);
+}
+
+.search:focus-within {
+  background: var(--fill-strong);
+}
+
+.search input {
+  /* WebKit gives a search field a default width; start from none and fill. */
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.search input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: grid;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 0 10px 10px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.heading {
+  margin: 12px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.note {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+
+.portsIcon {
+  color: var(--selection);
+}
+
+:global([role="listbox"]:focus-within) [aria-selected="true"] > .portsIcon {
+  color: currentColor;
+}
+
+.name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.star {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-top: 1px solid var(--separator);
+}
+
+.footerButtons {
+  display: flex;
+  gap: 2px;
+}
+
+.running {
+  font-size: 11px;
+}

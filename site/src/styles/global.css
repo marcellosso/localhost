@@ -1,0 +1,222 @@
+/* The apps' "Graded glass" tokens are the site's too: state, Service and
+ * accent colours stay identical to the product. Only the page itself, which the
+ * apps don't have, gets its own surfaces below. */
+@import '../../../apps/desktop/src/styles/tokens.css';
+
+:root {
+  --font-display: system-ui, -apple-system, 'SF Pro Display', 'Segoe UI', Cantarell, 'Noto Sans', sans-serif;
+  --page: #fafaf9;
+  --page-raised: #ffffff;
+  --page-sunken: #f2f2f0;
+  --ring: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+  --ring-strong: 0 0 0 1px rgb(0 0 0 / 0.1), 0 12px 32px -8px rgb(0 0 0 / 0.14);
+  --glow-a: rgb(215 48 101 / 0.16);
+  --glow-b: rgb(111 68 191 / 0.12);
+  --grid-line: rgb(0 0 0 / 0.045);
+  --code-bg: #f2f2f0;
+  --content: 1120px;
+  --radius: 12px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root[data-theme='dark'] {
+  --page: #0c0c0f;
+  --page-raised: #141417;
+  --page-sunken: #101013;
+  --ring: 0 0 0 1px rgb(255 255 255 / 0.08);
+  --ring-strong: 0 0 0 1px rgb(255 255 255 / 0.1), 0 24px 64px -12px rgb(0 0 0 / 0.7);
+  --glow-a: rgb(255 92 138 / 0.14);
+  --glow-b: rgb(179 146 240 / 0.1);
+  --grid-line: rgb(255 255 255 / 0.035);
+  --code-bg: #141417;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-padding-top: 88px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+code,
+kbd,
+pre,
+.mono {
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.container {
+  width: 100%;
+  max-width: calc(var(--content) + 48px);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Buttons: one accent for the primary action, quiet rings for the rest. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+  border: 0;
+  font: 600 15px/1 var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+}
+
+.button:active {
+  transform: scale(0.97);
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.2);
+}
+
+.button-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+
+.button-secondary {
+  background: var(--page-raised);
+  color: var(--text);
+  box-shadow: var(--ring);
+}
+
+.button-secondary:hover {
+  background: color-mix(in srgb, var(--page-raised) 92%, var(--text));
+}
+
+.button-small {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+/* Section headings, with a small engineered label above them. */
+.figure-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+.figure-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.lede {
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--fill);
+  box-shadow: inset 0 -1px 0 var(--separator);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+/* Code from Markdown: Shiki writes both themes' colours, the page picks one. */
+.astro-code,
+.astro-code span {
+  color: var(--shiki-light);
+}
+
+:root[data-theme='dark'] .astro-code,
+:root[data-theme='dark'] .astro-code span {
+  color: var(--shiki-dark);
+}

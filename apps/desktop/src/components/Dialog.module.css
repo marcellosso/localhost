@@ -1,0 +1,81 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.2);
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+  width: min(440px, calc(100vw - 48px));
+  max-height: 80vh;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.alert {
+  justify-items: center;
+  width: min(300px, calc(100vw - 48px));
+  gap: 8px;
+  text-align: center;
+}
+
+.icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.body {
+  overflow-y: auto;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  user-select: text;
+  /* Paths and commands have no spaces to wrap at. */
+  overflow-wrap: anywhere;
+}
+
+.body p {
+  margin: 0 0 8px;
+  white-space: pre-line;
+}
+
+.body p:last-child {
+  margin-bottom: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* An alert's buttons fill its width: side by side for two (the default on the
+ * right), stacked for more (the default on top). */
+.alert .actions {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  width: 100%;
+}
+
+.alert .actions:has(> :nth-child(3)) {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.alert .actions > :global(.button) {
+  height: 28px;
+}

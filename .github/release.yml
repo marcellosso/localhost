@@ -1,0 +1,15 @@
+# Sections of the release notes GitHub generates from merged PRs (RELEASING.md).
+changelog:
+  exclude:
+    authors: [dependabot]
+  categories:
+    - title: New
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Accessibility
+      labels: [accessibility]
+    - title: Documentation
+      labels: [documentation]
+    - title: Other changes
+      labels: ["*"]

@@ -1,0 +1,150 @@
+.pane {
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-log);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--separator);
+  font-size: 12.5px;
+}
+
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--service);
+}
+
+.title {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.summary,
+.runTime {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Without room, the run time gives way first, then the URL, then the
+   filter; the stats button and the `⋯` always stay in view. */
+.runTime {
+  flex: 0 1000 auto;
+}
+
+.failed {
+  color: var(--state-failed);
+}
+
+.warning {
+  color: var(--state-transitioning);
+}
+
+.url {
+  display: inline-flex;
+  flex: 0 10 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-text);
+  font: 12.5px var(--font-mono);
+  white-space: nowrap;
+}
+
+.url > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url > svg {
+  flex: none;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.filter {
+  display: flex;
+  flex: 0 1 170px;
+  align-items: center;
+  gap: 5px;
+  min-width: 96px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--text-secondary);
+}
+
+.filter input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.filter input::placeholder {
+  color: var(--text-secondary);
+}
+
+.filter input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: grid;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+/* The banner, then the log taking the rest. */
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.log {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.empty > * {
+  margin: 0;
+  pointer-events: auto;
+}

@@ -1,0 +1,447 @@
+---
+import { latestRelease, type Release } from '../lib/release';
+import { href, releases } from '../lib/site';
+
+const release = await latestRelease();
+const { files } = release;
+/** Links to the Releases page (no published release yet) open beside the site. */
+const target = (url: string) => (url === releases ? { target: '_blank', rel: 'noopener' } : {});
+const download = (key: keyof Release['files']) => ({ href: release[key], ...target(release[key]) });
+---
+
+<dialog class="install" data-install aria-labelledby="install-title">
+  <div class="head">
+    <h2 id="install-title">Install localhost <span data-platform-name>for macOS</span></h2>
+    <button type="button" class="close" data-close aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="m3 3 8 8M11 3l-8 8"></path></svg>
+    </button>
+  </div>
+  <p class="sub" data-sub>Two quick steps, usually under a minute.</p>
+
+  <section data-panel="macos">
+    <ol class="steps">
+      <li class="step first">
+        <span class="number" aria-hidden="true">1</span>
+        <div>
+          <h3>Drag it to Applications</h3>
+          <p>Open <code>{files.mac}</code> and drag <strong>localhost</strong> to <strong>Applications</strong>.</p>
+          <a class="file" {...download('mac')} data-again>Download <code>{files.mac}</code></a>
+        </div>
+      </li>
+      <li class="step">
+        <span class="number" aria-hidden="true">2</span>
+        <div>
+          <h3>Open it the first time</h3>
+          <p>localhost isn’t notarized by Apple yet, so macOS blocks the first launch once:</p>
+          <ol class="substeps">
+            <li>Click <strong>Done</strong> in the warning.</li>
+            <li>Open <strong>System Settings › Privacy &amp; Security</strong> and scroll to <strong>Security</strong>.</li>
+            <li>Click <strong>Open Anyway</strong>, and confirm with your password or Touch ID.</li>
+          </ol>
+          <p class="or">Or run this in Terminal, then open localhost:</p>
+          <div class="command">
+            <code>xattr -dr com.apple.quarantine /Applications/localhost.app</code>
+            <button type="button" data-copy="xattr -dr com.apple.quarantine /Applications/localhost.app">Copy</button>
+          </div>
+        </div>
+      </li>
+    </ol>
+    <p class="needs"><span class="check" aria-hidden="true"></span>macOS 15 or later · Apple silicon or Intel</p>
+  </section>
+
+  <section data-panel="windows">
+    <ol class="steps">
+      <li class="step first">
+        <span class="number" aria-hidden="true">1</span>
+        <div>
+          <h3>Run the installer</h3>
+          <p>Open <code>{files.windows}</code>. It installs for your user only, no administrator rights needed.</p>
+          <a class="file" {...download('windows')} data-again>Download <code>{files.windows}</code></a>
+        </div>
+      </li>
+      <li class="step">
+        <span class="number" aria-hidden="true">2</span>
+        <div>
+          <h3>Get past SmartScreen</h3>
+          <p>The installer isn’t signed by a known publisher yet, so Windows says “Windows protected your PC”:</p>
+          <ol class="substeps">
+            <li>Click <strong>More info</strong>.</li>
+            <li>Check that the file is <code>{files.windows}</code>.</li>
+            <li>Click <strong>Run anyway</strong>.</li>
+          </ol>
+        </div>
+      </li>
+    </ol>
+    <p class="needs"><span class="check" aria-hidden="true"></span>Windows 10 or 11 · x64 · WSL 2 for Projects in WSL</p>
+  </section>
+
+  <section data-panel="linux">
+    <ol class="steps">
+      <li class="step first">
+        <span class="number" aria-hidden="true">1</span>
+        <div>
+          <h3>Download your package</h3>
+          <div class="packages">
+            <a class="package" {...download('deb')}><strong>Ubuntu, Debian</strong><code>.deb</code></a>
+            <a class="package" {...download('rpm')}><strong>Fedora</strong><code>.rpm</code></a>
+            <a class="package" {...download('appImage')}><strong>Any distro</strong><code>AppImage</code></a>
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <span class="number" aria-hidden="true">2</span>
+        <div>
+          <h3>Install it</h3>
+          <p>From the folder you downloaded it to:</p>
+          <div class="command">
+            <code>sudo apt install ./{files.deb}</code>
+            <button type="button" data-copy={`sudo apt install ./${files.deb}`}>Copy</button>
+          </div>
+          <div class="command">
+            <code>sudo dnf install ./{files.rpm}</code>
+            <button type="button" data-copy={`sudo dnf install ./${files.rpm}`}>Copy</button>
+          </div>
+          <div class="command">
+            <code>chmod +x {files.appImage} &amp;&amp; ./{files.appImage}</code>
+            <button type="button" data-copy={`chmod +x ${files.appImage} && ./${files.appImage}`}>Copy</button>
+          </div>
+          <p class="or">
+            Secrets need a Secret Service (GNOME Keyring, KWallet). On stock GNOME the tray icon needs the <a href={href('docs/linux')}>AppIndicator extension</a>.
+          </p>
+        </div>
+      </li>
+    </ol>
+    <p class="needs"><span class="check" aria-hidden="true"></span>x86_64 · Ubuntu 22.04+ · Debian 12+ · Fedora</p>
+  </section>
+
+  <p class="other">
+    <span>On another system?</span>
+    <button type="button" data-other="macos">macOS</button>
+    <button type="button" data-other="windows">Windows</button>
+    <button type="button" data-other="linux">Linux</button>
+    <a href={href('docs/install')}>Install guide →</a>
+  </p>
+</dialog>
+
+<script>
+  import type { Platform } from '../lib/release';
+  import { names } from '../lib/platform';
+
+  const dialog = document.querySelector<HTMLDialogElement>('[data-install]')!;
+  const sub = dialog.querySelector<HTMLElement>('[data-sub]')!;
+
+  // One platform at a time, the visitor's own; the others are a click away below.
+  function show(platform: Platform) {
+    dialog.querySelector('[data-platform-name]')!.textContent = `for ${names[platform]}`;
+    for (const panel of dialog.querySelectorAll<HTMLElement>('[data-panel]')) panel.hidden = panel.dataset.panel !== platform;
+    for (const other of dialog.querySelectorAll<HTMLElement>('[data-other]')) other.hidden = other.dataset.other === platform;
+  }
+
+  document.addEventListener('install:open', (event) => {
+    const { platform, started } = (event as CustomEvent<{ platform: Platform; started: boolean }>).detail;
+    sub.textContent = started ? 'Your download has started. Two quick steps, usually under a minute.' : 'Two quick steps, usually under a minute.';
+    for (const link of dialog.querySelectorAll<HTMLElement>('[data-again]')) {
+      link.firstChild!.textContent = started ? 'Download again ' : 'Download ';
+    }
+    show(platform);
+    dialog.showModal();
+  });
+
+  dialog.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    // A click on the backdrop lands on the dialog itself.
+    if (target === dialog || target.closest('[data-close]')) dialog.close();
+    const other = target.closest<HTMLElement>('[data-other]');
+    if (other) {
+      // Moving away from the platform whose download started: the subtitle no longer applies.
+      sub.textContent = 'Two quick steps, usually under a minute.';
+      show(other.dataset.other as Platform);
+    }
+    const copy = target.closest<HTMLButtonElement>('[data-copy]');
+    if (copy) {
+      navigator.clipboard.writeText(copy.dataset.copy!).then(() => {
+        copy.textContent = 'Copied';
+        setTimeout(() => (copy.textContent = 'Copy'), 1500);
+      });
+    }
+  });
+
+</script>
+
+<style>
+  .install {
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 28px;
+    border: 0;
+    border-radius: 20px;
+    background: var(--page-raised);
+    color: var(--text);
+    box-shadow: var(--ring-strong);
+    overflow-y: auto;
+  }
+  .install[open] {
+    animation: enter 220ms var(--ease-out);
+  }
+  .install::backdrop {
+    background: rgb(0 0 0 / 0.55);
+  }
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .install[open] {
+      animation-name: fade;
+    }
+    @keyframes fade {
+      from {
+        opacity: 0;
+      }
+    }
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  h2 {
+    margin: 0;
+    font: 700 24px/1.2 var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  .close {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .close:hover {
+    background: var(--fill);
+    color: var(--text);
+  }
+  .sub {
+    margin: 6px 0 20px;
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
+
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 14px;
+    box-shadow: var(--ring);
+  }
+  .step > div {
+    min-width: 0;
+  }
+  .step.first {
+    background: var(--page-sunken);
+  }
+  .number {
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  h3 {
+    margin: 2px 0 6px;
+    font-size: 16px;
+  }
+  .step p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .step strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .step code {
+    font-size: 0.9em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    color: var(--accent-text);
+    overflow-wrap: anywhere;
+  }
+  .substeps {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .substeps li + li {
+    margin-top: 4px;
+  }
+  .step .or {
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .or a {
+    color: var(--accent-text);
+  }
+  .file {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .file code {
+    color: inherit;
+    background: none;
+    padding: 0;
+  }
+  .command {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 6px 6px 12px;
+    border-radius: 10px;
+    background: var(--page-sunken);
+    box-shadow: var(--ring);
+  }
+  .command code {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    background: none;
+    color: var(--text);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .command button {
+    flex: none;
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--fill-strong);
+    color: var(--text);
+    font: 600 12.5px/1 var(--font-sans);
+    cursor: pointer;
+  }
+  .command button:hover {
+    background: color-mix(in srgb, var(--fill-strong) 70%, var(--text) 10%);
+  }
+  .packages {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .package {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+    font-size: 13px;
+    text-decoration: none;
+    transition: box-shadow 150ms ease;
+  }
+  .package:hover {
+    box-shadow: 0 0 0 1.5px var(--accent);
+  }
+  .package code {
+    align-self: flex-start;
+  }
+  @media (max-width: 520px) {
+    .packages {
+      grid-template-columns: 1fr;
+    }
+  }
+  .needs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--separator);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .check {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    position: relative;
+  }
+  .check::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 3.5px;
+    width: 5px;
+    height: 3px;
+    border: solid var(--on-accent);
+    border-width: 0 0 1.5px 1.5px;
+    transform: rotate(-45deg);
+  }
+  h2 span {
+    color: var(--text-secondary);
+  }
+  .other {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+  .other button,
+  .other a {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .other button:hover,
+  .other a:hover {
+    color: var(--text);
+  }
+  .other button[hidden] {
+    display: none;
+  }
+  .other a {
+    margin-left: auto;
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+</style>

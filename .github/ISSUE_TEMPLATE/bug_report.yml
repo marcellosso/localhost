@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in localhost doesn't work as it should.
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The Project and Service setup matters most, e.g. the command line, the Port and any Dependencies.
+      placeholder: |
+        1. Add a Project with a Service running `pnpm dev` on port 3000
+        2. Start it
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Windows, Project in WSL
+        - The `localhost` CLI
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: localhost version
+      description: The release you installed, or the commit you built.
+      placeholder: "0.3.1"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS version
+      placeholder: "macOS 15.5, Ubuntu 24.04, Windows 11 24H2"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The Service's log, or what localhost printed. Remove anything secret first.
+      render: text

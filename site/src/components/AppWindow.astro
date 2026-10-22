@@ -1,0 +1,1023 @@
+---
+/* The localhost window, drawn in HTML so it stays sharp and can run. It is a
+ * small simulation, not a recording: Projects, Services, Dependencies and the
+ * Ports view behave the way the app does, so visitors can click around. */
+---
+
+<figure class="figure">
+  <div class="window" data-app-window>
+    <aside class="sidebar">
+      <div class="lights" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="brand" aria-hidden="true">localhost<span>:</span></div>
+      <div class="search" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3" stroke-linecap="round"></path></svg>
+        Search projects
+      </div>
+      <button type="button" class="nav-row" data-ports-button>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="var(--link)" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12"></path></svg>
+        Ports
+      </button>
+      <div class="group" aria-hidden="true">Projects</div>
+      <div data-projects></div>
+      <div class="sidebar-footer" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.25"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>
+        <span class="mono" data-running-total>0 running</span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="toolbar">
+        <div class="title">
+          <strong data-title>Acme Shop</strong>
+          <span class="mono" data-subtitle>~/Code/acme-shop</span>
+        </div>
+        <div class="profile" data-profile aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m8 2 6 3-6 3-6-3 6-3Z M2 8l6 3 6-3M2 11l6 3 6-3" stroke-linejoin="round"></path></svg>
+          Development
+        </div>
+        <button type="button" class="tool start" data-start-all>
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1v8l7-4z" fill="currentColor"></path></svg>
+          Start All
+        </button>
+        <button type="button" class="tool stop" data-stop-all disabled>
+          <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true"><rect width="9" height="9" rx="1.5" fill="currentColor"></rect></svg>
+          Stop All
+        </button>
+      </div>
+
+      <div class="panes" data-project-view>
+        <div class="services">
+          <div data-services></div>
+          <div class="add" aria-hidden="true">
+            <span>+ Add Service</span>
+            <kbd>⇧⌘N</kbd>
+          </div>
+        </div>
+        <div class="log">
+          <div class="log-header" data-log-header></div>
+          <div class="lines" data-log aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="ports" data-ports-view hidden>
+        <div class="ports-head" aria-hidden="true"><span>Port</span><span>Process</span><span>Belongs to</span></div>
+        <div data-ports></div>
+      </div>
+    </div>
+  </div>
+  <figcaption class="visually-hidden">
+    A working copy of the localhost window. Pick a Project in the sidebar or the Ports view, select a Service to see its own log, and
+    use Start All, Stop All, Start, Restart and Stop.
+  </figcaption>
+</figure>
+
+<script>
+  type State = 'stopped' | 'starting' | 'running' | 'stopping' | 'exited';
+  type Line = [number, string];
+  interface Service {
+    key: string;
+    name: string;
+    command: string;
+    process: string;
+    port?: number;
+    manual?: boolean;
+    oneShot?: boolean;
+    after?: string[];
+    boot: Line[];
+    chatter: (() => string)[];
+    state: State;
+    run: number;
+  }
+  interface Project {
+    name: string;
+    path: string;
+    services: Service[];
+    log: { key: string; html: string }[];
+  }
+
+  const random = (from: number, to: number) => from + Math.floor(Math.random() * (to - from));
+  const clock = () => new Date().toTimeString().slice(0, 8);
+  const stamp = () => new Date().toISOString();
+  const info = '<i class="g">INFO</i>:    ';
+
+  function service(fields: Omit<Service, 'state' | 'run'>): Service {
+    return { ...fields, state: 'stopped', run: 0 };
+  }
+
+  const projects: Project[] = [
+    {
+      name: 'Acme Shop',
+      path: '~/Code/acme-shop',
+      log: [],
+      services: [
+        service({
+          key: 'migrate', name: 'Migrations', command: 'pnpm db:migrate', process: 'node', oneShot: true,
+          boot: [
+            ...['0001_create_products', '0002_create_orders', '0003_add_cart_items', '0004_index_orders_by_customer'].map(
+              (name): Line => [160, `<i class="g">✔</i> ${name} <i class="d">applied</i>`],
+            ),
+            [120, '4 migrations applied in 0.61s'],
+            [0, '<i class="d it">Exited with code 0</i>'],
+          ],
+          chatter: [],
+        }),
+        service({
+          key: 'api', name: 'API', port: 8000, command: 'python3 server.py --port $PORT', process: 'python3', after: ['migrate'],
+          boot: [
+            [200, `${info} Will watch for changes in these directories: ['~/Code/acme-shop/api']`],
+            [380, `${info} Uvicorn running on <i class="u">http://127.0.0.1:8000</i> (Press CTRL+C to quit)`],
+            [120, `${info} Application startup complete.`],
+          ],
+          chatter: [
+            () => `${info} 127.0.0.1:${random(50000, 59999)} - "POST /api/cart HTTP/1.1" <i class="g">200 OK</i>`,
+            () => `${info} 127.0.0.1:${random(50000, 59999)} - "GET /api/products/${random(1, 99)} HTTP/1.1" <i class="g">200 OK</i>`,
+          ],
+        }),
+        service({
+          key: 'web', name: 'Web', port: 5173, command: 'pnpm dev --port $PORT', process: 'node', after: ['api'],
+          boot: [
+            [300, ''],
+            [0, '  <b class="g">VITE</b> <i class="g">v6.2.0</i>  ready in <b>412</b> ms'],
+            [0, ''],
+            [0, '  <i class="g">➜</i>  <b>Local</b>:   <i class="u">http://localhost:5173/</i>'],
+            [0, '  <i class="g">➜</i>  <b>Network</b>: use <b>--host</b> to expose'],
+          ],
+          chatter: [
+            () => `<i class="d">${clock()}</i> <i class="c">[vite]</i> hmr update <i class="d">/src/routes/cart.tsx</i>`,
+            () => `<i class="d">${clock()}</i> <i class="c">[vite]</i> hmr update <i class="d">/src/components/ProductCard.tsx</i>`,
+          ],
+        }),
+        service({
+          key: 'worker', name: 'Worker', command: 'pnpm dev', process: 'node', after: ['migrate'],
+          boot: [[250, 'worker ready, polling <i class="y">queue:emails</i> and <i class="y">queue:thumbnails</i>']],
+          chatter: [
+            () => `<i class="d">${stamp()}</i> <i class="y">emails</i> done order-confirmation #${random(1040, 1100)} ${random(110, 210)}ms`,
+            () => `<i class="d">${stamp()}</i> <i class="y">thumbnails</i> done product ${random(1, 99)} (3 sizes) ${random(85, 130)}ms`,
+          ],
+        }),
+        service({
+          key: 'storybook', name: 'Storybook', port: 6006, command: 'pnpm storybook --port $PORT', process: 'node', manual: true,
+          boot: [
+            [600, '<i class="d">info</i> => Starting manager..'],
+            [500, '<b class="g">Storybook 9.1</b> for react-vite started'],
+            [0, '  Local:            <i class="u">http://localhost:6006/</i>'],
+          ],
+          chatter: [() => `<i class="d">info</i> => Rebuilding <i class="d">src/stories/Button.stories.tsx</i>`],
+        }),
+      ],
+    },
+    {
+      name: 'Blog',
+      path: '~/Code/blog',
+      log: [],
+      services: [
+        service({
+          key: 'search', name: 'Search', port: 7700, command: 'meilisearch --http-addr localhost:$PORT', process: 'meilisearch',
+          boot: [
+            [300, '<i class="g">INFO</i> meilisearch: Database path: "./data.ms"'],
+            [200, '<i class="g">INFO</i> meilisearch: Server listening on: "<i class="u">http://localhost:7700</i>"'],
+          ],
+          chatter: [() => `<i class="g">INFO</i> HTTP request{method=POST path="/indexes/posts/search" status=200} ${random(1, 9)}ms`],
+        }),
+        service({
+          key: 'web', name: 'Web', port: 4321, command: 'pnpm astro dev --port $PORT', process: 'node', after: ['search'],
+          boot: [
+            [350, ''],
+            [0, ' <b class="m">astro</b>  <i class="g">v7.4.0</i> ready in 210 ms'],
+            [0, ''],
+            [0, '┃ Local    <i class="u">http://localhost:4321/</i>'],
+          ],
+          chatter: [
+            () => `<i class="d">${clock()}</i> <i class="g">[200]</i> /posts/hello-world <i class="d">${random(4, 30)}ms</i>`,
+            () => `<i class="d">${clock()}</i> <i class="g">[200]</i> / <i class="d">${random(4, 30)}ms</i>`,
+          ],
+        }),
+      ],
+    },
+    {
+      name: 'Design System',
+      path: '~/Code/design-system',
+      log: [],
+      services: [
+        service({
+          key: 'tokens', name: 'Tokens', command: 'pnpm tokens --watch', process: 'node',
+          boot: [[300, 'watching <i class="d">tokens/*.json</i>'], [150, `built <b>214</b> tokens in 38ms`]],
+          chatter: [() => `<i class="d">${clock()}</i> built <b>214</b> tokens in ${random(30, 60)}ms`],
+        }),
+        service({
+          key: 'storybook', name: 'Storybook', port: 6006, command: 'pnpm storybook --port $PORT', process: 'node', after: ['tokens'],
+          boot: [
+            [600, '<i class="d">info</i> => Starting manager..'],
+            [500, '<b class="g">Storybook 9.1</b> for react-vite started'],
+            [0, '  Local:            <i class="u">http://localhost:6006/</i>'],
+          ],
+          chatter: [() => `<i class="d">info</i> => Rebuilding <i class="d">src/Button.stories.tsx</i>`],
+        }),
+      ],
+    },
+  ];
+
+  const unmanaged = [
+    { port: 5432, process: 'postgres' },
+    { port: 6379, process: 'redis-server' },
+  ];
+
+  const root = document.querySelector<HTMLElement>('[data-app-window]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
+  const log = $('[data-log]');
+  const instant = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, instant ? 0 : ms));
+
+  let current = projects[0];
+  let selected: Service | null = null;
+  let showingPorts = false;
+  let visible = false;
+
+  const colour = (project: Project, svc: Service) => `var(--service-${project.services.indexOf(svc) % 8})`;
+  const projectOf = (svc: Service) => projects.find((project) => project.services.includes(svc))!;
+  const active = (svc: Service) => svc.state === 'starting' || svc.state === 'running';
+  const labels: Record<State, string> = { stopped: 'Stopped', starting: 'Starting', running: 'Running', stopping: 'Stopping', exited: 'Exited · code 0' };
+  const label = (svc: Service) => (svc.state === 'stopped' && svc.manual ? 'Manual' : labels[svc.state]);
+
+  function append(project: Project, svc: Service, html: string) {
+    const entry = { key: svc.key, html };
+    project.log.push(entry);
+    if (project.log.length > 300) project.log.shift();
+    if (project === current && !showingPorts && (!selected || selected === svc)) {
+      log.querySelector('.empty')?.remove();
+      const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+      log.append(lineElement(project, entry));
+      while (log.children.length > 300) log.firstElementChild!.remove();
+      if (stick) log.scrollTop = log.scrollHeight;
+    }
+  }
+
+  function lineElement(project: Project, entry: { key: string; html: string }) {
+    const svc = project.services.find((candidate) => candidate.key === entry.key)!;
+    const row = document.createElement('div');
+    row.className = 'line';
+    row.innerHTML = `<span class="key" style="color: ${colour(project, svc)}">${entry.key}</span><span>${entry.html}</span>`;
+    return row;
+  }
+
+  async function start(svc: Service): Promise<void> {
+    if (active(svc) || svc.state === 'stopping') return;
+    const project = projectOf(svc);
+    const run = ++svc.run;
+    svc.state = 'starting';
+    render();
+
+    // Dependencies first: each must be Running, or have Exited, before this one launches.
+    const dependencies = (svc.after ?? []).map((key) => project.services.find((candidate) => candidate.key === key)!);
+    while (dependencies.some((dependency) => dependency.state !== 'running' && dependency.state !== 'exited')) {
+      for (const dependency of dependencies) if (dependency.state === 'stopped') start(dependency);
+      await sleep(80);
+      if (svc.run !== run) return;
+    }
+
+    for (const [delay, html] of svc.boot) {
+      await sleep(delay);
+      if (svc.run !== run) return;
+      append(project, svc, html);
+    }
+    svc.state = svc.oneShot ? 'exited' : 'running';
+    render();
+    if (instant || !svc.chatter.length) return;
+    while (true) {
+      await sleep(random(1400, 4200));
+      if (svc.run !== run) return;
+      if (!visible || document.hidden) continue;
+      append(project, svc, svc.chatter[random(0, svc.chatter.length)]());
+    }
+  }
+
+  async function stop(svc: Service) {
+    if (!active(svc)) return;
+    const run = ++svc.run;
+    svc.state = 'stopping';
+    render();
+    await sleep(random(450, 800));
+    if (svc.run !== run) return;
+    svc.state = 'stopped';
+    render();
+  }
+
+  async function restart(svc: Service) {
+    await stop(svc);
+    start(svc);
+  }
+
+  function startAll(project: Project) {
+    for (const svc of project.services) if (!svc.manual) start(svc);
+  }
+
+  function stopAll(project: Project) {
+    for (const svc of [...project.services].reverse()) stop(svc);
+  }
+
+  function select(project: Project, svc: Service | null, ports = false) {
+    current = project;
+    selected = svc;
+    showingPorts = ports;
+    log.replaceChildren(...project.log.filter((entry) => !svc || entry.key === svc.key).map((entry) => lineElement(project, entry)));
+    log.scrollTop = log.scrollHeight;
+    render();
+  }
+
+  const glyph = (svc: Service) => `<span class="glyph" data-state="${svc.state}"></span>`;
+  const port = (project: Project, svc: Service) => (svc.port ? `<span class="port mono" style="--service: ${colour(project, svc)}">:${svc.port}</span>` : '');
+
+  function render() {
+    const running = projects.flatMap((project) => project.services).filter((svc) => svc.state === 'running');
+    $('[data-running-total]').textContent = `${running.length} running`;
+
+    $('[data-projects]').innerHTML = projects
+      .map((project, index) => {
+        const on = project.services.some((svc) => svc.state === 'running');
+        const here = project === current && !showingPorts;
+        return `<button type="button" class="project${here ? ' selected' : ''}" data-project="${index}" ${here ? 'aria-current="true"' : ''}>
+          <span class="dot${on ? ' on' : ''}"></span>${project.name}${index === 0 ? '<span class="star" aria-hidden="true">★</span>' : ''}</button>`;
+      })
+      .join('');
+    $('[data-ports-button]').classList.toggle('selected', showingPorts);
+
+    $('[data-project-view]').hidden = showingPorts;
+    $('[data-ports-view]').hidden = !showingPorts;
+    $('[data-profile]').hidden = showingPorts;
+    $<HTMLButtonElement>('[data-start-all]').hidden = showingPorts;
+    $<HTMLButtonElement>('[data-stop-all]').hidden = showingPorts;
+
+    if (showingPorts) {
+      $('[data-title]').textContent = 'Ports';
+      $('[data-subtitle]').textContent = 'listening on this machine';
+      const rows = projects.flatMap((project) =>
+        project.services
+          .filter((svc) => svc.port && svc.state === 'running')
+          .map((svc, index) => ({ port: svc.port!, html: `<button type="button" class="port-row" data-jump="${projects.indexOf(project)}:${project.services.indexOf(svc)}" style="--c: ${colour(project, svc)}"><code>:${svc.port}</code><span class="mono">${svc.process}</span><span class="owner"><i></i>${project.name} › ${svc.name}</span></button>`, index })),
+      );
+      for (const listener of unmanaged) {
+        rows.push({ port: listener.port, html: `<div class="port-row faint"><code>:${listener.port}</code><span class="mono">${listener.process}</span><span class="owner">Unmanaged</span></div>`, index: 0 });
+      }
+      $('[data-ports]').innerHTML = rows.sort((a, b) => a.port - b.port).map((row) => row.html).join('');
+      return;
+    }
+
+    $('[data-title]').textContent = current.name;
+    $('[data-subtitle]').textContent = current.path;
+    const count = current.services.filter((svc) => svc.state === 'running').length;
+    const total = current.services.length;
+    $<HTMLButtonElement>('[data-stop-all]').disabled = !current.services.some(active);
+
+    $('[data-services]').innerHTML =
+      `<button type="button" class="all${selected ? '' : ' selected'}" data-select="all">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>All services<span class="count mono">${count} of ${total}</span></button>` +
+      current.services
+        .map(
+          (svc, index) => `<button type="button" class="row${selected === svc ? ' selected' : ''}" data-select="${index}" style="--service: ${colour(current, svc)}" aria-label="${svc.name}, ${label(svc)}">
+            <span class="bar"></span>${glyph(svc)}<span class="name">${svc.name}</span>${port(current, svc)}
+            <span class="state">${label(svc)}</span><code class="command">${svc.command}</code></button>`,
+        )
+        .join('');
+
+    const header = $('[data-log-header]');
+    if (!selected) {
+      header.innerHTML = `<span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>All services</strong>
+        <span class="muted">${count} of ${total} running</span><span class="filter" aria-hidden="true">Filter <kbd>⌘F</kbd></span>`;
+    } else {
+      const svc = selected;
+      const runningNow = active(svc);
+      header.innerHTML = `${glyph(svc)}<strong>${svc.name}</strong>${port(current, svc)}<span class="muted">${label(svc)}</span>
+        <span class="actions">${
+          runningNow
+            ? `<button type="button" class="mini" data-action="restart">Restart</button><button type="button" class="mini" data-action="stop">Stop</button>`
+            : `<button type="button" class="mini primary" data-action="start" ${svc.state === 'stopping' ? 'disabled' : ''}>Start</button>`
+        }</span>`;
+    }
+
+    if (!current.log.length || (selected && !current.log.some((entry) => entry.key === selected!.key))) {
+      if (!log.querySelector('.empty')) {
+        log.replaceChildren();
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = selected ? `No output yet. Start ${selected.name} <kbd>⌘R</kbd>` : 'Press Start All to run every Service <kbd>⇧⌘R</kbd>';
+        log.append(empty);
+      }
+    } else {
+      log.querySelector('.empty')?.remove();
+    }
+  }
+
+  root.addEventListener('click', (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>('button');
+    if (!target || target.disabled) return;
+    if (target.matches('[data-start-all]')) startAll(current);
+    else if (target.matches('[data-stop-all]')) stopAll(current);
+    else if (target.matches('[data-ports-button]')) select(current, null, true);
+    else if (target.dataset.project) select(projects[Number(target.dataset.project)], null);
+    else if (target.dataset.select) select(current, target.dataset.select === 'all' ? null : current.services[Number(target.dataset.select)]);
+    else if (target.dataset.jump) {
+      const [project, svc] = target.dataset.jump.split(':').map(Number);
+      select(projects[project], projects[project].services[svc]);
+    } else if (target.dataset.action && selected) {
+      ({ start, stop, restart })[target.dataset.action as 'start' | 'stop' | 'restart'](selected);
+    }
+  });
+
+  select(current, null);
+
+  let started = false;
+  new IntersectionObserver(
+    ([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible && !started) {
+        started = true;
+        setTimeout(() => startAll(projects[0]), instant ? 0 : 700);
+      }
+    },
+    { threshold: 0.3 },
+  ).observe(root);
+</script>
+
+<style>
+  .figure {
+    margin: 0;
+  }
+  .window {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    height: 560px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--text);
+    text-align: left;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .window :global(button) {
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .window :global(button:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .mono,
+  .window :global(.command),
+  .window :global(.port),
+  .window :global(.count) {
+    font-family: var(--font-mono);
+  }
+
+  /* Glass steps down left to right: sidebar most translucent, log opaque. */
+  .sidebar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 10px;
+    background: color-mix(in srgb, var(--surface-sidebar) 72%, transparent);
+    backdrop-filter: blur(30px) saturate(1.6);
+    -webkit-backdrop-filter: blur(30px) saturate(1.6);
+    border-right: 1px solid var(--separator);
+  }
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: color-mix(in srgb, var(--surface-column) 90%, transparent);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .sidebar {
+      background: var(--surface-sidebar);
+    }
+    .main {
+      background: var(--surface-column);
+    }
+  }
+  .lights {
+    display: flex;
+    gap: 8px;
+    padding: 2px 4px 14px;
+  }
+  .lights span {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ff5f57;
+  }
+  .lights span:nth-child(2) {
+    background: #febc2e;
+  }
+  .lights span:nth-child(3) {
+    background: #28c840;
+  }
+  .brand {
+    font: 600 17px/1 var(--font-mono);
+    padding: 0 6px 12px;
+  }
+  .brand span {
+    color: var(--accent);
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
+    margin-bottom: 8px;
+    border-radius: 7px;
+    background: var(--fill);
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+  .nav-row,
+  .sidebar :global(.project) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 7px;
+  }
+  .nav-row:hover,
+  .sidebar :global(.project:hover) {
+    background: var(--fill);
+  }
+  .nav-row:global(.selected),
+  .sidebar :global(.project.selected) {
+    background: var(--fill-strong);
+  }
+  .group {
+    padding: 14px 8px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+  }
+  .sidebar :global(.project .dot) {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--state-stopped);
+  }
+  .sidebar :global(.project .dot.on) {
+    border: 0;
+    background: var(--state-running);
+  }
+  .sidebar :global(.star) {
+    margin-left: auto;
+    color: var(--text-tertiary);
+    font-size: 11px;
+  }
+  .sidebar-footer {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 52px;
+    padding: 0 12px 0 16px;
+    border-bottom: 1px solid var(--separator);
+  }
+  .title {
+    display: flex;
+    flex-direction: column;
+    margin-right: auto;
+    min-width: 0;
+  }
+  .title strong {
+    font-size: 13px;
+  }
+  .title span {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .profile,
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font: 600 12px/1 var(--font-sans);
+    white-space: nowrap;
+  }
+  .profile {
+    color: var(--text-secondary);
+    box-shadow: inset 0 0 0 1px var(--separator);
+    font-weight: 500;
+  }
+  .profile[hidden],
+  .tool[hidden] {
+    display: none;
+  }
+  .tool {
+    transition:
+      transform 140ms var(--ease-out),
+      opacity 140ms ease;
+  }
+  .window .tool {
+    font-weight: 600;
+  }
+  .tool:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .tool:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .window .start {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .window .stop {
+    background: var(--fill-strong);
+    color: var(--text);
+  }
+
+  .panes {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    min-height: 0;
+  }
+  .panes[hidden],
+  .ports[hidden] {
+    display: none;
+  }
+  .services {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    min-height: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--separator);
+  }
+  .services > div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .window :global(.all) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-weight: 600;
+  }
+  .window :global(.dots) {
+    display: grid;
+    grid-template-columns: repeat(2, 4px);
+    gap: 2px;
+  }
+  .window :global(.dots i) {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--service-0);
+  }
+  .window :global(.dots i:nth-child(2)) {
+    background: var(--service-1);
+  }
+  .window :global(.dots i:nth-child(3)) {
+    background: var(--service-2);
+  }
+  .window :global(.dots i:nth-child(4)) {
+    background: var(--service-3);
+  }
+  .window :global(.count) {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+  }
+  .window :global(.row) {
+    display: grid;
+    grid-template-columns: 3px 12px auto auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 3px;
+    align-items: center;
+    width: 100%;
+    padding: 8px 10px 8px 6px;
+    border-radius: 7px;
+  }
+  .window :global(.row:hover),
+  .window :global(.all:hover) {
+    background: var(--fill);
+  }
+  .window :global(.row.selected),
+  .window :global(.all.selected) {
+    background: var(--fill-strong);
+  }
+  .window :global(.bar) {
+    grid-row: 1 / 3;
+    align-self: stretch;
+    border-radius: 2px;
+    background: var(--service);
+  }
+  .window :global(.name) {
+    font-weight: 600;
+  }
+  .window :global(.port) {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--service);
+    background: color-mix(in srgb, var(--service) 16%, transparent);
+  }
+  .window :global(.row .state) {
+    grid-column: 5;
+    justify-self: end;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+  .window :global(.row:not(:has(.port)) .state) {
+    grid-column: 4 / 6;
+  }
+  .window :global(.command) {
+    grid-column: 3 / 6;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* State glyphs carry state by shape. */
+  .window :global(.glyph) {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    justify-self: center;
+    border-radius: 50%;
+    border: 1.5px solid var(--state-stopped);
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+  .window :global(.glyph[data-state='running']) {
+    border-color: transparent;
+    background: var(--state-running);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-running) 25%, transparent);
+  }
+  .window :global(.glyph[data-state='starting']),
+  .window :global(.glyph[data-state='stopping']) {
+    border: 2px solid var(--state-transitioning);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      transform: scale(0.75);
+      opacity: 0.6;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .window :global(.glyph[data-state='starting']),
+    .window :global(.glyph[data-state='stopping']) {
+      animation: none;
+    }
+  }
+
+  .add {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .window kbd,
+  .window :global(kbd) {
+    height: 18px;
+    min-width: 0;
+    font-size: 10.5px;
+  }
+
+  .log {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface-log);
+  }
+  .log-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--separator);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .window :global(.muted) {
+    color: var(--text-tertiary);
+  }
+  .log-header :global(.filter),
+  .log-header :global(.actions) {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .log-header :global(.filter) {
+    height: 24px;
+    padding: 0 4px 0 8px;
+    border-radius: 6px;
+    background: var(--fill);
+    color: var(--text-tertiary);
+    font-size: 11px;
+  }
+  .window :global(.mini) {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: var(--fill-strong);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .window :global(.mini.primary) {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .window :global(.mini:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .lines {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 10px 0 12px;
+    font: 12px/1.5 var(--font-mono);
+    white-space: pre;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .lines :global(.empty) {
+    height: 100%;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
+    white-space: normal;
+  }
+  .lines :global(.line) {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr);
+    padding: 0 12px;
+    min-height: 18px;
+    animation: appear 240ms var(--ease-out);
+  }
+  @keyframes appear {
+    from {
+      opacity: 0;
+    }
+  }
+  .lines :global(.key) {
+    font-weight: 600;
+  }
+  .lines :global(.line > span:last-child) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lines :global(i),
+  .lines :global(b) {
+    font-style: normal;
+  }
+  .lines :global(.g) {
+    color: var(--ansi-2);
+  }
+  .lines :global(.y) {
+    color: var(--ansi-3);
+  }
+  .lines :global(.c) {
+    color: var(--ansi-6);
+  }
+  .lines :global(.m) {
+    color: var(--ansi-5);
+  }
+  .lines :global(.d) {
+    color: var(--text-tertiary);
+  }
+  .lines :global(.it) {
+    font-style: italic;
+  }
+  .lines :global(.u) {
+    color: var(--link);
+    text-decoration: underline;
+  }
+
+  .ports {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 12px;
+    background: var(--surface-log);
+  }
+  .ports-head,
+  .ports :global(.port-row) {
+    display: grid;
+    grid-template-columns: 90px 140px 1fr;
+    align-items: center;
+    width: 100%;
+    padding: 0 10px;
+  }
+  .ports-head {
+    height: 32px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+  }
+  .ports :global(.port-row) {
+    height: 38px;
+    border-top: 1px solid var(--separator);
+  }
+  .ports :global(button.port-row:hover) {
+    background: var(--fill);
+    border-radius: 7px;
+  }
+  .ports :global(.port-row code) {
+    font-weight: 600;
+  }
+  .ports :global(.port-row .mono) {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .ports :global(.owner) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ports :global(.owner i) {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--c);
+  }
+  .ports :global(.faint) {
+    color: var(--text-tertiary);
+  }
+
+  @media (max-width: 960px) {
+    .window {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .sidebar {
+      display: none;
+    }
+  }
+  @media (max-width: 680px) {
+    .window {
+      height: auto;
+    }
+    .panes {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .services {
+      border-right: 0;
+      border-bottom: 1px solid var(--separator);
+    }
+    .add,
+    .profile,
+    .title span {
+      display: none;
+    }
+    .lines {
+      height: 260px;
+      flex: none;
+    }
+  }
+</style>

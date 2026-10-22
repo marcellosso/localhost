@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# localhostd for WSL, put here to be bundled into the Windows installer (release.yml)
+src-tauri/wsl/

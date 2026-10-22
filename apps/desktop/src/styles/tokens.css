@@ -1,0 +1,125 @@
+/* "Graded glass" tokens (AGENTS.md, Design), the same
+ * values as the macOS app's Theme (apps/macos/App/Views/Theme.swift): keep them in step.
+ * Green, orange and red are for Service State only; the accent marks primary
+ * actions. Text colours reach WCAG AA (4.5:1) on the surfaces below, glyphs 3:1,
+ * also on a selected row and on field fills. To reach it on these solid
+ * surfaces, secondary and tertiary text, the quiet selection and the text on
+ * a destructive button differ from macOS.
+ *
+ * The theme comes from Settings: `data-theme` on the root is "light" or
+ * "dark", resolved from the desktop's style when Settings say System. */
+
+:root {
+  color-scheme: light;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  /* Keys, ports, commands and paths are always monospace. */
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  /* Settings › Appearance › Log font size (settings.ts sets it). */
+  --log-font-size: 12px;
+
+  --accent: #d73065;
+  --on-accent: #ffffff;
+  --accent-text: #c2185b;
+  --on-destructive: #ffffff;
+
+  --state-running: #1a7f37;
+  --state-transitioning: #896100;
+  --state-failed: #cf222e;
+  --state-stopped: #737b84;
+
+  /* By position in the Project, so a Service keeps its colour everywhere. */
+  --service-0: #075cbf;
+  --service-1: #6f44bf;
+  --service-2: #815600;
+  --service-3: #a14100;
+  --service-4: #176a70;
+  --service-5: #a43175;
+  --service-6: #4455bf;
+  --service-7: #59660f;
+
+  /* Glass steps down from left to right: sidebar, column, opaque log.
+   * Translucency is off in the webview, so these are the solid variants. */
+  --surface-sidebar: #edecf0;
+  --surface-column: #f7f7f9;
+  --surface-log: #fcfcfd;
+  --surface-raised: #ffffff;
+
+  /* ANSI colours 0–7 (8–15 reuse them), readable on the log surface. */
+  --ansi-0: #59636e;
+  --ansi-1: #cf222e;
+  --ansi-2: #1a7f37;
+  --ansi-3: #9a6700;
+  --ansi-4: #0969da;
+  --ansi-5: #8250df;
+  --ansi-6: #1b7c83;
+  --ansi-7: #1f2328;
+
+  --text: #1f2328;
+  /* The same, for raised surfaces inside a selected row, where --text turns white. */
+  --text-base: #1f2328;
+  --text-secondary: #59636e;
+  --text-tertiary: #626b75;
+  --separator: rgb(0 0 0 / 0.1);
+  /* Quiet fills: fields, pills, hovered icon buttons (the primary colour at 6–7 %, as on macOS). */
+  --fill: rgb(0 0 0 / 0.06);
+  --fill-strong: rgb(0 0 0 / 0.11);
+  /* A selected row: filled while its list has focus, with white on it; quiet otherwise. */
+  --selection: #0064e1;
+  --on-selection: #ffffff;
+  --selection-quiet: rgb(0 0 0 / 0.045);
+  --find-highlight: #ffe066;
+  --link: #0969da;
+  --shadow: 0 16px 48px rgb(0 0 0 / 0.22), 0 0 0 0.5px rgb(0 0 0 / 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --accent: #ff5c8a;
+  --on-accent: #1a0b10;
+  --accent-text: #ff7fa3;
+  --on-destructive: #1a0b10;
+
+  --state-running: #3fb950;
+  --state-transitioning: #f0a030;
+  --state-failed: #ff5a4e;
+  --state-stopped: #7d8590;
+
+  --service-0: #79c0ff;
+  --service-1: #b392f0;
+  --service-2: #e5c07b;
+  --service-3: #f78c6c;
+  --service-4: #56d4dd;
+  --service-5: #f2a8d0;
+  --service-6: #a8b4ff;
+  --service-7: #c9d18a;
+
+  --surface-sidebar: #232329;
+  --surface-column: #1c1c21;
+  --surface-log: #141417;
+  --surface-raised: #2a2a30;
+
+  --ansi-0: #9198a1;
+  --ansi-1: #ff7b72;
+  --ansi-2: #3fb950;
+  --ansi-3: #d29922;
+  --ansi-4: #58a6ff;
+  --ansi-5: #bc8cff;
+  --ansi-6: #39c5cf;
+  --ansi-7: #e6edf3;
+
+  --text: #e6edf3;
+  --text-base: #e6edf3;
+  --text-secondary: #a1a8b1;
+  --text-tertiary: #8b939c;
+  --separator: rgb(255 255 255 / 0.1);
+  --fill: rgb(255 255 255 / 0.07);
+  --fill-strong: rgb(255 255 255 / 0.12);
+  --selection: #0058d0;
+  --on-selection: #ffffff;
+  --selection-quiet: rgb(255 255 255 / 0.065);
+  --find-highlight: #ffd33d;
+  --link: #58a6ff;
+  --shadow: 0 16px 48px rgb(0 0 0 / 0.5), 0 0 0 0.5px rgb(255 255 255 / 0.12);
+}

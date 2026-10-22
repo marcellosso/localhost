@@ -1,0 +1,132 @@
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-column);
+  border-right: 1px solid var(--separator);
+}
+
+.column > * {
+  flex: 1;
+}
+
+.list {
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px 10px 16px;
+  list-style: none;
+}
+
+/* A rail in the Service's colour on the left. */
+.row {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  margin-bottom: 2px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 6px;
+}
+
+.row::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--service, transparent);
+}
+
+.manual {
+  opacity: 0.75;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.name {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryEnd {
+  flex: none;
+  font-size: 11px;
+}
+
+.failed {
+  color: var(--state-failed);
+}
+
+.warning {
+  color: var(--state-transitioning);
+}
+
+/* Under the name, past the glyph. */
+.command {
+  padding-left: 23px;
+  overflow: hidden;
+  font-size: calc(var(--log-font-size) - 1px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  margin-top: 5px;
+  padding-left: 23px;
+  font-size: 11px;
+}
+
+/* Below the list, always visible. */
+.column > .addService {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px 10px 19px;
+  border: none;
+  border-top: 1px solid var(--separator);
+  background: transparent;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.addService:hover {
+  color: var(--text);
+}
+
+.addServiceTitle {
+  flex: 1;
+}
+
+/* Where the Project's stats popover hangs, below its `⋯`. */
+.statsAnchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}

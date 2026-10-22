@@ -1,0 +1,40 @@
+---
+import { latestRelease } from '../lib/release';
+
+interface Props {
+  size?: 'small' | 'large';
+}
+const { size = 'large' } = Astro.props;
+const release = await latestRelease();
+---
+
+<a
+  class:list={['button', 'button-primary', { 'button-small': size === 'small' }]}
+  href={release.mac}
+  data-download
+  data-macos={release.mac}
+  data-windows={release.windows}
+>
+  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"></path>
+  </svg>
+  <span data-download-label={size}>{size === 'small' ? 'Download' : 'Download for macOS'}</span>
+</a>
+
+<script>
+  import { detectPlatform, names, openInstall } from '../lib/platform';
+
+  // The page is static, so the visitor's platform is only known here.
+  const platform = detectPlatform();
+  for (const button of document.querySelectorAll<HTMLAnchorElement>('[data-download]')) {
+    const label = button.querySelector<HTMLElement>('[data-download-label]')!;
+    if (label.dataset.downloadLabel === 'large') label.textContent = `Download for ${names[platform]}`;
+    // Linux has three packages to choose from, so it opens the choice instead of downloading.
+    button.href = platform === 'linux' ? '#install' : button.dataset[platform]!;
+    button.addEventListener('click', (event) => {
+      const direct = platform !== 'linux' && button.href.includes('/releases/download/');
+      if (!direct) event.preventDefault();
+      openInstall(platform, direct);
+    });
+  }
+</script>

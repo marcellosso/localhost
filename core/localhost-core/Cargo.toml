@@ -1,0 +1,56 @@
+[package]
+name = "localhost-core"
+description = "The UI-free core of localhost: Projects, Services, Runs, logs, environment."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+libc = "0.2.190"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+tokio = { version = "1.53.2", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "net", "io-util", "process"] }
+unicode-normalization = "0.1.25"
+url = "2.5.8"
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
+uniffi = { version = "0.32.2", optional = true }
+specta = { version = "=2.0.0-rc.22", features = ["derive", "uuid"], optional = true }
+
+[features]
+# UniFFI bindings for the macOS app. Off by default: the CLI and the
+# Tauri app link the crate directly.
+ffi = ["dep:uniffi"]
+# TypeScript types for the Tauri app, through tauri-specta.
+specta = ["dep:specta"]
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = { version = "5.2.0", features = ["rt-async-io-crypto-rust"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+  "Wdk_System_Threading",
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_Security",
+  "Win32_Security_Credentials",
+  "Win32_System_Console",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Environment",
+  "Win32_System_JobObjects",
+  "Win32_System_ProcessStatus",
+  "Win32_System_RemoteDesktop",
+  "Win32_System_Services",
+  "Win32_System_Threading",
+] }
+
+[build-dependencies]
+cc = "1.8.0"
