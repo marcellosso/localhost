@@ -20,6 +20,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Its tag is the Rust version to install, which Dependabot bumps to ones that
+    # don't exist. Rust is updated by hand.
+    ignore:
+      - dependency-name: dtolnay/rust-toolchain
     groups:
       actions:
         patterns: ["*"]
