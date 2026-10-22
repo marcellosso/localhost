@@ -6,6 +6,12 @@ updates:
     directories: ["/core", "/apps/desktop/src-tauri"]
     schedule:
       interval: weekly
+    # Pinned to exact release candidates that only work together, and bumped one
+    # directory at a time they don't resolve. Moved together by hand.
+    ignore:
+      - dependency-name: specta
+      - dependency-name: specta-typescript
+      - dependency-name: tauri-specta
     groups:
       cargo:
         update-types: [minor, patch]
