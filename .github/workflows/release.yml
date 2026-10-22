@@ -219,7 +219,8 @@ jobs:
         run: |
           binary=target/x86_64-unknown-linux-musl/release/localhostd
           file "$binary"
-          file "$binary" | grep -q 'statically linked'
+          # Older `file` says "statically linked", newer "static-pie linked".
+          file "$binary" | grep -Eq 'statically linked|static-pie linked'
           ls -l "$binary"
           "$binary" --version
           LOCALHOST_STORAGE_ROOT=$(mktemp -d) "$binary" --stdio < /dev/null
