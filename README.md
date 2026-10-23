@@ -7,6 +7,8 @@
 
 <p align="center">Every local project, one place to run it. For macOS, Linux and Windows.</p>
 
+localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+
 <p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
 
 <p align="center">
@@ -152,13 +154,26 @@ Hold ⌘ (Ctrl) for a moment to see the Projects' numbers, or ⌥⌘ (Ctrl+Alt) 
 
 ### macOS: a build that isn't notarized
 
-Releases aren't notarized by Apple yet, so macOS refuses to open localhost the first time (“Apple could not verify “localhost” is free of malware…”). To open it anyway:
+Releases aren't notarized by Apple yet, so macOS refuses to open what your browser downloaded the first time (“Apple could not verify “localhost” is free of malware…”; it may name the DMG instead). There are three ways past it, each only for a copy from this project's releases, and each new version needs one again.
+
+**Open Anyway**, in System Settings:
 
 1. Click **Done** in that dialog.
-2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says “localhost” was blocked to protect your Mac.
+2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says the item was blocked to protect your Mac.
 3. Click **Open Anyway**, confirm with your password or Touch ID, then click **Open Anyway** once more.
 
-macOS remembers this; each new version you download asks once again. Or, from Terminal, remove the quarantine flag the download added, only for a copy from this project's releases:
+If the warning named the DMG, macOS may ask again the first time you open localhost: do the same.
+
+**Download from Terminal.** macOS only checks files marked as downloaded from the internet, and `curl` doesn't mark them. Download and open the DMG, then drag **localhost** to **Applications** as usual:
+
+```sh
+curl -fLO https://github.com/marcellosso/localhost/releases/download/v<version>/localhost-<version>.dmg
+open localhost-<version>.dmg
+```
+
+To check the download, also fetch `localhost-<version>.dmg.sha256` from the same release and run `shasum -a 256 -c localhost-<version>.dmg.sha256`.
+
+**Remove the quarantine flag** the browser added, from Terminal, once localhost is in Applications:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/localhost.app
@@ -228,6 +243,47 @@ localhost status my-saas
 localhost logs my-saas web
 localhost up my-saas
 ```
+
+## FAQ
+
+### What is localhost app?
+
+localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+
+A Project is a folder; a Service is one long-running command in it, such as `pnpm dev`, `uv run fastapi dev` or `docker compose up postgres`. localhost runs it in your login shell, keeps its output, knows when it is up, and stops its whole process tree when you ask.
+
+### Is localhost a pm2 alternative?
+
+For local development, yes. pm2 is a production process manager, mainly for Node.js/Bun apps, built to keep them alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.
+
+### How do I run frontend, backend and database together?
+
+Add the Project’s folder and localhost suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. Make the API start after the database, then press Start All (⇧⌘R, or Ctrl+Shift+R on Linux and Windows): each Service waits until its Dependencies are Running, and All services shows every log in one stream.
+
+### Is it free and open source?
+
+Yes. localhost is free and open source under the MIT license. There is no account and no backend, and it works offline.
+
+### Does it work on Windows/WSL and Linux?
+
+Yes. On Windows 10 or 11 (x64), a Project runs on Windows itself or inside a WSL 2 distro. On Linux there are `.deb` (Ubuntu 22.04+, Debian 12+), `.rpm` (Fedora) and AppImage packages for x86_64. On macOS it needs macOS 15 or later, on Apple silicon or Intel.
+
+Releases aren’t notarized yet, so the first launch on macOS needs one extra step: System Settings → Privacy & Security → Open Anyway, or `xattr -dr com.apple.quarantine /Applications/localhost.app` in Terminal. On Windows, SmartScreen asks once: click More info, then Run anyway.
+
+## How it compares
+
+Plenty of good tools overlap with localhost, and several are the better choice for some jobs. The full comparison, with where each one wins, is at [getlocalhost.app/compare](https://www.getlocalhost.app/compare).
+
+| Tool | Where it wins | Where localhost fits better |
+|---|---|---|
+| **pm2** | Supervising production processes on servers | Dev servers on your own machine, with a GUI |
+| **foreman, overmind, honcho** | A shared `Procfile` in the repo, terminal and SSH workflows | Per-Service control, Port readiness and logs in a window |
+| **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
+| **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
+| **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
+| **devglow, DevWebUI** | Agent control over MCP today | MIT license; Linux packages (devglow has none) |
+
+localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 
 ## Contributing
 

@@ -7,6 +7,8 @@ const { files } = release;
 /** Links to the Releases page (no published release yet) open beside the site. */
 const target = (url: string) => (url === releases ? { target: '_blank', rel: 'noopener' } : {});
 const download = (key: keyof Release['files']) => ({ href: release[key], ...target(release[key]) });
+/** curl doesn't mark what it downloads as quarantined, so Gatekeeper never checks the DMG or the app. */
+const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
 ---
 
 <dialog class="install" data-install aria-labelledby="install-title">
@@ -26,6 +28,15 @@ const download = (key: keyof Release['files']) => ({ href: release[key], ...targ
           <h3>Drag it to Applications</h3>
           <p>Open <code>{files.mac}</code> and drag <strong>localhost</strong> to <strong>Applications</strong>.</p>
           <a class="file" {...download('mac')} data-again>Download <code>{files.mac}</code></a>
+          {release.mac !== releases && (
+            <>
+              <p class="or">Or download it from Terminal, which macOS doesn’t block, so you can skip step 2:</p>
+              <div class="command">
+                <code>{curl}</code>
+                <button type="button" data-copy={curl}>Copy</button>
+              </div>
+            </>
+          )}
         </div>
       </li>
       <li class="step">

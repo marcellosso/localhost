@@ -14,13 +14,26 @@ Releases aren't notarized or code-signed by a known publisher yet, so the first 
 
 ### macOS: a build that isn't notarized
 
-Releases aren't notarized by Apple yet, so macOS refuses to open localhost the first time (“Apple could not verify “localhost” is free of malware…”). To open it anyway:
+Releases aren't notarized by Apple yet, so macOS refuses to open what your browser downloaded the first time (“Apple could not verify “localhost” is free of malware…”; it may name the DMG instead). There are three ways past it, each only for a copy from this project's releases, and each new version needs one again.
+
+**Open Anyway**, in System Settings:
 
 1. Click **Done** in that dialog.
-2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says “localhost” was blocked to protect your Mac.
+2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says the item was blocked to protect your Mac.
 3. Click **Open Anyway**, confirm with your password or Touch ID, then click **Open Anyway** once more.
 
-macOS remembers this; each new version you download asks once again. Or, from Terminal, remove the quarantine flag the download added, only for a copy from this project's releases:
+If the warning named the DMG, macOS may ask again the first time you open localhost: do the same.
+
+**Download from Terminal.** macOS only checks files marked as downloaded from the internet, and `curl` doesn't mark them. Download and open the DMG, then drag **localhost** to **Applications** as usual:
+
+```sh
+curl -fLO https://github.com/marcellosso/localhost/releases/download/v<version>/localhost-<version>.dmg
+open localhost-<version>.dmg
+```
+
+To check the download, also fetch `localhost-<version>.dmg.sha256` from the same release and run `shasum -a 256 -c localhost-<version>.dmg.sha256`.
+
+**Remove the quarantine flag** the browser added, from Terminal, once localhost is in Applications:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/localhost.app
