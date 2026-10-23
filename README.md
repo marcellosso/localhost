@@ -17,7 +17,9 @@ localhost (getlocalhost.app) is a free, open-source desktop process manager for 
   <a href="LICENSE"><img src="https://img.shields.io/github/license/marcellosso/localhost" alt="MIT license"></a>
 </p>
 
-![The localhost window: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
+<p align="center">
+  <img src=".github/assets/start-all.gif" width="1200" height="720" alt="Start All on the Acme Shop Project: Database, Migrations, API, Web and Worker start in dependency order, Migrations exits once done, and every Service's output streams into one merged log">
+</p>
 
 localhost remembers how each of your local development projects runs, and lets you start, stop and watch all of its Services from one place, instead of a row of terminal tabs.
 
@@ -31,6 +33,8 @@ A **Project** is a folder. A **Service** is one long-running command in it: `pnp
 - **Local**: no account, no cloud, works offline. Configuration lives in localhost's own storage, never in your project folders.
 
 A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside WSL.
+
+![The localhost window on macOS: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
 ## Install
 
@@ -162,6 +166,11 @@ Releases aren't notarized by Apple yet, so macOS refuses to open what your brows
 2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says the item was blocked to protect your Mac.
 3. Click **Open Anyway**, confirm with your password or Touch ID, then click **Open Anyway** once more.
 
+<!-- TODO(#16): macOS screenshot, taken by the maintainer. Save it as .github/assets/first-launch-macos-open-anyway.png, then replace this comment with:
+<p align="center"><img src=".github/assets/first-launch-macos-open-anyway.png" width="WIDTH" height="HEIGHT" alt="System Settings, Privacy & Security: under Security, “localhost” was blocked to protect your Mac, with an Open Anyway button"></p>
+<p align="center"><em>System Settings → Privacy &amp; Security → Open Anyway.</em></p>
+-->
+
 If the warning named the DMG, macOS may ask again the first time you open localhost: do the same.
 
 **Download from Terminal.** macOS only checks files marked as downloaded from the internet, and `curl` doesn't mark them. Download and open the DMG, then drag **localhost** to **Applications** as usual:
@@ -182,6 +191,13 @@ xattr -dr com.apple.quarantine /Applications/localhost.app
 ### Windows: SmartScreen
 
 Unsigned releases make SmartScreen say “Windows protected your PC”. Click **More info**, check that the file name is what you downloaded from this project's releases, then click **Run anyway**. Each new version asks once again.
+
+<!-- TODO(#16): Windows screenshots, taken by the maintainer. Save them as .github/assets/first-launch-windows-more-info.png and .github/assets/first-launch-windows-run-anyway.png, then replace this comment with:
+<p align="center"><img src=".github/assets/first-launch-windows-more-info.png" width="WIDTH" height="HEIGHT" alt="SmartScreen's “Windows protected your PC” dialog, with the More info link"></p>
+<p align="center"><em>Click More info…</em></p>
+<p align="center"><img src=".github/assets/first-launch-windows-run-anyway.png" width="WIDTH" height="HEIGHT" alt="The same dialog after More info: the app's file name, Publisher: Unknown publisher, and the Run anyway button"></p>
+<p align="center"><em>…check the file name, then click Run anyway.</em></p>
+-->
 
 ## Platform notes
 
