@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 import AppWindow from '../components/AppWindow.astro';
 import DownloadButton from '../components/DownloadButton.astro';
 import { href, name, releases, repository, tagline } from '../lib/site';
-import { definition, faq, html, plain, subtitle } from '../lib/faq';
+import { definition, faq, html, plain } from '../lib/faq';
 import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
@@ -92,9 +92,9 @@ const pillars = [
           </a>
         </div>
         <p class="platforms">
-          Free and open source for <a href={href('docs/install')}>macOS, Windows and Linux</a>
+          Free, open-source desktop process manager for your local dev servers on <a href={href('docs/install')}>macOS, Windows and Linux</a>.
+          A GUI alternative to pm2 and tmux.
         </p>
-        <p class="subtitle">{subtitle}</p>
       </div>
       <div class="stage">
         <div class="glow" aria-hidden="true"></div>
@@ -269,27 +269,6 @@ const pillars = [
     </div>
   </section>
 
-  <section class="feature" aria-labelledby="faq-label">
-    <div class="container">
-      <div class="feature-head">
-        <p class="figure-label" id="faq-label">FAQ</p>
-      </div>
-      <div class="faq">
-        {
-          faq.map((item) => (
-            <div class="faq-item">
-              <h2>{item.question}</h2>
-              {item.answer.map((paragraph) => (
-                <p set:html={html(paragraph)} />
-              ))}
-            </div>
-          ))
-        }
-      </div>
-      <a class="more" href={href('compare')}>How localhost compares to pm2, tmux, Docker Compose and others →</a>
-    </div>
-  </section>
-
   <section class="feature">
     <div class="container split">
       <div class="copy">
@@ -337,6 +316,27 @@ storybook  Storybook   not running  6006
           <span class="req">Ubuntu 22.04+ · Debian 12+ · Fedora</span>
         </a>
       </div>
+    </div>
+  </section>
+
+  <section class="feature" aria-labelledby="faq-label">
+    <div class="container">
+      <div class="feature-head">
+        <p class="figure-label" id="faq-label">FAQ</p>
+      </div>
+      <div class="faq">
+        {
+          faq.map((item) => (
+            <div class="faq-item">
+              <h2>{item.question}</h2>
+              {item.answer.map((paragraph) => (
+                <p set:html={html(paragraph)} />
+              ))}
+            </div>
+          ))
+        }
+      </div>
+      <a class="more" href={href('compare')}>How localhost compares to pm2, tmux, Docker Compose and others →</a>
     </div>
   </section>
 
@@ -441,11 +441,6 @@ storybook  Storybook   not running  6006
   .platforms a {
     color: var(--text-secondary);
     text-underline-offset: 3px;
-  }
-  .subtitle {
-    margin: 6px 0 0;
-    font-size: 14px;
-    color: var(--text-tertiary);
   }
   .pill {
     display: inline-flex;
