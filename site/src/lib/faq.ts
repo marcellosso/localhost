@@ -2,6 +2,9 @@
 export const definition =
   'localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.';
 
+/** The one line under the homepage's download buttons; the full definition is in the FAQ and the JSON-LD. */
+export const subtitle = 'Free, open-source desktop process manager for your local dev servers. A GUI alternative to pm2 and tmux.';
+
 /** The homepage FAQ, also its FAQPage JSON-LD, llms.txt and the README's `## FAQ`.
  * Answers are plain text; `code` spans are written in backticks. */
 export const faq: { question: string; answer: string[] }[] = [
@@ -15,7 +18,7 @@ export const faq: { question: string; answer: string[] }[] = [
   {
     question: 'Is localhost a pm2 alternative?',
     answer: [
-      'For local development, yes. pm2 is built to keep Node.js apps alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.',
+      'For local development, yes. pm2 is a production process manager, mainly for Node.js/Bun apps, built to keep them alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.',
     ],
   },
   {

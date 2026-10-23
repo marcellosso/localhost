@@ -254,7 +254,7 @@ A Project is a folder; a Service is one long-running command in it, such as `pnp
 
 ### Is localhost a pm2 alternative?
 
-For local development, yes. pm2 is built to keep Node.js apps alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.
+For local development, yes. pm2 is a production process manager, mainly for Node.js/Bun apps, built to keep them alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.
 
 ### How do I run frontend, backend and database together?
 
@@ -276,12 +276,12 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 
 | Tool | Where it wins | Where localhost fits better |
 |---|---|---|
-| **pm2** | Production Node.js processes on servers | Dev servers of any language on your machine, with a GUI |
+| **pm2** | Supervising production processes on servers | Dev servers on your own machine, with a GUI |
 | **foreman, overmind, honcho** | A shared `Procfile` in the repo, terminal and SSH workflows | Per-Service control, Port readiness and logs in a window |
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agent control over MCP today | MIT license, Linux packages, Environment Profiles and Secrets |
+| **devglow, DevWebUI** | Agent control over MCP today | MIT license; Linux packages (devglow has none) |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

@@ -16,7 +16,7 @@ export const alternatives: Alternative[] = [
   {
     id: 'pm2',
     name: 'pm2',
-    what: 'A process manager for Node.js apps in production, driven from the command line.',
+    what: 'A production process manager, mainly for Node.js/Bun apps, driven from the command line.',
     wins: [
       'Keeping apps alive on a server: it restarts them when they crash and starts them again at boot.',
       'Cluster mode, to run one Node.js app on every CPU core.',
@@ -24,10 +24,10 @@ export const alternatives: Alternative[] = [
     ],
     localhost: [
       'Development on your own machine: a window per Project, Start All in dependency order, one merged log.',
-      'Any command, not only Node.js: `uv run fastapi dev`, `cargo run`, `docker compose up postgres`.',
+      'Built for development: your login shell’s `PATH` and version managers, Port readiness and Dependencies between Services, instead of production supervision.',
       'Nothing restarts on its own: a Service that fails stays Failed, with the reason and its output.',
     ],
-    summary: { wins: 'Production Node.js processes on servers', localhost: 'Dev servers of any language on your machine, with a GUI' },
+    summary: { wins: 'Supervising production processes on servers', localhost: 'Dev servers on your own machine, with a GUI' },
   },
   {
     id: 'procfile',
@@ -39,7 +39,7 @@ export const alternatives: Alternative[] = [
       'The same `Procfile` format Heroku-style platforms read.',
     ],
     localhost: [
-      'Start, stop or restart one Service without touching the others.',
+      'Unlike foreman and honcho, start, stop or restart one Service from a window (Overmind can restart one process too, from the terminal).',
       'Each Service is Running only once its Port accepts connections, and a taken Port says who holds it.',
       'Nothing is written into your repository; export a Project file when you want to share one.',
     ],
@@ -94,15 +94,15 @@ export const alternatives: Alternative[] = [
   {
     id: 'gui-managers',
     name: 'devglow, DevWebUI',
-    what: 'Other GUIs for local dev servers. devglow is a paid desktop app for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
+    what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
       'Both ship an MCP server today, so coding agents such as Claude Code and Cursor can start and stop processes. localhost doesn’t have one yet.',
     ],
     localhost: [
-      'MIT licensed and free for any use.',
-      'A native SwiftUI app on macOS and one app for Linux and Windows, with `.deb`, `.rpm` and AppImage packages.',
+      'MIT license; Linux packages (devglow has none): `.deb`, `.rpm` and AppImage.',
+      'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agent control over MCP today', localhost: 'MIT license, Linux packages, Environment Profiles and Secrets' },
+    summary: { wins: 'Agent control over MCP today', localhost: 'MIT license; Linux packages (devglow has none)' },
   },
 ];

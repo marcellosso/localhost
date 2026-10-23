@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 import AppWindow from '../components/AppWindow.astro';
 import DownloadButton from '../components/DownloadButton.astro';
 import { href, name, releases, repository, tagline } from '../lib/site';
-import { definition, faq, html, plain } from '../lib/faq';
+import { definition, faq, html, plain, subtitle } from '../lib/faq';
 import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
@@ -17,7 +17,7 @@ const structuredData = [
     '@type': 'SoftwareApplication',
     name,
     alternateName,
-    description,
+    description: definition,
     url: Astro.site!.toString(),
     image: new URL('/og.png', Astro.site).toString(),
     applicationCategory: 'DeveloperApplication',
@@ -94,7 +94,7 @@ const pillars = [
         <p class="platforms">
           Free and open source for <a href={href('docs/install')}>macOS, Windows and Linux</a>
         </p>
-        <p class="definition">{definition}</p>
+        <p class="subtitle">{subtitle}</p>
       </div>
       <div class="stage">
         <div class="glow" aria-hidden="true"></div>
@@ -442,11 +442,9 @@ storybook  Storybook   not running  6006
     color: var(--text-secondary);
     text-underline-offset: 3px;
   }
-  .definition {
-    max-width: 560px;
-    margin: 20px 0 0;
+  .subtitle {
+    margin: 6px 0 0;
     font-size: 14px;
-    line-height: 1.55;
     color: var(--text-tertiary);
   }
   .pill {
