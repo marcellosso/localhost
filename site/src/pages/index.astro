@@ -3,29 +3,45 @@ import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import AppWindow from '../components/AppWindow.astro';
 import DownloadButton from '../components/DownloadButton.astro';
-import { href, name, repository, tagline } from '../lib/site';
+import { href, name, releases, repository, tagline } from '../lib/site';
+import { definition, faq, html, plain } from '../lib/faq';
 import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
 const description =
   'localhost remembers how each of your local projects runs. Start, stop and watch every Service from one place. Free and open source for macOS, Windows and Linux.';
+const alternateName = ['localhost app', 'getlocalhost'];
 const structuredData = [
-  { '@type': 'WebSite', name, url: Astro.site!.toString(), description: tagline },
+  { '@type': 'WebSite', name, alternateName, url: Astro.site!.toString(), description: tagline },
   {
     '@type': 'SoftwareApplication',
     name,
+    alternateName,
     description,
     url: Astro.site!.toString(),
     image: new URL('/og.png', Astro.site).toString(),
     applicationCategory: 'DeveloperApplication',
     operatingSystem: 'macOS 15 or later, Windows 10 or 11, Linux',
     ...(release.version === '<version>' ? {} : { softwareVersion: release.version }),
-    downloadUrl: new URL('/docs/install', Astro.site).toString(),
+    downloadUrl: releases,
     license: 'https://opensource.org/licenses/MIT',
     isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     codeRepository: repository,
-    author: { '@type': 'Person', name: 'Marcel Losso' },
+    author: {
+      '@type': 'Person',
+      name: 'Marcel Losso',
+      url: 'https://github.com/marcellosso',
+      sameAs: ['https://github.com/marcellosso', 'https://x.com/marcellosso'],
+    },
+  },
+  {
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer.map(plain).join('\n\n') },
+    })),
   },
 ];
 
@@ -78,6 +94,7 @@ const pillars = [
         <p class="platforms">
           Free and open source for <a href={href('docs/install')}>macOS, Windows and Linux</a>
         </p>
+        <p class="definition">{definition}</p>
       </div>
       <div class="stage">
         <div class="glow" aria-hidden="true"></div>
@@ -119,7 +136,7 @@ const pillars = [
     <div class="container split">
       <div class="copy">
         <p class="figure-label">Fig 02 · Ports</p>
-        <h2 class="display section-title">Know who’s on :3000.</h2>
+        <h2 class="display section-title">Know who’s on :3000. <span class="title-aside">Find which process is using a port.</span></h2>
         <p class="lede">
           A Service counts as Running once its Port accepts connections. If the Port is taken, localhost says by whom, and can start on
           the next free one for that Run only.
@@ -249,6 +266,27 @@ const pillars = [
           ))
         }
       </div>
+    </div>
+  </section>
+
+  <section class="feature" aria-labelledby="faq-label">
+    <div class="container">
+      <div class="feature-head">
+        <p class="figure-label" id="faq-label">FAQ</p>
+      </div>
+      <div class="faq">
+        {
+          faq.map((item) => (
+            <div class="faq-item">
+              <h2>{item.question}</h2>
+              {item.answer.map((paragraph) => (
+                <p set:html={html(paragraph)} />
+              ))}
+            </div>
+          ))
+        }
+      </div>
+      <a class="more" href={href('compare')}>How localhost compares to pm2, tmux, Docker Compose and others →</a>
     </div>
   </section>
 
@@ -404,6 +442,13 @@ storybook  Storybook   not running  6006
     color: var(--text-secondary);
     text-underline-offset: 3px;
   }
+  .definition {
+    max-width: 560px;
+    margin: 20px 0 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-tertiary);
+  }
   .pill {
     display: inline-flex;
     align-items: center;
@@ -463,6 +508,9 @@ storybook  Storybook   not running  6006
   }
   .feature .lede {
     margin-top: 16px;
+  }
+  .title-aside {
+    color: var(--text-tertiary);
   }
   .lede code,
   .checks code,
@@ -874,6 +922,38 @@ storybook  Storybook   not running  6006
     .pillar + .pillar {
       padding-left: 0;
       border-left: 0;
+    }
+  }
+
+  .faq {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px 64px;
+    margin-top: 24px;
+    padding-top: 32px;
+    border-top: 1px solid var(--separator);
+  }
+  .faq-item h2 {
+    margin: 0;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .faq-item p {
+    margin: 8px 0 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .faq-item code {
+    font-size: 0.9em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 760px) {
+    .faq {
+      grid-template-columns: 1fr;
     }
   }
 

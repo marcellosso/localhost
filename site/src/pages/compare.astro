@@ -1,0 +1,199 @@
+---
+import Base from '../layouts/Base.astro';
+import { alternatives } from '../lib/compare';
+import { html } from '../lib/faq';
+import { href, name } from '../lib/site';
+
+const description =
+  'An honest comparison of localhost with pm2, foreman, overmind, honcho, tmux, tmuxinator, Docker Compose, concurrently, devglow and DevWebUI: where each one wins, and where localhost fits better.';
+const url = new URL(href('compare'), Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'WebPage',
+    name: 'localhost compared to pm2, Procfile runners, tmux, Docker Compose and others',
+    description,
+    url,
+    isPartOf: { '@type': 'WebSite', name, url: new URL('/', Astro.site).toString() },
+  },
+];
+---
+
+<Base title="Compared to pm2, tmux and Docker Compose" {description} {structuredData}>
+  <div class="container page">
+    <header>
+      <p class="figure-label">Compare</p>
+      <h1 class="display">localhost compared to pm2, tmux, Docker Compose and others</h1>
+      <p class="lede">
+        localhost runs the dev servers, workers and databases of your local projects from one window. Plenty of good tools overlap with
+        it, and several of them are the better choice for some jobs. Here is where each one wins, and where localhost fits better.
+      </p>
+    </header>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Tool</th>
+            <th scope="col">Where it wins</th>
+            <th scope="col">Where localhost fits better</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            alternatives.map((tool) => (
+              <tr>
+                <th scope="row">
+                  <a href={`#${tool.id}`}>{tool.name}</a>
+                </th>
+                <td set:html={html(tool.summary.wins)} />
+                <td set:html={html(tool.summary.localhost)} />
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    {
+      alternatives.map((tool) => (
+        <section class="tool" id={tool.id}>
+          <h2>localhost vs {tool.name}</h2>
+          <p class="what" set:html={html(tool.what)} />
+          <div class="columns">
+            <div>
+              <h3>Where {tool.name} {tool.name.includes(',') ? 'win' : 'wins'}</h3>
+              <ul>
+                {tool.wins.map((line) => (
+                  <li set:html={html(line)} />
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Where localhost fits better</h3>
+              <ul>
+                {tool.localhost.map((line) => (
+                  <li set:html={html(line)} />
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      ))
+    }
+
+    <section class="tool">
+      <h2>What localhost isn’t</h2>
+      <p class="what">
+        It isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs
+        commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
+      </p>
+      <p class="what">
+        <a href={href('docs/install')}>Install localhost</a> or read the <a href={href('docs')}>docs</a>.
+      </p>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: 960px;
+    padding-top: 72px;
+  }
+  header {
+    margin-bottom: 48px;
+  }
+  h1 {
+    font-size: clamp(36px, 5vw, 52px);
+  }
+  .lede {
+    margin-top: 16px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th,
+  td {
+    padding: 12px 16px;
+    text-align: left;
+    vertical-align: top;
+    border-top: 1px solid var(--separator);
+  }
+  thead th {
+    border-top: 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+  tbody th {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody th a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  tbody th a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  td {
+    color: var(--text-secondary);
+  }
+  .tool {
+    padding: 48px 0 0;
+  }
+  h2 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  .what {
+    margin: 12px 0 0;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .what a {
+    color: var(--accent-text);
+    text-underline-offset: 3px;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 20px;
+  }
+  h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+  ul {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  li {
+    margin-bottom: 6px;
+  }
+  code {
+    font-size: 0.88em;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+  }
+  @media (max-width: 720px) {
+    .columns {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+  }
+</style>

@@ -7,6 +7,8 @@
 
 <p align="center">Every local project, one place to run it. For macOS, Linux and Windows.</p>
 
+localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+
 <p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
 
 <p align="center">
@@ -241,6 +243,47 @@ localhost status my-saas
 localhost logs my-saas web
 localhost up my-saas
 ```
+
+## FAQ
+
+### What is localhost app?
+
+localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+
+A Project is a folder; a Service is one long-running command in it, such as `pnpm dev`, `uv run fastapi dev` or `docker compose up postgres`. localhost runs it in your login shell, keeps its output, knows when it is up, and stops its whole process tree when you ask.
+
+### Is localhost a pm2 alternative?
+
+For local development, yes. pm2 is built to keep Node.js apps alive on servers. localhost is built for the dev servers on your own machine: a window per Project, Dependencies between Services, a Ports view and one merged log. It never restarts a Service on its own. To keep processes running in production, keep pm2.
+
+### How do I run frontend, backend and database together?
+
+Add the Project’s folder and localhost suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. Make the API start after the database, then press Start All (⇧⌘R, or Ctrl+Shift+R on Linux and Windows): each Service waits until its Dependencies are Running, and All services shows every log in one stream.
+
+### Is it free and open source?
+
+Yes. localhost is free and open source under the MIT license. There is no account and no backend, and it works offline.
+
+### Does it work on Windows/WSL and Linux?
+
+Yes. On Windows 10 or 11 (x64), a Project runs on Windows itself or inside a WSL 2 distro. On Linux there are `.deb` (Ubuntu 22.04+, Debian 12+), `.rpm` (Fedora) and AppImage packages for x86_64. On macOS it needs macOS 15 or later, on Apple silicon or Intel.
+
+Releases aren’t notarized yet, so the first launch on macOS needs one extra step: System Settings → Privacy & Security → Open Anyway, or `xattr -dr com.apple.quarantine /Applications/localhost.app` in Terminal. On Windows, SmartScreen asks once: click More info, then Run anyway.
+
+## How it compares
+
+Plenty of good tools overlap with localhost, and several are the better choice for some jobs. The full comparison, with where each one wins, is at [getlocalhost.app/compare](https://www.getlocalhost.app/compare).
+
+| Tool | Where it wins | Where localhost fits better |
+|---|---|---|
+| **pm2** | Production Node.js processes on servers | Dev servers of any language on your machine, with a GUI |
+| **foreman, overmind, honcho** | A shared `Procfile` in the repo, terminal and SSH workflows | Per-Service control, Port readiness and logs in a window |
+| **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
+| **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
+| **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
+| **devglow, DevWebUI** | Agent control over MCP today | MIT license, Linux packages, Environment Profiles and Secrets |
+
+localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 
 ## Contributing
 
