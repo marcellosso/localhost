@@ -16,7 +16,7 @@ interface Props {
   noindex?: boolean;
 }
 const { title, description, type = 'website', structuredData = [], noindex = false } = Astro.props;
-const fullTitle = title === name ? 'localhost: every local project, one place to run it' : `${title} · ${name}`;
+const fullTitle = title === name ? 'localhost app: desktop process manager for local dev servers' : `${title} · ${name}`;
 const canonical = new URL(Astro.url.pathname.replace(/(.)\/$/, '$1').replace(/\.html$/, '').replace(/\/index$/, '/'), Astro.site).toString();
 const image = new URL('/og.png', Astro.site).toString();
 ---
