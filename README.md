@@ -166,10 +166,8 @@ Releases aren't notarized by Apple yet, so macOS refuses to open what your brows
 2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says the item was blocked to protect your Mac.
 3. Click **Open Anyway**, confirm with your password or Touch ID, then click **Open Anyway** once more.
 
-<!-- TODO(#16): macOS screenshot, taken by the maintainer. Save it as .github/assets/first-launch-macos-open-anyway.png, then replace this comment with:
-<p align="center"><img src=".github/assets/first-launch-macos-open-anyway.png" width="WIDTH" height="HEIGHT" alt="System Settings, Privacy & Security: under Security, “localhost” was blocked to protect your Mac, with an Open Anyway button"></p>
+<p align="center"><img src=".github/assets/first-launch-macos-open-anyway.png" width="525" height="101" alt="System Settings, Privacy & Security: under Security, “localhost” was blocked to protect your Mac, with an Open Anyway button"></p>
 <p align="center"><em>System Settings → Privacy &amp; Security → Open Anyway.</em></p>
--->
 
 If the warning named the DMG, macOS may ask again the first time you open localhost: do the same.
 
@@ -192,12 +190,10 @@ xattr -dr com.apple.quarantine /Applications/localhost.app
 
 Unsigned releases make SmartScreen say “Windows protected your PC”. Click **More info**, check that the file name is what you downloaded from this project's releases, then click **Run anyway**. Each new version asks once again.
 
-<!-- TODO(#16): Windows screenshots, taken by the maintainer. Save them as .github/assets/first-launch-windows-more-info.png and .github/assets/first-launch-windows-run-anyway.png, then replace this comment with:
-<p align="center"><img src=".github/assets/first-launch-windows-more-info.png" width="WIDTH" height="HEIGHT" alt="SmartScreen's “Windows protected your PC” dialog, with the More info link"></p>
+<p align="center"><img src=".github/assets/first-launch-windows-more-info.png" width="400" height="374" alt="SmartScreen's “Windows protected your PC” dialog, with the More info link"></p>
 <p align="center"><em>Click More info…</em></p>
-<p align="center"><img src=".github/assets/first-launch-windows-run-anyway.png" width="WIDTH" height="HEIGHT" alt="The same dialog after More info: the app's file name, Publisher: Unknown publisher, and the Run anyway button"></p>
+<p align="center"><img src=".github/assets/first-launch-windows-run-anyway.png" width="400" height="374" alt="The same dialog after More info: the app's file name, Publisher: Unknown publisher, and the Run anyway button"></p>
 <p align="center"><em>…check the file name, then click Run anyway.</em></p>
--->
 
 ## Platform notes
 
