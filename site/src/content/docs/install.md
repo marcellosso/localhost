@@ -22,6 +22,9 @@ Releases aren't notarized by Apple yet, so macOS refuses to open what your brows
 2. Open **System Settings → Privacy & Security** and scroll to **Security**. It says the item was blocked to protect your Mac.
 3. Click **Open Anyway**, confirm with your password or Touch ID, then click **Open Anyway** once more.
 
+![System Settings, Privacy & Security: under Security, “localhost” was blocked to protect your Mac, with an Open Anyway button](../../../../.github/assets/first-launch-macos-open-anyway.png)
+*System Settings → Privacy & Security → Open Anyway.*
+
 If the warning named the DMG, macOS may ask again the first time you open localhost: do the same.
 
 **Download from Terminal.** macOS only checks files marked as downloaded from the internet, and `curl` doesn't mark them. Download and open the DMG, then drag **localhost** to **Applications** as usual:
@@ -42,5 +45,11 @@ xattr -dr com.apple.quarantine /Applications/localhost.app
 ### Windows: SmartScreen
 
 Unsigned releases make SmartScreen say “Windows protected your PC”. Click **More info**, check that the file name is what you downloaded from this project's releases, then click **Run anyway**. Each new version asks once again.
+
+![SmartScreen's “Windows protected your PC” dialog, with the More info link](../../../../.github/assets/first-launch-windows-more-info.png)
+*Click More info…*
+
+![The same dialog after More info: the app's file name, Publisher: Unknown publisher, and the Run anyway button](../../../../.github/assets/first-launch-windows-run-anyway.png)
+*…check the file name, then click Run anyway.*
 
 Next: [add your first Project](/docs/quick-start).
