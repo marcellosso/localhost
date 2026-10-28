@@ -7,18 +7,23 @@
 //! Requests are handled concurrently, so a status can be read while a start
 //! waits for its Service to come up.
 //!
-//! Services run in this process's own ServiceManager, recorded like any
-//! other session's Runs. When the agent disconnects (standard input closes)
-//! or the process is told to end, every Run it started is stopped first.
-//! Standard output carries the protocol only.
+//! Services run in the shared core on this machine (`remote::shared`),
+//! started if it isn't running yet, the one the app drives too: what the
+//! agent starts is Running in the app, and the reverse. When the agent
+//! disconnects (standard input closes) or the process is told to end, the
+//! core stops the Runs it started, unless the app is open, or another
+//! connected client needs them too. Standard output carries the protocol only.
 
 mod tools;
 
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use std::path::Path;
+
+use localhost_core::remote::{Client, shared};
 use localhost_core::{
-    LogStore, Origin, ProjectLibrary, RunRegistry, ServiceManager, ServiceManagerOptions, default_storage_root,
+    ExecutionTarget, Launcher, Link, LogStore, ProjectLibrary, ServiceManagerOptions, Targets, default_storage_root,
 };
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -40,7 +45,8 @@ the developer sees and controls what you start. \
 Call list_projects first; name Projects and Services by Key. \
 A Service is only running when status says `running`; check it before saying so. \
 When a start fails or a Port is taken, read logs and ports before trying again. \
-Services you start here stop when this connection ends.";
+The developer's localhost app shows the Services you start, and you see those it started. \
+Services you start here stop when this connection ends, unless the localhost app is open.";
 
 pub fn run(library: ProjectLibrary) -> Result<ExitCode, String> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -55,9 +61,12 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
     let storage_root = default_storage_root();
     let library = Arc::new(library);
     let logs = Arc::new(LogStore::new(&storage_root));
-    let registry = Arc::new(RunRegistry::new(&storage_root));
-    let manager = ServiceManager::new(library.clone(), logs.clone(), registry, ServiceManagerOptions::default());
-    let tools = Arc::new(Tools::new(library, manager.clone(), logs, storage_root));
+    let targets =
+        Targets::open(library.clone(), &storage_root, ServiceManagerOptions::default(), launcher(&storage_root));
+    // Now, so the first tool call doesn't wait for the core to start. If it
+    // can't, each call that needs it says why.
+    let _ = targets.connect(&ExecutionTarget::ThisMachine).await;
+    let tools = Arc::new(Tools::new(library, targets, logs, storage_root));
 
     let (replies, mut outgoing) = mpsc::unbounded_channel::<Value>();
     let writer = tokio::spawn(async move {
@@ -98,14 +107,30 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
         }
     }
 
-    manager.stop_every_run(Origin::Agent).await;
-    // A start that was launching when the stop began may have launched since.
+    // Closing the connection tells the core to stop what only this agent needed.
     requests.abort_all();
     while requests.join_next().await.is_some() {}
-    manager.stop_every_run(Origin::Agent).await;
+    drop(tools);
     drop(replies);
     let _ = writer.await;
     Ok(())
+}
+
+/// This machine through the shared core, started as `localhost daemon` if
+/// it isn't running. A WSL distro's Projects are run by the Windows app only.
+fn launcher(storage_root: &Path) -> Launcher {
+    let storage_root = storage_root.to_path_buf();
+    Box::new(move |target| match target {
+        ExecutionTarget::ThisMachine => {
+            let executable = std::env::current_exe().unwrap_or_else(|_| "localhost".into());
+            let mut daemon = std::process::Command::new(executable);
+            daemon.arg("daemon").arg(&storage_root);
+            shared::link(&storage_root, Client::Agent, daemon)
+        }
+        ExecutionTarget::Wsl { distro } => {
+            Link::Unavailable(format!("“{distro}” is reached only from the Windows app"))
+        }
+    })
 }
 
 /// The reply to one message, or `None` for a notification.

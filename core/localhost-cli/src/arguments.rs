@@ -1,4 +1,4 @@
-//! The command line. Five commands with positional arguments only, so it is
+//! The command line. Six commands with positional arguments only, so it is
 //! parsed by hand rather than with an argument-parsing crate.
 
 use std::ffi::OsString;
@@ -27,10 +27,23 @@ pub enum Command {
     Help,
     Version,
     Projects,
-    Status { project: String },
-    Logs { project: String, service: Option<String> },
-    Up { project: String, services: Vec<String> },
+    Status {
+        project: String,
+    },
+    Logs {
+        project: String,
+        service: Option<String>,
+    },
+    Up {
+        project: String,
+        services: Vec<String>,
+    },
     Mcp,
+    /// The shared core of a storage root, which `localhost mcp` and the
+    /// app start when it isn't running: not for people, so not in the usage.
+    Daemon {
+        storage_root: String,
+    },
 }
 
 /// Reads the arguments after the program name. `Err` says what is wrong.
@@ -48,6 +61,7 @@ pub fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, S
         ("-V" | "--version", []) => Ok(Command::Version),
         ("projects", []) => Ok(Command::Projects),
         ("mcp", []) => Ok(Command::Mcp),
+        ("daemon", [storage_root]) => Ok(Command::Daemon { storage_root: storage_root.clone() }),
         ("status", [project]) => Ok(Command::Status { project: project.clone() }),
         ("logs", [project]) => Ok(Command::Logs { project: project.clone(), service: None }),
         ("logs", [project, service]) => Ok(Command::Logs { project: project.clone(), service: Some(service.clone()) }),
@@ -58,6 +72,7 @@ pub fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, S
         ("status", _) => Err("Usage: localhost status <project>".into()),
         ("logs", _) => Err("Usage: localhost logs <project> [service]".into()),
         ("up", _) => Err("Usage: localhost up <project> [service…]".into()),
+        ("daemon", _) => Err("Usage: localhost daemon <storage root>".into()),
         _ => Err(format!("Unknown command `{command}`.")),
     }
 }
@@ -85,6 +100,7 @@ mod tests {
             Ok(Command::Up { project: "acme".into(), services: vec!["web".into(), "api".into()] })
         );
         assert_eq!(parsed(&["mcp"]), Ok(Command::Mcp));
+        assert_eq!(parsed(&["daemon", "/tmp/root"]), Ok(Command::Daemon { storage_root: "/tmp/root".into() }));
         assert_eq!(parsed(&["--help"]), Ok(Command::Help));
         assert_eq!(parsed(&["-V"]), Ok(Command::Version));
     }

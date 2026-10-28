@@ -4,10 +4,12 @@
 //! Every call reads the Project Configuration from disk again, so Projects
 //! added or edited in the app since the agent connected are seen.
 //!
-//! Another localhost session (the app, a `localhost up`) may be running some
-//! Services. Through their Run records this session sees them as running,
-//! with their pid and uptime, but can't tell Starting from Running or stop
-//! them. It never starts a second Run of one.
+//! Services run in the shared core the app drives too, so the app's Runs are
+//! this session's as well (`"session": "shared"`, with who started them).
+//! A `localhost up` in a terminal runs its own: through their Run records
+//! this session sees them as running (`"session": "other"`), with their pid
+//! and uptime, but can't tell Starting from Running or stop them. It never
+//! starts a second Run of one.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -15,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use localhost_core::{
     Ansi, Id, Listener, ListenerOwner, LocalhostError, LogStore, MemorySecretStore, Origin, Orphan, OutputChannel,
-    Project, ProjectLibrary, RunRegistry, Service, ServiceManager, ServiceState, ServiceStatus,
+    Project, ProjectLibrary, RunRegistry, Service, ServiceState, ServiceStatus, Targets,
 };
 use serde_json::{Map, Value, json};
 
@@ -105,7 +107,7 @@ pub fn definitions() -> Value {
         {
             "name": "stop_project",
             "title": "Stop a Project",
-            "description": "Stops every Service of the Project started here, dependents first, and waits until they have ended.",
+            "description": "Stops every running Service of the Project, whoever started it, dependents first, and waits until they have ended.",
             "inputSchema": { "type": "object", "properties": { "project": project }, "required": ["project"], "additionalProperties": false },
             "annotations": stops,
         },
@@ -175,19 +177,15 @@ impl From<LocalhostError> for ToolError {
 
 pub struct Tools {
     library: Arc<ProjectLibrary>,
-    manager: ServiceManager,
+    targets: Targets,
+    /// Read from disk only: the shared core writes the Runs' log files.
     logs: Arc<LogStore>,
     storage_root: PathBuf,
 }
 
 impl Tools {
-    pub fn new(
-        library: Arc<ProjectLibrary>,
-        manager: ServiceManager,
-        logs: Arc<LogStore>,
-        storage_root: PathBuf,
-    ) -> Tools {
-        Tools { library, manager, logs, storage_root }
+    pub fn new(library: Arc<ProjectLibrary>, targets: Targets, logs: Arc<LogStore>, storage_root: PathBuf) -> Tools {
+        Tools { library, targets, logs, storage_root }
     }
 
     /// The result of `tools/call`: the tool's answer, or its failure marked
@@ -296,7 +294,7 @@ impl Tools {
     }
 
     fn service_status(&self, project: &Project, service: &Service, live: &[Orphan]) -> Value {
-        let status = self.manager.status(service.id);
+        let status = self.targets.status(service.id);
         let mut value = json!({ "key": service.key, "name": service.name });
         if let Some(elsewhere) = self.elsewhere(&status, live) {
             let up = SystemTime::now().duration_since(elsewhere.started_at).unwrap_or_default();
@@ -306,7 +304,7 @@ impl Tools {
             value["port"] = json!(service.port);
             value["url"] = json!(service.url_to_open(None));
             value["uptimeSeconds"] = up.as_secs().into();
-            value["note"] = "Run by another localhost session (the app or `localhost up`); stop it there.".into();
+            value["note"] = "Run by a `localhost up` in a terminal; stop it there.".into();
             return value;
         }
         value["state"] = json!(status.state);
@@ -314,7 +312,8 @@ impl Tools {
             value["port"] = json!(service.port);
             return value;
         };
-        value["session"] = "agent".into();
+        value["session"] = "shared".into();
+        value["startedBy"] = started_by(run.origin).into();
         let is_active = status.state.is_active();
         if is_active && let Some(record) = live.iter().find(|record| record.run_id == run.id) {
             value["pid"] = record.process_group_id.into();
@@ -355,12 +354,15 @@ impl Tools {
                 Some(error) => json!({ "kind": error.kind, "message": error.message, "detail": error.detail }),
                 None => json!({ "message": run.termination.map(|termination| termination.summary()) }),
             };
+            // The latest Run file is this Run's: it ended, and none started since.
             let output: Vec<String> = self
                 .logs
-                .recent_output(run.id, FAILURE_OUTPUT_LINES)
-                .iter()
+                .stored_lines(service.id)
+                .into_iter()
+                .filter(|line| line.channel != OutputChannel::Localhost)
                 .map(|line| Ansi::strip(&line.text))
                 .collect();
+            let output = &output[output.len().saturating_sub(FAILURE_OUTPUT_LINES)..];
             value["lastOutput"] = output.into();
         }
         value
@@ -382,13 +384,15 @@ impl Tools {
         };
         let starting = with_dependencies(&project, vec![service.id]);
         let live = self.live_runs();
-        if self.elsewhere(&self.manager.status(service.id), &live).is_some() {
-            let note =
-                format!("{} is already running in another localhost session; it was left as it is.", service.key);
+        if self.elsewhere(&self.targets.status(service.id), &live).is_some() {
+            let note = format!(
+                "{} is already running in another localhost session (a `localhost up`); it was left as it is.",
+                service.key
+            );
             return Ok(self.statuses(&project, &starting, Some(note)));
         }
         self.refuse_running_elsewhere(&project, &starting, &live)?;
-        self.manager.start(service.id, port, Origin::Agent).await?;
+        self.targets.start(service.id, port, Origin::Agent).await?;
         self.settle(&starting).await;
         Ok(self.statuses(&project, &starting, self.still_starting(&project, &starting)))
     }
@@ -396,11 +400,11 @@ impl Tools {
     async fn stop_service(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let project = self.project(arguments)?;
         let service = self.service(&project, arguments)?;
-        let status = self.manager.status(service.id);
+        let status = self.targets.status(service.id);
         if let Some(elsewhere) = self.elsewhere(&status, &self.live_runs()) {
             return Err(running_elsewhere(service, elsewhere));
         }
-        self.manager.stop(service.id, Origin::Agent).await?;
+        self.targets.stop(service.id, Origin::Agent).await?;
         Ok(self.statuses(&project, &[service.id], None))
     }
 
@@ -413,19 +417,19 @@ impl Tools {
             return Err(ToolError::new("nothingToStart", format!("{} has no Services to start.", project.name)));
         }
         self.refuse_running_elsewhere(&project, &starting, &self.live_runs())?;
-        self.manager.start_all(project.id, Origin::Agent).await?;
+        self.targets.start_all(project.id, Origin::Agent).await?;
         self.settle(&starting).await;
         Ok(self.statuses(&project, &starting, self.still_starting(&project, &starting)))
     }
 
     async fn stop_project(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let project = self.project(arguments)?;
-        self.manager.stop_all(project.id, Origin::Agent).await?;
+        self.targets.stop_all(project.id, Origin::Agent).await?;
         let live = self.live_runs();
         let elsewhere: Vec<&str> = project
             .services
             .iter()
-            .filter(|service| self.elsewhere(&self.manager.status(service.id), &live).is_some())
+            .filter(|service| self.elsewhere(&self.targets.status(service.id), &live).is_some())
             .map(|service| service.key.as_str())
             .collect();
         let note = (!elsewhere.is_empty())
@@ -443,7 +447,7 @@ impl Tools {
         live: &[Orphan],
     ) -> Result<(), ToolError> {
         for service in service_ids.iter().filter_map(|id| project.service(*id)) {
-            if let Some(elsewhere) = self.elsewhere(&self.manager.status(service.id), live) {
+            if let Some(elsewhere) = self.elsewhere(&self.targets.status(service.id), live) {
                 return Err(running_elsewhere(service, elsewhere));
             }
         }
@@ -453,7 +457,7 @@ impl Tools {
     /// Waits until none of the Services is Starting, or `SETTLE_TIMEOUT`.
     async fn settle(&self, service_ids: &[Id]) {
         let settled = async {
-            while service_ids.iter().any(|id| self.manager.status(*id).state == ServiceState::Starting) {
+            while service_ids.iter().any(|id| self.targets.status(*id).state == ServiceState::Starting) {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
         };
@@ -463,7 +467,7 @@ impl Tools {
     fn still_starting(&self, project: &Project, service_ids: &[Id]) -> Option<String> {
         let keys: Vec<&str> = service_ids
             .iter()
-            .filter(|id| self.manager.status(**id).state == ServiceState::Starting)
+            .filter(|id| self.targets.status(**id).state == ServiceState::Starting)
             .filter_map(|id| project.service(*id))
             .map(|service| service.key.as_str())
             .collect();
@@ -562,10 +566,11 @@ impl Tools {
         let projects = self.library.projects();
         let live = self.live_runs();
         let listeners: Vec<Value> = self
-            .manager
+            .targets
             .listeners()
             .await
             .iter()
+            .map(|(_, listener)| listener)
             .filter(|listener| port.is_none_or(|port| listener.ports.contains(&port)))
             .filter_map(|listener| {
                 let value = self.listener(listener, &projects, &live);
@@ -588,7 +593,7 @@ impl Tools {
         let (project, service, session, owner) = match listener.owner {
             ListenerOwner::Run { service_id, .. } => {
                 let found = service_of(service_id);
-                (found.map(|(project, _)| project), found.map(|(_, service)| service), Some("agent"), "run")
+                (found.map(|(project, _)| project), found.map(|(_, service)| service), Some("shared"), "run")
             }
             _ => match live
                 .iter()
@@ -672,10 +677,19 @@ fn running_elsewhere(service: &Service, run: &Orphan) -> ToolError {
     ToolError {
         kind: "runningInAnotherSession".into(),
         message: format!(
-            "{} is running in another localhost session (pid {}): the app or a `localhost up`. Stop it there first, or use it as it is.",
+            "{} is running in another localhost session (pid {}): a `localhost up` in a terminal. Stop it there first, or use it as it is.",
             service.key, run.process_group_id
         ),
         detail: json!({ "service": service.key, "pid": run.process_group_id }),
+    }
+}
+
+/// Who started a Run, as an agent reads it.
+fn started_by(origin: Origin) -> &'static str {
+    match origin {
+        Origin::MainWindow | Origin::MenuBar => "app",
+        Origin::Cli => "cli",
+        Origin::Agent => "agent",
     }
 }
 

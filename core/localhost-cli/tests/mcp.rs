@@ -8,7 +8,11 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
-use localhost_core::{Id, Key, MemorySecretStore, NewService, Origin, Project, ProjectLibrary, Service};
+use localhost_core::remote::{Client as CoreClient, shared};
+use localhost_core::{
+    ExecutionTarget, Id, Key, Link, MemorySecretStore, NewService, Origin, Project, ProjectLibrary, Service,
+    ServiceManagerOptions, ServiceState, Targets,
+};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -96,6 +100,25 @@ impl Home {
         assert_eq!(reply["result"]["serverInfo"]["name"], "localhost");
         client.notify("notifications/initialized");
         client
+    }
+
+    /// The app's side of the shared core, as the Linux app reaches it.
+    /// Connect an agent first: the core it starts runs with this home's
+    /// environment, which the test process doesn't have.
+    async fn app(&self) -> Targets {
+        let root = self.storage_root();
+        let library = Arc::new(self.library());
+        let launcher = Box::new(move |target: &ExecutionTarget| match target {
+            ExecutionTarget::ThisMachine => {
+                let mut daemon = Command::new(env!("CARGO_BIN_EXE_localhost"));
+                daemon.arg("daemon").arg(&root);
+                shared::link(&root, CoreClient::App, daemon)
+            }
+            ExecutionTarget::Wsl { .. } => Link::Unavailable("not here".into()),
+        });
+        let targets = Targets::open(library, &self.storage_root(), ServiceManagerOptions::default(), launcher);
+        targets.connect(&ExecutionTarget::ThisMachine).await.unwrap();
+        targets
     }
 
     /// Waits for the file a Service writes when it has started: its shell's
@@ -250,7 +273,8 @@ fn starts_a_service_with_its_dependencies_reads_its_logs_and_stops_it() {
 
     let status = client.call("status", json!({ "project": "Acme Shop", "service": "web" }));
     assert_eq!(service(&status, "web")["pid"], web_group);
-    assert_eq!(service(&status, "web")["session"], "agent");
+    assert_eq!(service(&status, "web")["session"], "shared");
+    assert_eq!(service(&status, "web")["startedBy"], "agent");
 
     let logs = client.call("logs", json!({ "project": "acme", "service": "web" }));
     assert!(logs["lines"].as_array().unwrap().iter().any(|line| line["text"] == "started web"), "{logs:#}");
@@ -266,9 +290,9 @@ fn starts_a_service_with_its_dependencies_reads_its_logs_and_stops_it() {
     assert!(!process_group_exists(web_group));
     assert!(process_group_exists(db_group));
 
-    // Disconnecting stops everything this session started.
+    // Disconnecting stops everything this session started, with no app open.
     assert_eq!(client.disconnect(), 0);
-    assert!(!process_group_exists(db_group));
+    wait_until(|| !process_group_exists(db_group), "db to stop after the agent disconnected");
 }
 
 #[test]
@@ -409,4 +433,102 @@ fn ports_shows_who_holds_a_services_port() {
     assert_eq!(web["failure"]["detail"]["port"], port);
     drop(listener);
     client.disconnect();
+}
+
+fn runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap()
+}
+
+fn wait_for_state(runtime: &tokio::runtime::Runtime, app: &Targets, service_id: Id, state: ServiceState) {
+    runtime.block_on(async {
+        let deadline = Instant::now() + PATIENCE;
+        while app.status(service_id).state != state {
+            assert!(Instant::now() < deadline, "timed out waiting for {state:?}: {:?}", app.status(service_id));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    });
+}
+
+#[test]
+fn the_app_sees_what_an_agent_starts_and_the_reverse() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    let db = home.service(&project, "db", &long_running(&home, "db"), None, vec![]);
+    let web = home.service(&project, "web", &long_running(&home, "web"), None, vec![]);
+    let mut agent = home.mcp();
+    let runtime = runtime();
+    let app = runtime.block_on(home.app());
+
+    let started = agent.call("start_service", json!({ "project": "acme", "service": "web" }));
+    assert_eq!(service(&started, "web")["state"], "running", "{started:#}");
+    let web_group = home.wait_for_pid("web");
+    wait_for_state(&runtime, &app, web.id, ServiceState::Running);
+    assert_eq!(app.status(web.id).run.unwrap().origin, Origin::Agent);
+
+    runtime.block_on(app.start(db.id, None, Origin::MainWindow)).unwrap();
+    wait_for_state(&runtime, &app, db.id, ServiceState::Running);
+    let db_group = home.wait_for_pid("db");
+    let status = agent.call("status", json!({ "project": "acme", "service": "db" }));
+    assert_eq!(service(&status, "db")["state"], "running", "{status:#}");
+    assert_eq!(service(&status, "db")["session"], "shared");
+    assert_eq!(service(&status, "db")["startedBy"], "app");
+    assert_eq!(service(&status, "db")["pid"], db_group);
+
+    // A stop from either stops the one Run.
+    let stopped = agent.call("stop_service", json!({ "project": "acme", "service": "db" }));
+    assert_eq!(service(&stopped, "db")["state"], "stopped", "{stopped:#}");
+    assert!(!process_group_exists(db_group));
+    wait_for_state(&runtime, &app, db.id, ServiceState::Stopped);
+
+    runtime.block_on(app.stop(web.id, Origin::MainWindow)).unwrap();
+    assert!(!process_group_exists(web_group));
+    let status = agent.call("status", json!({ "project": "acme", "service": "web" }));
+    assert_eq!(service(&status, "web")["state"], "stopped", "{status:#}");
+
+    agent.disconnect();
+    drop(app);
+}
+
+#[test]
+fn an_agent_disconnecting_leaves_running_what_the_app_shows() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    let web = home.service(&project, "web", &long_running(&home, "web"), None, vec![]);
+    let mut agent = home.mcp();
+    let runtime = runtime();
+    let app = runtime.block_on(home.app());
+
+    agent.call("start_service", json!({ "project": "acme", "service": "web" }));
+    let web_group = home.wait_for_pid("web");
+    assert_eq!(agent.disconnect(), 0);
+    std::thread::sleep(Duration::from_secs(1));
+    assert!(process_group_exists(web_group), "the app is open, so the agent's Run goes on");
+    assert_eq!(app.status(web.id).state, ServiceState::Running);
+
+    // With no client left that needs it, it stops.
+    drop(app);
+    drop(runtime);
+    wait_until(|| !process_group_exists(web_group), "web to stop once the app disconnected too");
+}
+
+#[test]
+fn an_agent_disconnecting_leaves_running_what_another_agent_started() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    home.service(&project, "db", &long_running(&home, "db"), None, vec![]);
+    home.service(&project, "web", &long_running(&home, "web"), None, vec![]);
+    let mut first = home.mcp();
+    let mut second = home.mcp();
+
+    first.call("start_service", json!({ "project": "acme", "service": "web" }));
+    second.call("start_service", json!({ "project": "acme", "service": "db" }));
+    let (web_group, db_group) = (home.wait_for_pid("web"), home.wait_for_pid("db"));
+    let status = second.call("status", json!({ "project": "acme", "service": "web" }));
+    assert_eq!(service(&status, "web")["state"], "running", "{status:#}");
+
+    first.disconnect();
+    wait_until(|| !process_group_exists(web_group), "the first agent's Run to stop");
+    assert!(process_group_exists(db_group), "the second agent's Run goes on");
+    second.disconnect();
+    wait_until(|| !process_group_exists(db_group), "the second agent's Run to stop");
 }
