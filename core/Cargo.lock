@@ -885,6 +885,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "localhost-core",
+ "serde_json",
  "tempfile",
  "tokio",
 ]

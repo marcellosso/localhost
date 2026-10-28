@@ -40,6 +40,7 @@ export const sections: { title: string; pages: DocPage[] }[] = [
     title: 'Reference',
     pages: [
       { slug: 'cli', title: 'Command line', description: 'The localhost command.', collection: 'docs', id: 'cli' },
+      { slug: 'mcp', title: 'Coding agents (MCP)', description: 'Let Cursor, Claude Code and other agents start, stop and inspect your Services.', collection: 'docs', id: 'mcp' },
       { slug: 'data', title: 'Data and storage', description: 'Where configuration, logs and Secrets are kept.', collection: 'docs', id: 'data' },
     ],
   },
