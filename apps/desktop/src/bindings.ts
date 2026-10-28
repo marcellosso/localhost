@@ -854,10 +854,14 @@ export type LogSource =
 /**
  * Who or what requested a state-changing action.
  * 
- * Every mutation of the core takes an Origin so clients (and later agents)
- * can tell who changed what.
+ * Every mutation of the core takes an Origin so clients (and agents) can
+ * tell who changed what.
  */
-export type Origin = "mainWindow" | "menuBar" | "cli"
+export type Origin = "mainWindow" | "menuBar" | "cli" | 
+/**
+ * A coding agent, through `localhost mcp`.
+ */
+"agent"
 /**
  * A WSL distro had Orphans as it connected: the window asks about them.
  */
