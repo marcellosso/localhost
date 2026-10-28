@@ -1,8 +1,10 @@
 //! `localhost`: the core without a UI. It reads the same storage as the
-//! app, so it lists the same Projects, and runs Services in the foreground.
+//! app, so it lists the same Projects, runs Services in the foreground, and
+//! serves them to coding agents over MCP.
 
 mod arguments;
 mod logs;
+mod mcp;
 mod projects;
 mod resolve;
 mod status;
@@ -53,6 +55,7 @@ fn run(command: Command, terminal: &Terminal) -> Result<ExitCode, String> {
         Command::Status { project } => status::run(&open()?, &project, terminal)?,
         Command::Logs { project, service } => logs::run(&open()?, &project, service.as_deref(), terminal)?,
         Command::Up { project, services } => return up::run(open()?, &project, &services, terminal),
+        Command::Mcp => return mcp::run(open()?),
     }
     Ok(ExitCode::SUCCESS)
 }

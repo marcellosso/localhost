@@ -125,7 +125,7 @@ pub fn run(library: ProjectLibrary, query: &str, queries: &[String], terminal: &
 
 /// `service_ids` and every Service they depend on, directly or not, in
 /// dependency order.
-fn with_dependencies(project: &Project, mut service_ids: Vec<Id>) -> Vec<Id> {
+pub(crate) fn with_dependencies(project: &Project, mut service_ids: Vec<Id>) -> Vec<Id> {
     let mut index = 0;
     while index < service_ids.len() {
         if let Some(service) = project.service(service_ids[index]) {
