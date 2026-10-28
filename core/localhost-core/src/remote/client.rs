@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, oneshot};
 
-use super::{Call, Hello, Message, PROTOCOL_VERSION, Request};
+use super::{Call, Client, Hello, Message, PROTOCOL_VERSION, Request};
 use crate::{
     Id, Listener, LocalhostError, Origin, Orphan, OutputLine, Project, RunStats, ServiceEvent, ServiceOutputLine,
     ServiceStatus, ServiceSuggestion,
@@ -28,6 +28,9 @@ pub struct Remote {
 
 struct Inner {
     hello: Hello,
+    /// Builds the error for a lost connection: `TargetUnavailable`, or
+    /// `CoreUnavailable` for the shared core on this machine.
+    unavailable: fn(String) -> LocalhostError,
     outgoing: mpsc::UnboundedSender<String>,
     next_id: AtomicU64,
     state: Mutex<State>,
@@ -49,20 +52,18 @@ struct State {
     services_logs: HashMap<u64, mpsc::UnboundedSender<ServiceOutputLine>>,
 }
 
-fn unavailable(reason: impl Into<String>) -> LocalhostError {
-    LocalhostError::TargetUnavailable(reason.into())
-}
+const LOST: &str = "the connection to localhostd closed";
 
 impl Remote {
     /// Starts `command` (e.g. `wsl.exe -d Ubuntu -- ~/.local/share/localhost/localhostd --stdio`)
     /// and connects to it over its standard input and output.
     pub async fn spawn(mut command: tokio::process::Command) -> Result<Remote, LocalhostError> {
         command.stdin(Stdio::piped()).stdout(Stdio::piped());
-        let mut child = command.spawn().map_err(|error| unavailable(error.to_string()))?;
+        let mut child = command.spawn().map_err(|error| LocalhostError::TargetUnavailable(error.to_string()))?;
         let (Some(input), Some(output)) = (child.stdin.take(), child.stdout.take()) else {
-            return Err(unavailable("its input and output aren't available"));
+            return Err(LocalhostError::TargetUnavailable("its input and output aren't available".into()));
         };
-        Remote::connect_owning(output, input, Some(child)).await
+        Remote::connect_owning(output, input, Some(child), LocalhostError::TargetUnavailable).await
     }
 
     /// Connects over `reader` and `writer`: reads the `Hello`, then the
@@ -72,13 +73,14 @@ impl Remote {
         R: AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
     {
-        Remote::connect_owning(reader, writer, None).await
+        Remote::connect_owning(reader, writer, None, LocalhostError::TargetUnavailable).await
     }
 
-    async fn connect_owning<R, W>(
+    pub(crate) async fn connect_owning<R, W>(
         reader: R,
         mut writer: W,
         child: Option<tokio::process::Child>,
+        unavailable: fn(String) -> LocalhostError,
     ) -> Result<Remote, LocalhostError>
     where
         R: AsyncRead + Unpin + Send + 'static,
@@ -88,8 +90,8 @@ impl Remote {
         let first = lines.next_line().await.map_err(|error| unavailable(error.to_string()))?;
         let hello = match first.as_deref().map(serde_json::from_str::<Message>) {
             Some(Ok(Message::Hello(hello))) => hello,
-            None => return Err(unavailable("it ended before saying hello")),
-            Some(_) => return Err(unavailable("it didn't say hello")),
+            None => return Err(unavailable("it ended before saying hello".into())),
+            Some(_) => return Err(unavailable("it didn't say hello".into())),
         };
         if hello.protocol != PROTOCOL_VERSION {
             return Err(unavailable(format!(
@@ -112,6 +114,7 @@ impl Remote {
         let remote = Remote {
             inner: Arc::new(Inner {
                 hello,
+                unavailable,
                 outgoing,
                 next_id: AtomicU64::new(1),
                 state: Mutex::new(State { is_connected: true, ..State::default() }),
@@ -192,7 +195,7 @@ impl Remote {
         let mut state = self.state();
         state.is_connected = false;
         for (_, reply) in state.pending.drain() {
-            let _ = reply.send(Err(unavailable("the connection to localhostd closed")));
+            let _ = reply.send(Err((self.inner.unavailable)(LOST.into())));
         }
         state.subscribers.clear();
         state.run_logs.clear();
@@ -205,7 +208,7 @@ impl Remote {
         {
             let mut state = self.state();
             if !state.is_connected {
-                return Err(unavailable("the connection to localhostd closed"));
+                return Err((self.inner.unavailable)(LOST.into()));
             }
             state.pending.insert(id, sender);
         }
@@ -213,10 +216,11 @@ impl Remote {
         line.push('\n');
         if self.inner.outgoing.send(line).is_err() {
             self.state().pending.remove(&id);
-            return Err(unavailable("the connection to localhostd closed"));
+            return Err((self.inner.unavailable)(LOST.into()));
         }
-        let value = receiver.await.map_err(|_| unavailable("the connection to localhostd closed"))??;
-        serde_json::from_value(value).map_err(|error| unavailable(format!("localhostd replied unexpectedly: {error}")))
+        let value = receiver.await.map_err(|_| (self.inner.unavailable)(LOST.into()))??;
+        serde_json::from_value(value)
+            .map_err(|error| (self.inner.unavailable)(format!("localhostd replied unexpectedly: {error}")))
     }
 
     // MARK: Connection
@@ -233,6 +237,12 @@ impl Remote {
     pub async fn closed(&self) {
         let mut closed = self.inner.closed.clone();
         let _ = closed.wait_for(|closed| *closed).await;
+    }
+
+    /// Tells the core what this connection is, which decides what its
+    /// disconnecting stops (`Client`).
+    pub async fn identify(&self, client: Client) -> Result<(), LocalhostError> {
+        self.call(Request::Identify { client }).await
     }
 
     // MARK: Projects

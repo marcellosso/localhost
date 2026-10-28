@@ -55,6 +55,9 @@ pub enum LocalhostError {
     /// The core on the Project's Execution Target (`localhostd` in a WSL
     /// distro) can't be reached, or the connection to it was lost.
     TargetUnavailable(String),
+    /// The shared core on this machine (`remote::shared`) can't be started
+    /// or reached, or the connection to it was lost.
+    CoreUnavailable(String),
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -133,6 +136,9 @@ impl LocalhostError {
                     .into()
             }
             TargetUnavailable(reason) => format!("localhost can’t reach the WSL distro: {reason}."),
+            CoreUnavailable(reason) => {
+                format!("localhost’s background service isn’t running: {reason}. Quit localhost and open it again.")
+            }
             PortConflict { port, owner: Some(owner) } => {
                 format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
             }
