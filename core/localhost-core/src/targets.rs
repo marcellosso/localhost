@@ -1,7 +1,9 @@
-//! Where each Project's Services run, behind one interface. This
-//! machine is a Service manager in this process; any other Execution Target
-//! (a WSL distro) is a `localhostd` driven through a [`Remote`], connected
-//! the first time something needs it. A client reaches them all the same way.
+//! Where each Project's Services run, behind one interface. Each Execution
+//! Target is a Service manager in this process, or a core elsewhere driven
+//! through a [`Remote`]: the shared core on this machine
+//! (`remote::shared`), a `localhostd` inside a WSL distro. A remote one is
+//! connected the first time something needs it, or by `connect`. A client
+//! reaches them all the same way.
 //!
 //! The client keeps the one `ProjectLibrary`. Each connected `localhostd`
 //! is sent the Projects that run there, with their Secret values, whenever
@@ -10,10 +12,10 @@
 //! `ServiceManager`.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::task::Poll;
 use std::time::SystemTime;
 
@@ -62,7 +64,11 @@ pub struct Targets {
 struct Inner {
     library: Arc<ProjectLibrary>,
     launcher: Launcher,
-    local: Local,
+    /// This process's Service manager, made the first time the launcher
+    /// says a target is reached in-process.
+    local: OnceLock<Local>,
+    root: PathBuf,
+    options: ServiceManagerOptions,
     slots: Mutex<HashMap<ExecutionTarget, Arc<Slot>>>,
     /// Locked before `hub` whenever both are.
     feeds: Mutex<Vec<Feed>>,
@@ -123,24 +129,22 @@ enum Reached<'a> {
 const LOST: &str = "the connection to localhostd closed";
 
 impl Targets {
-    /// This machine's Runs keep their logs and records in `root`. Asks
-    /// `launcher` how to reach every other target.
+    /// Asks `launcher` how to reach each target. Runs in this process keep
+    /// their logs and records in `root`.
     pub fn open(
         library: Arc<ProjectLibrary>,
         root: &Path,
         options: ServiceManagerOptions,
         launcher: Launcher,
     ) -> Targets {
-        let logs = Arc::new(LogStore::new(root));
-        let runs = Arc::new(RunRegistry::new(root));
         let automatic_port_move = AtomicBool::new(options.automatic_port_move);
-        let manager = ServiceManager::new(library.clone(), logs.clone(), runs.clone(), options);
-        let local_statuses = manager.subscribe();
         let mut library_events = library.events();
         let inner = Arc::new(Inner {
             library,
             launcher,
-            local: Local { manager, logs, runs },
+            local: OnceLock::new(),
+            root: root.to_path_buf(),
+            options,
             slots: Mutex::new(HashMap::new()),
             feeds: Mutex::new(Vec::new()),
             hub: Mutex::new(Hub::default()),
@@ -148,7 +152,6 @@ impl Targets {
             next_source: AtomicU64::new(0),
             runtime: tokio::runtime::Handle::current(),
         });
-        inner.attach(local_statuses, false);
 
         // Sends changed Projects to every connected target, so a Run there
         // shows "Restart to apply" as one here does.
@@ -167,6 +170,13 @@ impl Targets {
 
     pub fn library(&self) -> &Arc<ProjectLibrary> {
         &self.inner.library
+    }
+
+    /// Connects to `target` now rather than when something first needs it,
+    /// e.g. this machine's shared core at launch, so the Runs it already
+    /// has show at once.
+    pub async fn connect(&self, target: &ExecutionTarget) -> Result<(), LocalhostError> {
+        self.inner.reach(target, false).await.map(|_| ())
     }
 
     // MARK: Observing
@@ -246,7 +256,9 @@ impl Targets {
                 let _ = remote.stop_every_run(origin).await;
             });
         }
-        self.inner.local.manager.stop_every_run(origin).await;
+        if let Some(local) = self.inner.local.get() {
+            local.manager.stop_every_run(origin).await;
+        }
         stops.join_all().await;
     }
 
@@ -254,7 +266,9 @@ impl Targets {
     /// May be called outside the runtime.
     pub fn set_automatic_port_move(&self, is_enabled: bool) {
         self.inner.automatic_port_move.store(is_enabled, Ordering::Relaxed);
-        self.inner.local.manager.set_automatic_port_move(is_enabled);
+        if let Some(local) = self.inner.local.get() {
+            local.manager.set_automatic_port_move(is_enabled);
+        }
         for (_, remote) in self.inner.connected() {
             self.inner.runtime.spawn(async move {
                 let _ = remote.set_automatic_port_move(is_enabled).await;
@@ -320,11 +334,15 @@ impl Targets {
 
     // MARK: Orphans
 
-    /// This machine's Orphans, as `RunRegistry::orphans`: call it at launch,
-    /// before anything starts. Other targets report theirs through
+    /// This machine's Orphans, as `RunRegistry::orphans`, if its Services
+    /// run in this process: call it at launch, before anything starts.
+    /// Remote targets, the shared core included, report theirs through
     /// `found_orphans` as they connect.
     pub fn orphans(&self) -> Vec<Orphan> {
-        self.inner.local.runs.orphans()
+        match (self.inner.launcher)(&ExecutionTarget::ThisMachine) {
+            Link::InProcess => self.inner.local().runs.orphans(),
+            _ => Vec::new(),
+        }
     }
 
     pub async fn stop_orphans(&self, target: &ExecutionTarget, orphans: &[Orphan]) -> Result<(), LocalhostError> {
@@ -462,6 +480,16 @@ async fn blocking<T: Default + Send + 'static>(work: impl FnOnce() -> T + Send +
 }
 
 impl Inner {
+    fn local(self: &Arc<Self>) -> &Local {
+        self.local.get_or_init(|| {
+            let logs = Arc::new(LogStore::new(&self.root));
+            let runs = Arc::new(RunRegistry::new(&self.root));
+            let manager = ServiceManager::new(self.library.clone(), logs.clone(), runs.clone(), self.options.clone());
+            self.attach(manager.subscribe(), None);
+            Local { manager, logs, runs }
+        })
+    }
+
     fn hub(&self) -> MutexGuard<'_, Hub> {
         self.hub.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
@@ -511,7 +539,7 @@ impl Inner {
             return Ok(Reached::Remote(remote));
         }
         let connecting = match (self.launcher)(target) {
-            Link::InProcess => return Ok(Reached::Local(&self.local)),
+            Link::InProcess => return Ok(Reached::Local(self.local())),
             Link::Unavailable(reason) => return Err(LocalhostError::TargetUnavailable(reason)),
             Link::Remote(connecting) => connecting,
         };
@@ -519,7 +547,7 @@ impl Inner {
         remote.set_automatic_port_move(self.automatic_port_move.load(Ordering::Relaxed)).await?;
         self.send_projects(target, &remote).await?;
         let orphans = remote.orphans().await?;
-        self.attach(remote.subscribe(), true);
+        self.attach(remote.subscribe(), Some(target.clone()));
         *slot.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(remote.clone());
         drop(one_at_a_time);
         if !orphans.is_empty() {
@@ -554,7 +582,7 @@ impl Inner {
     fn attach(
         self: &Arc<Self>,
         (statuses, events): (HashMap<Id, ServiceStatus>, mpsc::UnboundedReceiver<ServiceEvent>),
-        is_remote: bool,
+        remote: Option<ExecutionTarget>,
     ) {
         let source = self.next_source.fetch_add(1, Ordering::Relaxed);
         {
@@ -582,15 +610,13 @@ impl Inner {
             let Some(inner) = weak.upgrade().filter(|_| has_ended) else { return };
             let mut feeds = inner.feeds();
             feeds.retain(|feed| feed.source != source);
-            if !is_remote {
-                return;
-            }
+            let Some(target) = remote else { return };
             let mut hub = inner.hub();
             let lost: Vec<ServiceStatus> = hub
                 .statuses
                 .values()
                 .filter(|status| hub.sources.get(&status.service_id) == Some(&source))
-                .filter_map(lost_status)
+                .filter_map(|status| lost_status(status, &target))
                 .collect();
             for status in lost {
                 hub.publish(ServiceEvent::ServiceStateChanged(status), source);
@@ -610,8 +636,9 @@ impl Hub {
 }
 
 /// An active Service's status once its target's connection is lost: Failed
-/// with `TargetUnavailable` if its Run was alive, else Stopped.
-fn lost_status(status: &ServiceStatus) -> Option<ServiceStatus> {
+/// with `TargetUnavailable` (`CoreUnavailable` for this machine's shared
+/// core) if its Run was alive, else Stopped.
+fn lost_status(status: &ServiceStatus, target: &ExecutionTarget) -> Option<ServiceStatus> {
     if !status.state.is_active() {
         return None;
     }
@@ -621,7 +648,10 @@ fn lost_status(status: &ServiceStatus) -> Option<ServiceStatus> {
     match status.run.as_mut().filter(|run| run.ended_at.is_none()) {
         Some(run) => {
             run.ended_at = Some(SystemTime::now());
-            run.failure = Some(LocalhostError::TargetUnavailable(LOST.into()));
+            run.failure = Some(match target {
+                ExecutionTarget::ThisMachine => LocalhostError::CoreUnavailable(LOST.into()),
+                ExecutionTarget::Wsl { .. } => LocalhostError::TargetUnavailable(LOST.into()),
+            });
             status.state = ServiceState::Failed;
         }
         None => status.state = ServiceState::Stopped,
