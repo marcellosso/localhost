@@ -27,7 +27,7 @@ localhost is **not** a Docker Desktop replacement, a container or Kubernetes too
 ```text
 core/                    Cargo workspace: the UI-free core, shared by every client
   localhost-core/        Projects, Runs, logs, environment, Listeners, detection, persistence
-  localhost-cli/         the `localhost` command
+  localhost-cli/         the `localhost` command, and `localhost mcp` for coding agents
   localhost-daemon/      `localhostd --stdio`, the core driven over stdio (runs inside WSL distros)
   localhost-ffi/         the static library the macOS app links (UniFFI)
 apps/macos/              the macOS app
@@ -37,6 +37,7 @@ apps/macos/              the macOS app
 apps/desktop/            the Linux and Windows app (Tauri 2)
   src/                   React + TypeScript UI; src/bindings.ts is generated, never edited
   src-tauri/             Rust shell hosting the core
+skills/                  agent skills, e.g. using localhost's MCP server
 site/                    the website (Astro): landing page, docs, changelog; reads docs/ and the desktop tokens
 scripts/                 build-core.sh, build-release.sh, signing and installer artwork
 docs/configuration.md    the Project file format (user-facing)
@@ -64,7 +65,7 @@ The code, the UI and the docs use the same words. Use these, and avoid the alter
 | **Listener** | Any process listening on a TCP port, attributed to a Run, to a Project (its working directory is inside the folder), or to nobody. | port owner |
 | **Unmanaged Listener** | A Listener that belongs to no Run and no Project. localhost can show and stop it, never adopt it. | rogue, stray |
 | **Orphan** | A process tree left from a Run of a localhost session that ended unexpectedly. Never re-adopted as Running. | zombie, leftover |
-| **Origin** | Who asked for a change: main window, menu bar, CLI, later an agent. | source, actor, caller |
+| **Origin** | Who asked for a change: main window, menu bar, CLI, or an agent through `localhost mcp`. | source, actor, caller |
 | **Service State** | Exactly one of the six states below. | status (in the UI) |
 
 | State | Meaning |
@@ -257,7 +258,7 @@ Run only what the change touches. `cargo test` in `src-tauri/` regenerates `src/
 
 ## Where it is going
 
-A local development control plane: once localhost knows every Project, how each Service starts, what is running, its ports, environment and logs, a coding agent shouldn't need to guess shell commands. The CLI already drives the core; an MCP server may follow, possibly with the core in a background process. Design for it without building it:
+A local development control plane: once localhost knows every Project, how each Service starts, what is running, its ports, environment and logs, a coding agent shouldn't need to guess shell commands. The CLI drives the core, and `localhost mcp` serves it to agents over MCP; a background process that the apps and agents share may follow. Design for it:
 
 - semantic actions (`start_service(project: "my-saas", service: "api")`), never a generic "run this shell command";
 - stable identifiers (Keys, UUIDs) independent of display names;

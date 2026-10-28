@@ -23,10 +23,17 @@ cargo run -p localhost-cli -- projects           # every Project
 cargo run -p localhost-cli -- status acme         # which Services are running
 cargo run -p localhost-cli -- logs acme [web]     # the latest Run's output
 cargo run -p localhost-cli -- up acme [web …]     # run in the foreground; Ctrl-C stops everything
+cargo run -p localhost-cli -- mcp                 # an MCP server on stdin/stdout, for coding agents
+cargo install --path localhost-cli                # put `localhost` in ~/.cargo/bin
 ```
 
 Projects and Services are named by Key, name, or letters of either in order
 (`FuzzyMatch`).
+
+`localhost mcp` (`src/mcp/`) speaks JSON-RPC lines on stdin/stdout. Like
+`up`, it runs Services in its own `ServiceManager`, with `Origin::Agent`, and
+stops them when its input closes. Other sessions' Runs are read from the Run
+records, never started twice or stopped.
 
 ## localhostd
 

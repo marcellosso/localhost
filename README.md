@@ -254,7 +254,24 @@ localhost projects
 localhost status my-saas
 localhost logs my-saas web
 localhost up my-saas
+localhost mcp
 ```
+
+## Coding agents (MCP)
+
+`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. The Services an agent starts stop when it disconnects, and it never starts a second copy of one the app is running.
+
+For Cursor, add this to `.cursor/mcp.json` (or `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "localhost": { "command": "localhost", "args": ["mcp"] }
+  }
+}
+```
+
+Claude Code: `claude mcp add localhost -- localhost mcp`. To make your agent use it by default, give it [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md). More in the [MCP docs](https://www.getlocalhost.app/docs/mcp).
 
 ## FAQ
 
