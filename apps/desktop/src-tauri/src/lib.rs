@@ -3,8 +3,8 @@
 //! and events are typed: `src/bindings.ts` is generated from this crate.
 //!
 //! Services are reached through `Targets`, whatever their Project's
-//! Execution Target: this machine in-process, a WSL distro through its
-//! `localhostd` (`targets`).
+//! Execution Target: this machine through the shared core (in-process on
+//! Windows), a WSL distro through its `localhostd` (`targets`).
 
 mod bridge;
 mod desktop;
@@ -22,11 +22,13 @@ mod targets;
 mod tray;
 mod wsl;
 
+pub use targets::DAEMON_ARGUMENT;
+
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use localhost_core::{
-    LocalhostError, Origin, ProjectLibrary, SecretStore, ServiceManagerOptions, SystemSecretStore, Targets,
+    Launcher, LocalhostError, Origin, ProjectLibrary, SecretStore, ServiceManagerOptions, SystemSecretStore, Targets,
     default_storage_root,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
@@ -43,12 +45,18 @@ impl Core {
     /// Opens the Projects in `root`. Needs a tokio runtime: the Service
     /// manager spawns a task watching the library.
     fn open(root: &Path) -> Result<Core, LocalhostError> {
-        Core::open_with_secrets(root, Arc::new(SystemSecretStore::new()))
+        Core::open_with(root, Arc::new(SystemSecretStore::new()), targets::launcher(root))
     }
 
-    fn open_with_secrets(root: &Path, secrets: Arc<dyn SecretStore>) -> Result<Core, LocalhostError> {
+    /// With this machine's Services in this process: a test's executable
+    /// can't be started as the shared core.
+    #[cfg(test)]
+    fn open_in_process(root: &Path, secrets: Arc<dyn SecretStore>) -> Result<Core, LocalhostError> {
+        Core::open_with(root, secrets, Box::new(|_| localhost_core::Link::InProcess))
+    }
+
+    fn open_with(root: &Path, secrets: Arc<dyn SecretStore>, launcher: Launcher) -> Result<Core, LocalhostError> {
         let library = Arc::new(ProjectLibrary::open(root, secrets)?);
-        let launcher = targets::launcher(root);
         let targets = Targets::open(library.clone(), root, ServiceManagerOptions::default(), launcher);
         Ok(Core { library, targets })
     }
@@ -162,7 +170,9 @@ pub fn run() {
                     None => Core::open(&storage_root()),
                 }
             });
-            // Before anything starts, so this session's Runs can't be mistaken for Orphans.
+            // Before anything starts, so this session's Runs can't be mistaken
+            // for Orphans. Only when they run in-process: the shared core
+            // reports its own as it connects (`launch::watch_found_orphans`).
             let orphans = match &core {
                 Ok(core) if perf.is_none() => core.targets.orphans(),
                 _ => Vec::new(),

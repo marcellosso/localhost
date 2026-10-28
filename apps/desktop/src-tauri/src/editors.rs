@@ -670,7 +670,7 @@ mod tests {
     fn core() -> (Core, std::path::PathBuf) {
         let root = std::env::temp_dir().join(format!("localhost-editors-{}-{}", std::process::id(), Id::new()));
         std::fs::create_dir_all(&root).unwrap();
-        (Core::open_with_secrets(&root, Arc::new(MemorySecretStore::new())).unwrap(), root)
+        (Core::open_in_process(&root, Arc::new(MemorySecretStore::new())).unwrap(), root)
     }
 
     fn suggestion(name: &str, key: &str, port: &str) -> SuggestionEdit {
