@@ -75,6 +75,12 @@ extension Targets {
         await ffiStopEveryRun(origin: origin)
     }
 
+    /// Asks the shared core to exit as soon as no client is connected, so
+    /// the version an update relaunches starts a core of its own.
+    public func retireSharedCore() async {
+        await ffiRetireSharedCore()
+    }
+
     public func setAutomaticPortMove(_ isEnabled: Bool) {
         ffiSetAutomaticPortMove(isEnabled: isEnabled)
     }

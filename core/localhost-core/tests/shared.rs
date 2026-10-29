@@ -192,6 +192,23 @@ fn the_core_exits_once_no_client_has_been_connected_for_a_while() {
 }
 
 #[test]
+fn a_retired_core_exits_as_soon_as_its_last_client_leaves() {
+    within_patience(async {
+        // Far longer than the test may take: only retiring ends it in time.
+        let setup = setup(PATIENCE * 10).await;
+        let app = setup.connect(Client::App).await;
+        let agent = setup.connect(Client::Agent).await;
+        app.retire().await.unwrap();
+        drop(app);
+        settle().await;
+        assert!(!setup.core.is_finished(), "the agent still needs it");
+
+        drop(agent);
+        tokio::time::timeout(PATIENCE, setup.core).await.expect("the core exits").unwrap();
+    });
+}
+
+#[test]
 fn one_core_per_storage_root() {
     let fixture = Fixture::new();
     let lock = shared::lock(fixture.path()).unwrap();

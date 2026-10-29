@@ -4,6 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::task::Poll;
 use std::time::Duration;
@@ -37,6 +38,8 @@ pub(crate) struct Core {
     manager: ServiceManager,
     stop_policy: StopPolicy,
     connections: Mutex<Connections>,
+    /// A client asked it to exit once none is connected (`Request::Retire`).
+    is_retiring: AtomicBool,
 }
 
 #[derive(Default)]
@@ -86,6 +89,7 @@ impl Core {
             manager,
             stop_policy,
             connections: Mutex::new(Connections::default()),
+            is_retiring: AtomicBool::new(false),
         })
     }
 
@@ -95,6 +99,10 @@ impl Core {
 
     pub(crate) fn connection_count(&self) -> usize {
         self.connections().clients.len()
+    }
+
+    pub(crate) fn is_retiring(&self) -> bool {
+        self.is_retiring.load(Ordering::Relaxed)
     }
 
     pub(crate) async fn stop_every_run(&self) {
@@ -301,6 +309,10 @@ impl Connection {
             Request::StopEveryRun { origin } => {
                 manager.stop_every_run(origin).await;
                 core.connections().holders.clear();
+                done()
+            }
+            Request::Retire => {
+                core.is_retiring.store(true, Ordering::Relaxed);
                 done()
             }
             Request::SetAutomaticPortMove { is_enabled } => {

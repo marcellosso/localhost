@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 /// What a connection is, which decides what its disconnecting stops.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -127,6 +127,10 @@ pub(crate) enum Request {
     StopEveryRun {
         origin: Origin,
     },
+    /// Exit as soon as no client is connected rather than after the idle
+    /// time: the app is being replaced by an update, and the one it
+    /// relaunches should start a core of its own version.
+    Retire,
     SetAutomaticPortMove {
         is_enabled: bool,
     },

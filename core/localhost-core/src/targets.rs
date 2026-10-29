@@ -272,6 +272,18 @@ impl Targets {
         stops.join_all().await;
     }
 
+    /// Asks this machine's shared core to exit as soon as no client is
+    /// connected, instead of after its idle time: the app is about to quit
+    /// to install an update, and the version it relaunches should start a
+    /// core of its own rather than reach this one. Nothing to do when the
+    /// core isn't connected, or runs in this process.
+    pub async fn retire_shared_core(&self) {
+        let shared = self.inner.connected().into_iter().find(|(target, _)| *target == ExecutionTarget::ThisMachine);
+        if let Some((_, remote)) = shared {
+            let _ = remote.retire().await;
+        }
+    }
+
     /// An app setting, on by default; a target connected later gets it too.
     /// May be called outside the runtime.
     pub fn set_automatic_port_move(&self, is_enabled: bool) {

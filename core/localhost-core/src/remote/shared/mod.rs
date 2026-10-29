@@ -14,8 +14,10 @@
 //!
 //! Its lifetime follows its clients. A client disconnecting stops the Runs
 //! nobody needs any more (`Client`); once none has been connected for
-//! `IDLE_TIMEOUT`, it exits. Being told to end (SIGTERM, SIGINT, SIGHUP; on
-//! Windows its console closing, logoff or shutdown) stops every Run first.
+//! `IDLE_TIMEOUT`, it exits, or at once if a client asked it to retire (an
+//! app about to install an update). Being told to end (SIGTERM, SIGINT,
+//! SIGHUP; on Windows its console closing, logoff or shutdown) stops every
+//! Run first.
 
 #[cfg(unix)]
 mod unix;
@@ -186,6 +188,7 @@ pub async fn serve(
     tokio::pin!(shutdown);
     loop {
         let is_idle = core.connection_count() == 0;
+        let idle_timeout = if core.is_retiring() { Duration::ZERO } else { idle_timeout };
         tokio::select! {
             accepted = transport::accept(&mut listener) => match accepted {
                 Ok(Some((reader, writer))) => {
