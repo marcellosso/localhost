@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc, watch};
 
 use super::runtime::on_runtime;
-use crate::{OutputLine, ProjectLibraryEvent, ServiceEvent, ServiceOutputLine};
+use crate::{Orphan, OutputLine, ProjectLibraryEvent, ServiceEvent, ServiceOutputLine};
 
 macro_rules! subscription {
     ($(#[$doc:meta])* $name:ident, $item:ty) => {
@@ -67,6 +67,11 @@ subscription!(
     /// Lines appended to any Run of a set of Services.
     ServiceOutputLines,
     ServiceOutputLine
+);
+subscription!(
+    /// The Orphans the shared core finds as the app connects to it.
+    FoundOrphansEvents,
+    Vec<Orphan>
 );
 
 #[cfg(test)]

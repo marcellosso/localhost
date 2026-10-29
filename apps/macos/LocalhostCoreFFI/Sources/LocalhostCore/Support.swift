@@ -67,6 +67,10 @@ extension ServiceOutputLines {
     var stream: AsyncStream<ServiceOutputLine> { makeStream(next: next, close: close) }
 }
 
+extension FoundOrphansEvents {
+    var stream: AsyncStream<[Orphan]> { makeStream(next: next, close: close) }
+}
+
 // MARK: Foundation types
 
 extension URL {

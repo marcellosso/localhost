@@ -57,6 +57,7 @@ pub struct FoundOrphans {
 /// Every Execution Target, as one Service manager. Cheap to clone. Must be
 /// used inside a tokio runtime.
 #[derive(Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct Targets {
     inner: Arc<Inner>,
 }

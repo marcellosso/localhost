@@ -2,7 +2,7 @@
 //!
 //! The data types derive their UniFFI traits where they are defined. This
 //! module adds what the derives can't express: custom types, and the objects
-//! the app holds (the library, the manager, the log store, subscriptions).
+//! the app holds (the library, the targets it runs Services on, subscriptions).
 
 mod functions;
 mod objects;

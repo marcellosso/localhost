@@ -9,12 +9,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::runtime::{blocking, on_runtime};
-use super::subscriptions::{LibraryEvents, OutputLines, ServiceEvents, ServiceOutputLines};
+use super::subscriptions::{FoundOrphansEvents, LibraryEvents, OutputLines, ServiceEvents, ServiceOutputLines};
+use crate::remote::{Client, shared};
 use crate::{
-    EnvironmentProfile, Id, Key, KeyClash, Listener, LocalhostError, LogStore, NewService, Origin, Orphan, OutputLine,
-    ProfileChanges, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service,
-    ServiceChanges, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy,
-    SystemSecretStore, UnreadableProjectFile, VariableInput, VariableLayer,
+    EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash, Link, Listener, LocalhostError, LogStore, NewService,
+    Origin, Orphan, OutputLine, ProfileChanges, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry,
+    RunStats, Service, ServiceChanges, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus,
+    StopPolicy, SystemSecretStore, Targets, UnreadableProjectFile, VariableInput, VariableLayer,
 };
 
 // MARK: ProjectLibrary
@@ -401,6 +402,174 @@ impl ServiceManager {
         previous: Option<RunStats>,
     ) -> Result<Option<RunStats>, LocalhostError> {
         on_runtime(async move { self.run_stats(service_id, previous).await }).await
+    }
+}
+
+// MARK: Targets
+
+/// What the app runs Services through: this machine's shared core, which
+/// `localhost mcp` drives too. The app's executable is started as that core
+/// (`--daemon <storage root>`) when it isn't running.
+#[uniffi::export]
+impl Targets {
+    #[uniffi::constructor]
+    pub fn ffi_open_shared(
+        library: Arc<ProjectLibrary>,
+        storage_root: String,
+        automatic_port_move: bool,
+    ) -> Arc<Targets> {
+        let root = std::path::PathBuf::from(storage_root);
+        let launcher_root = root.clone();
+        let launcher = Box::new(move |target: &ExecutionTarget| match target {
+            ExecutionTarget::ThisMachine => {
+                let executable = std::env::current_exe().unwrap_or_else(|_| "localhost".into());
+                let mut daemon = std::process::Command::new(executable);
+                daemon.arg("--daemon").arg(&launcher_root);
+                shared::link(&launcher_root, Client::App, daemon)
+            }
+            ExecutionTarget::Wsl { distro } => {
+                Link::Unavailable(format!("“{distro}” is reached only from the Windows app"))
+            }
+        });
+        let options = ServiceManagerOptions { automatic_port_move, ..ServiceManagerOptions::default() };
+        // It spawns a task watching the library.
+        let _runtime = super::runtime::enter();
+        Arc::new(Targets::open(library, &root, options, launcher))
+    }
+
+    /// Connects to the shared core now, starting it if needed, so the Runs
+    /// it already has show at once and its Orphans are reported.
+    #[uniffi::method]
+    pub async fn ffi_connect(self: Arc<Self>) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.connect(&ExecutionTarget::ThisMachine).await }).await
+    }
+
+    #[uniffi::method]
+    pub fn ffi_status(&self, service_id: Id) -> ServiceStatus {
+        self.status(service_id)
+    }
+
+    #[uniffi::method]
+    pub fn ffi_subscribe(&self) -> ServiceSubscription {
+        let (snapshot, receiver) = self.subscribe();
+        ServiceSubscription { snapshot: snapshot.into_values().collect(), events: ServiceEvents::new(receiver) }
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_start(
+        self: Arc<Self>,
+        service_id: Id,
+        on_port: Option<u16>,
+        origin: Origin,
+    ) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.start(service_id, on_port, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop(self: Arc<Self>, service_id: Id, origin: Origin) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.stop(service_id, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_restart(self: Arc<Self>, service_id: Id, origin: Origin) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.restart(service_id, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_start_all(self: Arc<Self>, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.start_all(project_id, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop_all(self: Arc<Self>, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.stop_all(project_id, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop_every_run(self: Arc<Self>, origin: Origin) {
+        on_runtime(async move { self.stop_every_run(origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub fn ffi_set_automatic_port_move(&self, is_enabled: bool) {
+        self.set_automatic_port_move(is_enabled)
+    }
+
+    /// This machine's Listeners: the macOS app has no other target.
+    #[uniffi::method]
+    pub async fn ffi_listeners(self: Arc<Self>) -> Vec<Listener> {
+        let listeners = on_runtime(async move { self.listeners().await }).await;
+        listeners.into_iter().map(|(_, listener)| listener).collect()
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop_listener(self: Arc<Self>, listener: Listener, origin: Origin) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.stop_listener(&ExecutionTarget::ThisMachine, &listener, origin).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_next_free_port(self: Arc<Self>, service_id: Id) -> Result<Option<u16>, LocalhostError> {
+        on_runtime(async move { self.next_free_port(service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_run_stats(
+        self: Arc<Self>,
+        service_id: Id,
+        previous: Option<RunStats>,
+    ) -> Result<Option<RunStats>, LocalhostError> {
+        on_runtime(async move { self.run_stats(service_id, previous).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_subscribe_to_run(self: Arc<Self>, run_id: Id) -> Result<RunSubscription, LocalhostError> {
+        let (lines, receiver) = on_runtime(async move { self.subscribe_to_run(run_id).await }).await?;
+        Ok(RunSubscription { lines, updates: OutputLines::new(receiver) })
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_subscribe_to_services(
+        self: Arc<Self>,
+        service_ids: Vec<Id>,
+    ) -> Result<ServicesSubscription, LocalhostError> {
+        let service_ids = service_ids.into_iter().collect::<HashSet<Id>>();
+        let (lines, receiver) = on_runtime(async move { self.subscribe_to_services(service_ids).await }).await?;
+        Ok(ServicesSubscription { lines, updates: ServiceOutputLines::new(receiver) })
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_clear_buffer(self: Arc<Self>, service_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.clear_buffer(service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_remove_logs(self: Arc<Self>, service_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.remove_logs(&ExecutionTarget::ThisMachine, service_id).await }).await
+    }
+
+    /// The Orphans the shared core finds as it connects.
+    #[uniffi::method]
+    pub fn ffi_found_orphans(&self) -> Arc<FoundOrphansEvents> {
+        let mut found = self.found_orphans();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        super::runtime::spawn(async move {
+            while let Some(found) = found.recv().await {
+                if sender.send(found.orphans).is_err() {
+                    return;
+                }
+            }
+        });
+        FoundOrphansEvents::new(receiver)
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop_orphans(self: Arc<Self>, orphans: Vec<Orphan>) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.stop_orphans(&ExecutionTarget::ThisMachine, &orphans).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_leave_orphans(self: Arc<Self>, orphans: Vec<Orphan>) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.leave_orphans(&ExecutionTarget::ThisMachine, &orphans).await }).await
     }
 }
 

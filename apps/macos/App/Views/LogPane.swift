@@ -233,7 +233,7 @@ private struct FailedBanner: View {
     @Environment(AppModel.self) private var model
     let service: Service
     let run: Run
-    let logs: LogStore
+    let logs: Targets
     let dismiss: () -> Void
     @State private var excerpt: [OutputLine] = []
 
@@ -294,10 +294,12 @@ private struct FailedBanner: View {
         .padding(.bottom, 4)
         .task(id: run.id) {
             // Lines may still arrive after the Service turned Failed.
-            let (_, updates) = logs.subscribe(toRun: run.id)
-            excerpt = Self.excerpt(of: logs.recentOutput(forRun: run.id, limit: 40))
-            for await _ in updates {
-                excerpt = Self.excerpt(of: logs.recentOutput(forRun: run.id, limit: 40))
+            guard let (buffered, updates) = try? await logs.subscribe(toRun: run.id) else { return }
+            var lines = buffered
+            excerpt = Self.excerpt(of: Array(lines.suffix(40)))
+            for await line in updates {
+                lines.append(line)
+                excerpt = Self.excerpt(of: Array(lines.suffix(40)))
             }
         }
     }
@@ -353,7 +355,7 @@ struct LogView: NSViewRepresentable {
     }
 
     let source: Source
-    let logs: LogStore
+    let logs: Targets
     @AppStorage(Preferences.logFontSizeKey) private var fontSize = Preferences.defaultLogFontSize
     /// Only lines containing this text are shown, with matches highlighted.
     let filter: String
@@ -394,7 +396,7 @@ final class LogViewController {
 
     let scrollView = NSScrollView()
     private let textView = LogTextView(frame: .zero)
-    private let logs: LogStore
+    private let logs: Targets
     private var source: LogView.Source?
     private var clearCount = 0
     private var filter = ""
@@ -407,7 +409,7 @@ final class LogViewController {
     /// UTF-16 length of each displayed line, oldest first, for trimming.
     private var displayedLengths: [Int] = []
 
-    init(logs: LogStore) {
+    init(logs: Targets) {
         self.logs = logs
         textView.isEditable = false
         textView.isSelectable = true
@@ -500,11 +502,11 @@ final class LogViewController {
             case .run(nil):
                 break
             case .run(let runID?):
-                let (lines, updates) = logs.subscribe(toRun: runID)
+                guard let (lines, updates) = try? await logs.subscribe(toRun: runID) else { break }
                 batcher.append(lines.map { Line(line: $0, serviceID: nil) })
                 for await line in updates { batcher.append([Line(line: line, serviceID: nil)]) }
             case .services(let prefixes):
-                let (lines, updates) = logs.subscribe(toServices: Set(prefixes.keys))
+                guard let (lines, updates) = try? await logs.subscribe(toServices: Set(prefixes.keys)) else { break }
                 batcher.append(lines.map { Line(line: $0.line, serviceID: $0.serviceID) })
                 for await line in updates { batcher.append([Line(line: line.line, serviceID: line.serviceID)]) }
             }
