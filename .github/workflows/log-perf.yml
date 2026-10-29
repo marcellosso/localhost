@@ -1,0 +1,135 @@
+name: Log performance
+
+# `apps/desktop/scripts/log-perf.sh` on WebKitGTK, the slowest webview
+# (AGENTS.md, Performance): this commit and a baseline, built side by side
+# and measured in alternating rounds on one runner, so its noise falls on
+# both. The numbers go to the run's summary and an artifact. A shared
+# runner renders in software under Xvfb: compare the two columns of one run,
+# not numbers across runs or with a desktop.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - apps/desktop/src/log/**
+      - apps/desktop/src/components/Log*
+      - apps/desktop/src/perf.ts
+      - apps/desktop/src-tauri/src/logs.rs
+      - apps/desktop/src-tauri/src/perf.rs
+      - apps/desktop/src-tauri/src/targets.rs
+      - apps/desktop/scripts/log-perf.sh
+      - core/localhost-core/src/logs.rs
+      - core/localhost-core/src/output.rs
+      - core/localhost-core/src/remote/**
+      - .github/workflows/log-perf.yml
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: Commit, branch or tag to compare with (empty for none)
+        default: main
+      services:
+        description: Services
+        default: "4"
+      rate:
+        description: Lines per second per Service
+        default: "1000"
+      seconds:
+        description: Seconds per round
+        default: "30"
+      rounds:
+        description: Rounds per build
+        default: "3"
+
+concurrency:
+  group: log-perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Log view on WebKitGTK
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-22.04
+    # Two LTO release builds, then the rounds.
+    timeout-minutes: 60
+    defaults:
+      run:
+        # With pipefail, so a failed round fails the job through `tee`.
+        shell: bash
+    env:
+      BASELINE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.baseline }}
+      SERVICES: ${{ inputs.services || '4' }}
+      RATE: ${{ inputs.rate || '1000' }}
+      SECONDS_PER_ROUND: ${{ inputs.seconds || '30' }}
+      ROUNDS: ${{ inputs.rounds || '3' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: current
+          fetch-depth: 0
+      - name: Check out the baseline
+        if: env.BASELINE != ''
+        working-directory: current
+        run: |
+          commit=$(git rev-parse --verify --quiet "origin/$BASELINE^{commit}" || git rev-parse --verify "$BASELINE^{commit}")
+          git worktree add --detach ../baseline "$commit"
+      - name: Install the webview and tray libraries, Xvfb and D-Bus
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+          xvfb dbus-x11
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            current/apps/desktop/src-tauri
+            baseline/apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: current/apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: |
+          for build in current baseline; do
+            [[ -d $build ]] || continue
+            echo "::group::Build $build"
+            (cd "$build/apps/desktop" && pnpm install --frozen-lockfile && pnpm tauri build --no-bundle)
+            echo "::endgroup::"
+          done
+      - name: Measure
+        run: |
+          mkdir -p results
+          for round in $(seq "$ROUNDS"); do
+            for build in current baseline; do
+              [[ -d $build ]] || continue
+              echo "::group::Round $round, $build"
+              SKIP_BUILD=1 xvfb-run -a -s "-screen 0 1920x1080x24" dbus-run-session -- \
+                "$build/apps/desktop/scripts/log-perf.sh" "$SERVICES" "$RATE" "$SECONDS_PER_ROUND" \
+                | tee "results/$build-$round.txt"
+              echo "::endgroup::"
+            done
+          done
+      - name: Summarize
+        run: |
+          {
+            echo "### Log view on WebKitGTK (Xvfb, ubuntu-22.04)"
+            echo
+            echo "$SERVICES Services × $RATE lines/s for ${SECONDS_PER_ROUND}s, $ROUNDS rounds each."
+            echo "current: \`$(git -C current rev-parse --short HEAD)\`"
+            [[ -d baseline ]] && echo "baseline: \`$(git -C baseline rev-parse --short HEAD)\` ($BASELINE)"
+            echo
+            echo "| build | round | lines received | frames | p50 ms | p95 ms | max ms | frames > 33 ms | peak MB | average MB |"
+            echo "|---|---|---|---|---|---|---|---|---|---|"
+            for file in results/*.txt; do
+              name=$(basename "$file" .txt)
+              report=$(head -n 1 "$file")
+              memory=$(sed -n 's/^memory: peak \([0-9]*\) MB, average \([0-9]*\) MB.*/\1 | \2/p' "$file")
+              echo "| ${name%-*} | ${name##*-} | $(jq -r '.report | "\(.linesReceived) | \(.frames) | \(.frameMsP50) | \(.frameMsP95) | \(.frameMsMax) | \(.longFrames)"' <<<"$report") | $memory |"
+            done
+          } >>"$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: log-perf
+          path: results/
