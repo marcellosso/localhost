@@ -1,7 +1,7 @@
 //! Where Secret values live. Each Secret is one item, addressed by its
 //! layer's owner and its name (`VariableLayer::secret_account`).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use crate::LocalhostError;
@@ -44,9 +44,17 @@ impl MemorySecretStore {
         Self::default()
     }
 
-    /// Makes `items` (value by account) the only stored values.
-    pub fn replace_all(&self, items: HashMap<String, String>) {
-        *self.items.lock().unwrap() = items;
+    /// Stores `values` by account, removing those that are `None`, then
+    /// forgets every account not in `kept`.
+    pub fn update(&self, values: HashMap<String, Option<String>>, kept: &HashSet<String>) {
+        let mut items = self.items.lock().unwrap();
+        for (account, value) in values {
+            match value {
+                Some(value) => items.insert(account, value),
+                None => items.remove(&account),
+            };
+        }
+        items.retain(|account, _| kept.contains(account));
     }
 
     /// Every account with a stored value.

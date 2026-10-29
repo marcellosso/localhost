@@ -10,8 +10,9 @@
 //! and log batches arrive between replies.
 //!
 //! The client keeps the Project Configuration: it sends the Projects, with
-//! the values of their Secrets, and the core holds them in memory only,
-//! the latest a client sent winning.
+//! the values of the Secrets a start needs, and the core holds them in
+//! memory only, the latest a client sent winning. A value stays until a
+//! client sends another, or no Project names its Secret.
 //!
 //! Runs belong to the core, not to a connection. A client says what it is
 //! ([`Client`]); when one disconnects, the Runs nobody needs any more stop:
@@ -39,7 +40,7 @@ use crate::{
 };
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 /// What a connection is, which decides what its disconnecting stops.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -97,10 +98,11 @@ pub(crate) enum Request {
     Identify {
         client: Client,
     },
-    /// Replaces the Projects, and the Secret values by account.
+    /// Replaces the Projects, and sets the given Secret values by account
+    /// (`None` has none).
     SetProjects {
         projects: Vec<Project>,
-        secrets: HashMap<String, String>,
+        secrets: HashMap<String, Option<String>>,
     },
     /// Replies with every status; then every Service event follows.
     Subscribe,

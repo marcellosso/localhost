@@ -14,6 +14,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use super::{Call, Client, Hello, Message, Request};
+use crate::library::all_secret_accounts;
 use crate::{
     Id, LocalhostError, LogStore, MemorySecretStore, ProjectLibrary, ProjectScanner, RunRegistry, ServiceEvent,
     ServiceManager, ServiceManagerOptions, StopPolicy,
@@ -257,7 +258,10 @@ impl Connection {
                 done()
             }
             Request::SetProjects { projects, secrets } => {
-                core.secrets.replace_all(secrets);
+                // Values a client didn't send are kept, for other clients'
+                // Runs, until no Project names them.
+                let named: HashSet<String> = projects.iter().flat_map(all_secret_accounts).collect();
+                core.secrets.update(secrets, &named);
                 core.library.replace_projects(projects, self.client().origin());
                 done()
             }

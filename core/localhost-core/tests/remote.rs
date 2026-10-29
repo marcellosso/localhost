@@ -45,13 +45,14 @@ async fn setup() -> Setup {
 }
 
 impl Setup {
-    /// Sends the library's Projects and their Secret values, as the app does.
+    /// Sends the library's Projects, with the Secret values their Services
+    /// read, as the app does before starting them all.
     async fn sync(&self) {
-        let mut secrets = HashMap::new();
-        for project in self.library.projects() {
-            secrets.extend(self.library.stored_secrets(project.id).unwrap());
-        }
-        self.remote.set_projects(self.library.projects(), secrets).await.unwrap();
+        let projects = self.library.projects();
+        let services: Vec<_> =
+            projects.iter().flat_map(|project| project.services.iter().map(|service| service.id)).collect();
+        let secrets = self.library.secrets_for_runs(&services).unwrap();
+        self.remote.set_projects(projects, secrets).await.unwrap();
     }
 }
 
@@ -201,4 +202,35 @@ async fn refuses_a_localhostd_that_speaks_another_protocol() {
     let error = Remote::connect(reader, writer).await.err().unwrap();
     assert!(matches!(&error, LocalhostError::TargetUnavailable(reason) if reason.contains("9.9.9")), "{error:?}");
     let _ = Arc::new(server);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn keeps_the_secret_values_it_was_sent_until_no_project_names_them() {
+    let setup = setup().await;
+    let add = |variables| {
+        let service = NewService::new("Web", key("web"), "echo \"token=$TOKEN\"; sleep 30");
+        setup.library.add_service(setup.project.id, service, variables, vec![], Origin::MainWindow).unwrap()
+    };
+    let service = add(vec![VariableInput::secret("TOKEN", "s3cret")]);
+    setup.sync().await;
+    // Another client's Projects, with no Secret value: an agent starting something else.
+    setup.remote.set_projects(setup.library.projects(), HashMap::new()).await.unwrap();
+
+    let (_, mut lines) = setup.remote.subscribe_to_services(HashSet::from([service.id])).await.unwrap();
+    setup.remote.start(service.id, None, Origin::Agent).await.unwrap();
+    let line = until(&mut lines, |line| line.line.text.starts_with("token=")).await;
+    assert_eq!(line.line.text, "token=s3cret");
+    setup.remote.stop(service.id, Origin::Agent).await.unwrap();
+
+    // Once no Project names it, the value is gone, even if the name comes back.
+    let edit = |variables| {
+        let changes = ServiceChanges { variables: Some(variables), ..Default::default() };
+        setup.library.edit_service(service.id, changes, Origin::MainWindow).unwrap();
+    };
+    edit(vec![]);
+    setup.remote.set_projects(setup.library.projects(), HashMap::new()).await.unwrap();
+    edit(vec![VariableInput::secret("TOKEN", "s3cret")]);
+    setup.remote.set_projects(setup.library.projects(), HashMap::new()).await.unwrap();
+    let failed = setup.remote.start(service.id, None, Origin::Agent).await.unwrap();
+    assert_eq!(failed.run.unwrap().failure, Some(LocalhostError::SecretMissing("TOKEN".into())));
 }

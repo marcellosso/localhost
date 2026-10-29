@@ -2,13 +2,14 @@
 
 mod common;
 
+use std::collections::HashMap;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use common::{Fixture, key};
 use localhost_core::{
-    ExecutionTarget, Id, LocalhostError, NewService, Origin, ProjectChanges, ProjectLibraryEvent, ServiceChanges,
-    UnreadableProjectFile, VariableInput,
+    ExecutionTarget, Id, LocalhostError, NewService, Origin, ProjectChanges, ProjectLibraryEvent, SecretStore,
+    ServiceChanges, UnreadableProjectFile, VariableInput, VariableLayer,
 };
 
 fn web(command_line: &str) -> NewService {
@@ -222,16 +223,41 @@ fn a_mirror_takes_projects_as_given_and_announces_what_changed() {
 }
 
 #[test]
-fn lists_the_stored_values_of_a_projects_secrets_by_account() {
-    let library = Fixture::new().library();
+fn reads_only_the_secrets_runs_of_the_services_and_their_dependencies_read() {
+    let fixture = Fixture::new();
+    let library = fixture.library();
     let project = library.add_project("App", key("app"), "/tmp/app", vec![], Origin::MainWindow).unwrap();
-    let changes = ProjectChanges {
-        variables: Some(vec![VariableInput::secret("TOKEN", "t0ken"), VariableInput::plain("MODE", "dev")]),
-        ..Default::default()
-    };
+    let variables = vec![VariableInput::secret("TOKEN", "t0ken"), VariableInput::plain("MODE", "dev")];
+    let changes = ProjectChanges { variables: Some(variables), ..Default::default() };
     library.edit_project(project.id, changes, Origin::MainWindow).unwrap();
-    let account = localhost_core::VariableLayer::Project(project.id).secret_account("TOKEN");
-    assert_eq!(library.stored_secrets(project.id).unwrap(), [(account, "t0ken".to_string())].into());
+    let add = |name: &str, secret: &str, dependencies: Vec<Id>| {
+        let service = NewService::new(name, key(&name.to_lowercase()), "true");
+        let variables = vec![VariableInput::secret(secret, format!("{secret}-value"))];
+        library.add_service(project.id, service, variables, dependencies, Origin::MainWindow).unwrap()
+    };
+    let db = add("Db", "DB_PASSWORD", vec![]);
+    let web = add("Web", "WEB_KEY", vec![db.id]);
+    let worker = add("Worker", "WORKER_KEY", vec![]);
+    let active =
+        library.add_profile(project.id, "Testing", vec![VariableInput::secret("ACTIVE", "on")], Origin::MainWindow);
+    let inactive =
+        library.add_profile(project.id, "Other", vec![VariableInput::secret("OFF", "off")], Origin::MainWindow);
+    let (active, inactive) = (active.unwrap(), inactive.unwrap());
+    library.set_active_profile(Some(active.id), project.id, Origin::MainWindow).unwrap();
+    let account = |layer: VariableLayer, name: &str| layer.secret_account(name);
+    fixture.secrets.remove_value(&account(VariableLayer::Service(db.id), "DB_PASSWORD")).unwrap();
+
+    let expected: HashMap<String, Option<String>> = [
+        (account(VariableLayer::Project(project.id), "TOKEN"), Some("t0ken".to_string())),
+        (account(VariableLayer::Service(web.id), "WEB_KEY"), Some("WEB_KEY-value".to_string())),
+        (account(VariableLayer::Service(db.id), "DB_PASSWORD"), None),
+        (account(VariableLayer::Profile(active.id), "ACTIVE"), Some("on".to_string())),
+    ]
+    .into();
+    assert_eq!(library.secrets_for_runs(&[web.id]).unwrap(), expected);
+    let all = library.secrets_for_runs(&[web.id, worker.id]).unwrap();
+    assert!(all.contains_key(&account(VariableLayer::Service(worker.id), "WORKER_KEY")));
+    assert!(!all.contains_key(&account(VariableLayer::Profile(inactive.id), "OFF")), "an inactive Profile isn't read");
 }
 
 #[test]

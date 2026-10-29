@@ -67,7 +67,7 @@ Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `
 - **For as long as someone needs it.** When the agent disconnects or quits, the Services it started stop, unless the app is open: then they keep running there, and you stop them when you like. Nothing keeps running unseen. Quitting the app stops every Service after asking, whoever started it.
 - **Never twice.** If a `localhost up` in a terminal already runs a Service, `status` shows it running (`"session": "other"`), with its pid and uptime. The agent won't start a second copy, and won't stop it: stop it where it runs.
 - **Configuration stays yours.** The agent can't add or change Projects or Services. Changes you make in the app apply to its next start.
-- **On macOS**, the first Service with a Secret that an agent starts may ask for access to the Keychain, as described in [macOS](/docs/macos).
+- **On macOS**, starting a Service that uses a Secret may ask for access to the Keychain: `localhost mcp` is another program than the app, so macOS asks it separately, once for each Secret, as described in [macOS](/docs/macos). It reads only the Secrets of what it starts: the Service, its Dependencies, or for `start_project` the Services that start. Listing, `status`, `logs` and `ports` read none. A Secret you change in the app reaches a running Service when it next starts.
 
 ## The background core
 

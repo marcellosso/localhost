@@ -247,13 +247,14 @@ impl Remote {
 
     // MARK: Projects
 
-    /// Makes `projects` the Projects `localhostd` runs, with the values of
-    /// their Secrets by account (`ProjectLibrary::stored_secrets`).
-    /// `localhostd` keeps both in memory only.
+    /// Makes `projects` the Projects `localhostd` runs, and sets the values
+    /// of these Secrets by account (`ProjectLibrary::secrets_for_runs`); it
+    /// keeps the others it has that a Project still names. `localhostd`
+    /// keeps both in memory only.
     pub async fn set_projects(
         &self,
         projects: Vec<Project>,
-        secrets: HashMap<String, String>,
+        secrets: HashMap<String, Option<String>>,
     ) -> Result<(), LocalhostError> {
         self.call(Request::SetProjects { projects, secrets }).await
     }

@@ -160,17 +160,28 @@ impl ProjectLibrary {
         }
     }
 
-    /// The stored value of every Secret the Project names, by account
-    /// (`VariableLayer::secret_account`). Secrets without a value are left out.
-    pub fn stored_secrets(&self, project_id: Id) -> Result<BTreeMap<String, String>, LocalhostError> {
-        let project = self.project(project_id)?;
-        let mut values = BTreeMap::new();
-        for account in all_secret_accounts(&project) {
-            if let Some(value) = self.secrets.value(&account)? {
-                values.insert(account, value);
+    /// The stored value, by account (`VariableLayer::secret_account`), of
+    /// every Secret read by a Run of these Services or of a Dependency they
+    /// start; `None` where none is stored. No other Secret is read from the
+    /// store.
+    pub fn secrets_for_runs(&self, service_ids: &[Id]) -> Result<HashMap<String, Option<String>>, LocalhostError> {
+        let mut accounts = HashSet::new();
+        for &service_id in service_ids {
+            let Ok((project, _)) = self.service(service_id) else { continue };
+            for id in project.with_dependencies(&[service_id]) {
+                let Some(service) = project.service(id) else { continue };
+                for (layer, variables) in run_layers(&project, service) {
+                    accounts.extend(secret_accounts(layer, &variables));
+                }
             }
         }
-        Ok(values)
+        accounts
+            .into_iter()
+            .map(|account| {
+                let value = self.secrets.value(&account)?;
+                Ok((account, value))
+            })
+            .collect()
     }
 
     /// The Project files that couldn't be loaded, to tell the user once.
@@ -215,13 +226,8 @@ impl ProjectLibrary {
     /// one before, with Secrets resolved.
     pub(crate) fn resolved_variables(&self, service_id: Id) -> Result<BTreeMap<String, String>, LocalhostError> {
         let (project, service) = self.service(service_id)?;
-        let mut layers = vec![(VariableLayer::Project(project.id), project.variables.clone())];
-        layers.push((VariableLayer::Service(service_id), service.variables()));
-        if let Some(profile) = project.active_profile() {
-            layers.push((VariableLayer::Profile(profile.id), profile.variables.clone()));
-        }
         let mut resolved = BTreeMap::new();
-        for (layer, variables) in layers {
+        for (layer, variables) in run_layers(&project, &service) {
             resolved.extend(variables.values);
             for name in variables.secret_names {
                 let value = self.secrets.value(&layer.secret_account(&name))?;
@@ -777,8 +783,19 @@ fn secret_accounts(layer: VariableLayer, variables: &Variables) -> Vec<String> {
     variables.secret_names.iter().map(|name| layer.secret_account(name)).collect()
 }
 
+/// The variable layers a Run of the Service reads, later ones winning: the
+/// Project's, the Service's, the active Environment Profile's.
+fn run_layers(project: &Project, service: &Service) -> Vec<(VariableLayer, Variables)> {
+    let mut layers = vec![(VariableLayer::Project(project.id), project.variables.clone())];
+    layers.push((VariableLayer::Service(service.id), service.variables()));
+    if let Some(profile) = project.active_profile() {
+        layers.push((VariableLayer::Profile(profile.id), profile.variables.clone()));
+    }
+    layers
+}
+
 /// The accounts of every Secret of the Project, on every layer.
-fn all_secret_accounts(project: &Project) -> Vec<String> {
+pub(crate) fn all_secret_accounts(project: &Project) -> Vec<String> {
     let mut accounts = secret_accounts(VariableLayer::Project(project.id), &project.variables);
     for service in &project.services {
         accounts.extend(secret_accounts(VariableLayer::Service(service.id), &service.variables()));

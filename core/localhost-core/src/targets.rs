@@ -6,10 +6,12 @@
 //! reaches them all the same way.
 //!
 //! The client keeps the one `ProjectLibrary`. Each connected `localhostd`
-//! is sent the Projects that run there, with their Secret values, whenever
-//! they change and before every start. The statuses and events of every
-//! target are merged, so a client observes them as it would one
-//! `ServiceManager`.
+//! is sent the Projects that run there whenever they change and before
+//! every start. Only a start sends Secret values: those that the Runs it
+//! may start read. So a client reads from the secret store only what it is
+//! about to run, which on macOS keeps Keychain prompts to those Secrets.
+//! The statuses and events of every target are merged, so a client
+//! observes them as it would one `ServiceManager`.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -155,14 +157,15 @@ impl Targets {
         });
 
         // Sends changed Projects to every connected target, so a Run there
-        // shows "Restart to apply" as one here does.
+        // shows "Restart to apply" as one here does. A changed Secret value
+        // goes with the next start.
         let weak = Arc::downgrade(&inner);
         tokio::spawn(async move {
             while library_events.recv().await.is_some() {
                 while library_events.try_recv().is_ok() {}
                 let Some(inner) = weak.upgrade() else { return };
                 for (target, remote) in inner.connected() {
-                    let _ = inner.send_projects(&target, &remote).await;
+                    let _ = inner.send_projects(&target, &remote, &[]).await;
                 }
             }
         });
@@ -177,7 +180,7 @@ impl Targets {
     /// e.g. this machine's shared core at launch, so the Runs it already
     /// has show at once.
     pub async fn connect(&self, target: &ExecutionTarget) -> Result<(), LocalhostError> {
-        self.inner.reach(target, false).await.map(|_| ())
+        self.inner.reach(target, None).await.map(|_| ())
     }
 
     // MARK: Observing
@@ -232,8 +235,14 @@ impl Targets {
     }
 
     pub async fn start_all(&self, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
-        let target = self.inner.library.project(project_id)?.execution_target;
-        match self.inner.reach(&target, true).await? {
+        let project = self.inner.library.project(project_id)?;
+        let included: Vec<Id> = project
+            .services
+            .iter()
+            .filter(|service| !service.is_excluded_from_start_all)
+            .map(|service| service.id)
+            .collect();
+        match self.inner.reach(&project.execution_target, Some(&included)).await? {
             Reached::Local(local) => local.manager.start_all(project_id, origin).await,
             Reached::Remote(remote) => remote.start_all(project_id, origin).await,
         }
@@ -241,7 +250,7 @@ impl Targets {
 
     pub async fn stop_all(&self, project_id: Id, origin: Origin) -> Result<(), LocalhostError> {
         let target = self.inner.library.project(project_id)?.execution_target;
-        match self.inner.reach(&target, false).await? {
+        match self.inner.reach(&target, None).await? {
             Reached::Local(local) => local.manager.stop_all(project_id, origin).await,
             Reached::Remote(remote) => remote.stop_all(project_id, origin).await,
         }
@@ -287,7 +296,7 @@ impl Targets {
         let connected = self.inner.connected().into_iter().map(|(target, _)| target);
         targets.extend(connected.filter(|target| !target.is_this_machine()));
         for target in targets {
-            let listeners = match self.inner.reach(&target, false).await {
+            let listeners = match self.inner.reach(&target, None).await {
                 Ok(Reached::Local(local)) => local.manager.listeners().await,
                 Ok(Reached::Remote(remote)) => remote.listeners().await.unwrap_or_default(),
                 Err(_) => Vec::new(),
@@ -304,7 +313,7 @@ impl Targets {
         listener: &Listener,
         origin: Origin,
     ) -> Result<(), LocalhostError> {
-        match self.inner.reach(target, false).await? {
+        match self.inner.reach(target, None).await? {
             Reached::Local(local) => local.manager.stop_listener(listener, origin).await,
             Reached::Remote(remote) => remote.stop_listener(listener, origin).await,
         }
@@ -347,7 +356,7 @@ impl Targets {
     }
 
     pub async fn stop_orphans(&self, target: &ExecutionTarget, orphans: &[Orphan]) -> Result<(), LocalhostError> {
-        match self.inner.reach(target, false).await? {
+        match self.inner.reach(target, None).await? {
             Reached::Local(local) => {
                 local.runs.stop_orphans(orphans, Default::default()).await;
                 Ok(())
@@ -357,7 +366,7 @@ impl Targets {
     }
 
     pub async fn leave_orphans(&self, target: &ExecutionTarget, orphans: &[Orphan]) -> Result<(), LocalhostError> {
-        match self.inner.reach(target, false).await? {
+        match self.inner.reach(target, None).await? {
             Reached::Local(local) => {
                 local.runs.leave_orphans(orphans);
                 Ok(())
@@ -371,7 +380,7 @@ impl Targets {
     /// Removes the Service's logs where it ran. `target` is given since the
     /// Service may already be removed from the library.
     pub async fn remove_logs(&self, target: &ExecutionTarget, service_id: Id) -> Result<(), LocalhostError> {
-        match self.inner.reach(target, false).await? {
+        match self.inner.reach(target, None).await? {
             Reached::Local(local) => {
                 local.logs.remove_logs(service_id);
                 Ok(())
@@ -404,7 +413,7 @@ impl Targets {
                 .map(|s| s.service_id)
         };
         let target = service_id.map_or(ExecutionTarget::ThisMachine, |id| self.inner.target_of_service(id));
-        match self.inner.reach(&target, false).await? {
+        match self.inner.reach(&target, None).await? {
             Reached::Local(local) => Ok(local.logs.subscribe_to_run(run_id)),
             Reached::Remote(remote) => remote.subscribe_to_run(run_id).await,
         }
@@ -422,7 +431,7 @@ impl Targets {
         }
         let mut parts = Vec::new();
         for (target, ids) in by_target {
-            parts.push(match self.inner.reach(&target, false).await? {
+            parts.push(match self.inner.reach(&target, None).await? {
                 Reached::Local(local) => local.logs.subscribe_to_services(ids),
                 Reached::Remote(remote) => remote.subscribe_to_services(ids).await?,
             });
@@ -455,7 +464,7 @@ impl Targets {
         target: &ExecutionTarget,
         path: &str,
     ) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
-        match self.inner.reach(target, false).await? {
+        match self.inner.reach(target, None).await? {
             Reached::Local(_) => {
                 let path = path.to_string();
                 Ok(blocking(move || ProjectScanner::default().scan_folder(&path)).await)
@@ -466,7 +475,7 @@ impl Targets {
 
     /// As `ProjectScanner::scan_project`, where the Project runs.
     pub async fn scan_project(&self, project: &Project) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
-        match self.inner.reach(&project.execution_target, false).await? {
+        match self.inner.reach(&project.execution_target, None).await? {
             Reached::Local(_) => {
                 let project = project.clone();
                 Ok(blocking(move || ProjectScanner::default().scan_project(&project)).await)
@@ -523,19 +532,25 @@ impl Inner {
 
     async fn reach_service(self: &Arc<Self>, service_id: Id, is_start: bool) -> Result<Reached<'_>, LocalhostError> {
         let (project, _) = self.library.service(service_id)?;
-        self.reach(&project.execution_target, is_start).await
+        let starting = [service_id];
+        self.reach(&project.execution_target, is_start.then_some(&starting[..])).await
     }
 
-    /// The way to `target`, connecting to it if needed. Before a start, a
-    /// `localhostd` is sent the current Projects first, so it starts what
-    /// the user just saved.
-    async fn reach(self: &Arc<Self>, target: &ExecutionTarget, is_start: bool) -> Result<Reached<'_>, LocalhostError> {
+    /// The way to `target`, connecting to it if needed. Before a start of
+    /// `starting`, a `localhostd` is sent the current Projects first, so it
+    /// starts what the user just saved, with the Secrets those Services and
+    /// their Dependencies read.
+    async fn reach(
+        self: &Arc<Self>,
+        target: &ExecutionTarget,
+        starting: Option<&[Id]>,
+    ) -> Result<Reached<'_>, LocalhostError> {
         let slot = self.slot(target);
         let one_at_a_time = slot.connecting.lock().await;
         if let Some(remote) = slot.connected() {
             drop(one_at_a_time);
-            if is_start {
-                self.send_projects(target, &remote).await?;
+            if let Some(starting) = starting {
+                self.send_projects(target, &remote, starting).await?;
             }
             return Ok(Reached::Remote(remote));
         }
@@ -546,7 +561,7 @@ impl Inner {
         };
         let remote = connecting.await?;
         remote.set_automatic_port_move(self.automatic_port_move.load(Ordering::Relaxed)).await?;
-        self.send_projects(target, &remote).await?;
+        self.send_projects(target, &remote, starting.unwrap_or_default()).await?;
         let orphans = remote.orphans().await?;
         self.attach(remote.subscribe(), Some(target.clone()));
         *slot.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(remote.clone());
@@ -564,16 +579,19 @@ impl Inner {
     }
 
     /// Sends `remote` the Projects that run on `target`, with the values of
-    /// their Secrets.
-    async fn send_projects(&self, target: &ExecutionTarget, remote: &Remote) -> Result<(), LocalhostError> {
+    /// the Secrets that Runs of `starting` read. It keeps the values it
+    /// already has of the others.
+    async fn send_projects(
+        &self,
+        target: &ExecutionTarget,
+        remote: &Remote,
+        starting: &[Id],
+    ) -> Result<(), LocalhostError> {
         let slot = self.slot(target);
         let _sending = slot.sending.lock().await;
         let projects: Vec<Project> =
             self.library.projects().into_iter().filter(|project| project.execution_target == *target).collect();
-        let mut secrets = HashMap::new();
-        for project in &projects {
-            secrets.extend(self.library.stored_secrets(project.id)?);
-        }
+        let secrets = self.library.secrets_for_runs(starting)?;
         remote.set_projects(projects, secrets).await
     }
 
