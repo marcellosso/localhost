@@ -35,7 +35,7 @@ jobs:
       # The Windows app links the core. Checked here rather than on a
       # Windows runner: clippy doesn't link, so it needs no Windows toolchain.
       - name: Clippy for Windows
-        run: cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+        run: cargo clippy -p localhost-core -p localhost-cli --target x86_64-pc-windows-msvc --all-targets -- -D warnings
       - run: cargo test
 
   windows:
@@ -57,8 +57,11 @@ jobs:
         with:
           python-version: "3.13"
       # The tests that run natively on Windows, against real processes.
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --no-run
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared --no-run
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared
+        timeout-minutes: 5
+      # The shared core on its named pipe, driven by `localhost mcp` and an app at once.
+      - run: cargo test -p localhost-cli --test mcp
         timeout-minutes: 5
 
   macos:
