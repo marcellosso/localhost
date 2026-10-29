@@ -140,7 +140,7 @@ fn create(name: &str, is_first: bool) -> io::Result<NamedPipeServer> {
         let acl_pointer = acl.as_mut_ptr().cast::<ACL>();
         let mut descriptor: SECURITY_DESCRIPTOR = std::mem::zeroed();
         let descriptor_pointer = (&raw mut descriptor).cast();
-        if InitializeAcl(acl_pointer, acl_length as u32, ACL_REVISION) == 0
+        if InitializeAcl(acl_pointer, size_of_val(acl.as_slice()) as u32, ACL_REVISION) == 0
             || AddAccessAllowedAce(acl_pointer, ACL_REVISION, GENERIC_ALL, sid) == 0
             || InitializeSecurityDescriptor(descriptor_pointer, SECURITY_DESCRIPTOR_REVISION) == 0
             || SetSecurityDescriptorDacl(descriptor_pointer, 1, acl_pointer, 0) == 0
@@ -207,15 +207,16 @@ fn user_of(process: HANDLE) -> io::Result<Vec<u32>> {
 
 /// Completes when its console closes, or the user logs off or shuts down.
 /// Not on Ctrl-C or Ctrl-Break: those are for the Runs on its console.
+/// Never fails to start the core: without these, its Runs still end with
+/// it, as their jobs close.
 pub(super) fn told_to_end() -> io::Result<impl Future<Output = ()>> {
-    let mut close = ctrl_close()?;
-    let mut logoff = ctrl_logoff()?;
-    let mut shutdown = ctrl_shutdown()?;
+    let (mut close, mut logoff, mut shutdown) = (ctrl_close().ok(), ctrl_logoff().ok(), ctrl_shutdown().ok());
     Ok(async move {
         tokio::select! {
-            _ = close.recv() => {}
-            _ = logoff.recv() => {}
-            _ = shutdown.recv() => {}
+            Some(_) = async { close.as_mut()?.recv().await } => {}
+            Some(_) = async { logoff.as_mut()?.recv().await } => {}
+            Some(_) = async { shutdown.as_mut()?.recv().await } => {}
+            else => std::future::pending().await,
         }
     })
 }
