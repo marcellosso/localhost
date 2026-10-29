@@ -134,6 +134,7 @@ struct SettingsRow<Control: View>: View {
 }
 
 private struct GeneralSettings: View {
+    @Environment(AppModel.self) private var model
     @AppStorage(AppModel.editorApplicationKey) private var editorPath: String?
 
     var body: some View {
@@ -152,6 +153,18 @@ private struct GeneralSettings: View {
                     Button("Choose…") { AppModel.chooseEditor() }
                         .buttonStyle(PillButtonStyle())
                 }
+            }
+            @Bindable var updates = model.updates
+            SettingsRow(title: "Check for updates automatically",
+                        detail: "At launch and every few hours. A new version is offered, never installed without asking.") {
+                Toggle("Check for updates automatically", isOn: $updates.isAutomaticCheckEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Theme.accent)
+            }
+            SettingsRow(title: "Check for updates now") {
+                Button("Check Now") { model.updates.checkForUpdates() }
+                    .buttonStyle(PillButtonStyle())
             }
         }
     }
