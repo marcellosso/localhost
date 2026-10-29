@@ -1,9 +1,9 @@
 //! How the app reaches each Execution Target (`localhost_core::Targets`).
-//! On Linux (and macOS, in development) this machine is the shared core
-//! that `localhost mcp` drives too (`remote::shared`): this executable
-//! started with `--daemon <storage root>`, if it isn't running yet. On
-//! Windows it runs in this process. A WSL distro is reached through the
-//! `localhostd` inside it (`wsl`), which only the Windows app starts.
+//! This machine is the shared core that `localhost mcp` drives too
+//! (`remote::shared`, on a named pipe on Windows): this executable started
+//! with `--daemon <storage root>`, if it isn't running yet. A WSL distro is
+//! reached through the `localhostd` inside it (`wsl`), which only the
+//! Windows app starts.
 //!
 //! For development on Linux and macOS, `LOCALHOST_DEV_LOCALHOSTD=<path to
 //! localhostd>` reaches every target, this machine included, through a
@@ -13,9 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
-use localhost_core::remote::Remote;
-#[cfg(unix)]
-use localhost_core::remote::{Client, shared};
+use localhost_core::remote::{Client, Remote, shared};
 use localhost_core::{ExecutionTarget, Launcher, Link};
 
 const DEV_LOCALHOSTD: &str = "LOCALHOST_DEV_LOCALHOSTD";
@@ -31,7 +29,6 @@ pub fn launcher(storage_root: &Path) -> Launcher {
 /// `localhostd`: the one to reach every target through, if any.
 fn launcher_with(storage_root: &Path, localhostd: Option<PathBuf>) -> Launcher {
     let roots = storage_root.join("localhostd");
-    #[cfg(unix)]
     let storage_root = storage_root.to_path_buf();
     Box::new(move |target| match (&localhostd, target) {
         (Some(localhostd), target) => {
@@ -39,14 +36,11 @@ fn launcher_with(storage_root: &Path, localhostd: Option<PathBuf>) -> Launcher {
             command.arg("--stdio").env("LOCALHOST_STORAGE_ROOT", roots.join(folder_name(target)));
             Link::Remote(Box::pin(Remote::spawn(command)))
         }
-        #[cfg(unix)]
         (None, ExecutionTarget::ThisMachine) => {
             let mut daemon = std::process::Command::new(executable());
             daemon.arg(DAEMON_ARGUMENT).arg(&storage_root);
             shared::link(&storage_root, Client::App, daemon)
         }
-        #[cfg(windows)]
-        (None, ExecutionTarget::ThisMachine) => Link::InProcess,
         #[cfg(windows)]
         (None, ExecutionTarget::Wsl { distro }) => Link::Remote(Box::pin(crate::wsl::connect(distro.clone()))),
         #[cfg(not(windows))]
@@ -58,7 +52,6 @@ fn launcher_with(storage_root: &Path, localhostd: Option<PathBuf>) -> Launcher {
 
 /// This app's executable. An AppImage's is inside a mount that ends with
 /// the app, so the core is started from the AppImage itself.
-#[cfg(unix)]
 fn executable() -> PathBuf {
     match std::env::var_os("APPIMAGE") {
         Some(appimage) => appimage.into(),
