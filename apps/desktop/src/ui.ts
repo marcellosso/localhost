@@ -21,7 +21,9 @@ export type Alert =
   | { kind: "removeProject"; projectId: Id }
   | { kind: "removeService"; serviceId: Id; dependents: string[] }
   /** A Project file that can't be imported, and why. */
-  | { kind: "importFailure"; fileName: string; message: string };
+  | { kind: "importFailure"; fileName: string; message: string }
+  /** Check for Updates found nothing newer than `version`. */
+  | { kind: "upToDate"; version: string };
 
 /** An editor over the main window, one at a time. */
 export type Sheet =

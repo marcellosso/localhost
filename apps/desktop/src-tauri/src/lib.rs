@@ -20,6 +20,7 @@ mod services;
 mod settings;
 mod targets;
 mod tray;
+mod updates;
 mod wsl;
 
 pub use targets::DAEMON_ARGUMENT;
@@ -63,8 +64,8 @@ impl Core {
 }
 
 /// What the commands share: the core, or why it couldn't be opened (the UI
-/// says so), the open log streams, the launch questions, the settings and
-/// the app's lifetime.
+/// says so), the open log streams, the launch questions, the settings, the
+/// update on offer and the app's lifetime.
 pub struct AppState {
     core: Result<Core, LocalhostError>,
     logs: logs::LogStreams,
@@ -72,6 +73,7 @@ pub struct AppState {
     lifecycle: lifecycle::Lifecycle,
     launch: Mutex<launch::Launch>,
     settings: settings::SettingsStore,
+    updates: updates::Updates,
     perf: Option<perf::PerfSettings>,
 }
 
@@ -150,8 +152,13 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             perf::finish_perf_run,
             lifecycle::quit_app,
             lifecycle::take_reveal,
+            updates::update_state,
+            updates::check_for_updates,
+            updates::put_off_update,
+            updates::download_update,
+            updates::install_update,
         ])
-        .events(collect_events![lifecycle::Reveal, launch::OrphansFound])
+        .events(collect_events![lifecycle::Reveal, launch::OrphansFound, updates::UpdateState])
 }
 
 pub fn run() {
@@ -161,6 +168,7 @@ pub fn run() {
         // First, so a second launch only brings the window forward.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| lifecycle::show_window(app, None)))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -177,6 +185,7 @@ pub fn run() {
                 Ok(core) if perf.is_none() => core.targets.orphans(),
                 _ => Vec::new(),
             };
+            let is_measuring = perf.is_some();
             let settings = settings::SettingsStore::open(
                 app.path().app_config_dir().ok().map(|folder| folder.join("settings.json")),
             );
@@ -190,6 +199,7 @@ pub fn run() {
                 lifecycle: lifecycle::Lifecycle::default(),
                 launch: launch::Launch::new(orphans),
                 settings,
+                updates: updates::Updates::default(),
                 perf,
             });
             if let Some(window) = app.get_webview_window(lifecycle::MAIN_WINDOW) {
@@ -197,6 +207,9 @@ pub fn run() {
             }
             tray::install(app)?;
             launch::watch_found_orphans(app.handle());
+            if !is_measuring {
+                updates::watch(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| match event {
