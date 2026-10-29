@@ -9,11 +9,14 @@ use std::io;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
+use std::pin::Pin;
 use std::ptr;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
-use tokio::io::{ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
 use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions};
 use tokio::signal::windows::{ctrl_close, ctrl_logoff, ctrl_shutdown};
 use windows_sys::Win32::Foundation::{ERROR_ACCESS_DENIED, ERROR_PIPE_BUSY, GENERIC_ALL, HANDLE};
@@ -37,8 +40,74 @@ pub struct Listener {
     next: NamedPipeServer,
 }
 
-pub(super) type Reader = ReadHalf<NamedPipeClient>;
-pub(super) type Writer = WriteHalf<NamedPipeClient>;
+/// A client's halves of the pipe. A pipe has no half-close: the core learns
+/// a client has gone only once its handle closes, which the read half, still
+/// waiting for the core, would hold open. So closing the write half (as a
+/// `Remote` does when dropped) ends the read half too.
+pub(super) struct Reader {
+    half: ReadHalf<NamedPipeClient>,
+    closing: Arc<Closing>,
+}
+
+pub(super) struct Writer {
+    half: WriteHalf<NamedPipeClient>,
+    closing: Arc<Closing>,
+}
+
+#[derive(Default)]
+struct Closing {
+    is_closed: AtomicBool,
+    /// The read half's task, woken to see its end.
+    reader: Mutex<Option<Waker>>,
+}
+
+impl Closing {
+    fn close(&self) {
+        self.is_closed.store(true, Ordering::SeqCst);
+        if let Some(waker) = self.reader.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take() {
+            waker.wake();
+        }
+    }
+}
+
+impl AsyncRead for Reader {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        {
+            let mut reader = this.closing.reader.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if !reader.as_ref().is_some_and(|waker| waker.will_wake(cx.waker())) {
+                *reader = Some(cx.waker().clone());
+            }
+        }
+        // After registering, so a close in between still wakes it.
+        if this.closing.is_closed.load(Ordering::SeqCst) {
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut this.half).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for Writer {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.get_mut().half).poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().half).poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        this.closing.close();
+        Pin::new(&mut this.half).poll_shutdown(cx)
+    }
+}
+
+impl Drop for Writer {
+    fn drop(&mut self) {
+        self.closing.close();
+    }
+}
 
 /// `SECURITY_DESCRIPTOR_REVISION`, from a module windows-sys gates behind
 /// a feature this crate doesn't otherwise need.
@@ -75,7 +144,9 @@ pub(super) async fn connect(storage_root: &Path) -> io::Result<(Reader, Writer)>
     if !found || !runs_as_this_user(server) {
         return Err(io::Error::new(io::ErrorKind::PermissionDenied, "its pipe is held by another user"));
     }
-    Ok(tokio::io::split(client))
+    let (reader, writer) = tokio::io::split(client);
+    let closing = Arc::new(Closing::default());
+    Ok((Reader { half: reader, closing: closing.clone() }, Writer { half: writer, closing }))
 }
 
 /// Starts the core without a window, with the user's environment as a new
