@@ -131,6 +131,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      # What the release workflow writes the update feeds with, on throwaway keys.
+      - name: Test the updater scripts
+        run: ../../scripts/test-updater-scripts.sh
       # The Rust build embeds dist/.
       - run: pnpm build
       - name: Rust
