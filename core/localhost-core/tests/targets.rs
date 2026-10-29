@@ -13,8 +13,8 @@ use std::sync::{Arc, Mutex};
 use common::{Fixture, PATIENCE, key, process_group_exists, test_options};
 use localhost_core::remote::{self, Remote};
 use localhost_core::{
-    ExecutionTarget, Link, LocalhostError, NewService, Origin, Project, ProjectLibrary, RunRegistry, ServiceChanges,
-    ServiceEvent, ServiceManager, ServiceState, Targets, VariableInput,
+    ExecutionTarget, Link, LocalhostError, MemorySecretStore, NewService, Origin, Project, ProjectLibrary, RunRegistry,
+    SecretStore, ServiceChanges, ServiceEvent, ServiceManager, ServiceState, Targets, VariableInput, VariableLayer,
 };
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
@@ -34,6 +34,29 @@ struct Setup {
     launches: Arc<AtomicUsize>,
     /// Each connection's pipe, to cut it as a crash of `localhostd` would.
     cables: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The accounts the app's library read from its secret store.
+    reads: Arc<Mutex<Vec<String>>>,
+}
+
+/// The app's secret store, noting each read, as a Keychain would prompt.
+struct Recording {
+    store: Arc<MemorySecretStore>,
+    reads: Arc<Mutex<Vec<String>>>,
+}
+
+impl SecretStore for Recording {
+    fn value(&self, account: &str) -> Result<Option<String>, LocalhostError> {
+        self.reads.lock().unwrap().push(account.to_string());
+        self.store.value(account)
+    }
+
+    fn set_value(&self, value: &str, account: &str) -> Result<(), LocalhostError> {
+        self.store.set_value(value, account)
+    }
+
+    fn remove_value(&self, account: &str) -> Result<(), LocalhostError> {
+        self.store.remove_value(account)
+    }
 }
 
 /// The storage root of the distro's `localhostd`.
@@ -43,7 +66,9 @@ fn distro_root(fixture: &Fixture) -> PathBuf {
 
 fn setup() -> Setup {
     let fixture = Fixture::new();
-    let library = Arc::new(fixture.library());
+    let reads = Arc::new(Mutex::new(Vec::new()));
+    let store = Recording { store: fixture.secrets.clone(), reads: reads.clone() };
+    let library = Arc::new(ProjectLibrary::open(fixture.path(), Arc::new(store)).unwrap());
     let folder = |name: &str| {
         let folder = fixture.path().join(name);
         std::fs::create_dir_all(&folder).unwrap();
@@ -77,7 +102,7 @@ fn setup() -> Setup {
         ExecutionTarget::Wsl { distro } => Link::Unavailable(format!("{distro} isn't installed")),
     });
     let targets = Targets::open(library.clone(), fixture.path(), test_options(), launcher);
-    Setup { fixture, library, targets, here, there, launches, cables }
+    Setup { fixture, library, targets, here, there, launches, cables, reads }
 }
 
 impl Setup {
@@ -90,6 +115,23 @@ impl Setup {
     ) -> localhost_core::Service {
         let service = NewService::new(name, key(&name.to_lowercase()), command);
         self.library.add_service(project.id, service, variables, vec![], Origin::MainWindow).unwrap()
+    }
+
+    /// The accounts read since the last call.
+    fn take_reads(&self) -> HashSet<String> {
+        self.reads.lock().unwrap().drain(..).collect()
+    }
+}
+
+fn account(service: &localhost_core::Service, name: &str) -> String {
+    VariableLayer::Service(service.id).secret_account(name)
+}
+
+async fn output_of(targets: &Targets, service_id: localhost_core::Id, text: &str) {
+    let run_id = targets.status(service_id).run.unwrap().id;
+    let (lines, mut more) = targets.subscribe_to_run(run_id).await.unwrap();
+    if !lines.iter().any(|line| line.text == text) {
+        until(&mut more, |line| line.text == text).await;
     }
 }
 
@@ -257,4 +299,60 @@ async fn a_distro_reports_orphans_of_an_earlier_session_as_it_connects() {
     setup.targets.stop_orphans(&found.target, &found.orphans).await.unwrap();
     assert!(!process_group_exists(group));
     assert!(setup.targets.orphans().is_empty(), "this machine has none");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_start_reads_only_the_secrets_of_the_service_and_its_dependencies() {
+    let setup = setup();
+    let db = setup.add(
+        &setup.there,
+        "Db",
+        "echo \"db $DB_PASSWORD\"; sleep 30",
+        vec![VariableInput::secret("DB_PASSWORD", "hunter2")],
+    );
+    let api = setup.add(
+        &setup.there,
+        "Api",
+        "echo \"api $API_TOKEN\"; sleep 30",
+        vec![VariableInput::secret("API_TOKEN", "t0ken")],
+    );
+    let changes = ServiceChanges { dependencies: Some(vec![db.id]), ..Default::default() };
+    setup.library.edit_service(api.id, changes, Origin::MainWindow).unwrap();
+    let other = setup.add(&setup.there, "Other", "sleep 30", vec![VariableInput::secret("OTHER", "unused")]);
+    setup.add(&setup.here, "Local", "sleep 30", vec![VariableInput::secret("LOCAL", "unused")]);
+    let (_, mut events) = setup.targets.subscribe();
+    setup.take_reads();
+
+    setup.targets.connect(&distro("Test")).await.unwrap();
+    assert_eq!(setup.take_reads(), HashSet::new(), "connecting reads no Secret");
+
+    setup.targets.start(api.id, None, Origin::MainWindow).await.unwrap();
+    until(&mut events, reached(api.id, ServiceState::Running)).await;
+    assert_eq!(setup.take_reads(), HashSet::from([account(&api, "API_TOKEN"), account(&db, "DB_PASSWORD")]));
+    output_of(&setup.targets, db.id, "db hunter2").await;
+    output_of(&setup.targets, api.id, "api t0ken").await;
+
+    // Edits send the Projects without reading a Secret; the distro keeps the values it has.
+    let changes = ServiceChanges { command_line: Some("sleep 31".into()), ..Default::default() };
+    setup.library.edit_service(other.id, changes, Origin::MainWindow).unwrap();
+    let changes =
+        ServiceChanges { variables: Some(vec![VariableInput::secret("API_TOKEN", "n3w")]), ..Default::default() };
+    setup.library.edit_service(api.id, changes, Origin::MainWindow).unwrap();
+    assert_eq!(setup.take_reads(), HashSet::new());
+
+    // The next start sends the new value.
+    setup.targets.restart(api.id, Origin::MainWindow).await.unwrap();
+    until(&mut events, reached(api.id, ServiceState::Running)).await;
+    output_of(&setup.targets, api.id, "api n3w").await;
+    assert_eq!(setup.take_reads(), HashSet::from([account(&api, "API_TOKEN"), account(&db, "DB_PASSWORD")]));
+    let db_status = setup.targets.status(db.id);
+    assert_eq!(db_status.state, ServiceState::Running);
+    assert!(!db_status.is_restart_needed, "the Dependency still has its Secret");
+
+    // Start All reads the Secrets of the Services it starts, not of one it skips.
+    let changes = ServiceChanges { is_excluded_from_start_all: Some(true), ..Default::default() };
+    setup.library.edit_service(other.id, changes, Origin::MainWindow).unwrap();
+    setup.targets.start_all(setup.there.id, Origin::MainWindow).await.unwrap();
+    assert_eq!(setup.take_reads(), HashSet::from([account(&api, "API_TOKEN"), account(&db, "DB_PASSWORD")]));
+    setup.targets.stop_every_run(Origin::MainWindow).await;
 }

@@ -43,6 +43,22 @@ impl Project {
         Some(cycle)
     }
 
+    /// `service_ids` and every Service they depend on, directly or not:
+    /// what starting them may start.
+    pub fn with_dependencies(&self, service_ids: &[Id]) -> HashSet<Id> {
+        let mut found = HashSet::new();
+        let mut next = service_ids.to_vec();
+        while let Some(id) = next.pop() {
+            if !found.contains(&id)
+                && let Some(service) = self.service(id)
+            {
+                found.insert(id);
+                next.extend(&service.dependencies);
+            }
+        }
+        found
+    }
+
     /// `service_ids` ordered so that every Service comes after its
     /// Dependencies among them; otherwise in the Project's order.
     pub fn dependency_order(&self, service_ids: &[Id]) -> Vec<Id> {
