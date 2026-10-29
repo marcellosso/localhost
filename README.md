@@ -54,7 +54,7 @@ Releases aren't notarized or code-signed by a known publisher yet, so the first 
 
 localhost checks GitHub Releases for a new version at launch and every few hours. When there is one, a notice at the bottom of the sidebar says “localhost X.Y.Z is available”, with its release notes:
 
-- **Update Now** downloads it in the background, and **Restart to Update** installs it and opens the new version. **Later** hides the notice until the next version.
+- **Update Now** downloads it in the background, and **Restart to Update** installs it and opens the new version. **Later** hides the notice until the next version. On macOS, an update that has downloaded also installs when you quit localhost.
 - **Restarting stops every running Service first**, as quitting does, after listing them and asking. Start them again once the new version opens.
 - Each update is signed, and localhost checks the signature before installing it.
 - **`.deb` and `.rpm`**: your package manager installs updates, so the notice's **Download** opens the release instead. The AppImage and the Windows installer update themselves; on macOS, so does the app.
