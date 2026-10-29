@@ -35,6 +35,8 @@ impl Home {
     fn storage_root(&self) -> PathBuf {
         if cfg!(target_os = "macos") {
             self.path().join("Library/Application Support/localhost")
+        } else if cfg!(windows) {
+            self.path().join("AppData").join("Roaming").join("localhost")
         } else {
             self.path().join("data/localhost")
         }
@@ -72,6 +74,7 @@ impl Home {
             .current_dir(self.path())
             .env("HOME", self.path())
             .env("XDG_DATA_HOME", self.path().join("data"))
+            .env("APPDATA", self.path().join("AppData").join("Roaming"))
             .env("SHELL", "/bin/sh");
         command
     }
@@ -102,7 +105,7 @@ impl Home {
         client
     }
 
-    /// The app's side of the shared core, as the Linux app reaches it.
+    /// The app's side of the shared core, as the Linux and Windows apps reach it.
     /// Connect an agent first: the core it starts runs with this home's
     /// environment, which the test process doesn't have.
     async fn app(&self) -> Targets {
@@ -210,14 +213,45 @@ fn wait_until(condition: impl Fn() -> bool, what: &str) {
     }
 }
 
+#[cfg(unix)]
 fn process_group_exists(group: i32) -> bool {
     unsafe { libc::kill(-group, 0) == 0 }
 }
 
+/// Whether the shell, whose pid names the Run's process group, is alive:
+/// stopping a Run ends its whole job.
+#[cfg(windows)]
+fn process_group_exists(group: i32) -> bool {
+    let filter = format!("PID eq {group}");
+    let output = Command::new("tasklist").args(["/FI", &filter, "/FO", "CSV", "/NH"]).output().unwrap();
+    String::from_utf8_lossy(&output.stdout).contains(&format!("\"{group}\""))
+}
+
 /// A command line that records its shell's pid in `name`, then stays up
 /// with a grandchild, as most dev servers do.
+#[cfg(unix)]
 fn long_running(home: &Home, name: &str) -> String {
     format!("echo started {name}; sleep 1000 & echo $$ > '{}'; wait", home.path().join(name).display())
+}
+
+/// The same with Python, by its full path: the core's Runs start from the
+/// user's environment, not the test runner's.
+#[cfg(windows)]
+fn long_running(home: &Home, name: &str) -> String {
+    let script = home.path().join("long_running.py");
+    std::fs::write(
+        &script,
+        "import os, sys, time\n\
+         print('started', sys.argv[1], flush=True)\n\
+         with open(sys.argv[2], 'w') as pid:\n    pid.write(f'{os.getppid()}\\n')\n\
+         time.sleep(1000)\n",
+    )
+    .unwrap();
+    let python = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|folder| folder.join("python.exe"))
+        .find(|path| path.is_file())
+        .expect("python on PATH");
+    format!(r#""{}" "{}" {name} "{}""#, python.display(), script.display(), home.path().join(name).display())
 }
 
 fn service<'a>(result: &'a Value, key: &str) -> &'a Value {
@@ -316,6 +350,8 @@ fn start_and_stop_a_whole_project() {
     client.disconnect();
 }
 
+/// Shell syntax.
+#[cfg(unix)]
 #[test]
 fn a_failed_start_says_why_with_its_last_output() {
     let home = Home::new();
@@ -364,6 +400,8 @@ fn projects_added_after_connecting_are_seen() {
     client.disconnect();
 }
 
+/// Shell syntax, and SIGINT.
+#[cfg(unix)]
 #[test]
 fn a_service_another_session_runs_is_never_started_twice_or_stopped_from_here() {
     let home = Home::new();

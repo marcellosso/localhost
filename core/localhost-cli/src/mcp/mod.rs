@@ -27,11 +27,11 @@ use localhost_core::{
 };
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
 use self::tools::Tools;
+use crate::signals::Signals;
 
 /// The protocol versions this server speaks, newest first. A client asking
 /// for another gets the newest, and decides whether to go on.
@@ -80,9 +80,7 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
         }
     });
 
-    let mut terminate = signal(SignalKind::terminate()).map_err(|error| error.to_string())?;
-    let mut interrupt = signal(SignalKind::interrupt()).map_err(|error| error.to_string())?;
-    let mut hang_up = signal(SignalKind::hangup()).map_err(|error| error.to_string())?;
+    let mut signals = Signals::new().map_err(|error| error.to_string())?;
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     let mut requests = JoinSet::new();
     loop {
@@ -100,9 +98,7 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
                     }
                 });
             }
-            _ = terminate.recv() => break,
-            _ = interrupt.recv() => break,
-            _ = hang_up.recv() => break,
+            _ = signals.next() => break,
             Some(_) = requests.join_next(), if !requests.is_empty() => {}
         }
     }
