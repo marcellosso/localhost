@@ -118,6 +118,7 @@ These are product rules, not implementation details. A change that breaks one ne
 **Sessions**
 - Closing the window keeps the app and its Services running; the menu bar or tray shows them. Quitting asks first when anything is active, then stops everything in parallel, whoever started it.
 - The apps and `localhost mcp` drive one shared core, so they see the same Runs, on Windows too. When a client disconnects, the core stops the Runs nobody needs any more: none while an app is connected, else those no remaining client started (with their Dependencies). It exits once no client has been connected for 10 s.
+- Updates are offered, never installed unasked: a check at launch and every few hours (off in Settings), a notice, then Update Now and Restart to Update. Restarting to update stops every Service first, like quitting, after listing them, and retires the shared core so the new version starts its own. A `.deb` or `.rpm` only links to the release. Builds without the updater's public key never check.
 - Each active Run is recorded on disk (pid, process group, start time). At the next launch, survivors are offered as Orphans: Stop them (default) or Leave them.
 
 **Detection**
@@ -201,6 +202,7 @@ The hard-to-reverse choices, and why. Changing one is an issue and a discussion 
 - **Pipes, not a PTY.** Keeping stderr distinct matters for failures and, later, for agents. The colour hints make up for the missing terminal.
 - **`$PORT`, and moves scoped to one Run.** It is the existing convention, needs no parser and works the same from any client. A moved port never rewrites the configuration.
 - **Run stats sampled on request.** Nothing is sampled unless a stats popover is open (every 1.5 s). The tree includes descendants that left the session. Memory is each platform's honest number rather than RSS, which counts forked workers once each.
+- **Updates through the platform's updater, stopping Services first.** Sparkle on macOS, Tauri's updater on Linux and Windows, both behind localhost's own notice, both verifying a signature from the release workflow's keys; the feeds are files on GitHub Releases, so there is no update server. An update replaces the executable the shared core runs from (on Windows the installer closes it, and its Job Objects with it), and the new app would otherwise reach an old core, so Runs are stopped, after asking, rather than kept across the update.
 - **Not sandboxed; no Flatpak or Snap.** Sandboxes can't run arbitrary host commands or signal process groups.
 
 ## Design
@@ -232,7 +234,7 @@ The log must stay smooth with very chatty Services. Lines never cross to a UI on
 ## Writing code
 
 - **Match the surrounding code**: its naming, idioms and comment density. Doc comments say *why*, not *what*; don't restate a name, narrate history or cite issue numbers.
-- **Few dependencies.** Each crate is justified on its own; the macOS app adds no Swift packages. Adding one needs an issue first. Beyond `serde_json`, manifests (TOML, YAML) and Project files are read and written by small built-in readers.
+- **Few dependencies.** Each crate is justified on its own; the macOS app adds no Swift packages besides Sparkle, for updates. Adding one needs an issue first. Beyond `serde_json`, manifests (TOML, YAML) and Project files are read and written by small built-in readers.
 - **Rust**: `cargo fmt`, and `cargo clippy --all-targets -- -D warnings` clean, also for `--target x86_64-pc-windows-msvc`.
 - **Swift**: Swift 6 language mode, strict concurrency. No `@unchecked Sendable` without a comment saying why it is safe.
 - **TypeScript**: strict; `pnpm typecheck` and `pnpm test` clean. Never edit `src/bindings.ts`.
