@@ -116,7 +116,8 @@ These are product rules, not implementation details. A change that breaks one ne
 - Each Run keeps an in-memory buffer of 10,000 lines for viewers and a log file. The last 5 Runs per Service are kept, up to 10 MB each with rotation. "All services" is a merged view at read time, each line prefixed with its Service's Key. Clearing empties buffers, never files.
 
 **Sessions**
-- Closing the window keeps the app and its Services running; the menu bar or tray shows them. Quitting asks first when anything is active, then stops everything in parallel.
+- Closing the window keeps the app and its Services running; the menu bar or tray shows them. Quitting asks first when anything is active, then stops everything in parallel, whoever started it.
+- On macOS and Linux the apps and `localhost mcp` drive one shared core, so they see the same Runs. When a client disconnects, the core stops the Runs nobody needs any more: none while an app is connected, else those no remaining client started (with their Dependencies). It exits once no client has been connected for 10 s.
 - Each active Run is recorded on disk (pid, process group, start time). At the next launch, survivors are offered as Orphans: Stop them (default) or Leave them.
 
 **Detection**
@@ -135,11 +136,13 @@ These are product rules, not implementation details. A change that breaks one ne
                           │
       ┌───────────────────┼────────────────────┬──────────────────┐
   SwiftUI app        Tauri app             localhost CLI       localhostd
-  macOS, in-process  Linux + Windows,      same crates         inside a WSL distro,
-  via UniFFI         links the crates                          driven over stdio
+  macOS, via UniFFI  Linux + Windows,      same crates         inside a WSL distro,
+                     links the crates                          driven over stdio
+      └─────────┬─────────┘                    │
+          the shared core: one per user, on a local socket (macOS, Linux)
 ```
 
-All state, process management, logs and persistence live in the core, which never depends on a UI toolkit. The apps only draw and turn user actions into core calls. Its API is shaped so a later MCP server or background daemon can drive the same core:
+All state, process management, logs and persistence live in the core, which never depends on a UI toolkit. The apps only draw and turn user actions into core calls. Its API is shaped so any client, in-process or over IPC, drives the same core:
 
 - **async, on tokio**; every public type is `Send + Sync`, and serializable where it is data;
 - **snapshots plus events**: clients read the current state and subscribe to a stream of changes, taken together so nothing falls between them;
@@ -154,7 +157,8 @@ All state, process management, logs and persistence live in the core, which neve
 | `ProcessTree` | One Run's processes: launch, separate stdout/stderr pipes, stopping the whole group. |
 | `LogStore`, `LogBuffer` | Each Run's output: in-memory buffer and rotated file. |
 | `RunRegistry` | Records active Runs on disk, to find Orphans. |
-| `Targets`, `remote` | Where each Project runs, behind one interface: this machine in-process, a WSL distro through a `localhostd`. Merges every target's statuses and events. |
+| `Targets`, `remote` | Where each Project runs, behind one interface: this machine through the shared core (in-process on Windows), a WSL distro through a `localhostd`. Merges every target's statuses and events. |
+| `remote::shared` | The shared core: the `remote` protocol on a Unix socket in the storage root, started by its first client, one per storage root. Decides which Runs a disconnecting client takes with it. |
 | `listener` | Finds Listeners (libproc, `/proc`, `GetExtendedTcpTable`, never `lsof`) and attributes them. |
 | `ProjectScanner` + detectors | Reads a folder and returns Suggestions. |
 | `ProjectDocument` | The YAML Project file. |
@@ -185,7 +189,8 @@ The Keychain service and Secret account names (`io.github.marcellosso.localhost.
 
 The hard-to-reverse choices, and why. Changing one is an issue and a discussion first.
 
-- **One Rust core for every client.** Windows is where the hardest code lives (Job Objects, console control events, TCP tables, Credential Manager), and Rust is first-class there. The macOS app calls it in-process through UniFFI, so quitting the app stops every Service.
+- **One Rust core for every client.** Windows is where the hardest code lives (Job Objects, console control events, TCP tables, Credential Manager), and Rust is first-class there. The macOS app links it through UniFFI.
+- **One shared core per user, on a local socket.** The app and coding agents must see the same Runs, so on macOS and Linux every client drives one core in the background, over the same protocol as a WSL `localhostd`. Any localhost executable can serve it (`localhost daemon`, the app with `--daemon`), so the `localhost` command, built on its own, needs no second binary. Runs belong to the core, not to a connection: a client disconnecting stops only what no one else needs, and an open app needs everything it shows. Quitting the app still stops every Service. Clients send the Projects and Secret values, as to a WSL `localhostd`, so the core never touches the Keychain; it keeps only the session variables of the client that started it, so one client's environment doesn't leak into every Run.
 - **SwiftUI on macOS, one Tauri app for Linux and Windows.** It keeps the native macOS app, avoids three toolkits and avoids Electron's size. The cost: every feature is built twice, so both UIs stay thin and all logic is in the core.
 - **Commands through the login shell.** GUI apps don't inherit the `PATH` set by nvm, asdf, mise, pyenv or Homebrew. A single command line also keeps pipes, `&&` and variables working as in a terminal.
 - **cmd.exe on native Windows, with a fresh environment.** It is everywhere, fast, supports `&&`, runs npm's `.cmd` shims, and is what npm uses. The environment is rebuilt from the registry each start, since a GUI app's inherited one is stale. Stdin is `NUL`, so "Terminate batch job (Y/N)?" never waits.
@@ -258,7 +263,7 @@ Run only what the change touches. `cargo test` in `src-tauri/` regenerates `src/
 
 ## Where it is going
 
-A local development control plane: once localhost knows every Project, how each Service starts, what is running, its ports, environment and logs, a coding agent shouldn't need to guess shell commands. The CLI drives the core, and `localhost mcp` serves it to agents over MCP; a background process that the apps and agents share may follow. Design for it:
+A local development control plane: once localhost knows every Project, how each Service starts, what is running, its ports, environment and logs, a coding agent shouldn't need to guess shell commands. The CLI drives the core, and `localhost mcp` serves it to agents over MCP, through the shared core the apps drive too. Design for it:
 
 - semantic actions (`start_service(project: "my-saas", service: "api")`), never a generic "run this shell command";
 - stable identifiers (Keys, UUIDs) independent of display names;

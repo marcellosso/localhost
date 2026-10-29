@@ -63,10 +63,21 @@ Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `
 ## How it runs your Services
 
 - **The same way the app does.** Services run in your login shell with their Project's variables, Environment Profile and Secrets, start after their Dependencies, and stop SIGINT → SIGTERM → SIGKILL. Their logs go where the app keeps them.
-- **For as long as the agent is connected.** The Services an agent starts stop when its client disconnects or quits. Nothing keeps running unseen.
-- **Never twice.** If the app or a `localhost up` already runs a Service, `status` shows it running, with its pid and uptime. The agent won't start a second copy, and won't stop it: stop it where it runs. For now the app doesn't show the Services an agent started; `localhost status` and the Ports view do.
+- **In the app too.** The agent and the app drive the same localhost core, so a Service the agent starts is Running in the app, with its logs, and one you start in the app is running for the agent. A stop from either stops the same Run. `status` says who started each one (`"startedBy": "app"` or `"agent"`).
+- **For as long as someone needs it.** When the agent disconnects or quits, the Services it started stop, unless the app is open: then they keep running there, and you stop them when you like. Nothing keeps running unseen. Quitting the app stops every Service after asking, whoever started it.
+- **Never twice.** If a `localhost up` in a terminal already runs a Service, `status` shows it running (`"session": "other"`), with its pid and uptime. The agent won't start a second copy, and won't stop it: stop it where it runs.
 - **Configuration stays yours.** The agent can't add or change Projects or Services. Changes you make in the app apply to its next start.
 - **On macOS**, the first Service with a Secret that an agent starts may ask for access to the Keychain, as described in [macOS](/docs/macos).
+
+## The background core
+
+The app and `localhost mcp` share one localhost core that runs in the background. Whichever of them needs it first starts it, from its own program: the app, or `localhost daemon`. It listens on a socket in localhost's data folder (`~/Library/Application Support/localhost/localhostd.sock` on macOS, `~/.local/share/localhost/localhostd.sock` on Linux) that only your user can open, and writes its diagnostics to `localhostd.log` next to it. About 10 seconds after the last of them disconnects, it stops what is left and exits.
+
+When an agent disconnects, the core stops the Services that only it needed: those it started, and the Dependencies it started them with, unless the app is connected or another agent started them too. When the app quits, it stops everything first, as it always has.
+
+If the app and the `localhost` command come from versions that speak to the core differently, the second one to connect says so. Quit the app and your agents, then open the app again.
+
+On Windows the app still runs its Services itself, and `localhost mcp` runs on macOS and Linux.
 
 ## Teach your agent
 

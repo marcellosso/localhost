@@ -30,4 +30,4 @@ Starting a Service starts its Dependencies first. **Start All** goes in dependen
 
 Stopping sends Ctrl-C (SIGINT) to the Service's whole process group, then SIGTERM after 5 seconds, then SIGKILL, so nothing is left running in the background. On Windows itself it sends Ctrl-Break, then ends every process the Service started. The log says when a stop had to be forced.
 
-If localhost itself crashes, the next launch finds the Services still running from that session and asks whether to stop them.
+If localhost's background core ever crashes, the next launch finds the Services still running from it and asks whether to stop them.

@@ -101,7 +101,7 @@ Closing the window doesn't stop anything: your Services keep running, and the me
 
 <p align="center"><img src=".github/assets/menu-bar-light.png" alt="The menu bar panel: Acme Shop's Services with their states and Start, Restart, Stop and Open in Browser buttons" width="340"></p>
 
-If localhost itself crashes, the next launch finds the Services still running from that session and asks whether to stop them.
+Coding agents drive the same Services through [`localhost mcp`](#coding-agents-mcp): what an agent starts shows in the app, and the reverse. If localhost's background core ever crashes, the next launch finds the Services still running from it and asks whether to stop them.
 
 ### 4. Read the logs
 
@@ -259,7 +259,7 @@ localhost mcp
 
 ## Coding agents (MCP)
 
-`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. The Services an agent starts stop when it disconnects, and it never starts a second copy of one the app is running.
+`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. An agent and the app drive the same Services: what one starts is Running in the other, and a stop from either stops it. The Services an agent starts stop when it disconnects, unless the app is open.
 
 For Cursor, add this to `.cursor/mcp.json` (or `~/.cursor/mcp.json`):
 
