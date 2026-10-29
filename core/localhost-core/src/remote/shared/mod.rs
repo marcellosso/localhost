@@ -54,6 +54,11 @@ pub const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 /// How long a client waits for a core it started to accept connections.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How long a client waits for a connected core to answer. A core says
+/// hello at once; one that doesn't is going away, e.g. a Windows pipe
+/// instance still open while its core ends.
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// A name derived from the storage root, for a socket or pipe that can't
 /// be in it. FNV-1a: stable across versions and processes, unlike
 /// `DefaultHasher`.
@@ -94,7 +99,10 @@ pub async fn connect(
             wait_for(storage_root).await?
         }
     };
-    let remote = Remote::connect_owning(reader, writer, None, LocalhostError::CoreUnavailable).await?;
+    let handshake = Remote::connect_owning(reader, writer, None, LocalhostError::CoreUnavailable);
+    let remote = tokio::time::timeout(HANDSHAKE_TIMEOUT, handshake)
+        .await
+        .map_err(|_| unavailable("it didn't answer in time"))??;
     remote.identify(client).await?;
     Ok(remote)
 }
@@ -197,6 +205,7 @@ pub async fn serve(
             // A connection accepted just before may not be counted yet.
             _ = tokio::time::sleep(idle_timeout), if is_idle => {
                 if core.connection_count() == 0 {
+                    eprintln!("localhostd: no client for {idle_timeout:?}, exiting");
                     break;
                 }
             }

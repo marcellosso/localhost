@@ -167,18 +167,26 @@ fn a_stopped_run_is_held_by_whoever_starts_it_next() {
 #[test]
 fn the_core_exits_once_no_client_has_been_connected_for_a_while() {
     within_patience(async {
-        let setup = setup(Duration::from_millis(300)).await;
+        // Long enough for the first client to connect on a slow machine.
+        let idle_timeout = Duration::from_secs(2);
+        let started = std::time::Instant::now();
+        let step = |what: &str| eprintln!("{:?}: {what}", started.elapsed());
+        let setup = setup(idle_timeout).await;
         let web = setup.service("web", vec![]);
         let app = setup.connect(Client::App).await;
+        step("connected");
         app.start(web.id, None, Origin::MainWindow).await.unwrap();
         wait_for(&app, web.id, ServiceState::Running).await;
+        step("running");
 
         // Still serving while connected, however long.
-        tokio::time::sleep(Duration::from_millis(600)).await;
+        tokio::time::sleep(idle_timeout * 2).await;
         assert!(!setup.core.is_finished());
         drop(app);
         tokio::time::timeout(PATIENCE, setup.core).await.expect("the core exits").unwrap();
+        step("the core exited");
         let error = shared::connect(setup.fixture.path(), Client::Agent, None).await.err().unwrap();
+        step("a new client is refused");
         assert!(matches!(error, localhost_core::LocalhostError::CoreUnavailable(_)), "{error:?}");
     });
 }
