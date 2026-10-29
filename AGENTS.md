@@ -227,7 +227,7 @@ Part of done, on every platform.
 
 ## Performance
 
-The log must stay smooth with very chatty Services. Lines never cross to a UI one at a time: the core keeps the buffers, apps take batches (at most once a frame on the desktop app, about every 50 ms on macOS) and render only the visible rows. WebKitGTK on Linux is the slowest webview: run `apps/desktop/scripts/log-perf.sh` there before and after any change on the log path, and put the numbers in the PR.
+The log must stay smooth with very chatty Services. Lines never cross to a UI one at a time: the core keeps the buffers, apps take batches (at most once a frame on the desktop app, about every 50 ms on macOS) and render only the visible rows. WebKitGTK on Linux is the slowest webview: run `apps/desktop/scripts/log-perf.sh` there before and after any change on the log path, and put the numbers in the PR. The Log performance workflow does it on pull requests touching the log path, against their base; the Linux baseline is in the script.
 
 ## Writing code
 
