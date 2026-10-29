@@ -9,9 +9,12 @@ import SwiftUI
 final class AppModel {
     struct Core {
         let library: ProjectLibrary
-        let services: ServiceManager
-        let logs: LogStore
+        /// This machine's shared core, which `localhost mcp` drives too.
+        let services: Targets
         let statuses: ServiceStatusStore
+
+        /// The Runs' output, kept where they run.
+        var logs: Targets { services }
     }
 
     enum Sheet: Identifiable, Hashable {
@@ -106,6 +109,9 @@ final class AppModel {
 
     /// Orphans found at launch, waiting for the user to stop or leave them.
     private(set) var orphans: [Orphan] = []
+    /// Orphans the shared core reported, until the launch checks reach them.
+    @ObservationIgnored private var foundOrphans: [Orphan] = []
+    @ObservationIgnored private var isAskingAboutOrphans = false
     private(set) var orphanDescriptions: [String] = []
     private(set) var isStoppingOrphans = false
     var isShowingOrphanAlert = false
@@ -141,7 +147,7 @@ final class AppModel {
 
     private static let automaticPortMoveKey = "automaticPortMove"
 
-    @ObservationIgnored private let runRegistry: RunRegistry
+    @ObservationIgnored private var coreConnection: Task<Void, Never>?
     @ObservationIgnored private var projectObservation: Task<Void, Never>?
     @ObservationIgnored private var stateAnnouncements: Task<Void, Never>?
 
@@ -156,18 +162,14 @@ final class AppModel {
 
     init() {
         let root = Self.storageRoot
-        let runRegistry = RunRegistry(root: root)
-        self.runRegistry = runRegistry
         let isAutomaticPortMoveEnabled = UserDefaults.standard.object(forKey: Self.automaticPortMoveKey) as? Bool ?? true
         self.isAutomaticPortMoveEnabled = isAutomaticPortMoveEnabled
         do {
             let library = try ProjectLibrary(storageRoot: root)
-            let logs = LogStore(root: root)
-            let services = ServiceManager(
-                library: library, logs: logs, runRegistry: runRegistry,
-                isAutomaticPortMoveEnabled: isAutomaticPortMoveEnabled
+            let services = Targets(
+                library: library, storageRoot: root, isAutomaticPortMoveEnabled: isAutomaticPortMoveEnabled
             )
-            core = Core(library: library, services: services, logs: logs, statuses: ServiceStatusStore(manager: services))
+            core = Core(library: library, services: services, statuses: ServiceStatusStore(manager: services))
             startupError = nil
         } catch {
             core = nil
@@ -175,6 +177,7 @@ final class AppModel {
         }
         observeProjects()
         announceStates()
+        connectToSharedCore()
     }
 
     // MARK: Reading
@@ -313,7 +316,7 @@ final class AppModel {
             : selectedService.map { [$0.id] } ?? []
         Task {
             for serviceID in serviceIDs {
-                logs.clearBuffer(ofService: serviceID)
+                try? await logs.clearBuffer(ofService: serviceID)
             }
             logClearCount += 1
         }
@@ -362,7 +365,7 @@ final class AppModel {
                 try await core.services.stop(service.id, origin: .mainWindow)
             }
             try await core.library.removeProject(id: id, origin: .mainWindow)
-            for service in project.services { await core.logs.removeLogs(ofService: service.id) }
+            for service in project.services { try await core.logs.removeLogs(ofService: service.id) }
         }
         if selectedProjectID == id { selectedProjectID = projects.first?.id }
     }
@@ -405,7 +408,7 @@ final class AppModel {
         let replaced = onKeyClash == .replace ? projectClashing(with: document) : nil
         let project = try await core.library.importProject(document, onKeyClash: onKeyClash, origin: .mainWindow)
         for service in replaced?.services ?? [] where !project.services.contains(where: { $0.id == service.id }) {
-            await core.logs.removeLogs(ofService: service.id)
+            try await core.logs.removeLogs(ofService: service.id)
         }
         projects = core.library.projects()
         selectedProjectID = project.id
@@ -483,7 +486,7 @@ final class AppModel {
         await report { () throws(LocalhostError) in
             try await core.services.stop(id, origin: .mainWindow)
             try await core.library.removeService(id: id, origin: .mainWindow)
-            await core.logs.removeLogs(ofService: id)
+            try await core.logs.removeLogs(ofService: id)
         }
         if selectedServiceID == id { selectedServiceID = nil }
     }
@@ -596,29 +599,61 @@ final class AppModel {
             : "\(orphans.count) services from the last session are still running"
     }
 
-    /// Looks for Orphans of a previous session. Call once at launch, before
-    /// anything is started.
+    /// Asks about the Orphans of a previous session the shared core
+    /// reported, now and as it reports more. Call once at launch.
     func checkForOrphans() async {
-        let orphans = runRegistry.orphans()
-        guard !orphans.isEmpty else { return }
+        isAskingAboutOrphans = true
+        presentFoundOrphans()
+    }
+
+    private func presentFoundOrphans() {
+        guard isAskingAboutOrphans, !foundOrphans.isEmpty, orphans.isEmpty else { return }
+        orphans = foundOrphans
+        foundOrphans = []
         orphanDescriptions = orphans.map { $0.description(in: projects) }
-        self.orphans = orphans
         isShowingOrphanAlert = true
     }
 
     func stopOrphans() async {
+        guard let services = core?.services else { return }
         isStoppingOrphans = true
-        await runRegistry.stopOrphans(orphans)
+        await report { () throws(LocalhostError) in try await services.stopOrphans(orphans) }
         orphans = []
         isStoppingOrphans = false
+        presentFoundOrphans()
     }
 
     func leaveOrphans() {
-        runRegistry.leaveOrphans(orphans)
+        guard let services = core?.services else { return }
+        let left = orphans
         orphans = []
+        Task {
+            await report { () throws(LocalhostError) in try await services.leaveOrphans(left) }
+            presentFoundOrphans()
+        }
     }
 
     // MARK: Private
+
+    /// Connects to the shared core at launch, starting it if needed, so the
+    /// Services it already runs (an agent's, say) show at once.
+    private func connectToSharedCore() {
+        guard let services = core?.services else { return }
+        coreConnection = Task { [weak self] in
+            // Subscribed first: the core reports its Orphans as it connects.
+            let found = services.foundOrphans()
+            do throws(LocalhostError) {
+                try await services.connect()
+            } catch {
+                self?.actionError = error
+            }
+            for await orphans in found {
+                guard let self else { return }
+                self.foundOrphans += orphans
+                self.presentFoundOrphans()
+            }
+        }
+    }
 
     private func observeProjects() {
         guard let library = core?.library else { return }

@@ -8,9 +8,13 @@ import Testing
 
 /// A storage root of its own, removed after the test.
 private final class TemporaryRoot {
-    let url = FileManager.default.temporaryDirectory.appending(path: "localhost-tests-\(UUID().uuidString)")
+    let url: URL
 
-    init() throws {
+    /// `isShort` keeps it short enough to hold the shared core's socket.
+    init(isShort: Bool = false) throws {
+        url = isShort
+            ? URL(filePath: "/tmp/localhost-\(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
+            : FileManager.default.temporaryDirectory.appending(path: "localhost-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     }
 
@@ -178,5 +182,51 @@ private final class TemporaryRoot {
         let unknown = UUID()
         #expect(store.status(of: unknown) == .neverRun(unknown))
         #expect(manager.status(of: service.id).run?.serviceID == service.id)
+    }
+}
+
+@Suite(.serialized) struct SharedCoreTests {
+    /// The app's path: `Targets` on a shared core, here served by this
+    /// process, since a test can't be started as one.
+    @Test @MainActor func runsAServiceThroughTheSharedCore() async throws {
+        let root = try TemporaryRoot(isShort: true)
+        let url = root.url
+        Thread.detachNewThread { _ = runSharedCore(storageRoot: url) }
+        // Up before connecting, or `Targets` would start this test's executable as the core.
+        let socket = url.appending(path: "localhostd.sock").path(percentEncoded: false)
+        for _ in 0..<200 where !FileManager.default.fileExists(atPath: socket) {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        let library = try ProjectLibrary(storageRoot: url)
+        let targets = Targets(library: library, storageRoot: url)
+        let store = ServiceStatusStore(manager: targets)
+        try await targets.connect()
+
+        let project = try await library.addProject(
+            name: "Echo", key: Key("echo"), path: url.path(percentEncoded: false), origin: .mainWindow
+        )
+        let service = try await library.addService(
+            toProject: project.id, name: "Echo", key: Key("echo"),
+            commandLine: "echo on $PORT; exec sleep 30", port: 45_679, portCanChange: false, origin: .mainWindow
+        )
+        let started = try await targets.start(service.id, origin: .mainWindow)
+        #expect(started.state.isActive)
+        let runID = try #require(started.run?.id)
+
+        let (buffered, updates) = try await targets.subscribe(toRun: runID)
+        var printed = buffered.filter { $0.channel == .stdout }.map(\.text)
+        var lines = updates.makeAsyncIterator()
+        while printed.isEmpty, let line = await lines.next() {
+            if line.channel == .stdout { printed.append(line.text) }
+        }
+        #expect(printed == ["on 45679"])
+
+        let stopped = try await targets.stop(service.id, origin: .mainWindow)
+        #expect(stopped.state == .stopped)
+        for _ in 0..<50 where store.status(of: service.id).state != .stopped {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(store.status(of: service.id).state == .stopped)
+        try await targets.removeLogs(ofService: service.id)
     }
 }

@@ -31,17 +31,22 @@ impl Launch {
     }
 }
 
-/// A WSL distro had Orphans as it connected: the window asks about them.
+/// A target (this machine's shared core, a WSL distro) had Orphans as it
+/// connected: the window asks about them.
 #[derive(Clone, Debug, Serialize, Type, Event)]
 pub struct OrphansFound;
 
 /// Adds the Orphans each target finds as it connects to the launch question.
+/// Then connects to this machine's shared core, so the Runs it already has
+/// (an agent's, say) show at once.
 pub fn watch_found_orphans(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
         let Ok(core) = state.core() else { return };
         let mut found = core.targets.found_orphans();
+        // If it can't start, each action that needs it says why.
+        let _ = core.targets.connect(&ExecutionTarget::ThisMachine).await;
         while let Some(found) = found.recv().await {
             let target = found.target;
             let orphans = found.orphans.into_iter().map(|orphan| (target.clone(), orphan));

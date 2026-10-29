@@ -787,6 +787,11 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  */
 { kind: "targetUnavailable"; detail: string } | 
 /**
+ * The shared core on this machine (`remote::shared`) can't be started
+ * or reached, or the connection to it was lost.
+ */
+{ kind: "coreUnavailable"; detail: string } | 
+/**
  * Something already listens on the port; `owner` is that Listener, if
  * localhost can see it (processes of other users can't be inspected).
  */
@@ -863,7 +868,8 @@ export type Origin = "mainWindow" | "menuBar" | "cli" |
  */
 "agent"
 /**
- * A WSL distro had Orphans as it connected: the window asks about them.
+ * A target (this machine's shared core, a WSL distro) had Orphans as it
+ * connected: the window asks about them.
  */
 export type OrphansFound = null
 /**

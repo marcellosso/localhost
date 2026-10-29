@@ -2,7 +2,7 @@ import AppKit
 import LocalhostCore
 import SwiftUI
 
-@main
+/// Started from `main.swift`, which may run the shared core instead.
 struct LocalhostApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
 

@@ -30,10 +30,32 @@ cargo install --path localhost-cli                # put `localhost` in ~/.cargo/
 Projects and Services are named by Key, name, or letters of either in order
 (`FuzzyMatch`).
 
-`localhost mcp` (`src/mcp/`) speaks JSON-RPC lines on stdin/stdout. Like
-`up`, it runs Services in its own `ServiceManager`, with `Origin::Agent`, and
-stops them when its input closes. Other sessions' Runs are read from the Run
-records, never started twice or stopped.
+`localhost mcp` (`src/mcp/`) speaks JSON-RPC lines on stdin/stdout. It runs
+Services in the shared core (below), the one the app drives, with
+`Origin::Agent`. `up` runs its own `ServiceManager` in the foreground; the
+Runs of such a session are read from the Run records, never started twice
+or stopped.
+
+## The shared core
+
+On macOS and Linux, the apps and `localhost mcp` drive one core in the
+background, so what one starts is Running in the others
+(`localhost-core/src/remote/shared.rs`). It speaks the `localhostd` protocol
+(below) on a Unix socket, `localhostd.sock` in the storage root, that only
+the user may connect to. The first client that needs it starts it from its
+own executable: `localhost daemon <storage root>`, or the app with
+`--daemon <storage root>`. A lock file keeps it to one per storage root.
+
+- A client says what it is (`Client`: app, agent, CLI). When one
+  disconnects, the core stops the Runs nobody needs any more: none while an
+  app is connected, else those no remaining client started (a Run's
+  Dependencies count as started by whoever started it).
+- It exits once no client has been connected for 10 s, stopping every Run.
+- Its standard error goes to `localhostd.log` in the storage root.
+
+```sh
+cargo run -p localhost-cli -- daemon "$HOME/Library/Application Support/localhost"   # serve it in the foreground
+```
 
 ## localhostd
 
@@ -46,7 +68,8 @@ batches. `Remote` is the app's side of it.
 - The app sends the Projects with their Secret values, which `localhostd`
   holds in memory only.
 - Runs' logs and records go to `~/.local/share/localhost/localhostd/`.
-- When its input closes, it stops every Run and exits.
+- When its input closes, it stops every Run and exits: its only client is
+  the app.
 
 ```sh
 cargo run -p localhost-daemon -- --stdio    # speaks the protocol on stdin/stdout

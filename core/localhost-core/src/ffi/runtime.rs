@@ -42,3 +42,11 @@ where
 pub(super) fn enter() -> EnterGuard<'static> {
     RUNTIME.enter()
 }
+
+/// Runs a task on the runtime, for a synchronous call that starts one.
+pub(super) fn spawn<F>(future: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    RUNTIME.spawn(future);
+}

@@ -13,7 +13,7 @@ localhost knows how each of the developer's Projects runs: its Services (dev ser
 2. **Find the Project, then reuse its Services.** Call `list_projects` and pick the one whose `path` holds the folder you work in, then `list_services`. Name Projects and Services by Key.
 3. **Check `status` before saying something is running.** Only `"state": "running"` means running. `starting` is not up yet; `exited` ended on its own; `failed` didn't work.
 4. **When a start fails, read before retrying.** `status` gives the failure and the last output; `logs` gives more (use `contains` or `since_seconds` to keep it short). On `portConflict`, call `ports` to see who holds the port, then tell the developer, or start on a free port with `start_service`'s `port`.
-5. **Don't fight another session.** A Service the developer runs in the app shows `"session": "other"`. Use it as it is. Don't try to start a second copy, and ask the developer if it needs stopping.
+5. **Respect what the developer started.** You and the localhost app share the same Services: one the developer started shows `"startedBy": "app"`. Use it as it is, and ask before stopping it. One a `localhost up` in a terminal runs shows `"session": "other"`: don't try to start a second copy, and ask the developer if it needs stopping.
 
 ## Typical flow
 
@@ -30,4 +30,4 @@ stop_service  { project: "my-saas", service: "web" }   when you are done
 
 The MCP server can't add or edit Projects. If the folder has no Project, or the Service you need is missing, tell the developer and suggest adding it in the localhost app (it scans the folder and suggests Services). Only fall back to a shell if they say so.
 
-Services you started stop when your session ends. Tell the developer what is still running when you finish.
+Services you started stop when your session ends, unless the localhost app is open: then they keep running there. Tell the developer what is still running when you finish.

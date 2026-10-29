@@ -20,6 +20,14 @@ pub fn default_storage_root() -> String {
     crate::default_storage_root().to_string_lossy().into_owned()
 }
 
+/// Serves the shared core of `storage_root` until it is idle: what the app's
+/// executable does when started with `--daemon <storage root>`. Returns why
+/// it couldn't, or `None`.
+#[uniffi::export]
+pub fn run_shared_core(storage_root: String) -> Option<String> {
+    crate::remote::shared::run(std::path::Path::new(&storage_root)).err()
+}
+
 // MARK: Errors and endings
 
 #[uniffi::export]

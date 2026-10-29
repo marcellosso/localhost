@@ -1,6 +1,7 @@
 //! `localhost`: the core without a UI. It reads the same storage as the
 //! app, so it lists the same Projects, runs Services in the foreground, and
-//! serves them to coding agents over MCP.
+//! serves them to coding agents over MCP, through the core it shares with
+//! the app (`localhost daemon`).
 
 mod arguments;
 mod logs;
@@ -56,6 +57,7 @@ fn run(command: Command, terminal: &Terminal) -> Result<ExitCode, String> {
         Command::Logs { project, service } => logs::run(&open()?, &project, service.as_deref(), terminal)?,
         Command::Up { project, services } => return up::run(open()?, &project, &services, terminal),
         Command::Mcp => return mcp::run(open()?),
+        Command::Daemon { storage_root } => localhost_core::remote::shared::run(storage_root.as_ref())?,
     }
     Ok(ExitCode::SUCCESS)
 }

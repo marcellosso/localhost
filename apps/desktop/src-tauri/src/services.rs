@@ -125,8 +125,7 @@ mod tests {
     async fn a_start_blocked_by_a_taken_port_says_who_holds_it_and_where_else_to_start() {
         let root = std::env::temp_dir().join(format!("localhost-blocked-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        let core =
-            Core::open_with_secrets(&root, std::sync::Arc::new(localhost_core::MemorySecretStore::new())).unwrap();
+        let core = Core::open_in_process(&root, std::sync::Arc::new(localhost_core::MemorySecretStore::new())).unwrap();
         // This test process holds the port, so it is a holder localhost won't stop.
         let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = socket.local_addr().unwrap().port();
