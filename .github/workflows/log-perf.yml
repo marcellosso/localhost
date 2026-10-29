@@ -61,6 +61,8 @@ jobs:
       RATE: ${{ inputs.rate || '1000' }}
       SECONDS_PER_ROUND: ${{ inputs.seconds || '30' }}
       ROUNDS: ${{ inputs.rounds || '3' }}
+      # Before it, the measurement opened no log: it is applied to an older baseline.
+      HARNESS_FIX: 0ed4d216a1b1c514ffa37a8076c254b0770dc9c3
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,6 +74,9 @@ jobs:
         run: |
           commit=$(git rev-parse --verify --quiet "origin/$BASELINE^{commit}" || git rev-parse --verify "$BASELINE^{commit}")
           git worktree add --detach ../baseline "$commit"
+          if ! git merge-base --is-ancestor "$HARNESS_FIX" "$commit"; then
+            git -C ../baseline -c user.name=ci -c user.email=ci@localhost cherry-pick "$HARNESS_FIX"
+          fi
       - name: Install the webview and tray libraries, Xvfb and D-Bus
         run: >
           sudo apt-get update && sudo apt-get install -y
@@ -117,13 +122,14 @@ jobs:
             echo
             echo "$SERVICES Services × $RATE lines/s for ${SECONDS_PER_ROUND}s, $ROUNDS rounds each."
             echo "current: \`$(git -C current rev-parse --short HEAD)\`"
-            [[ -d baseline ]] && echo "baseline: \`$(git -C baseline rev-parse --short HEAD)\` ($BASELINE)"
+            [[ -d baseline ]] && echo "baseline: \`$(git -C baseline rev-parse --short HEAD)\` ($BASELINE, with the measurement's fix if older)"
             echo
             echo "| build | round | lines received | frames | p50 ms | p95 ms | max ms | frames > 33 ms | peak MB | average MB |"
             echo "|---|---|---|---|---|---|---|---|---|---|"
             for file in results/*.txt; do
               name=$(basename "$file" .txt)
-              report=$(head -n 1 "$file")
+              # xvfb-run passes the app's stderr on with the report.
+              report=$(grep -m 1 '^{' "$file")
               memory=$(sed -n 's/^memory: peak \([0-9]*\) MB, average \([0-9]*\) MB.*/\1 | \2/p' "$file")
               echo "| ${name%-*} | ${name##*-} | $(jq -r '.report | "\(.linesReceived) | \(.frames) | \(.frameMsP50) | \(.frameMsP95) | \(.frameMsMax) | \(.longFrames)"' <<<"$report") | $memory |"
             done
