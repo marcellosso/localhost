@@ -9,6 +9,17 @@
 # session: WebKitGTK is the webview to measure. On Linux the web process is a
 # child of the app, so the memory includes it; on macOS WKWebView's web
 # process is not, so the memory there is the app's alone.
+#
+# CI runs it on pull requests touching the log path, against their base
+# (.github/workflows/log-perf.yml). Linux baseline, defaults, on GitHub's
+# ubuntu-22.04 under Xvfb (software rendering), 3 rounds, October 2026:
+#
+#   core                          p50   p95      frames > 33 ms   memory, average
+#   in-process (bed41da)          16-20  27-34    20-80            727-776 MB
+#   shared core, 16 ms batches    16     20-21    4-10             713-758 MB
+#
+# Compare runs made on the same machine: these numbers come from a shared
+# runner, not a desktop.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -62,4 +73,9 @@ if [[ -z $report ]]; then
 fi
 rm -f "$output"
 echo "$report"
+# Frame times with nothing on screen would look perfect.
+if [[ $report == *'"linesReceived":0,'* ]]; then
+    echo "error: the log view received no lines, so it measured nothing" >&2
+    exit 1
+fi
 echo "memory: peak $(( peak / 1024 )) MB, average $(( total / (samples > 0 ? samples : 1) / 1024 )) MB (app process tree, without the Services)"
