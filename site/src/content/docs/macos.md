@@ -7,5 +7,6 @@ Secret values live in your login Keychain. macOS lets the app that saved them re
 - **Release builds** are signed with the same certificate every time, so updating keeps access: no prompts.
 - **Builds signed ad hoc** (including ones you build yourself) look like a new app after every update. The first time each Secret is used, macOS asks “localhost wants to use your confidential information stored in “io.github.marcellosso.localhost.secret” in your keychain”. Enter your login password and click **Always Allow**.
 - **When the signing identity changes** (for example once releases are notarized), macOS asks once for each Secret on that one update.
+- **`localhost mcp`** is another program than the app, so macOS asks it separately the first time it reads each Secret. It reads only the Secrets of the Services an agent starts, and of their Dependencies, as it starts them.
 
 **Deny** isn't remembered: Services that use that Secret fail to start, and the next start asks again.
