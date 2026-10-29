@@ -8,6 +8,7 @@ mod logs;
 mod mcp;
 mod projects;
 mod resolve;
+mod signals;
 mod status;
 mod terminal;
 mod up;

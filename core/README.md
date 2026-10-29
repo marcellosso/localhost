@@ -38,11 +38,12 @@ or stopped.
 
 ## The shared core
 
-On macOS and Linux, the apps and `localhost mcp` drive one core in the
-background, so what one starts is Running in the others
-(`localhost-core/src/remote/shared.rs`). It speaks the `localhostd` protocol
-(below) on a Unix socket, `localhostd.sock` in the storage root, that only
-the user may connect to. The first client that needs it starts it from its
+The apps and `localhost mcp` drive one core in the background, so what one
+starts is Running in the others (`localhost-core/src/remote/shared/`). It
+speaks the `localhostd` protocol (below) on a Unix socket, `localhostd.sock`
+in the storage root, or on Windows a named pipe named after the storage
+root (`\\.\pipe\localhostd-<hash>`); only the user may connect to
+either. The first client that needs it starts it from its
 own executable: `localhost daemon <storage root>`, or the app with
 `--daemon <storage root>`. A lock file keeps it to one per storage root.
 
@@ -52,6 +53,10 @@ own executable: `localhost daemon <storage root>`, or the app with
   Dependencies count as started by whoever started it).
 - It exits once no client has been connected for 10 s, stopping every Run.
 - Its standard error goes to `localhostd.log` in the storage root.
+- On Windows, where pipe names are shared by every user, the core takes
+  the name only while it is free, and each end checks that the other's
+  process runs as the user. A core started by an agent breaks away from
+  the agent's job, so it outlives it.
 
 ```sh
 cargo run -p localhost-cli -- daemon "$HOME/Library/Application Support/localhost"   # serve it in the foreground

@@ -3,8 +3,8 @@
 //! and events are typed: `src/bindings.ts` is generated from this crate.
 //!
 //! Services are reached through `Targets`, whatever their Project's
-//! Execution Target: this machine through the shared core (in-process on
-//! Windows), a WSL distro through its `localhostd` (`targets`).
+//! Execution Target: this machine through the shared core, a WSL distro
+//! through its `localhostd` (`targets`).
 
 mod bridge;
 mod desktop;

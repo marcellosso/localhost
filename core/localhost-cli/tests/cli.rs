@@ -1,5 +1,7 @@
 //! The `localhost` command, run as a real process against a temporary home
 //! folder, so it finds its storage the way it does on a user's machine.
+//! Its Services are shell command lines, stopped with Unix signals.
+#![cfg(unix)]
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};

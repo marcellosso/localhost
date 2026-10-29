@@ -3,7 +3,6 @@
 
 fn main() {
     // Started by the app or `localhost mcp` as the shared core (`targets`).
-    #[cfg(unix)]
     if let [flag, storage_root] = &std::env::args_os().skip(1).collect::<Vec<_>>()[..]
         && flag == localhost_desktop::DAEMON_ARGUMENT
     {

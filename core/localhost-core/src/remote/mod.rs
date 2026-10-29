@@ -1,8 +1,8 @@
 //! Driving a localhost core that runs somewhere else, over a byte stream:
 //! the Windows app drives `localhostd --stdio` inside a WSL distro, where
-//! the distro's Services, Listeners and Orphans are; on macOS and Linux
-//! every client drives one shared core on this machine through a local
-//! socket ([`shared`]).
+//! the distro's Services, Listeners and Orphans are; every client drives
+//! one shared core on this machine through a local socket, or a named pipe
+//! on Windows ([`shared`]).
 //!
 //! The protocol is JSON, one message per line. `localhostd` opens with a
 //! [`Hello`]. Then the app sends requests, each with an id, and `localhostd`
@@ -22,9 +22,7 @@
 //! in-process core does when the app quits.
 
 mod client;
-#[cfg(unix)]
 mod server;
-#[cfg(unix)]
 pub mod shared;
 
 use std::collections::{HashMap, HashSet};
@@ -32,7 +30,6 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 pub use client::Remote;
-#[cfg(unix)]
 pub use server::serve;
 
 use crate::{

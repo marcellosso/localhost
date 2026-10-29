@@ -16,12 +16,12 @@ use localhost_core::{
     Id, LogStore, Origin, Project, ProjectLibrary, RunRegistry, ServiceEvent, ServiceManager, ServiceManagerOptions,
     ServiceOutputLine, ServiceState, ServiceStatus, default_storage_root,
 };
-use tokio::signal::unix::{Signal, SignalKind, signal};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinSet;
 
 use crate::logs::prefix_width;
 use crate::resolve;
+use crate::signals::Signals;
 use crate::terminal::Terminal;
 
 /// How long to wait, once Runs have ended, for the last of their output.
@@ -143,26 +143,6 @@ pub(crate) fn with_dependencies(project: &Project, mut service_ids: Vec<Id>) -> 
 async fn wait_until_nothing_is_active(manager: &ServiceManager, project: &Project) {
     while project.services.iter().any(|service| manager.status(service.id).state.is_active()) {
         tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-}
-
-/// SIGINT (Ctrl-C), SIGTERM, and SIGHUP (the terminal closed). Once these
-/// are watched, none of them ends the process: it stops its Services first.
-struct Signals(Vec<Signal>);
-
-impl Signals {
-    fn new() -> std::io::Result<Signals> {
-        let kinds = [SignalKind::interrupt(), SignalKind::terminate(), SignalKind::hangup()];
-        Ok(Signals(kinds.into_iter().map(signal).collect::<Result<_, _>>()?))
-    }
-
-    async fn next(&mut self) {
-        let [interrupt, terminate, hang_up] = &mut self.0[..] else { unreachable!() };
-        tokio::select! {
-            _ = interrupt.recv() => {}
-            _ = terminate.recv() => {}
-            _ = hang_up.recv() => {}
-        }
     }
 }
 

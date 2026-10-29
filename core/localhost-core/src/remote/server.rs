@@ -23,6 +23,11 @@ use crate::{
 /// How often log lines cross, at most: once per frame.
 const LOG_BATCH_INTERVAL: Duration = Duration::from_millis(16);
 
+/// How long a closed connection's last messages may take to go out. A
+/// named pipe whose client has gone may never fail the write that would
+/// end them, and the shared core counts a connection closed only after.
+const LAST_MESSAGES_TIMEOUT: Duration = Duration::from_secs(1);
+
 /// What every connection shares.
 pub(crate) struct Core {
     secrets: Arc<MemorySecretStore>,
@@ -105,7 +110,7 @@ impl Core {
         W: AsyncWrite + Unpin + Send + 'static,
     {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let writer = tokio::spawn(write_messages(receiver, output));
+        let mut writer = tokio::spawn(write_messages(receiver, output));
         let _ = sender.send(Message::Hello(Hello::current()));
         let id = {
             let mut connections = self.connections();
@@ -145,7 +150,9 @@ impl Core {
         }
         drop(connection);
         self.release(id).await;
-        let _ = writer.await;
+        if tokio::time::timeout(LAST_MESSAGES_TIMEOUT, &mut writer).await.is_err() {
+            writer.abort();
+        }
     }
 
     /// Forgets a closed connection and stops the Runs nobody needs any more:
