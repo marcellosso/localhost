@@ -4,6 +4,7 @@
 # prove an update comes from the release workflow, on every platform.
 #
 #   scripts/create-updater-keys.sh <new folder> [--upload]
+#   scripts/create-updater-keys.sh <existing folder> --upload-only
 #
 # Writes into <new folder>:
 #   tauri-updater.key          the Linux and Windows app's private key (minisign), encrypted
@@ -14,7 +15,9 @@
 #
 # --upload stores them with `gh`: the secrets TAURI_SIGNING_PRIVATE_KEY,
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD and SPARKLE_PRIVATE_KEY, and the
-# variables TAURI_UPDATER_PUBLIC_KEY and SPARKLE_PUBLIC_KEY.
+# variables TAURI_UPDATER_PUBLIC_KEY and SPARKLE_PUBLIC_KEY, in the repository
+# LOCALHOST_REPO (default marcellosso/localhost). --upload-only stores the
+# keys of a folder this script made before, without generating any.
 #
 # Do this once. Every installed app trusts only the public keys it was built
 # with: losing a private key, or replacing a pair, means users must download
@@ -22,13 +25,47 @@
 # Needs pnpm install in apps/desktop (for `tauri signer`) and OpenSSL 3.
 set -euo pipefail
 
-folder=${1:?usage: scripts/create-updater-keys.sh <new folder> [--upload]}
-upload=${2:-}
-if [[ -e $folder ]]; then
-    echo "error: $folder already exists; pick a new folder" >&2
+usage="usage: scripts/create-updater-keys.sh <new folder> [--upload] | <existing folder> --upload-only"
+folder=${1:?$usage}
+mode=${2:-}
+if [[ -n $mode && $mode != --upload && $mode != --upload-only ]]; then
+    echo "$usage" >&2
     exit 1
 fi
+# Explicit, so a clone with several remotes doesn't make `gh` ask which one.
+repo=${LOCALHOST_REPO:-marcellosso/localhost}
 root=$(cd "$(dirname "$0")/.." && pwd)
+files=(tauri-updater.key tauri-updater.key.pub tauri-updater.password sparkle-private-key sparkle-public-key)
+
+upload() {
+    echo "==> Storing them in $(gh repo view "$repo" --json nameWithOwner -q .nameWithOwner)" >&2
+    gh secret set TAURI_SIGNING_PRIVATE_KEY -R "$repo" < "$folder/tauri-updater.key"
+    gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R "$repo" < "$folder/tauri-updater.password"
+    gh secret set SPARKLE_PRIVATE_KEY -R "$repo" < "$folder/sparkle-private-key"
+    gh variable set TAURI_UPDATER_PUBLIC_KEY -R "$repo" < "$folder/tauri-updater.key.pub"
+    gh variable set SPARKLE_PUBLIC_KEY -R "$repo" < "$folder/sparkle-public-key"
+}
+
+if [[ $mode == --upload-only ]]; then
+    for file in "${files[@]}"; do
+        if [[ ! -s $folder/$file ]]; then
+            echo "error: $folder/$file is missing; --upload-only needs a folder this script made" >&2
+            exit 1
+        fi
+    done
+    # The pair the release workflow checks, before anything is stored.
+    if [[ $("$root/scripts/sparkle-public-key.sh" < "$folder/sparkle-private-key") != "$(tr -d ' \n\r' < "$folder/sparkle-public-key")" ]]; then
+        echo "error: $folder/sparkle-public-key isn't the pair of sparkle-private-key" >&2
+        exit 1
+    fi
+    upload
+    exit 0
+fi
+
+if [[ -e $folder ]]; then
+    echo "error: $folder already exists; pick a new folder, or store its keys with --upload-only" >&2
+    exit 1
+fi
 mkdir -p "$folder"
 folder=$(cd "$folder" && pwd)
 chmod 700 "$folder"
@@ -52,15 +89,7 @@ chmod 600 "$folder"/*
 echo "Tauri public key:   $(cat "$folder/tauri-updater.key.pub")" >&2
 echo "Sparkle public key: $(cat "$folder/sparkle-public-key")" >&2
 
-if [[ $upload == --upload ]]; then
-    echo "==> Storing them in $(cd "$root" && gh repo view --json nameWithOwner -q .nameWithOwner)" >&2
-    (
-        cd "$root"
-        gh secret set TAURI_SIGNING_PRIVATE_KEY < "$folder/tauri-updater.key"
-        gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD < "$folder/tauri-updater.password"
-        gh secret set SPARKLE_PRIVATE_KEY < "$folder/sparkle-private-key"
-        gh variable set TAURI_UPDATER_PUBLIC_KEY < "$folder/tauri-updater.key.pub"
-        gh variable set SPARKLE_PUBLIC_KEY < "$folder/sparkle-public-key"
-    )
+if [[ $mode == --upload ]]; then
+    upload
 fi
 echo "Back up $folder (a password manager or an encrypted disk), never in the repository." >&2

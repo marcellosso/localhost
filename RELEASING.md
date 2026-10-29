@@ -121,7 +121,7 @@ From a clone of the repository that publishes releases, on a Mac with `gh` logge
 scripts/create-updater-keys.sh ~/localhost-updater-keys --upload
 ```
 
-It creates both keypairs in a new folder, prints the public keys, and stores the three secrets and two variables above. The Sparkle key is made with OpenSSL, so nothing is added to your keychain. Without `--upload` it only creates the files; to store them by hand:
+It creates both keypairs in a new folder, prints the public keys, and stores the three secrets and two variables above in `marcellosso/localhost` (set `LOCALHOST_REPO=owner/name` for another repository). If the keys already exist, store them again without making new ones: `scripts/create-updater-keys.sh ~/localhost-updater-keys --upload-only`. The Sparkle key is made with OpenSSL, so nothing is added to your keychain. Without `--upload` it only creates the files; to store them by hand:
 
 ```sh
 gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/localhost-updater-keys/tauri-updater.key
