@@ -11,7 +11,7 @@ git clone https://github.com/marcellosso/localhost
 cargo install --path localhost/core/localhost-cli
 ```
 
-That puts `localhost` in `~/.cargo/bin`. Add your Projects in the app first; the command reads the same Projects.
+That puts `localhost` in `~/.cargo/bin` (`%USERPROFILE%\.cargo\bin` on Windows). Add your Projects in the app first; the command reads the same Projects.
 
 ## Connect Cursor
 
@@ -28,7 +28,7 @@ Add the server to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json`
 }
 ```
 
-If Cursor says it can't find `localhost`, use the full path instead, e.g. `"command": "/Users/you/.cargo/bin/localhost"`. Apps started from the Dock don't always get your shell's `PATH`.
+If Cursor says it can't find `localhost`, use the full path instead, e.g. `"command": "/Users/you/.cargo/bin/localhost"`. Apps started from the Dock don't always get your shell's `PATH`. On Windows: `"command": "C:\\Users\\you\\.cargo\\bin\\localhost.exe"`.
 
 Open **Cursor Settings → MCP** to check that **localhost** is connected and lists its tools.
 
@@ -62,7 +62,7 @@ Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `
 
 ## How it runs your Services
 
-- **The same way the app does.** Services run in your login shell with their Project's variables, Environment Profile and Secrets, start after their Dependencies, and stop SIGINT → SIGTERM → SIGKILL. Their logs go where the app keeps them.
+- **The same way the app does.** Services run in your login shell (`cmd.exe` on Windows) with their Project's variables, Environment Profile and Secrets, start after their Dependencies, and stop SIGINT → SIGTERM → SIGKILL (Ctrl-Break, then ending every process they started, on Windows). Their logs go where the app keeps them.
 - **In the app too.** The agent and the app drive the same localhost core, so a Service the agent starts is Running in the app, with its logs, and one you start in the app is running for the agent. A stop from either stops the same Run. `status` says who started each one (`"startedBy": "app"` or `"agent"`).
 - **For as long as someone needs it.** When the agent disconnects or quits, the Services it started stop, unless the app is open: then they keep running there, and you stop them when you like. Nothing keeps running unseen. Quitting the app stops every Service after asking, whoever started it.
 - **Never twice.** If a `localhost up` in a terminal already runs a Service, `status` shows it running (`"session": "other"`), with its pid and uptime. The agent won't start a second copy, and won't stop it: stop it where it runs.
@@ -71,13 +71,13 @@ Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `
 
 ## The background core
 
-The app and `localhost mcp` share one localhost core that runs in the background. Whichever of them needs it first starts it, from its own program: the app, or `localhost daemon`. It listens on a socket in localhost's data folder (`~/Library/Application Support/localhost/localhostd.sock` on macOS, `~/.local/share/localhost/localhostd.sock` on Linux) that only your user can open, and writes its diagnostics to `localhostd.log` next to it. About 10 seconds after the last of them disconnects, it stops what is left and exits.
+The app and `localhost mcp` share one localhost core that runs in the background. Whichever of them needs it first starts it, from its own program: the app, or `localhost daemon`. It listens on a socket in localhost's data folder (`~/Library/Application Support/localhost/localhostd.sock` on macOS, `~/.local/share/localhost/localhostd.sock` on Linux) that only your user can open, and writes its diagnostics to `localhostd.log` next to it. On Windows it listens on a named pipe instead, `\\.\pipe\localhostd-<number>`, that only your user can open, and writes `localhostd.log` to `%APPDATA%\localhost`; it runs without a window, as a second `localhost-app.exe` or `localhost.exe` in Task Manager. About 10 seconds after the last of them disconnects, it stops what is left and exits.
 
 When an agent disconnects, the core stops the Services that only it needed: those it started, and the Dependencies it started them with, unless the app is connected or another agent started them too. When the app quits, it stops everything first, as it always has.
 
 If the app and the `localhost` command come from versions that speak to the core differently, the second one to connect says so. Quit the app and your agents, then open the app again.
 
-On Windows the app still runs its Services itself, and `localhost mcp` runs on macOS and Linux.
+On Windows this covers Projects on Windows itself. A Project in a WSL distro runs only from the app, which starts the `localhostd` inside the distro: asked to start one, the agent is told so.
 
 ## Teach your agent
 

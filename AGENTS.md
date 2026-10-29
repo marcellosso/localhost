@@ -117,7 +117,7 @@ These are product rules, not implementation details. A change that breaks one ne
 
 **Sessions**
 - Closing the window keeps the app and its Services running; the menu bar or tray shows them. Quitting asks first when anything is active, then stops everything in parallel, whoever started it.
-- On macOS and Linux the apps and `localhost mcp` drive one shared core, so they see the same Runs. When a client disconnects, the core stops the Runs nobody needs any more: none while an app is connected, else those no remaining client started (with their Dependencies). It exits once no client has been connected for 10 s.
+- The apps and `localhost mcp` drive one shared core, so they see the same Runs, on Windows too. When a client disconnects, the core stops the Runs nobody needs any more: none while an app is connected, else those no remaining client started (with their Dependencies). It exits once no client has been connected for 10 s.
 - Each active Run is recorded on disk (pid, process group, start time). At the next launch, survivors are offered as Orphans: Stop them (default) or Leave them.
 
 **Detection**
@@ -139,7 +139,7 @@ These are product rules, not implementation details. A change that breaks one ne
   macOS, via UniFFI  Linux + Windows,      same crates         inside a WSL distro,
                      links the crates                          driven over stdio
       └─────────┬─────────┘                    │
-          the shared core: one per user, on a local socket (macOS, Linux)
+          the shared core: one per user, on a local socket (a named pipe on Windows)
 ```
 
 All state, process management, logs and persistence live in the core, which never depends on a UI toolkit. The apps only draw and turn user actions into core calls. Its API is shaped so any client, in-process or over IPC, drives the same core:
@@ -157,8 +157,8 @@ All state, process management, logs and persistence live in the core, which neve
 | `ProcessTree` | One Run's processes: launch, separate stdout/stderr pipes, stopping the whole group. |
 | `LogStore`, `LogBuffer` | Each Run's output: in-memory buffer and rotated file. |
 | `RunRegistry` | Records active Runs on disk, to find Orphans. |
-| `Targets`, `remote` | Where each Project runs, behind one interface: this machine through the shared core (in-process on Windows), a WSL distro through a `localhostd`. Merges every target's statuses and events. |
-| `remote::shared` | The shared core: the `remote` protocol on a Unix socket in the storage root, started by its first client, one per storage root. Decides which Runs a disconnecting client takes with it. |
+| `Targets`, `remote` | Where each Project runs, behind one interface: this machine through the shared core, a WSL distro through a `localhostd`. Merges every target's statuses and events. |
+| `remote::shared` | The shared core: the `remote` protocol on a Unix socket in the storage root, or on Windows a named pipe named after it, started by its first client, one per storage root. Only the transport differs per platform. Decides which Runs a disconnecting client takes with it. |
 | `listener` | Finds Listeners (libproc, `/proc`, `GetExtendedTcpTable`, never `lsof`) and attributes them. |
 | `ProjectScanner` + detectors | Reads a folder and returns Suggestions. |
 | `ProjectDocument` | The YAML Project file. |
@@ -182,6 +182,7 @@ All state, process management, logs and persistence live in the core, which neve
 | Secrets | Keychain | Secret Service | Credential Manager |
 | Storage | `~/Library/Application Support/localhost` | `$XDG_DATA_HOME/localhost` | `%APPDATA%\localhost` |
 | Tray | menu bar extra | AppIndicator | notification area |
+| Shared core | Unix socket, mode 0600 | Unix socket, mode 0600 | named pipe `\\.\pipe\localhostd-<hash>`, DACL for the user only |
 
 The Keychain service and Secret account names (`io.github.marcellosso.localhost.secret`, `<OWNER-ID>/<NAME>`), the storage layout and the JSON schema must never change: existing users' data depends on them, and `core/localhost-core/tests/swift_compatibility.rs` checks files written by earlier versions.
 
@@ -190,11 +191,11 @@ The Keychain service and Secret account names (`io.github.marcellosso.localhost.
 The hard-to-reverse choices, and why. Changing one is an issue and a discussion first.
 
 - **One Rust core for every client.** Windows is where the hardest code lives (Job Objects, console control events, TCP tables, Credential Manager), and Rust is first-class there. The macOS app links it through UniFFI.
-- **One shared core per user, on a local socket.** The app and coding agents must see the same Runs, so on macOS and Linux every client drives one core in the background, over the same protocol as a WSL `localhostd`. Any localhost executable can serve it (`localhost daemon`, the app with `--daemon`), so the `localhost` command, built on its own, needs no second binary. Runs belong to the core, not to a connection: a client disconnecting stops only what no one else needs, and an open app needs everything it shows. Quitting the app still stops every Service. Clients send the Projects, and before a start the Secret values its Runs read, as to a WSL `localhostd`, so the core never touches the Keychain and a client reads only the Secrets it starts with; it keeps only the session variables of the client that started it, so one client's environment doesn't leak into every Run.
+- **One shared core per user, on a local socket.** The app and coding agents must see the same Runs, so every client drives one core in the background, over the same protocol as a WSL `localhostd`: a Unix socket in the storage root, or on Windows a named pipe. Pipe names are shared by every user of a Windows machine, so the core takes its name only if it is free, the pipe admits only the user, and each end checks that the other runs as the user before a Secret crosses. Any localhost executable can serve it (`localhost daemon`, the app with `--daemon`), so the `localhost` command, built on its own, needs no second binary. Runs belong to the core, not to a connection: a client disconnecting stops only what no one else needs, and an open app needs everything it shows. Quitting the app still stops every Service. Clients send the Projects, and before a start the Secret values its Runs read, as to a WSL `localhostd`, so the core never touches the Keychain and a client reads only the Secrets it starts with; it keeps only the session variables of the client that started it, so one client's environment doesn't leak into every Run.
 - **SwiftUI on macOS, one Tauri app for Linux and Windows.** It keeps the native macOS app, avoids three toolkits and avoids Electron's size. The cost: every feature is built twice, so both UIs stay thin and all logic is in the core.
 - **Commands through the login shell.** GUI apps don't inherit the `PATH` set by nvm, asdf, mise, pyenv or Homebrew. A single command line also keeps pipes, `&&` and variables working as in a terminal.
 - **cmd.exe on native Windows, with a fresh environment.** It is everywhere, fast, supports `&&`, runs npm's `.cmd` shims, and is what npm uses. The environment is rebuilt from the registry each start, since a GUI app's inherited one is stale. Stdin is `NUL`, so "Terminate batch job (Y/N)?" never waits.
-- **Windows Runs in Job Objects, stopped with Ctrl-Break.** Windows has no process-group signals; a job holds the whole tree and dies with localhost even on a crash. Ctrl-Break needs a shared console, so the app attaches once to a hidden one.
+- **Windows Runs in Job Objects, stopped with Ctrl-Break.** Windows has no process-group signals; a job holds the whole tree and dies with the core even on a crash. Ctrl-Break needs a shared console, so the core attaches once to a hidden one. A core an agent starts breaks away from the agent's job, which Node ends with the agent.
 - **WSL Projects run by a core inside the distro.** A Windows process sees nothing behind `wsl.exe`. The app copies its `localhostd` into the distro and drives it over stdio: no socket, port or firewall rule. Configuration and Secrets stay on Windows.
 - **Configuration stored by localhost, not in the Project folder.** Writing into users' repos is a surprising side effect. The Project file is the explicit bridge.
 - **Pipes, not a PTY.** Keeping stderr distinct matters for failures and, later, for agents. The colour hints make up for the missing terminal.
@@ -242,7 +243,7 @@ The log must stay smooth with very chatty Services. Lines never cross to a UI on
 
 ```sh
 cd core && cargo test && cargo clippy --all-targets -- -D warnings && cargo fmt --check
-cargo clippy -p localhost-core --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+cargo clippy -p localhost-core -p localhost-cli --target x86_64-pc-windows-msvc --all-targets -- -D warnings
 
 scripts/build-core.sh debug && (cd apps/macos/LocalhostCoreFFI && swift test)
 xcodebuild -project apps/macos/localhost.xcodeproj -scheme localhost -configuration Debug \
