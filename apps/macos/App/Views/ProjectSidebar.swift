@@ -2,7 +2,8 @@ import LocalhostCore
 import SwiftUI
 
 /// The app's name, project search with Add Project, Ports and the Projects,
-/// and a footer with Settings, Keyboard Shortcuts and how many Services are running.
+/// a newer version when there is one, and a footer with Settings, Keyboard
+/// Shortcuts and how many Services are running.
 struct ProjectSidebar: View {
     @Environment(AppModel.self) private var model
 
@@ -42,7 +43,12 @@ struct ProjectSidebar: View {
         .listStyle(.sidebar)
         .modifier(SolidSidebar())
         .safeAreaInset(edge: .top, spacing: 0) { SidebarHeader() }
-        .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFooter() }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                UpdateNotice()
+                SidebarFooter()
+            }
+        }
         .contextMenu(forSelectionType: AppModel.SidebarItem.self) { items in
             if case .project(let id) = items.first, let project = model.project(id) {
                 Button("Edit Project…") { model.presentedSheet = .editProject(id) }

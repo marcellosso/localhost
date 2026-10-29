@@ -512,6 +512,39 @@ async quitApp() : Promise<void> {
  */
 async takeReveal() : Promise<Reveal | null> {
     return await TAURI_INVOKE("take_reveal");
+},
+/**
+ * The notice's current state, e.g. for a window that just opened.
+ */
+async updateState() : Promise<UpdateState> {
+    return await TAURI_INVOKE("update_state");
+},
+/**
+ * Check for Updates: checks now, and shows the notice again even for a
+ * version put off with Later.
+ */
+async checkForUpdates() : Promise<UpdateCheck> {
+    return await TAURI_INVOKE("check_for_updates");
+},
+/**
+ * Later: hides the notice until a newer version, or Check for Updates.
+ */
+async putOffUpdate() : Promise<void> {
+    await TAURI_INVOKE("put_off_update");
+},
+/**
+ * Update Now: downloads the update in the background and verifies its
+ * signature. Nothing is installed until Restart to Update.
+ */
+async downloadUpdate() : Promise<void> {
+    await TAURI_INVOKE("download_update");
+},
+/**
+ * Restart to Update: asks first if any Service is active, since the
+ * restart stops them, then installs and relaunches.
+ */
+async installUpdate() : Promise<void> {
+    await TAURI_INVOKE("install_update");
 }
 }
 
@@ -520,10 +553,12 @@ async takeReveal() : Promise<Reveal | null> {
 
 export const events = __makeEvents__<{
 orphansFound: OrphansFound,
-reveal: Reveal
+reveal: Reveal,
+updateState: UpdateState
 }>({
 orphansFound: "orphans-found",
-reveal: "reveal"
+reveal: "reveal",
+updateState: "update-state"
 })
 
 /** user-defined constants **/
@@ -1194,7 +1229,11 @@ automaticPortMove: boolean; appearance: Appearance;
 /**
  * Points, for the log and the commands in Service rows.
  */
-logFontSize: number }
+logFontSize: number; 
+/**
+ * Whether localhost checks for a new version at launch and every few hours.
+ */
+automaticUpdateChecks: boolean }
 /**
  * Everything the UI shows, at the moment it subscribed.
  */
@@ -1244,6 +1283,39 @@ export type Termination = { kind: "exited"; code: number } | { kind: "signaled";
  * The text attributes set by ANSI SGR sequences.
  */
 export type TextStyle = { foreground: AnsiColor | null; background: AnsiColor | null; isBold: boolean; isDim: boolean; isItalic: boolean; isUnderlined: boolean; isInverse: boolean; isStrikethrough: boolean }
+/**
+ * What Check for Updates found.
+ */
+export type UpdateCheck = 
+/**
+ * The notice shows it.
+ */
+{ kind: "available"; version: string } | { kind: "upToDate"; version: string } | 
+/**
+ * The check couldn't be made, or this build doesn't update itself.
+ */
+{ kind: "failed"; message: string }
+/**
+ * What the update notice shows; also the event sent when it changes.
+ */
+export type UpdateState = 
+/**
+ * No newer version known, or the notice was put off with Later.
+ */
+{ kind: "none" } | 
+/**
+ * A newer version. `can_install` is false where a package manager
+ * installs it (`.deb`, `.rpm`); `problem` says why a download failed.
+ */
+{ kind: "available"; version: string; notesUrl: string; canInstall: boolean; problem: string | null } | 
+/**
+ * `progress` is from 0 to 1, `None` while the size isn't known.
+ */
+{ kind: "downloading"; version: string; notesUrl: string; progress: number | null } | 
+/**
+ * Downloaded and verified: restarting installs it.
+ */
+{ kind: "ready"; version: string; notesUrl: string }
 /**
  * The kind of value a Project file field takes.
  */

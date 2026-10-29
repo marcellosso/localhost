@@ -56,6 +56,10 @@ extension AppModel {
                                  shortcut: "⌘/", keywords: "help keys cheat sheet") { [weak self] in
             self?.presentedSheet = .keyboardShortcuts
         })
+        items.append(PaletteItem(id: "other:check-for-updates", title: "Check for Updates…",
+                                 icon: .symbol("arrow.down.circle"), keywords: "update upgrade version release") { [weak self] in
+            self?.updates.checkForUpdates()
+        })
         // Only reachable by typing: other Projects' actions and Services.
         for project in projects where project.id != selected?.id {
             items += project.services.enumerated().map { serviceJump($1, in: project, index: $0, isInSelectedProject: false) }

@@ -22,6 +22,7 @@ import type { CoreView } from "./core";
 import type { Navigator } from "./palette";
 import { useWindowShortcuts } from "./shortcuts";
 import { startCore, useCore } from "./store";
+import { startUpdates } from "./updates";
 import { showSheet, useUi } from "./ui";
 
 let started: Promise<void> | null = null;
@@ -31,7 +32,7 @@ let started: Promise<void> | null = null;
  * A WSL distro's Orphans are asked about when it connects, which may be later.
  */
 function start(): Promise<void> {
-  started ??= Promise.all([loadSettings(), loadHome(), startCore()]).then(async () => {
+  started ??= Promise.all([loadSettings(), loadHome(), startCore(), startUpdates()]).then(async () => {
     void events.orphansFound.listen(() => void askAboutFoundOrphans());
     await runLaunchChecks();
     await runPerfMeasurement();

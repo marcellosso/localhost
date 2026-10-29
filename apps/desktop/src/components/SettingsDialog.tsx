@@ -1,6 +1,7 @@
 import { type ReactNode, useId, useRef, useState } from "react";
 import type { Appearance } from "../bindings";
 import { saveSettings, useSettings } from "../settings";
+import { checkForUpdates } from "../updates";
 import { Dialog, useModal } from "./Dialog";
 import { CircleHalfIcon, GearIcon, GlobeIcon } from "./Icons";
 import styles from "./SettingsDialog.module.css";
@@ -113,6 +114,21 @@ function GeneralSettings() {
           onBlur={save}
           onKeyDown={(event) => event.key === "Enter" && save()}
         />
+      </SettingsRow>
+      <SettingsRow
+        title="Check for updates automatically"
+        detail="At launch and every few hours. A new version is offered, never installed without asking."
+      >
+        <Switch
+          label="Check for updates automatically"
+          isOn={settings.automaticUpdateChecks}
+          onChange={(automaticUpdateChecks) => void saveSettings({ automaticUpdateChecks })}
+        />
+      </SettingsRow>
+      <SettingsRow title="Check for updates now">
+        <button className="button" onClick={() => void checkForUpdates()}>
+          Check Now
+        </button>
       </SettingsRow>
     </>
   );

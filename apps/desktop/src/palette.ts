@@ -6,6 +6,7 @@ import { tildePath } from "./paths";
 import type { ServiceSelection } from "./selection";
 import { isActive } from "./status";
 import { showAlert, showSheet } from "./ui";
+import { checkForUpdates } from "./updates";
 
 // What the command palette (Ctrl+K) offers: jumps to Projects and Services,
 // and actions on them.
@@ -89,6 +90,13 @@ export function paletteItems(
     shortcut: label(SHORTCUTS.keyboardShortcuts),
     keywords: "help keys cheat sheet",
     run: () => showAlert({ kind: "keyboardShortcuts" }),
+  });
+  items.push({
+    id: "other:check-for-updates",
+    title: "Check for Updates…",
+    icon: { kind: "symbol", name: "new" },
+    keywords: "update upgrade version release",
+    run: () => void checkForUpdates(),
   });
   // Only reachable by typing: other Projects' Services and actions.
   for (const project of view.projects) {

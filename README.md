@@ -50,6 +50,17 @@ Download the latest release from [GitHub Releases](https://github.com/marcelloss
 
 Releases aren't notarized or code-signed by a known publisher yet, so the first launch needs one extra step on macOS and Windows; see [First launch](#first-launch). There are no Flatpak or Snap packages: their sandboxes can't run your project's commands.
 
+### Updates
+
+localhost checks GitHub Releases for a new version at launch and every few hours. When there is one, a notice at the bottom of the sidebar says “localhost X.Y.Z is available”, with its release notes:
+
+- **Update Now** downloads it in the background, and **Restart to Update** installs it and opens the new version. **Later** hides the notice until the next version. On macOS, an update that has downloaded also installs when you quit localhost.
+- **Restarting stops every running Service first**, as quitting does, after listing them and asking. Start them again once the new version opens.
+- Each update is signed, and localhost checks the signature before installing it.
+- **`.deb` and `.rpm`**: your package manager installs updates, so the notice's **Download** opens the release instead. The AppImage and the Windows installer update themselves; on macOS, so does the app.
+
+Turn automatic checks off in **Settings → General**; **Check for Updates…** (in the localhost menu on macOS, in Settings or the command palette) checks at any time. Checking is the only thing localhost asks the network for, and builds you make yourself never check.
+
 ## Getting started
 
 Shortcuts are written for macOS; on Linux and Windows use Ctrl for ⌘ and Alt for ⌥ (see [Keyboard shortcuts](#keyboard-shortcuts)).

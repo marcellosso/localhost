@@ -491,6 +491,11 @@ impl Targets {
     }
 
     #[uniffi::method]
+    pub async fn ffi_retire_shared_core(self: Arc<Self>) {
+        on_runtime(async move { self.retire_shared_core().await }).await
+    }
+
+    #[uniffi::method]
     pub fn ffi_set_automatic_port_move(&self, is_enabled: bool) {
         self.set_automatic_port_move(is_enabled)
     }

@@ -4,5 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<!-- Sparkle.framework is embedded. With the hardened runtime, library validation only
+	     loads frameworks signed by the app's Team ID, and builds signed ad hoc or with the
+	     self-signed certificate have none, so the app wouldn't launch. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 </dict>
 </plist>

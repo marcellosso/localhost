@@ -12,6 +12,13 @@ name: Release
 #   ad hoc         neither
 # Windows: Authenticode with WINDOWS_CERTIFICATE_PFX and WINDOWS_CERTIFICATE_PASSWORD,
 # unsigned without them.
+#
+# Updates: every package is also signed with the updater's keys, and the release
+# carries latest.json (Linux, Windows) and appcast.xml (macOS), which installed
+# apps check. These need, and the release fails without:
+#   secrets    TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD, SPARKLE_PRIVATE_KEY
+#   variables  TAURI_UPDATER_PUBLIC_KEY, SPARKLE_PUBLIC_KEY
+# scripts/create-updater-keys.sh makes them; see RELEASING.md.
 
 on:
   push:
@@ -29,7 +36,27 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release_url: ${{ steps.version.outputs.release_url }}
     steps:
+      # A release without signed updates would leave every user of it on that
+      # version for good, so none is built without the keys.
+      - name: Check the updater keys
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+        run: |
+          missing=()
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD SPARKLE_PRIVATE_KEY \
+            TAURI_UPDATER_PUBLIC_KEY SPARKLE_PUBLIC_KEY; do
+            [[ -n ${!name} ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing the updater keys: ${missing[*]}. Create them once with scripts/create-updater-keys.sh, see RELEASING.md (Updates)."
+            exit 1
+          fi
       - id: version
         run: |
           version=${GITHUB_REF_NAME#v}
@@ -38,6 +65,7 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
   macos:
     name: Build the macOS DMG
@@ -53,6 +81,12 @@ jobs:
       NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
       SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
       SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+      SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+      # Sparkle's command-line tools, for signing the update; the app gets the
+      # same version through Swift Package Manager.
+      SPARKLE_VERSION: 2.10.1
+      SPARKLE_SHA256: 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.90
@@ -110,6 +144,7 @@ jobs:
         env:
           SIGNING_IDENTITY: ${{ steps.identity.outputs.identity || '-' }}
           DEVELOPER_ID: ${{ steps.signing.outputs.mode == 'developer-id' && '1' || '' }}
+          FEED_URL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/appcast.xml
         run: |
           dmg=$(scripts/build-release.sh "${{ needs.version.outputs.version }}" "$GITHUB_RUN_NUMBER" | tail -1)
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
@@ -140,12 +175,39 @@ jobs:
           DMG: ${{ steps.build.outputs.dmg }}
         run: cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256"
 
+      # After notarization, which staples a ticket into the DMG.
+      - name: Sign the update and write the appcast
+        id: appcast
+        env:
+          DMG: ${{ steps.build.outputs.dmg }}
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_URL: ${{ needs.version.outputs.release_url }}
+        run: |
+          tools=$RUNNER_TEMP/sparkle
+          mkdir -p "$tools"
+          curl -fsSL -o "$tools/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "$SPARKLE_SHA256  $tools/sparkle.tar.xz" | shasum -a 256 -c -
+          tar -xJf "$tools/sparkle.tar.xz" -C "$tools" ./bin/sign_update
+          derived=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | scripts/sparkle-public-key.sh)
+          if [[ $derived != "$SPARKLE_PUBLIC_KEY" ]]; then
+            echo "::error::SPARKLE_PRIVATE_KEY isn't the private half of SPARKLE_PUBLIC_KEY: installed apps would reject this update."
+            exit 1
+          fi
+          signature=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$tools/bin/sign_update" --ed-key-file - -p "$DMG")
+          appcast=$(dirname "$DMG")/appcast.xml
+          scripts/appcast.sh "$DMG" "$VERSION" "$GITHUB_RUN_NUMBER" "$signature" "$RELEASE_URL" > "$appcast"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$tools/bin/sign_update" --ed-key-file - "$appcast"
+          cat "$appcast"
+          echo "path=$appcast" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: |
             ${{ steps.build.outputs.dmg }}
             ${{ steps.build.outputs.dmg }}.sha256
+            ${{ steps.appcast.outputs.path }}
           if-no-files-found: error
 
       - name: Remove the signing keychain
@@ -179,24 +241,53 @@ jobs:
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
 
+      # Signed for the updater too (each package gets a .sig), with the public
+      # key and the feed of this repository built in.
       - name: Build the .deb, .rpm and AppImage
         env:
           VERSION: ${{ needs.version.outputs.version }}
-        run: pnpm tauri build --bundles deb,rpm,appimage --config "{\"version\":\"$VERSION\"}"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          FEED_URL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/latest.json
+        run: |
+          config=$(jq -nc --arg version "$VERSION" --arg key "$PUBLIC_KEY" --arg feed "$FEED_URL" '
+            {version: $version, bundle: {createUpdaterArtifacts: true},
+             plugins: {updater: {pubkey: $key, endpoints: [$feed]}}}')
+          pnpm tauri build --bundles deb,rpm,appimage --config "$config"
 
       - name: Collect and checksum
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          mkdir -p "$RUNNER_TEMP/linux"
+          mkdir -p "$RUNNER_TEMP/linux" "$RUNNER_TEMP/signatures"
           cp src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/rpm/*.rpm \
             src-tauri/target/release/bundle/appimage/*.AppImage "$RUNNER_TEMP/linux/"
+          for package in "$RUNNER_TEMP"/linux/*; do
+            built=$(find src-tauri/target/release/bundle -name "$(basename "$package").sig" | head -1)
+            # The bundler signs what the updater installs; the .deb and .rpm are signed here if it didn't.
+            if [[ -z $built ]]; then
+              pnpm tauri signer sign --app-version "$VERSION" "$package"
+              built=$package.sig
+            fi
+            mv "$built" "$RUNNER_TEMP/signatures/$(basename "$package").sig"
+          done
           cd "$RUNNER_TEMP/linux"
           for file in *; do sha256sum "$file" > "$file.sha256"; done
-          ls -l
+          ls -l . "$RUNNER_TEMP/signatures"
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux
           path: ${{ runner.temp }}/linux/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signatures-linux
+          path: ${{ runner.temp }}/signatures/*
           if-no-files-found: error
 
   localhostd:
@@ -276,13 +367,20 @@ jobs:
           if (-not $certificate.HasPrivateKey) { Write-Error "The certificate secret has no private key"; exit 1 }
           "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
 
+      # Signed for the updater too (a .sig beside the installer), with the
+      # public key and the feed of this repository built in.
       - name: Build the installer
         env:
           VERSION: ${{ needs.version.outputs.version }}
           THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          FEED_URL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/latest.json
         run: |
-          config=$(jq -nc --arg version "$VERSION" --arg thumbprint "$THUMBPRINT" '
-            {version: $version, bundle: {resources: {"wsl/localhostd": "localhostd"}}}
+          config=$(jq -nc --arg version "$VERSION" --arg thumbprint "$THUMBPRINT" --arg key "$PUBLIC_KEY" --arg feed "$FEED_URL" '
+            {version: $version, bundle: {resources: {"wsl/localhostd": "localhostd"}, createUpdaterArtifacts: true},
+             plugins: {updater: {pubkey: $key, endpoints: [$feed]}}}
             * if $thumbprint == "" then {} else {bundle: {windows: {certificateThumbprint: $thumbprint}}} end')
           pnpm tauri build --bundles nsis --config "$config"
 
@@ -298,16 +396,23 @@ jobs:
 
       - name: Collect and checksum
         run: |
-          mkdir -p "$RUNNER_TEMP/windows"
+          mkdir -p "$RUNNER_TEMP/windows" "$RUNNER_TEMP/signatures"
           cp src-tauri/target/release/bundle/nsis/*-setup.exe "$RUNNER_TEMP/windows/"
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig "$RUNNER_TEMP/signatures/"
           cd "$RUNNER_TEMP/windows"
           for file in *; do sha256sum "$file" > "$file.sha256"; done
-          ls -l
+          ls -l . "$RUNNER_TEMP/signatures"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: ${{ runner.temp }}/windows/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signatures-windows
+          path: ${{ runner.temp }}/signatures/*
           if-no-files-found: error
 
       - name: Remove the signing certificate
@@ -320,10 +425,28 @@ jobs:
     needs: [version, macos, linux, windows]
     runs-on: ubuntu-latest
     steps:
+      # For scripts/updater-manifest.sh.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
       - uses: actions/download-artifact@v4
         with:
           path: assets
           merge-multiple: true
+
+      # The packages' signatures go into latest.json, not the release.
+      - name: Write latest.json
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_URL: ${{ needs.version.outputs.release_url }}
+          PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: |
+          scripts/updater-manifest.sh assets "$VERSION" "$RELEASE_URL" "$PUBLIC_KEY" > latest.json
+          rm assets/*.sig
+          mv latest.json assets/
+          cat assets/latest.json
+          ls -l assets
 
       - name: Draft the GitHub Release
         env:

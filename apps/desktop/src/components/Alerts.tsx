@@ -216,6 +216,21 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
         </Dialog>
       );
 
+    case "upToDate":
+      return (
+        <Dialog
+          title="localhost is up to date"
+          onCancel={close}
+          actions={
+            <button className="button accent" onClick={close} data-autofocus>
+              OK
+            </button>
+          }
+        >
+          <p>Version {alert.version} is the latest.</p>
+        </Dialog>
+      );
+
     case "settings":
       return alert.forEditor ? (
         <ChooseEditorDialog onChosen={alert.forEditor} onClose={close} />

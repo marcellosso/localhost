@@ -305,6 +305,12 @@ impl Remote {
         self.call(Request::StopEveryRun { origin }).await
     }
 
+    /// Asks the shared core to exit as soon as no client is connected, e.g.
+    /// before the app quits to install an update.
+    pub async fn retire(&self) -> Result<(), LocalhostError> {
+        self.call(Request::Retire).await
+    }
+
     pub async fn set_automatic_port_move(&self, is_enabled: bool) -> Result<(), LocalhostError> {
         self.call(Request::SetAutomaticPortMove { is_enabled }).await
     }

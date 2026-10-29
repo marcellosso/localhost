@@ -11,6 +11,9 @@
 #                      search list; unset or "-" signs ad hoc
 #   DEVELOPER_ID=1     add a secure timestamp, which notarization requires
 #   OUTPUT_DIR         where the DMG goes (default: build/release)
+#   SPARKLE_PUBLIC_KEY the updater's public key (RELEASING.md); without it the app
+#                      doesn't check for updates
+#   FEED_URL           where the app looks for updates, if not the Info.plist's appcast
 #
 # Prints the DMG's path on the last line.
 set -euo pipefail
@@ -53,10 +56,28 @@ for arch in arm64 x86_64; do
     fi
 done
 
+# Updates (apps/macos/App/Updates.swift): the key apps verify them with, and where they look.
+plist="$app/Contents/Info.plist"
+if [[ -n ${SPARKLE_PUBLIC_KEY:-} ]]; then
+    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$plist"
+else
+    echo "warning: no SPARKLE_PUBLIC_KEY: this build won't check for updates" >&2
+fi
+if [[ -n ${FEED_URL:-} ]]; then
+    /usr/libexec/PlistBuddy -c "Set :SUFeedURL $FEED_URL" "$plist"
+fi
+
 echo "==> Signing with ${identity/#-/an ad hoc signature}" >&2
-# Hardened runtime as in the Xcode project; the app has no nested code to sign first.
-codesign --force --sign "$identity" "${timestamp[@]}" \
-    --options runtime --entitlements apps/macos/App/Localhost.entitlements "$app" >&2
+# Hardened runtime as in the Xcode project. Sparkle's helpers first, inside
+# out, then the app; Sparkle's own documentation lists them.
+sparkle="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
+sign() { codesign --force --sign "$identity" "${timestamp[@]}" --options runtime "$@" >&2; }
+sign "$sparkle/XPCServices/Installer.xpc"
+sign --preserve-metadata=entitlements "$sparkle/XPCServices/Downloader.xpc"
+sign "$sparkle/Autoupdate"
+sign "$sparkle/Updater.app"
+sign "$app/Contents/Frameworks/Sparkle.framework"
+sign --entitlements apps/macos/App/Localhost.entitlements "$app"
 codesign --verify --strict --verbose=2 "$app" >&2
 
 echo "==> Packing $dmg" >&2

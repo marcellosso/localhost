@@ -24,6 +24,8 @@ pub struct Settings {
     pub appearance: Appearance,
     /// Points, for the log and the commands in Service rows.
     pub log_font_size: u8,
+    /// Whether localhost checks for a new version at launch and every few hours.
+    pub automatic_update_checks: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
@@ -41,7 +43,13 @@ pub const LOG_FONT_SIZES: [u8; 6] = [10, 11, 12, 13, 14, 16];
 
 impl Default for Settings {
     fn default() -> Settings {
-        Settings { editor_command: None, automatic_port_move: true, appearance: Appearance::System, log_font_size: 12 }
+        Settings {
+            editor_command: None,
+            automatic_port_move: true,
+            appearance: Appearance::System,
+            log_font_size: 12,
+            automatic_update_checks: true,
+        }
     }
 }
 
@@ -155,6 +163,7 @@ mod tests {
             automatic_port_move: false,
             appearance: Appearance::Dark,
             log_font_size: 14,
+            automatic_update_checks: false,
         };
         store.save(changed.clone()).unwrap();
         assert_eq!(SettingsStore::open(Some(path)).get(), changed);

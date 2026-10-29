@@ -80,6 +80,9 @@ struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { model.updates.checkForUpdates() }
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { openWindow(id: "settings") }
                 .keyboardShortcut(",")

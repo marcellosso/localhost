@@ -5,5 +5,19 @@
 	<!-- Keep the pre-Liquid Glass appearance on macOS 26 (AGENTS.md, Design: no Liquid Glass). -->
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
+	<!-- Updates (Updates.swift). scripts/build-release.sh adds SUPublicEDKey, and may move
+	     the feed; without the key, the app doesn't check. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/marcellosso/localhost/releases/latest/download/appcast.xml</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>21600</integer>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

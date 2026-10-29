@@ -227,6 +227,12 @@ pub fn exit_now(app: &AppHandle) {
     app.exit(0);
 }
 
+/// Lets the next exit through without asking, e.g. the restart that
+/// installs an update, once it has stopped every Run itself.
+pub fn allow_exit(app: &AppHandle) {
+    app.state::<AppState>().lifecycle.is_exiting.store(true, Ordering::SeqCst);
+}
+
 /// Whether an exit Tauri is about to make may go ahead. `code` is `None`
 /// when the last window closed, which keeps the app running; an
 /// `AppHandle::exit` that didn't come through `quit` asks first.

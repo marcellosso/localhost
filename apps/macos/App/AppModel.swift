@@ -135,6 +135,8 @@ final class AppModel {
     @ObservationIgnored var quitOrigin: Origin = .mainWindow
     /// Opens (or focuses) the main window; set by the scene that can open it.
     @ObservationIgnored var showMainWindow: (() -> Void)?
+    /// New versions: the sidebar's notice, Check for Updates… and its setting.
+    let updates = UpdateController()
 
     /// Whether a Service may move to a free port when its Port is taken.
     var isAutomaticPortMoveEnabled: Bool {
@@ -178,6 +180,7 @@ final class AppModel {
         observeProjects()
         announceStates()
         connectToSharedCore()
+        updates.model = self
     }
 
     // MARK: Reading
@@ -220,6 +223,15 @@ final class AppModel {
 
     var activeServiceCount: Int {
         core?.statuses.statuses.values.filter(\.state.isActive).count ?? 0
+    }
+
+    /// The active Services' names by Project, in the sidebar's order, e.g.
+    /// to say what an update stops.
+    var activeServicesByProject: [(project: String, services: [String])] {
+        projects.compactMap { project in
+            let names = project.services.filter { status(of: $0).state.isActive }.map(\.name)
+            return names.isEmpty ? nil : (project.name, names)
+        }
     }
 
     /// A Key derived from `name` that no other Project uses.
@@ -324,6 +336,13 @@ final class AppModel {
 
     func stopAllServices(origin: Origin = .mainWindow) async {
         await core?.services.stopAll(origin: origin)
+    }
+
+    /// Before an update installs: stops every Run, then retires the shared
+    /// core, so the new version starts one of its own.
+    func prepareForUpdate() async {
+        await core?.services.stopAll(origin: .mainWindow)
+        await core?.services.retireSharedCore()
     }
 
     // MARK: Editing

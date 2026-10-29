@@ -6,11 +6,13 @@ import { importProject } from "../editors";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { isActive, projectServicesSummary } from "../status";
 import { showAlert, showSheet } from "../ui";
+import { useUpdate } from "../updates";
 import { ClearIcon, GearIcon, GlobeIcon, KeyboardIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph } from "./StateGlyph";
+import { UpdateNotice } from "./UpdateNotice";
 import styles from "./Sidebar.module.css";
 
 type Props = {
@@ -19,9 +21,13 @@ type Props = {
   onSelect: (selection: SidebarSelection) => void;
 };
 
-/** The wordmark and project search, Ports and the Projects, and a footer with Settings and how many Services run. */
+/**
+ * The wordmark and project search, Ports and the Projects, a newer version
+ * when there is one, and a footer with Settings and how many Services run.
+ */
 export function Sidebar({ view, selection, onSelect }: Props) {
   const [search, setSearch] = useState("");
+  const update = useUpdate();
   const query = search.trim().toLowerCase();
   const projects = query
     ? view.projects.filter((p) => p.name.toLowerCase().includes(query) || p.key.includes(query))
@@ -113,6 +119,7 @@ export function Sidebar({ view, selection, onSelect }: Props) {
           </li>
         )}
       </ul>
+      <UpdateNotice update={update} />
       <footer className={styles.footer}>
         <div className={styles.footerButtons}>
           <button

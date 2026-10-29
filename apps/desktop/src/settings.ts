@@ -4,7 +4,13 @@ import { commands, type Settings } from "./bindings";
 import { showAlert } from "./ui";
 
 /** Until the app's settings arrive: the defaults. */
-let current: Settings = { editorCommand: null, automaticPortMove: true, appearance: "system", logFontSize: 12 };
+let current: Settings = {
+  editorCommand: null,
+  automaticPortMove: true,
+  appearance: "system",
+  logFontSize: 12,
+  automaticUpdateChecks: true,
+};
 const listeners = new Set<() => void>();
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
