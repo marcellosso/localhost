@@ -31,7 +31,7 @@ use tokio::sync::Notify;
 
 use super::server::Core;
 use super::{Client, Remote};
-use crate::{Link, LocalhostError, ServiceManagerOptions};
+use crate::{Link, LocalhostError, RunEnvironment, ServiceManagerOptions};
 
 const SOCKET_NAME: &str = "localhostd.sock";
 const LOCK_NAME: &str = "localhostd.lock";
@@ -131,9 +131,9 @@ fn start(mut daemon: std::process::Command, storage_root: &Path) -> Result<(), L
         .stderr(log.map_or_else(|_| Stdio::null(), Stdio::from))
         .current_dir("/")
         .env_clear()
-        .envs(std::env::vars_os().filter(|(name, _)| {
-            let name = name.to_string_lossy();
-            KEPT_VARIABLES.contains(&name.as_ref()) || name.starts_with("LC_") || name.starts_with("XDG_")
+        // Without an AppImage's own entries, which go away with the client.
+        .envs(RunEnvironment::current().into_iter().filter(|(name, _)| {
+            KEPT_VARIABLES.contains(&name.as_str()) || name.starts_with("LC_") || name.starts_with("XDG_")
         }));
     // SAFETY: `setsid` is async-signal-safe, and nothing else runs between
     // fork and exec.
