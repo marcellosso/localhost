@@ -2,6 +2,16 @@ import { commands } from "./bindings";
 import { linesReceived } from "./log/useLog";
 import { currentCore } from "./store";
 
+// The main window's: its selection is its own state.
+let showAllServices: (() => void) | null = null;
+let isMeasuring = false;
+
+/** How the measurement puts the Project's combined stream on screen; without it, no log is open. */
+export function onPerfMeasurement(show: () => void) {
+  showAllServices = show;
+  if (isMeasuring) show();
+}
+
 /**
  * The log performance measurement (src-tauri/src/perf.rs): when the app was
  * launched for one, starts the chatty Project and records every frame while
@@ -12,6 +22,8 @@ export async function runPerfMeasurement() {
   const core = currentCore();
   if (!settings || core.phase !== "ready") return;
   const project = core.view.projects[0];
+  isMeasuring = true;
+  showAllServices?.();
   await commands.startAll(project.id);
 
   // Let the first batch (the buffered lines) land before measuring.

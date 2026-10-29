@@ -62,4 +62,9 @@ if [[ -z $report ]]; then
 fi
 rm -f "$output"
 echo "$report"
+# Frame times with nothing on screen would look perfect.
+if [[ $report == *'"linesReceived":0,'* ]]; then
+    echo "error: the log view received no lines, so it measured nothing" >&2
+    exit 1
+fi
 echo "memory: peak $(( peak / 1024 )) MB, average $(( total / (samples > 0 ? samples : 1) / 1024 )) MB (app process tree, without the Services)"

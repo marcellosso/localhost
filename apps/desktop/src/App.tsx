@@ -15,8 +15,8 @@ import { Toolbar } from "./components/Toolbar";
 import { importProject } from "./editors";
 import { SHORTCUTS, serviceShortcut, shortcutLabel } from "./keyboard";
 import { loadHome, tildePath } from "./paths";
-import { runPerfMeasurement } from "./perf";
-import { noService, type ServiceSelection, type SidebarSelection } from "./selection";
+import { onPerfMeasurement, runPerfMeasurement } from "./perf";
+import { allServices, noService, type ServiceSelection, type SidebarSelection } from "./selection";
 import { loadSettings } from "./settings";
 import type { CoreView } from "./core";
 import type { Navigator } from "./palette";
@@ -92,6 +92,7 @@ function MainWindow({ view }: { view: CoreView }) {
   );
   useWindowShortcuts({ view, selected, selection, setSelection, navigator });
   useReveal(navigator);
+  useEffect(() => onPerfMeasurement(() => setSelection(allServices)), []);
 
   return (
     <div className="app">
