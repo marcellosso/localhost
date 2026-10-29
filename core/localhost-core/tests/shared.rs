@@ -1,17 +1,17 @@
 //! The shared core (`localhost_core::remote::shared`): several clients on
-//! one socket driving one Service manager, with real processes, and what
-//! each one disconnecting stops.
-#![cfg(unix)]
+//! one socket (a named pipe on Windows) driving one Service manager, with
+//! real processes, and what each one disconnecting stops.
 
 mod common;
 
-use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
 
 use common::{Fixture, PATIENCE, key, test_options, wait_until};
 use localhost_core::remote::{Client, Remote, shared};
 use localhost_core::{Id, NewService, Origin, Project, ProjectLibrary, Service, ServiceState};
 use tokio::task::JoinHandle;
+
+const SLEEPING: &str = if cfg!(windows) { r#"python -c "import time; time.sleep(1000)""# } else { "sleep 1000" };
 
 struct Setup {
     fixture: Fixture,
@@ -39,7 +39,7 @@ async fn setup(idle_timeout: Duration) -> Setup {
 
 impl Setup {
     fn service(&self, key_text: &str, dependencies: Vec<Id>) -> Service {
-        let service = NewService::new(key_text.to_uppercase(), key(key_text), "sleep 1000");
+        let service = NewService::new(key_text.to_uppercase(), key(key_text), SLEEPING);
         self.library.add_service(self.project.id, service, vec![], dependencies, Origin::MainWindow).unwrap()
     }
 
@@ -160,20 +160,49 @@ async fn the_core_exits_once_no_client_has_been_connected_for_a_while() {
 }
 
 #[test]
-fn one_core_per_storage_root_and_only_its_user_may_connect() {
+fn one_core_per_storage_root() {
     let fixture = Fixture::new();
     let lock = shared::lock(fixture.path()).unwrap();
     assert!(lock.is_some());
     assert!(shared::lock(fixture.path()).unwrap().is_none(), "a second core finds it taken");
     drop(lock);
     assert!(shared::lock(fixture.path()).unwrap().is_some(), "free again once the first is gone");
+}
 
+#[cfg(unix)]
+#[test]
+fn only_its_user_may_connect() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = Fixture::new();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let _listener = runtime.block_on(async { shared::bind(fixture.path()).unwrap() });
     let mode = std::fs::metadata(shared::socket_path(fixture.path())).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o600);
 }
 
+/// Pipe names are one namespace for the whole machine: a core never serves
+/// a name someone else already has.
+#[cfg(windows)]
+#[test]
+fn a_pipe_is_named_after_its_storage_root_and_taken_only_once() {
+    let fixture = Fixture::new();
+    let name = shared::pipe_name(fixture.path());
+    assert!(name.starts_with(r"\\.\pipe\localhostd-"), "{name}");
+    let shouted = std::path::PathBuf::from(fixture.path().to_string_lossy().to_uppercase());
+    assert_eq!(shared::pipe_name(&shouted), name, "the same root regardless of case");
+    assert_ne!(shared::pipe_name(&fixture.path().join("other")), name);
+
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    runtime.block_on(async {
+        let listener = shared::bind(fixture.path()).unwrap();
+        assert!(shared::bind(fixture.path()).is_err(), "a second core can't take the name");
+        drop(listener);
+        shared::bind(fixture.path()).expect("free again once the first is gone");
+    });
+}
+
+#[cfg(unix)]
 #[test]
 fn a_socket_path_too_long_for_the_system_moves_to_the_temporary_folder() {
     let short = std::path::Path::new("/tmp/localhost");
