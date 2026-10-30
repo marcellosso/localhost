@@ -42,7 +42,7 @@ Agents that run inside a WSL distro, such as Claude Code installed in Ubuntu, ke
 
 ## Use it in a terminal
 
-**Settings → Agents → Use localhost in a terminal → Add to PATH** links `~/.local/bin/localhost` to the app's command on macOS and Linux, and tells you the line to add to your shell profile if `~/.local/bin` isn't on your `PATH`. On Windows it adds the app's folder to your user `PATH`; new terminals find `localhost`. **Remove from PATH** undoes it. The `.deb` and `.rpm` put `localhost` in `/usr/bin` already. Agents don't need it: their configuration names the full path.
+**Settings → Agents → Use localhost in a terminal → Add to PATH** links `~/.local/bin/localhost` to the app's command on macOS and Linux, and tells you the line to add to your shell profile if `~/.local/bin` isn't on your `PATH`. On Windows it adds the app's folder to your user `PATH`; new terminals find `localhost`. **Remove from PATH** undoes it. The `.deb` and `.rpm` put `localhost` in `/usr/bin` already, and the [Homebrew cask](/docs/install#homebrew-macos) links it into Homebrew's `bin`. Agents don't need it: their configuration names the full path.
 
 ## Set it up by hand
 

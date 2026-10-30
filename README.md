@@ -337,7 +337,7 @@ Yes. localhost is free and open source under the MIT license. There is no accoun
 
 ### Does it work on Windows/WSL and Linux?
 
-Yes. On Windows 10 or 11 (x64), a Project runs on Windows itself or inside a WSL 2 distro. On Linux there are `.deb` (Ubuntu 22.04+, Debian 12+), `.rpm` (Fedora) and AppImage packages for x86_64. On macOS it needs macOS 15 or later, on Apple silicon or Intel.
+Yes. On Windows 10 or 11 (x64), a Project runs on Windows itself or inside a WSL 2 distro. On Linux there are `.deb` (Ubuntu 22.04+, Debian 12+), `.rpm` (Fedora) and AppImage packages for x86_64. On macOS it needs macOS 15 or later, on Apple silicon or Intel, and Homebrew installs it too: `brew install --cask marcellosso/tap/localhost`.
 
 Releases aren’t notarized yet, so the first launch on macOS needs one extra step: System Settings → Privacy & Security → Open Anyway, or `xattr -dr com.apple.quarantine /Applications/localhost.app` in Terminal. On Windows, SmartScreen asks once: click More info, then Run anyway.
 

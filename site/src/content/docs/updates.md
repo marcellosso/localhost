@@ -18,7 +18,7 @@ Installing restarts localhost, so, as when you quit, **every running Service sto
 
 | | How it updates |
 |---|---|
-| macOS | The app updates itself. |
+| macOS | The app updates itself, also when installed with [Homebrew](/docs/install#homebrew-macos): `brew upgrade` leaves it alone. |
 | Windows | The app updates itself. The `localhostd` it copies into WSL distros is replaced with it. |
 | Linux AppImage | The AppImage updates itself. |
 | Linux `.deb`, `.rpm` | Your package manager installs updates, so the notice says “Install it with your package manager.” and its **Download** opens the release. Install it as in [Install](/docs/install). |

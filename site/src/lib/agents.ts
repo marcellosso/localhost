@@ -50,7 +50,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'Do I need to install anything besides the app?',
     answer: [
-      'No. The app comes with the `localhost` command, the same version, and updates it with itself. Settings → Agents adds the `localhost` MCP server to Claude Code, Cursor or Codex and installs the localhost-mcp skill, showing exactly what changes first; it can also put `localhost` on your PATH for the terminal.',
+      'No. The app comes with the `localhost` command, the same version, and updates it with itself. Settings → Agents adds the `localhost` MCP server to Claude Code, Cursor or Codex and installs the localhost-mcp skill, showing exactly what changes first; it can also put `localhost` on your PATH for the terminal. On macOS, installing with Homebrew (`brew install --cask marcellosso/tap/localhost`) puts it there already.',
     ],
   },
 ];

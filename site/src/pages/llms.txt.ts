@@ -3,7 +3,7 @@ import { agentsDefinition, agentsFaq, tools } from '../lib/agents';
 import { alternatives } from '../lib/compare';
 import { pages } from '../lib/docs';
 import { definition, faq, plain } from '../lib/faq';
-import { releases, repository } from '../lib/site';
+import { brewInstall, releases, repository } from '../lib/site';
 
 /** A plain-text summary for language models, in the llms.txt format: what localhost is, the FAQ and where to read more. */
 export const GET: APIRoute = ({ site }) => {
@@ -34,7 +34,7 @@ export const GET: APIRoute = ({ site }) => {
     '## More',
     '',
     `- [Changelog](${url('/changelog')}): what changed in each release.`,
-    `- [Download](${releases}): the latest release on GitHub.`,
+    `- [Download](${releases}): the latest release on GitHub. On macOS, also with Homebrew: ${brewInstall}`,
     `- [Source code](${repository}): MIT licensed.`,
     '',
   ];
