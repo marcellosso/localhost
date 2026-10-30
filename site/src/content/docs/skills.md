@@ -25,7 +25,7 @@ The MCP server itself also sends the agent short instructions when it connects, 
 | Cursor | `~/.cursor/skills/localhost-mcp/SKILL.md` | `.cursor/skills/localhost-mcp/SKILL.md` |
 | Codex | `~/.agents/skills/localhost-mcp/SKILL.md` | `.agents/skills/localhost-mcp/SKILL.md` |
 
-The app installs the version it comes with, and **Settings → Agents** offers **Update** when the installed one differs. It removes a `localhost-mcp` skill only if it is localhost's (its `name` is `localhost-mcp`).
+Cursor also reads Claude Code's and Codex's folders ([Cursor's docs](https://cursor.com/docs/skills)), so while either has the skill, Cursor uses that copy instead of a second one in `~/.cursor/skills`. The app installs the version it comes with, and **Settings → Agents** offers **Update** when the installed one differs. It removes a `localhost-mcp` skill only if it is localhost's (its `name` is `localhost-mcp`).
 
 To install it by hand, copy the `localhost-mcp` folder (with its `SKILL.md`) there. For example, for Claude Code:
 

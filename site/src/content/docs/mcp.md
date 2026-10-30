@@ -4,17 +4,19 @@ It is a [Model Context Protocol](https://modelcontextprotocol.io) server on stan
 
 ## Connect from the app
 
-The app comes with the `localhost` command and connects your agents for you, no terminal needed. Open **Settings → Agents**, or **Connect Agents…** in the command palette (**Connect Your Agents** before you have any Projects), and click **Connect** next to Claude Code, Cursor or Codex. **What changes** shows exactly what localhost writes before you click:
+The app comes with the `localhost` command and connects your agents for you, no terminal needed. It opens **Connect your agents** by itself the first time it starts; after that, open **Settings → Agents**, or **Connect Agents…** in the command palette (also **Connect Your Agents** before you have any Projects), and click **Connect** next to Claude Code, Cursor or Codex. **What changes** shows exactly what localhost writes before you click:
 
 | Agent | MCP server added to | Skill installed in |
 |---|---|---|
 | Claude Code | `~/.claude.json`, as a user-scope server for every project | `~/.claude/skills/localhost-mcp/` |
-| Cursor | `~/.cursor/mcp.json` | `~/.cursor/skills/localhost-mcp/` |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursor/skills/localhost-mcp/`, unless Claude Code's or Codex's folder has it: Cursor reads those too |
 | Codex | `~/.codex/config.toml`, shared by the Codex CLI, IDE extension and app | `~/.agents/skills/localhost-mcp/` |
 
 The entry is a server named `localhost` that runs the command inside the app with `mcp`, and the skill is the [localhost-mcp skill](/docs/skills). Then start a new Claude Code session, check **Cursor Settings → MCP**, or restart Codex.
 
 - **Only its own entries.** Every other server and setting in the file stays as it was, comments and order included.
+- **Claude Code's own command when there is one.** If `claude` is installed, localhost runs `claude mcp add-json --scope user localhost` and `claude mcp remove --scope user localhost` instead of editing `~/.claude.json`, which Claude Code also writes while it runs. Without it, localhost edits the file.
+- **One copy of the skill.** Cursor [also reads](https://cursor.com/docs/skills) `~/.claude/skills` and `~/.agents/skills`, so when Claude Code or Codex is connected, Cursor uses their copy, and gets its own again if they disconnect.
 - **A backup first.** Before it first changes a file, localhost keeps a copy in the `agent-backups` folder of its [data folder](/docs/data), and shows where.
 - **Nothing until you click**, and connecting again changes nothing.
 - **Disconnect** removes the `localhost` entry and the skill, nothing else.
@@ -23,7 +25,7 @@ An agent that isn't installed shows as not found. If its file can't be read, or 
 
 ### Keeping it current
 
-The command updates with the app, so agents always run the same version as the app and its background core. If an agent's `localhost` server runs another command, such as one built with `cargo install` in `~/.cargo/bin`, or one that's gone because the app moved, **Settings → Agents** shows **Update**: it points the server at the app's command and keeps the rest of its entry, such as `env`.
+The command updates with the app, so agents always run the same version as the app and its background core. Restart to Update asks first when agents are connected ("Stop 2 services and disconnect 1 agent and update?") and disconnects them as it stops your Services: their `localhost mcp` ends, so the update can replace the command (on Windows a running one can't be), and the agent's next session starts the new version. If an agent's `localhost` server runs another command, such as one built with `cargo install` in `~/.cargo/bin`, or one that's gone because the app moved, **Settings → Agents** shows **Update**: it points the server at the app's command and keeps the rest of its entry, such as `env`.
 
 Where the command is:
 
