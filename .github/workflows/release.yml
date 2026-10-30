@@ -22,10 +22,17 @@ name: Release
 #   secrets    TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD, SPARKLE_PRIVATE_KEY
 #   variables  TAURI_UPDATER_PUBLIC_KEY, SPARKLE_PUBLIC_KEY
 # scripts/create-updater-keys.sh makes them; see RELEASING.md.
+#
+# Homebrew: publishing the release runs this workflow again, which only writes
+# the cask for its DMG into the tap (marcellosso/homebrew-tap, Casks/localhost.rb).
+# It needs, and fails without, the secret HOMEBREW_TAP_TOKEN: a fine-grained
+# token for the tap alone, with Contents read and write.
 
 on:
   push:
     tags: ["v*"]
+  release:
+    types: [published]
 
 permissions:
   contents: write
@@ -44,6 +51,7 @@ jobs:
       # A release without signed updates would leave every user of it on that
       # version for good, so none is built without the keys.
       - name: Check the updater keys
+        if: github.event_name == 'push'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -73,6 +81,7 @@ jobs:
   macos:
     name: Build the macOS DMG
     needs: version
+    if: github.event_name == 'push'
     runs-on: macos-26
     outputs:
       mode: ${{ steps.signing.outputs.mode }}
@@ -220,6 +229,7 @@ jobs:
   linux:
     name: Build the Linux packages
     needs: version
+    if: github.event_name == 'push'
     # The oldest Ubuntu the packages support: they need its glibc or newer.
     runs-on: ubuntu-22.04
     defaults:
@@ -316,6 +326,7 @@ jobs:
   localhostd:
     name: Build localhostd for WSL
     needs: version
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -529,3 +540,66 @@ jobs:
             --draft --verify-tag --title "localhost $VERSION" \
             --notes "$notes" --generate-notes
 
+  homebrew:
+    name: Update the Homebrew cask
+    needs: version
+    # Once the release is published, so the cask never points at a draft's DMG;
+    # a pre-release isn't offered to Homebrew users.
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      TAP: ${{ github.repository_owner }}/homebrew-tap
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Check the tap token
+        run: |
+          if [[ -z $HOMEBREW_TAP_TOKEN ]]; then
+            echo "::error::Missing the HOMEBREW_TAP_TOKEN secret, so $TAP can't be updated. Create it as RELEASING.md (Homebrew) says, then re-run this job."
+            exit 1
+          fi
+
+      # For scripts/homebrew-cask.sh and its template.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts
+            packaging
+
+      # The published DMG, checked against the release's own .sha256.
+      - name: Write the cask
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dmg=localhost-$VERSION.dmg
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/dmg" \
+            --pattern "$dmg" --pattern "$dmg.sha256"
+          (cd "$RUNNER_TEMP/dmg" && sha256sum -c "$dmg.sha256")
+          sha256=$(sha256sum "$RUNNER_TEMP/dmg/$dmg" | cut -d' ' -f1)
+          scripts/homebrew-cask.sh "$VERSION" "$sha256" > "$RUNNER_TEMP/localhost.rb"
+          cat "$RUNNER_TEMP/localhost.rb"
+
+      # A release older than the tap's cask, e.g. a fix for an earlier minor
+      # version, leaves the cask alone.
+      - name: Push the cask to the tap
+        run: |
+          tap=$RUNNER_TEMP/tap
+          git clone --depth 1 "https://x-access-token:$HOMEBREW_TAP_TOKEN@github.com/$TAP.git" "$tap"
+          cask=$tap/Casks/localhost.rb
+          current=$(sed -n 's/^  version "\(.*\)"$/\1/p' "$cask" 2>/dev/null || true)
+          if [[ -n $current && $current != "$VERSION" &&
+                $(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | tail -1) == "$current" ]]; then
+            echo "::notice::$TAP already has localhost $current, newer than $VERSION: left as it is."
+            exit 0
+          fi
+          mkdir -p "$tap/Casks"
+          cp "$RUNNER_TEMP/localhost.rb" "$cask"
+          cd "$tap"
+          git add Casks/localhost.rb
+          if git diff --cached --quiet; then
+            echo "$TAP already has this cask."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898173+github-actions[bot]@users.noreply.github.com" \
+            commit -m "localhost $VERSION"
+          git push origin HEAD

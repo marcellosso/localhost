@@ -40,6 +40,7 @@ apps/desktop/            the Linux and Windows app (Tauri 2)
 skills/                  agent skills, e.g. using localhost's MCP server
 site/                    the website (Astro): landing page, docs, changelog; reads docs/ and the desktop tokens
 scripts/                 build-core.sh, build-release.sh, signing and installer artwork
+packaging/homebrew/      the Homebrew cask's template; the tap is marcellosso/homebrew-tap
 docs/configuration.md    the Project file format (user-facing)
 ```
 

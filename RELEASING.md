@@ -4,6 +4,8 @@ Releases are on GitHub Releases: a DMG for macOS; for Linux, a `.deb`, an `.rpm`
 
 The release also carries the update feeds that installed apps check: `latest.json` for the Linux and Windows app and `appcast.xml` for the macOS app, both naming this release's packages, each signed with the updater keys (see [Updates](#updates)). Apps read them from `releases/latest/download/`, so an update reaches users only once its release is published, and a draft or pre-release never.
 
+Publishing the release runs the workflow once more, to write the [Homebrew](#homebrew) cask for its DMG into the tap.
+
 ## Versions
 
 [SemVer](https://semver.org), `0.x` for now. The tag is the only place the version lives: `v0.3.1` builds version `0.3.1` (`CFBundleShortVersionString`), with the workflow's run number as the build number (`CFBundleVersion`). The Linux packages get the same version. `MARKETING_VERSION` in the Xcode project and `version` in `apps/desktop/src-tauri/tauri.conf.json` are only what local builds say. The bundled `localhost` command gets it through `LOCALHOST_VERSION` at build time; without it, it says the crates' version.
@@ -31,6 +33,7 @@ Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*`
 4. Wait for the **Release** workflow (Actions tab). It ends with a draft release named "localhost 0.3.0".
 5. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears. On Windows 11 with Ubuntu in WSL 2, run the installer and check that a Project in the distro starts, opens in the browser, and stops when localhost quits.
 6. Click **Publish release**. Installed apps see the update at their next check (at launch, or within six hours). Check that one does: open the previous version, use **Check for Updates…**, and install the update with a Service running, which should be listed and stopped first.
+7. Check the **Release** run that publishing started: its one job, **Update the Homebrew cask**, pushes `Casks/localhost.rb` with the new version to [marcellosso/homebrew-tap](https://github.com/marcellosso/homebrew-tap). `brew update && brew info --cask marcellosso/tap/localhost` then shows it.
 
 A fix is a normal change: branch → PR → merge → a patch tag (`v0.3.1`).
 
@@ -147,6 +150,29 @@ gh variable set SPARKLE_PUBLIC_KEY < ~/localhost-updater-keys/sparkle-public-key
 - `scripts/test-updater-scripts.sh` checks these scripts with throwaway keys; CI runs it.
 
 Local builds have no public key, so they never check for updates.
+
+## Homebrew
+
+macOS users can install with `brew install --cask marcellosso/tap/localhost`. The cask lives in its own repository, [marcellosso/homebrew-tap](https://github.com/marcellosso/homebrew-tap), as `Casks/localhost.rb`; its template is [`packaging/homebrew/localhost.rb`](packaging/homebrew/localhost.rb) here, and `scripts/homebrew-cask.sh <version> <sha256>` fills in a release's version and the DMG's SHA-256. [`packaging/homebrew/Casks/localhost.rb`](packaging/homebrew/Casks/localhost.rb) is that output for 0.3.0, the tap's first cask.
+
+The cask installs the app and links its `localhost` command (`Contents/Helpers/localhost`) as `localhost` into Homebrew's `bin`. It says `auto_updates true`: Sparkle updates the app, so `brew upgrade` doesn't replace it, and the cask only needs to be current for new installs.
+
+When a release is published (not a draft, not a pre-release), the workflow's `homebrew` job downloads its DMG, checks it against the release's `.sha256`, writes the cask and pushes it to the tap as "localhost <version>". A release older than the tap's cask leaves it alone. The job fails, before anything else, without this secret:
+
+| | Name | What |
+|---|---|---|
+| secret | `HOMEBREW_TAP_TOKEN` | a fine-grained personal access token for `marcellosso/homebrew-tap` only, with **Contents: Read and write** |
+
+Create it under GitHub → Settings → Developer settings → Fine-grained tokens: resource owner `marcellosso`, **Only select repositories** → `homebrew-tap`, repository permission **Contents** read and write (Metadata read-only comes with it). Store it with `gh secret set HOMEBREW_TAP_TOKEN -R marcellosso/localhost`. Fine-grained tokens expire, a year at most: put the expiry in your calendar, and when a run fails for it, make a new one, store it, and re-run the failed job.
+
+To update the tap by hand, e.g. for a release published before the secret existed:
+
+```sh
+gh release download v0.3.0 -R marcellosso/localhost -p 'localhost-0.3.0.dmg.sha256'
+scripts/homebrew-cask.sh 0.3.0 "$(cut -d' ' -f1 localhost-0.3.0.dmg.sha256)" > ../homebrew-tap/Casks/localhost.rb
+```
+
+To check a cask change before it ships, copy the rendered cask into a local tap (`brew tap-new <you>/test`, then `Casks/localhost.rb` in it) and run `brew style --cask` and `brew audit --cask --strict --online` on it.
 
 ## Building a release locally
 

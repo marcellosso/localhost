@@ -10,9 +10,17 @@ Download the latest release from [GitHub Releases](https://github.com/marcelloss
 
 Releases aren't notarized or code-signed by a known publisher yet, so the first launch needs one extra step on macOS and Windows; see [First launch](#first-launch). There are no Flatpak or Snap packages: their sandboxes can't run your project's commands.
 
+## Homebrew (macOS)
+
+```sh
+brew install --cask marcellosso/tap/localhost
+```
+
+The same app, from the same release, in **Applications**. Homebrew also links its `localhost` command into its own `bin`, so terminals can run `localhost` without [Add to PATH](/docs/mcp#use-it-in-a-terminal). The app keeps updating itself, so `brew upgrade` leaves it alone. `brew uninstall --cask localhost` removes it; with `--zap` it also deletes localhost's data folder (your Projects and logs; Secrets stay in the Keychain). Homebrew marks what it downloads as quarantined, as a browser does, so the first launch needs the same extra step: see [First launch](#first-launch).
+
 ## Updates
 
-localhost checks for a new version at launch and every 6 hours, and offers it in a notice at the bottom of the sidebar; installing it stops your running Services first, after asking. The AppImage, the Windows installer and the macOS app update themselves; for a `.deb` or `.rpm`, your package manager does. See [Updates](/docs/updates).
+localhost checks for a new version at launch and every 6 hours, and offers it in a notice at the bottom of the sidebar; installing it stops your running Services first, after asking. The AppImage, the Windows installer and the macOS app (also when installed with Homebrew) update themselves; for a `.deb` or `.rpm`, your package manager does. See [Updates](/docs/updates).
 
 ## First launch
 
