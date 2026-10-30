@@ -125,7 +125,8 @@ fn connecting_adds_only_localhost_and_disconnecting_restores_every_byte() {
         assert!(status.is_skill_installed);
         assert_eq!(status.configured_command.as_deref(), Some(fixture.command().as_str()));
         let connected = fixture.read(config(client));
-        assert!(connected.contains(&fixture.command()), "{client:?}: {connected}");
+        // As JSON and TOML strings write it: Windows' backslashes doubled.
+        assert!(connected.contains(&fixture.command().replace('\\', "\\\\")), "{client:?}: {connected}");
         assert_eq!(fixture.read(skill(client)), AGENT_SKILL);
 
         // The first edit's backup is the file as it was.
