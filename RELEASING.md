@@ -1,6 +1,6 @@
 # Releasing localhost
 
-Releases are on GitHub Releases: a DMG for macOS; for Linux, a `.deb`, an `.rpm` and an AppImage; and an installer for Windows. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml). It builds and signs the macOS app into `localhost-<version>.dmg`, and builds the Linux app (`apps/desktop/`) on Ubuntu 22.04 into `localhost-app_<version>_amd64.deb`, `localhost-app-<version>-1.x86_64.rpm` and `localhost-app_<version>_amd64.AppImage`, unsigned. For Windows it builds `localhostd` static for Linux (`x86_64-unknown-linux-musl`), then the same app on Windows into the per-user NSIS installer `localhost_<version>_x64-setup.exe`, with `localhostd` installed beside `localhost-app.exe` for the WSL distros. The installer is signed when a certificate exists (below). Every app bundles the `localhost` command of the same commit, which coding agents run as their MCP server: the macOS app in `Contents/Helpers/localhost`, signed like the app; the Linux packages as `/usr/bin/localhost`; the Windows installer as `localhost.exe` beside `localhost-app.exe`. Each job checks that it reports the release's version. Then it drafts one GitHub Release with all of them, a SHA-256 for each, and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
+Releases are on GitHub Releases: a DMG for macOS; for Linux, a `.deb`, an `.rpm` and an AppImage; and an installer for Windows. Pushing a `v*` tag runs the [Release workflow](.github/workflows/release.yml). It builds and signs the macOS app into `localhost-<version>.dmg`, and builds the Linux app (`apps/desktop/`) on Ubuntu 22.04 into `localhost-app_<version>_amd64.deb`, `localhost-app-<version>-1.x86_64.rpm` and `localhost-app_<version>_amd64.AppImage`, unsigned. For Windows it builds `localhostd` static for Linux (`x86_64-unknown-linux-musl`), then the same app on Windows into the per-user NSIS installer `localhost_<version>_x64-setup.exe`, with `localhostd` installed beside `localhost-app.exe` for the WSL distros. The installer is signed when a certificate exists (below). Every app bundles the `localhost` command of the same commit, which coding agents run as their MCP server: the macOS app in `Contents/Helpers/localhost`, signed like the app; the Linux packages as `/usr/bin/localhost`; the Windows installer as `localhost.exe` beside `localhost-app.exe`. Each job checks that it reports the release's version; for Linux, `scripts/check-linux-packages.sh` unpacks the `.deb`, the `.rpm` and the AppImage and runs the command in each. The Linux packages workflow does the same, unsigned, when run by hand. Then it drafts one GitHub Release with all of them, a SHA-256 for each, and notes generated from the merged PRs. Nothing is public until a maintainer publishes the draft.
 
 The release also carries the update feeds that installed apps check: `latest.json` for the Linux and Windows app and `appcast.xml` for the macOS app, both naming this release's packages, each signed with the updater keys (see [Updates](#updates)). Apps read them from `releases/latest/download/`, so an update reaches users only once its release is published, and a draft or pre-release never.
 
@@ -13,7 +13,14 @@ Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*`
 ## Cutting a release
 
 1. Make sure `main` has everything and CI is green.
-2. Tag the commit and push the tag:
+2. Run **Linux packages** by hand on the release commit, and wait for it to pass. Pull-request CI doesn't build the packages; this builds the `.deb`, the `.rpm` and the AppImage as the release does, unsigned, and checks the bundled `localhost` command in each (`scripts/check-linux-packages.sh`):
+
+   ```sh
+   gh workflow run packages.yml -R marcellosso/localhost --ref <branch>
+   gh run watch -R marcellosso/localhost "$(gh run list -R marcellosso/localhost --workflow packages.yml --limit 1 --json databaseId -q '.[0].databaseId')"
+   ```
+
+3. Tag the commit and push the tag:
 
    ```sh
    git switch main && git pull
@@ -21,9 +28,9 @@ Tags are `vMAJOR.MINOR.PATCH`, nothing else; the workflow rejects any other `v*`
    git push origin v0.3.0
    ```
 
-3. Wait for the **Release** workflow (Actions tab). It ends with a draft release named "localhost 0.3.0".
-4. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears. On Windows 11 with Ubuntu in WSL 2, run the installer and check that a Project in the distro starts, opens in the browser, and stops when localhost quits.
-5. Click **Publish release**. Installed apps see the update at their next check (at launch, or within six hours). Check that one does: open the previous version, use **Check for Updates…**, and install the update with a Service running, which should be listed and stopped first.
+4. Wait for the **Release** workflow (Actions tab). It ends with a draft release named "localhost 0.3.0".
+5. Open the draft. Edit the notes if needed (the first line says how the build is signed and what the first launch needs). Download the DMG and check that it opens, installs and launches, following the README's first-launch steps. Install the `.deb` on Ubuntu and the `.rpm` on Fedora (or run the AppImage) and check that the app launches and its tray icon appears. On Windows 11 with Ubuntu in WSL 2, run the installer and check that a Project in the distro starts, opens in the browser, and stops when localhost quits.
+6. Click **Publish release**. Installed apps see the update at their next check (at launch, or within six hours). Check that one does: open the previous version, use **Check for Updates…**, and install the update with a Service running, which should be listed and stopped first.
 
 A fix is a normal change: branch → PR → merge → a patch tag (`v0.3.1`).
 

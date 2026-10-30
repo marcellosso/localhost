@@ -232,7 +232,7 @@ jobs:
       - name: Install the webview and tray libraries
         run: >
           sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libarchive-tools
       - uses: dtolnay/rust-toolchain@1.90
       - uses: pnpm/action-setup@v4
         with:
@@ -274,9 +274,10 @@ jobs:
             {version: $version, bundle: {createUpdaterArtifacts: true, externalBin: ["binaries/localhost"]},
              plugins: {updater: {pubkey: $key, endpoints: [$feed]}}}')
           pnpm tauri build --bundles deb,rpm,appimage --config "$config"
-          # The command is in every package.
-          dpkg-deb --contents src-tauri/target/release/bundle/deb/*.deb | grep -E ' \./usr/bin/localhost$'
-          rpm -qlp src-tauri/target/release/bundle/rpm/*.rpm | grep -x /usr/bin/localhost
+
+      # Each package unpacked: usr/bin/localhost is there, runs, and says this version.
+      - name: Check the localhost command in every package
+        run: ../../scripts/check-linux-packages.sh src-tauri/target/release/bundle "${{ needs.version.outputs.version }}"
 
       - name: Collect and checksum
         env:
