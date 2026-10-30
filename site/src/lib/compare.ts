@@ -26,6 +26,7 @@ export const alternatives: Alternative[] = [
       'Development on your own machine: a window per Project, Start All in dependency order, one merged log.',
       'Built for development: your login shell’s `PATH` and version managers, Port readiness and Dependencies between Services, instead of production supervision.',
       'Nothing restarts on its own: a Service that fails stays Failed, with the reason and its output.',
+      'Coding agents start and stop the same Services over MCP (`localhost mcp`), and you see what they run in the window.',
     ],
     summary: { wins: 'Supervising production processes on servers', localhost: 'Dev servers on your own machine, with a GUI' },
   },
@@ -96,13 +97,14 @@ export const alternatives: Alternative[] = [
     name: 'devglow, DevWebUI',
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
-      'Both ship an MCP server today, so coding agents such as Claude Code and Cursor can start and stop processes. localhost doesn’t have one yet.',
+      'Both ship an MCP server, so coding agents such as Claude Code and Cursor can start and stop processes. localhost has one too, `localhost mcp`, but it isn’t in the release downloads yet: you build it from source.',
     ],
     localhost: [
       'MIT license; Linux packages (devglow has none): `.deb`, `.rpm` and AppImage.',
+      'Coding agents and the app share one background core: what an agent starts shows in the window with its logs, it never starts a second copy, and its Services stop when it disconnects unless the app is open.',
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agent control over MCP today', localhost: 'MIT license; Linux packages (devglow has none)' },
+    summary: { wins: 'Agent control over MCP without a source build', localhost: 'MIT license; Linux packages; agents and the app share Services' },
   },
 ];

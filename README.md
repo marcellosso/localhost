@@ -30,9 +30,11 @@ A **Project** is a folder. A **Service** is one long-running command in it: `pnp
 - **Environment without `.env` juggling**: variables on the Project, on each Service and in Environment Profiles (Development, Testing, …). Any variable can be a Secret, kept in your system's secret store.
 - **Set up in seconds**: point it at a folder and it suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. You review every suggestion; nothing is applied silently.
 - **Keyboard first**: a command palette, a shortcut for every action, arrow keys across the window. Screen readers, light and dark, reduced motion.
+- **Coding agents included**: Claude Code, Cursor, Codex and other MCP clients start, stop and inspect your Services through `localhost mcp` instead of a hidden shell. The agent and the app share one background core, so what the agent starts shows in the app, with its logs. See [Coding agents (MCP)](#coding-agents-mcp).
+- **Updates that ask first**: a check at launch and every 6 hours, a notice in the sidebar, and Restart to Update stops your running Services only after asking. See [Updates](#updates).
 - **Local**: no account, no cloud, works offline. Configuration lives in localhost's own storage, never in your project folders.
 
-A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside WSL.
+A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside a WSL 2 distro. All of them, the `localhost` command and the MCP server run on one Rust core.
 
 ![The localhost window on macOS: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
 
@@ -52,14 +54,14 @@ Releases aren't notarized or code-signed by a known publisher yet, so the first 
 
 ### Updates
 
-localhost checks GitHub Releases for a new version at launch and every few hours. When there is one, a notice at the bottom of the sidebar says “localhost X.Y.Z is available”, with its release notes:
+localhost checks GitHub Releases for a new version at launch and every 6 hours. When there is one, a notice at the bottom of the sidebar says “localhost X.Y.Z is available”, with its release notes:
 
 - **Update Now** downloads it in the background, and **Restart to Update** installs it and opens the new version. **Later** hides the notice until the next version. On macOS, an update that has downloaded also installs when you quit localhost.
 - **Restarting stops every running Service first**, as quitting does, after listing them and asking. Start them again once the new version opens.
 - Each update is signed, and localhost checks the signature before installing it.
 - **`.deb` and `.rpm`**: your package manager installs updates, so the notice's **Download** opens the release instead. The AppImage and the Windows installer update themselves; on macOS, so does the app.
 
-Turn automatic checks off in **Settings → General**; **Check for Updates…** (in the localhost menu on macOS, in Settings or the command palette) checks at any time. Checking is the only thing localhost asks the network for, and builds you make yourself never check.
+Turn automatic checks off in **Settings → General**; **Check for Updates…** (in the localhost menu on macOS, in Settings or the command palette) checks at any time. Checking is the only thing localhost asks the network for, and builds you make yourself never check. More in the [Updates docs](https://www.getlocalhost.app/docs/updates).
 
 ## Getting started
 
@@ -271,19 +273,25 @@ localhost mcp
 
 ## Coding agents (MCP)
 
-`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. An agent and the app drive the same Services: what one starts is Running in the other, and a stop from either stops it. The Services an agent starts stop when it disconnects, unless the app is open.
+`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. An agent and the app drive the same background core: what one starts is Running in the other, and a stop from either stops it. An agent never starts a second copy of a running Service, can't change your configuration, and reads only the Secrets of the Services it starts. The Services an agent starts stop when it disconnects, unless the app is open.
 
-For Cursor, add this to `.cursor/mcp.json` (or `~/.cursor/mcp.json`):
+It comes with the `localhost` command, built from source (see [The command line](#the-command-line)). Then connect your agent:
 
-```json
-{
-  "mcpServers": {
-    "localhost": { "command": "localhost", "args": ["mcp"] }
+- **Claude Code**: `claude mcp add localhost -- localhost mcp`
+- **Codex**: `codex mcp add localhost -- localhost mcp`
+- **Cursor**: add this to `.cursor/mcp.json` (or `~/.cursor/mcp.json`):
+
+  ```json
+  {
+    "mcpServers": {
+      "localhost": { "command": "localhost", "args": ["mcp"] }
+    }
   }
-}
-```
+  ```
 
-Claude Code: `claude mcp add localhost -- localhost mcp`. To make your agent use it by default, give it [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md). More in the [MCP docs](https://www.getlocalhost.app/docs/mcp).
+Other MCP clients take the same `command` and `args`. On Windows it covers Projects on Windows itself; a Project in a WSL distro runs only from the app.
+
+To make your agent use it by default, give it the skill in [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md): copy the `localhost-mcp` folder to `~/.claude/skills/` for Claude Code or `~/.agents/skills/` for Codex. More in the [MCP docs](https://www.getlocalhost.app/docs/mcp), the [skill docs](https://www.getlocalhost.app/docs/skills) and [localhost for AI coding agents](https://www.getlocalhost.app/agents).
 
 ## FAQ
 
@@ -300,6 +308,10 @@ For local development, yes. pm2 is a production process manager, mainly for Node
 ### How do I run frontend, backend and database together?
 
 Add the Project’s folder and localhost suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. Make the API start after the database, then press Start All (⇧⌘R, or Ctrl+Shift+R on Linux and Windows): each Service waits until its Dependencies are Running, and All services shows every log in one stream.
+
+### Can AI coding agents start my dev servers through localhost?
+
+Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
 
 ### Is it free and open source?
 
@@ -322,7 +334,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agent control over MCP today | MIT license; Linux packages (devglow has none) |
+| **devglow, DevWebUI** | Agent control over MCP without a source build | MIT license; Linux packages; agents and the app share Services |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

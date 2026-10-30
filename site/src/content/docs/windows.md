@@ -12,6 +12,16 @@ The first time a distro is used, localhost copies a small helper, `localhostd`, 
 
 Open in Browser uses `localhost:<port>`, which WSL forwards to Windows by default. If a Service in WSL is Running but the browser can't reach it, check that `%UserProfile%\.wslconfig` doesn't turn `localhostForwarding` off, then run `wsl --shutdown` and start it again.
 
+## Coding agents
+
+[`localhost mcp`](/docs/mcp) works on Windows for Projects on Windows itself: the app and the agent share one background core, reached through a named pipe (`\\.\pipe\localhostd-<number>`) that only your user can open. It runs without a window, as a second `localhost-app.exe` or `localhost.exe` in Task Manager.
+
+A Project in a WSL distro runs only from the app, which starts the `localhostd` inside the distro. An agent asked to start one is told so.
+
+## Updates
+
+The app installed by `localhost_<version>_x64-setup.exe` updates itself: **Restart to Update** stops your running Services, after asking, then installs the new version and opens it. The `localhostd` in each distro is replaced with it. See [Updates](/docs/updates).
+
 ## Terminal, editors and the tray
 
 - Open in Terminal uses Windows Terminal (with the distro's profile for WSL Projects). VS Code, Cursor, VSCodium and Windsurf open WSL folders through their WSL remote.

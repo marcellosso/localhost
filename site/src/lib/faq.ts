@@ -25,6 +25,12 @@ export const faq: { question: string; answer: string[] }[] = [
     ],
   },
   {
+    question: 'Can AI coding agents start my dev servers through localhost?',
+    answer: [
+      'Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.',
+    ],
+  },
+  {
     question: 'Is it free and open source?',
     answer: ['Yes. localhost is free and open source under the MIT license. There is no account and no backend, and it works offline.'],
   },

@@ -298,21 +298,94 @@ storybook  Storybook   not running  6006
   </section>
 
   <section class="feature">
+    <div class="container split reverse">
+      <div class="copy">
+        <p class="figure-label">Fig 08 · Coding agents</p>
+        <h2 class="display section-title">Your agent runs the same Services. <span class="title-aside">MCP for Claude Code, Cursor and Codex.</span></h2>
+        <p class="lede">
+          <code>localhost mcp</code> lets coding agents start, stop and read the logs and ports of your Services, instead of a
+          <code>pnpm dev</code> in a shell you can’t see. What an agent starts shows in the window, it never starts a second copy, and it
+          stops when the agent leaves, unless the app is open.
+        </p>
+        <ul class="checks">
+          <li>One background core for the app and the agent</li>
+          <li>Typed failures such as <code>portConflict</code></li>
+          <li>An agent skill to make it the default</li>
+        </ul>
+        <a class="more" href={href('agents')}>localhost for coding agents →</a>
+      </div>
+      <div class="terminal" aria-hidden="true">
+        <pre><span class="d">// a coding agent, through localhost mcp</span>
+<span class="p">→</span> start_service <span class="d">{'{ project: "acme-shop", service: "web" }'}</span>
+<span class="g">←</span> web   running  5173  <span class="d">startedBy:</span> agent
+  api   running  8000  <span class="d">startedBy:</span> app
+
+<span class="p">→</span> logs <span class="d">{'{ project: "acme-shop", service: "web", lines: 2 }'}</span>
+<span class="g">←</span>   <span class="g">VITE</span> v6.2.0  ready in 412 ms
+    <span class="g">➜</span>  Local:   http://localhost:5173/</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="container split">
+      <div class="copy">
+        <p class="figure-label">Fig 09 · Updates</p>
+        <h2 class="display section-title">Updates that ask first.</h2>
+        <p class="lede">
+          localhost checks for a new version at launch and every 6 hours, and offers it in the sidebar. Restart to Update stops your
+          running Services first, after listing them. Updates are signed and checked before they install.
+        </p>
+        <ul class="checks">
+          <li>The macOS app, AppImage and Windows installer update themselves</li>
+          <li><code>.deb</code> and <code>.rpm</code> stay with your package manager</li>
+          <li>Off with one switch in Settings</li>
+        </ul>
+        <a class="more" href={href('docs/updates')}>How updates work →</a>
+      </div>
+      <div class="mock-stack updates" aria-hidden="true">
+        <div class="mock notice">
+          <strong>localhost 0.3.0 is available</strong>
+          <div class="dialog-actions">
+            <span class="notes">Release Notes</span>
+            <span class="fake secondary">Later</span>
+            <span class="fake primary">Update Now</span>
+          </div>
+        </div>
+        <div class="mock dialog">
+          <strong>Stop 2 services and update?</strong>
+          <p>localhost restarts to install version 0.3.0. These services are stopped first:</p>
+          <p>Acme Shop: API, Web</p>
+          <div class="dialog-actions">
+            <span class="fake secondary">Cancel</span>
+            <span class="fake primary">Stop and Update</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature">
     <div class="container">
+      <div class="feature-head">
+        <p class="figure-label">Fig 10 · Platforms</p>
+        <h2 class="display section-title">macOS, Windows and Linux.</h2>
+        <p class="lede">One Rust core under every app, the command line and the MCP server, so a Project runs the same everywhere.</p>
+      </div>
       <div class="platform-grid">
-        <a class="platform" href={href('docs/install')}>
+        <a class="platform" href={href('docs/macos')}>
           <h3>macOS</h3>
-          <p>A native SwiftUI app with a menu bar companion.</p>
+          <p>A native SwiftUI app with a menu bar companion. Secrets in the Keychain.</p>
           <span class="req">macOS 15 or later · Apple silicon or Intel</span>
         </a>
         <a class="platform" href={href('docs/windows')}>
           <h3>Windows</h3>
-          <p>Projects on Windows itself, or inside a WSL distro.</p>
+          <p>Projects on Windows itself, or inside a WSL 2 distro. Per-user install, no administrator rights.</p>
           <span class="req">Windows 10 or 11 · x64</span>
         </a>
         <a class="platform" href={href('docs/linux')}>
           <h3>Linux</h3>
-          <p><code>.deb</code>, <code>.rpm</code> and AppImage, with a tray icon.</p>
+          <p><code>.deb</code>, <code>.rpm</code> and AppImage, with a tray icon. Secrets in the Secret Service.</p>
           <span class="req">Ubuntu 22.04+ · Debian 12+ · Fedora</span>
         </a>
       </div>
@@ -973,7 +1046,30 @@ storybook  Storybook   not running  6006
     color: #3fb950;
   }
 
+  .copy .checks {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .updates {
+    padding-bottom: 150px;
+  }
+  .notice {
+    padding: 16px;
+    max-width: 360px;
+    background: var(--surface-raised);
+  }
+  .notice strong {
+    display: block;
+    margin-bottom: 14px;
+  }
+  .notes {
+    margin-right: auto;
+    align-self: center;
+    font-size: 12px;
+    color: var(--accent-text);
+  }
   .platform-grid {
+    margin-top: 48px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;

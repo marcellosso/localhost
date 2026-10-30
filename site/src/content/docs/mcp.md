@@ -1,6 +1,6 @@
 Coding agents tend to start dev servers in a shell you can't see: a `pnpm dev` that holds a port, prints nowhere you can read, and lives on after the chat. `localhost mcp` lets them go through localhost instead. The agent starts and stops your Services, reads their status, logs and ports, and you see the same Projects and Services you configured.
 
-It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Cursor, Claude Code, Claude Desktop and any other MCP client.
+It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client.
 
 ## Install the command
 
@@ -32,15 +32,29 @@ If Cursor says it can't find `localhost`, use the full path instead, e.g. `"comm
 
 Open **Cursor Settings → MCP** to check that **localhost** is connected and lists its tools.
 
-## Other clients
-
-Claude Code:
+## Connect Claude Code
 
 ```sh
 claude mcp add localhost -- localhost mcp
 ```
 
-Claude Desktop and most other clients take the same `command` and `args` as Cursor, in their own configuration file.
+## Connect Codex
+
+```sh
+codex mcp add localhost -- localhost mcp
+```
+
+Or add it to `~/.codex/config.toml` yourself (`.codex/config.toml` for one trusted project):
+
+```toml
+[mcp_servers.localhost]
+command = "localhost"
+args = ["mcp"]
+```
+
+## Other clients
+
+Claude Desktop and most other MCP clients take the same `command` and `args` as Cursor, in their own configuration file. If a client can't find `localhost`, give it the full path, as for Cursor.
 
 ## Tools
 
@@ -51,11 +65,11 @@ Projects and Services are named by their **Key**, as `list_projects` and `list_s
 | `list_projects` | Every Project: Key, name, folder and Service Keys. |
 | `list_services` | A Project's Services as configured: command line, working directory, Port, URL, Dependencies. |
 | `status` | Each Service's state, pid, Port, URL and uptime; for a Failed one, why, with its last output. |
-| `start_service` | Starts one Service after its Dependencies, and waits until it is Running, Exited or Failed. Optionally on another port for this Run. |
+| `start_service` | Starts one Service after its Dependencies, and waits until it is Running, Exited or Failed (up to 45 seconds). Optionally on another port for this Run. |
 | `stop_service` | Stops one Service and waits until its whole process tree has ended. Dependents keep running. |
 | `start_project` | Start All: every Service in dependency order, then waits for them the same way. |
 | `stop_project` | Stops every Service of the Project, dependents first. |
-| `logs` | The latest Run's output of one Service or the whole Project, merged by time: the last `lines` lines (200 by default), optionally only from the last `since_seconds` or `contains` some text. |
+| `logs` | The latest Run's output of one Service or the whole Project, merged by time: the last `lines` lines (200 by default, at most 2,000), optionally only from the last `since_seconds` or `contains` some text. |
 | `ports` | Who listens on which port: one of your Services, a process in a Project's folder, or something unmanaged. With a Project, also whoever holds one of its Ports. |
 
 Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `commandNotFound`, `notFound`, …) and a message saying what to do next.
@@ -81,7 +95,7 @@ On Windows this covers Projects on Windows itself. A Project in a WSL distro run
 
 ## Teach your agent
 
-The server tells the agent how to use it when it connects. To make it the default, give your agent the skill in the repository, [`skills/localhost-mcp/SKILL.md`](https://github.com/marcellosso/localhost/blob/main/skills/localhost-mcp/SKILL.md), or add these lines to your project's `AGENTS.md`:
+The server tells the agent how to use it when it connects. To make it the default, give your agent the [localhost-mcp skill](/docs/skills), or add these lines to your project's `AGENTS.md`:
 
 ```md
 ## Running the project
@@ -89,3 +103,5 @@ Use the localhost MCP server to run this project's Services, never a shell:
 start_service / start_project to run, status before saying anything is running,
 logs and ports when something fails or a port is taken.
 ```
+
+Why this matters, and what agents do with it: [localhost for AI coding agents](/agents).

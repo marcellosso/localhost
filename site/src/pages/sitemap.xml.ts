@@ -18,6 +18,7 @@ function lastModified(files: string[]): string {
 /** Every indexable page, at the address its canonical link names, with the sources it is built from. */
 const entries: { path: string; files: string[] }[] = [
   { path: '/', files: ['src/pages/index.astro', 'src/lib/faq.ts', 'src/components/AppWindow.astro'] },
+  { path: '/agents', files: ['src/pages/agents.astro', 'src/lib/agents.ts'] },
   { path: '/compare', files: ['src/pages/compare.astro', 'src/lib/compare.ts'] },
   { path: '/changelog', files: ['src/pages/changelog.astro', 'src/content/changelog'] },
   ...pages.map((page) => ({

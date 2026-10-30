@@ -24,6 +24,7 @@ export const sections: { title: string; pages: DocPage[] }[] = [
       { slug: 'logs', title: 'Logs', description: 'Each Service’s output, the merged view, filtering and what is kept.', collection: 'docs', id: 'logs' },
       { slug: 'environment', title: 'Environment and Secrets', description: 'Variables on Projects, Services and Environment Profiles, and Secrets.', collection: 'docs', id: 'environment' },
       { slug: 'ports', title: 'Ports', description: 'When a Service is up, taken ports, and the Ports view.', collection: 'docs', id: 'ports' },
+      { slug: 'updates', title: 'Updates', description: 'How localhost checks for, downloads and installs a new version, and how to turn it off.', collection: 'docs', id: 'updates' },
       { slug: 'keyboard', title: 'Keyboard shortcuts', description: 'The command palette and every shortcut.', collection: 'docs', id: 'keyboard' },
       { slug: 'project-files', title: 'Project files', description: 'The YAML file Export writes and Import reads.', collection: 'reference', id: 'configuration' },
     ],
@@ -32,15 +33,16 @@ export const sections: { title: string; pages: DocPage[] }[] = [
     title: 'Platforms',
     pages: [
       { slug: 'macos', title: 'macOS', description: 'Keychain prompts for Secrets.', collection: 'docs', id: 'macos' },
-      { slug: 'linux', title: 'Linux', description: 'The Secret Service and the tray icon on GNOME.', collection: 'docs', id: 'linux' },
-      { slug: 'windows', title: 'Windows and WSL', description: 'Projects on Windows itself or in a WSL distro.', collection: 'docs', id: 'windows' },
+      { slug: 'linux', title: 'Linux', description: 'Updates, the Secret Service and the tray icon on GNOME.', collection: 'docs', id: 'linux' },
+      { slug: 'windows', title: 'Windows and WSL', description: 'Projects on Windows itself or in a WSL distro, coding agents and updates.', collection: 'docs', id: 'windows' },
     ],
   },
   {
     title: 'Reference',
     pages: [
       { slug: 'cli', title: 'Command line', description: 'The localhost command.', collection: 'docs', id: 'cli' },
-      { slug: 'mcp', title: 'Coding agents (MCP)', description: 'Let Cursor, Claude Code and other agents start, stop and inspect your Services.', collection: 'docs', id: 'mcp' },
+      { slug: 'mcp', title: 'Coding agents (MCP)', description: 'Let Claude Code, Cursor, Codex and other agents start, stop and inspect your Services.', collection: 'docs', id: 'mcp' },
+      { slug: 'skills', title: 'Agent skill', description: 'The localhost-mcp skill: what it teaches a coding agent, and how to install it.', collection: 'docs', id: 'skills' },
       { slug: 'data', title: 'Data and storage', description: 'Where configuration, logs and Secrets are kept.', collection: 'docs', id: 'data' },
     ],
   },

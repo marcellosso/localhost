@@ -15,6 +15,7 @@ const current = (section: string) => path.startsWith(href(section));
     </a>
     <nav aria-label="Site">
       <a href={href('docs')} aria-current={current('docs') ? 'page' : undefined}>Docs</a>
+      <a href={href('agents')} aria-current={current('agents') ? 'page' : undefined}>Agents</a>
       <a href={href('changelog')} aria-current={current('changelog') ? 'page' : undefined}>Changelog</a>
       <a href={repository} class="github">GitHub</a>
     </nav>
