@@ -13,7 +13,7 @@ Scope: site/src/pages/prototypes/a.astro, a candidate replacement for the landin
 
 THESIS: A Project's Services are printed tickets clipped to one steel rail; Start All fires them in dependency order. Refuses the dark glow hero with a centred headline over a screenshot and a grid of feature cards.
 
-OWN-WORLD: thermal-paper white tickets with torn tops, printed in the mono voice they really are printed in, clipped to a brushed stainless rail; Archivo expanded black for headlines like rubber-stamp lettering; state as stamps (Running green, Starting amber, Failed red, Stopped grey); localhost pink owns full fields at page scale (the install band and close), not sprinkled accents.
+OWN-WORLD: thermal-paper white tickets, torn at the bottom (the clip holds the top), rendered as flat graphic paper rather than textured assets for the prototype, printed in the mono voice they really are printed in, clipped to a flat steel-grey rail; Archivo expanded black for headlines like rubber-stamp lettering; state as stamps (Running green, Starting amber, Failed red, Stopped grey); localhost pink owns full fields at page scale (the install band and close), not sprinkled accents.
 
 STORY: Visitor sees their terminal tabs become tickets on one rail, understands "one place, every Service, in order", downloads or copies the brew command; scrolls for ports, agents, local-first, platforms, FAQ.
 
