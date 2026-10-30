@@ -1,19 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import type { APIRoute } from 'astro';
 import { pages } from '../lib/docs';
-
-const built = new Date().toISOString();
-
-/** When any of `files` (relative to site/) last changed in git, or the build time
- * when git can't tell (no history, or a shallow clone without those commits). */
-function lastModified(files: string[]): string {
-  try {
-    const date = execFileSync('git', ['log', '-1', '--format=%cI', '--', ...files], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return date ? new Date(date).toISOString() : built;
-  } catch {
-    return built;
-  }
-}
+import { lastModified } from '../lib/modified';
 
 /** Every indexable page, at the address its canonical link names, with the sources it is built from. */
 const entries: { path: string; files: string[] }[] = [

@@ -9,7 +9,7 @@ import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
 const description =
-  'localhost remembers how each of your local projects runs. Start, stop and watch every Service from one place. Free and open source for macOS, Windows and Linux.';
+  'localhost app: free, open-source desktop process manager for local dev servers on macOS, Windows and Linux, with an MCP server for Claude Code, Cursor and Codex.';
 const alternateName = ['localhost app', 'getlocalhost'];
 const structuredData = [
   { '@type': 'WebSite', name, alternateName, url: Astro.site!.toString(), description: tagline },
@@ -24,6 +24,18 @@ const structuredData = [
     operatingSystem: 'macOS 15 or later, Windows 10 or 11, Linux',
     ...(release.version === '<version>' ? {} : { softwareVersion: release.version }),
     downloadUrl: releases,
+    featureList: [
+      'Start, stop and restart dev servers, workers and databases from one window',
+      'Start All in dependency order, with one merged log',
+      'Services counted as Running once their Port accepts connections',
+      'A Ports view of every process listening on a TCP port',
+      'Variables, Environment Profiles and Secrets in the system’s secret store',
+      'Services suggested from package.json, Compose files, Python apps and Cargo binaries',
+      'An MCP server (localhost mcp) for Claude Code, Cursor, Codex and other coding agents',
+      'In-app updates that stop running Services only after asking',
+      'Projects on Windows itself or in a WSL 2 distro',
+      'A command palette and a keyboard shortcut for every action',
+    ],
     license: 'https://opensource.org/licenses/MIT',
     isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -345,7 +357,7 @@ storybook  Storybook   not running  6006
       </div>
       <div class="mock-stack updates" aria-hidden="true">
         <div class="mock notice">
-          <strong>localhost 0.3.0 is available</strong>
+          <strong>A new version of localhost is available</strong>
           <div class="dialog-actions">
             <span class="notes">Release Notes</span>
             <span class="fake secondary">Later</span>
@@ -354,7 +366,7 @@ storybook  Storybook   not running  6006
         </div>
         <div class="mock dialog">
           <strong>Stop 2 services and update?</strong>
-          <p>localhost restarts to install version 0.3.0. These services are stopped first:</p>
+          <p>localhost restarts to install the new version. These services are stopped first:</p>
           <p>Acme Shop: API, Web</p>
           <div class="dialog-actions">
             <span class="fake secondary">Cancel</span>

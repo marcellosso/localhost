@@ -1,6 +1,6 @@
 /** The one-sentence answer to "what is localhost?", word for word as the README has it. */
 export const definition =
-  'localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.';
+  'localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.';
 
 /** The homepage FAQ, also its FAQPage JSON-LD, llms.txt and the README's `## FAQ`.
  * Answers are plain text; `code` spans are written in backticks. */

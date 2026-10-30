@@ -1,7 +1,7 @@
 /** The /agents page's definition and FAQ, also its FAQPage JSON-LD and llms.txt.
  * Answers are plain text; `code` spans are written in backticks. */
 export const agentsDefinition =
-  'localhost mcp is the Model Context Protocol (MCP) server of localhost, the free, open-source desktop process manager for local development. It lets AI coding agents such as Claude Code, Cursor and Codex list, start, stop and inspect the dev servers, databases and workers of your local Projects through localhost instead of a shell, while you see and control the same Services in the localhost app.';
+  'localhost mcp is the Model Context Protocol (MCP) server of localhost app (getlocalhost.app), the free, MIT-licensed desktop process manager for local dev servers on macOS, Windows and Linux. It lets AI coding agents such as Claude Code, Cursor and Codex list, start, stop and inspect the dev servers, databases and workers of your local Projects through localhost instead of a shell, while you see and control the same Services in the localhost app.';
 
 /** The MCP tools, as `localhost mcp` lists them. */
 export const tools: { name: string; text: string }[] = [
@@ -20,7 +20,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'What is localhost mcp?',
     answer: [
-      'A Model Context Protocol server on standard input and output, run as `localhost mcp`. It gives a coding agent nine tools (`list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`) over the Projects and Services you configured in the localhost app.',
+      '`localhost mcp` is the MCP server of localhost app, run over stdio (standard input and output) by your coding agent. It gives the agent nine tools (`list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`) over the Projects and Services you configured in the localhost app.',
     ],
   },
   {

@@ -97,14 +97,15 @@ export const alternatives: Alternative[] = [
     name: 'devglow, DevWebUI',
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
-      'Both ship an MCP server, so coding agents such as Claude Code and Cursor can start and stop processes. localhost has one too, `localhost mcp`, but it isn’t in the release downloads yet: you build it from source.',
+      'An MCP server you add without Rust: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost’s, `localhost mcp`, isn’t in the release downloads yet: you build it with Rust’s `cargo`.',
+      'Their agents can also register, edit and delete projects, so an agent can set one up for you. In localhost you add and edit them in the app.',
     ],
     localhost: [
       'MIT license; Linux packages (devglow has none): `.deb`, `.rpm` and AppImage.',
-      'Coding agents and the app share one background core: what an agent starts shows in the window with its logs, it never starts a second copy, and its Services stop when it disconnects unless the app is open.',
+      'The agent can’t add, change or delete your Projects or Services, reads only the Secrets of the Services it starts (and their Dependencies), and its Services stop when it disconnects unless the app is open.',
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agent control over MCP without a source build', localhost: 'MIT license; Linux packages; agents and the app share Services' },
+    summary: { wins: 'An MCP server you add without Rust (devglow via `npx devglow-mcp`)', localhost: 'MIT license; Linux packages; agents can’t add, edit or delete Projects' },
   },
 ];

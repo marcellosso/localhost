@@ -9,7 +9,7 @@ import { releases, repository } from '../lib/site';
 export const GET: APIRoute = ({ site }) => {
   const url = (path: string) => new URL(path, site).toString();
   const lines = [
-    '# localhost',
+    '# localhost app',
     '',
     `> ${definition}`,
     '',

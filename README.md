@@ -7,9 +7,9 @@
 
 <p align="center">Every local project, one place to run it. For macOS, Linux and Windows.</p>
 
-localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
 
-<p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
+<p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/agents">Coding agents (MCP)</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
 
 <p align="center">
   <a href="https://github.com/marcellosso/localhost/releases/latest"><img src="https://img.shields.io/github/v/release/marcellosso/localhost" alt="Latest release"></a>
@@ -297,7 +297,7 @@ To make your agent use it by default, give it the skill in [skills/localhost-mcp
 
 ### What is localhost app?
 
-localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.
+localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
 
 A Project is a folder; a Service is one long-running command in it, such as `pnpm dev`, `uv run fastapi dev` or `docker compose up postgres`. localhost runs it in your login shell, keeps its output, knows when it is up, and stops its whole process tree when you ask.
 
@@ -334,7 +334,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agent control over MCP without a source build | MIT license; Linux packages; agents and the app share Services |
+| **devglow, DevWebUI** | An MCP server you add without Rust (devglow via `npx devglow-mcp`) | MIT license; Linux packages; agents can’t add, edit or delete Projects |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

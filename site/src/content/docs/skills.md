@@ -40,3 +40,5 @@ Use the localhost MCP server to run this project's Services, never a shell:
 start_service / start_project to run, status before saying anything is running,
 logs and ports when something fails or a port is taken.
 ```
+
+Why agents should run dev servers through localhost, and what they can do with it: [localhost for AI coding agents](/agents).
