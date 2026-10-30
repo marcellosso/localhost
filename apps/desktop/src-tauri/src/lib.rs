@@ -158,6 +158,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             updates::put_off_update,
             updates::download_update,
             updates::install_update,
+            agents::take_connect_agents_offer,
             agents::agent_statuses,
             agents::connect_agent,
             agents::disconnect_agent,

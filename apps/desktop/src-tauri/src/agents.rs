@@ -76,6 +76,14 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) 
     tauri::async_runtime::spawn_blocking(work).await.expect("the agents' work doesn't panic")
 }
 
+/// Whether Connect your agents should open by itself at this launch: once,
+/// the first time localhost runs with it.
+#[tauri::command]
+#[specta::specta]
+pub fn take_connect_agents_offer(state: tauri::State<'_, crate::AppState>) -> bool {
+    state.settings.take_agents_offer()
+}
+
 /// Each agent and where it stands.
 #[tauri::command]
 #[specta::specta]

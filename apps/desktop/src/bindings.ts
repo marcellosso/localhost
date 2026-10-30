@@ -540,11 +540,19 @@ async downloadUpdate() : Promise<void> {
     await TAURI_INVOKE("download_update");
 },
 /**
- * Restart to Update: asks first if any Service is active, since the
- * restart stops them, then installs and relaunches.
+ * Restart to Update: asks first if any Service is active or any coding
+ * agent is connected, since the restart stops the Services and
+ * disconnects the agents, then installs and relaunches.
  */
 async installUpdate() : Promise<void> {
     await TAURI_INVOKE("install_update");
+},
+/**
+ * Whether Connect your agents should open by itself at this launch: once,
+ * the first time localhost runs with it.
+ */
+async takeConnectAgentsOffer() : Promise<boolean> {
+    return await TAURI_INVOKE("take_connect_agents_offer");
 },
 /**
  * Each agent and where it stands.
@@ -665,9 +673,20 @@ configPath: string;
  */
 entry: string; 
 /**
+ * The command Connect and Disconnect run to change that file, when the
+ * agent has one (Claude Code's `claude mcp`), instead of editing it.
+ */
+viaCommand: string | null; 
+/**
  * Where Connect installs the localhost-mcp skill.
  */
 skillPath: string; 
+/**
+ * The agent whose skill folder, at `skill_path`, this one reads the
+ * skill from instead of a copy of its own (Cursor reads Claude Code's
+ * and Codex's).
+ */
+skillSharedFrom: string | null; 
 /**
  * The command its `localhost` server runs now, if it has one.
  */
@@ -1008,7 +1027,11 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
 /**
  * Another file is where the `localhost` link would go.
  */
-{ kind: "commandPathTaken"; detail: string }
+{ kind: "commandPathTaken"; detail: string } | 
+/**
+ * An agent's own command (`claude mcp …`) failed: what it printed.
+ */
+{ kind: "agentCommandFailed"; detail: { command: string; output: string } }
 export type LogBatch = { lines: LogLine[]; 
 /**
  * Lines that arrived but were left out because the batch kept only its
