@@ -22,3 +22,6 @@ core/target/
 # Rust core built for the app (scripts/build-core.sh)
 apps/macos/LocalhostCoreFFI/Generated/
 apps/macos/LocalhostCoreFFI/Sources/LocalhostCore/Generated/
+
+# Site
+site/.env

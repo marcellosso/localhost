@@ -12,7 +12,7 @@ import { href, releases, repository } from '../lib/site';
     <nav aria-label="Footer">
       <div>
         <h2>Product</h2>
-        <a href={releases}>Download</a>
+        <a href={releases} data-track="download_clicked" data-track-location="footer">Download</a>
         <a href={href('changelog')}>Changelog</a>
         <a href={href('docs/install')}>Install</a>
         <a href={href('agents')}>Coding agents</a>
@@ -28,7 +28,7 @@ import { href, releases, repository } from '../lib/site';
       </div>
       <div>
         <h2>Open source</h2>
-        <a href={repository}>GitHub</a>
+        <a href={repository} data-track="github_clicked" data-track-location="footer">GitHub</a>
         <a href={`${repository}/issues`}>Issues</a>
         <a href={`${repository}/blob/main/SECURITY.md`}>Security</a>
       </div>

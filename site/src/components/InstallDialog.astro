@@ -6,7 +6,13 @@ const release = await latestRelease();
 const { files } = release;
 /** Links to the Releases page (no published release yet) open beside the site. */
 const target = (url: string) => (url === releases ? { target: '_blank', rel: 'noopener' } : {});
-const download = (key: keyof Release['files']) => ({ href: release[key], ...target(release[key]) });
+const download = (key: keyof Release['files']) => ({
+  href: release[key],
+  ...target(release[key]),
+  'data-track': 'download_clicked',
+  'data-track-location': 'install_dialog',
+  'data-track-package': key.toLowerCase(),
+});
 /** curl doesn't mark what it downloads as quarantined, so Gatekeeper never checks the DMG or the app. */
 const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
 ---
@@ -33,7 +39,7 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
               <p class="or">Or download it from Terminal, which macOS doesn’t block, so you can skip step 2:</p>
               <div class="command">
                 <code>{curl}</code>
-                <button type="button" data-copy={curl}>Copy</button>
+                <button type="button" data-copy={curl} data-track="install_command_copied" data-track-command="curl">Copy</button>
               </div>
             </>
           )}
@@ -52,7 +58,7 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
           <p class="or">Or run this in Terminal, then open localhost:</p>
           <div class="command">
             <code>xattr -dr com.apple.quarantine /Applications/localhost.app</code>
-            <button type="button" data-copy="xattr -dr com.apple.quarantine /Applications/localhost.app">Copy</button>
+            <button type="button" data-copy="xattr -dr com.apple.quarantine /Applications/localhost.app" data-track="install_command_copied" data-track-command="xattr">Copy</button>
           </div>
         </div>
       </li>
@@ -106,15 +112,15 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
           <p>From the folder you downloaded it to:</p>
           <div class="command">
             <code>sudo apt install ./{files.deb}</code>
-            <button type="button" data-copy={`sudo apt install ./${files.deb}`}>Copy</button>
+            <button type="button" data-copy={`sudo apt install ./${files.deb}`} data-track="install_command_copied" data-track-command="apt">Copy</button>
           </div>
           <div class="command">
             <code>sudo dnf install ./{files.rpm}</code>
-            <button type="button" data-copy={`sudo dnf install ./${files.rpm}`}>Copy</button>
+            <button type="button" data-copy={`sudo dnf install ./${files.rpm}`} data-track="install_command_copied" data-track-command="dnf">Copy</button>
           </div>
           <div class="command">
             <code>chmod +x {files.appImage} &amp;&amp; ./{files.appImage}</code>
-            <button type="button" data-copy={`chmod +x ${files.appImage} && ./${files.appImage}`}>Copy</button>
+            <button type="button" data-copy={`chmod +x ${files.appImage} && ./${files.appImage}`} data-track="install_command_copied" data-track-command="appimage">Copy</button>
           </div>
           <p class="or">
             Secrets need a Secret Service (GNOME Keyring, KWallet). On stock GNOME the tray icon needs the <a href={href('docs/linux')}>AppIndicator extension</a>.
