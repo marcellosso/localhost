@@ -1,18 +1,11 @@
 name: Linux packages
 
 # Builds the .deb, .rpm and AppImage as the release does, unsigned, and
-# checks the localhost command in each (scripts/check-linux-packages.sh), so
-# a pull request that changes how they are built finds out before a tag does.
+# checks the localhost command in each (scripts/check-linux-packages.sh).
+# Run by hand on the release commit before tagging (RELEASING.md), so a
+# packaging problem shows up before a tag does:
+#   gh workflow run packages.yml -R marcellosso/localhost --ref <branch>
 on:
-  pull_request:
-    paths:
-      - .github/workflows/packages.yml
-      - .github/workflows/release.yml
-      - scripts/check-linux-packages.sh
-      - apps/desktop/src-tauri/tauri*.json
-      - apps/desktop/src-tauri/Cargo.toml
-      - apps/desktop/src-tauri/src/agents.rs
-      - core/localhost-cli/**
   workflow_dispatch:
 
 permissions:
@@ -38,7 +31,7 @@ jobs:
       - name: Install the webview and tray libraries, and the package tools
         run: >
           sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm cpio
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libarchive-tools
       - uses: dtolnay/rust-toolchain@1.90
       - uses: Swatinem/rust-cache@v2
         with:

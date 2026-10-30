@@ -232,7 +232,7 @@ jobs:
       - name: Install the webview and tray libraries
         run: >
           sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm cpio
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libarchive-tools
       - uses: dtolnay/rust-toolchain@1.90
       - uses: pnpm/action-setup@v4
         with:
