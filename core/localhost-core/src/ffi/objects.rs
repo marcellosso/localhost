@@ -12,10 +12,11 @@ use super::runtime::{blocking, on_runtime};
 use super::subscriptions::{FoundOrphansEvents, LibraryEvents, OutputLines, ServiceEvents, ServiceOutputLines};
 use crate::remote::{Client, shared};
 use crate::{
-    EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash, Link, Listener, LocalhostError, LogStore, NewService,
-    Origin, Orphan, OutputLine, ProfileChanges, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry,
-    RunStats, Service, ServiceChanges, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus,
-    StopPolicy, SystemSecretStore, Targets, UnreadableProjectFile, VariableInput, VariableLayer,
+    AgentClient, AgentSetup, AgentStatus, CommandLineStatus, EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash,
+    Link, Listener, LocalhostError, LogStore, NewService, Origin, Orphan, OutputLine, ProfileChanges, Project,
+    ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service, ServiceChanges, ServiceManager,
+    ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore, Targets,
+    UnreadableProjectFile, VariableInput, VariableLayer,
 };
 
 // MARK: ProjectLibrary
@@ -640,5 +641,51 @@ impl ProjectDocument {
     #[uniffi::method]
     pub fn ffi_to_yaml(&self) -> String {
         self.to_yaml()
+    }
+}
+
+// MARK: AgentSetup
+
+#[uniffi::export]
+impl AgentSetup {
+    /// Agents of this user, pointed at `command` (the app's bundled `localhost`).
+    #[uniffi::constructor]
+    pub fn ffi_new(command: String, storage_root: String) -> Arc<AgentSetup> {
+        Arc::new(AgentSetup::new(command, Path::new(&storage_root)))
+    }
+
+    #[uniffi::method]
+    pub fn ffi_command(&self) -> String {
+        self.command().to_string_lossy().into_owned()
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_statuses(self: Arc<Self>) -> Vec<AgentStatus> {
+        blocking(move || self.statuses()).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_connect(self: Arc<Self>, client: AgentClient) -> Result<AgentStatus, LocalhostError> {
+        blocking(move || self.connect(client)).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_disconnect(self: Arc<Self>, client: AgentClient) -> Result<AgentStatus, LocalhostError> {
+        blocking(move || self.disconnect(client)).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_command_line(self: Arc<Self>) -> CommandLineStatus {
+        blocking(move || self.command_line()).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_add_command_to_path(self: Arc<Self>) -> Result<CommandLineStatus, LocalhostError> {
+        blocking(move || self.add_command_to_path()).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_remove_command_from_path(self: Arc<Self>) -> Result<CommandLineStatus, LocalhostError> {
+        blocking(move || self.remove_command_from_path()).await
     }
 }

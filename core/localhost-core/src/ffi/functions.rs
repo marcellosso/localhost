@@ -2,9 +2,9 @@
 //! only, so the Swift layer wraps these in extensions (`error.message`, `project.dependents(of:)`, …).
 
 use crate::{
-    Ansi, FuzzyMatch, Id, Key, Listener, LocalUrl, LocalhostError, Orphan, PortWarning, Project, ProjectFileProblem,
-    ProjectScanner, Run, Service, ServiceState, ServiceStatus, ServiceSuggestion, StyledLine, Termination,
-    UnreadableProjectFile, Variables,
+    AgentClient, Ansi, FuzzyMatch, Id, Key, Listener, LocalUrl, LocalhostError, Orphan, PortWarning, Project,
+    ProjectFileProblem, ProjectScanner, Run, Service, ServiceState, ServiceStatus, ServiceSuggestion, StyledLine,
+    Termination, UnreadableProjectFile, Variables,
 };
 
 use super::runtime::blocking;
@@ -209,4 +209,11 @@ pub fn local_url_matches(text: &str) -> Vec<LocalUrlMatch> {
 #[uniffi::export]
 pub fn local_url_first(text: &str) -> Option<String> {
     LocalUrl::first(text)
+}
+
+// MARK: Coding agents
+
+#[uniffi::export]
+pub fn agent_client_name(client: AgentClient) -> String {
+    client.name().to_string()
 }

@@ -57,8 +57,8 @@ jobs:
         with:
           python-version: "3.13"
       # The tests that run natively on Windows, against real processes.
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared --no-run
-      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared --test agents --no-run
+      - run: cargo test -p localhost-core --lib --test process_tree_windows --test detection --test ports --test dependencies --test run_stats --test shared --test agents
         timeout-minutes: 5
       # The shared core on its named pipe, driven by `localhost mcp` and an app at once.
       - run: cargo test -p localhost-cli --test mcp
