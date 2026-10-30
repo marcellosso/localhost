@@ -82,6 +82,10 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") { model.updates.checkForUpdates() }
+            Button("Connect Agents…") {
+                openWindow(id: "main")
+                model.showConnectAgents()
+            }
         }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { openWindow(id: "settings") }

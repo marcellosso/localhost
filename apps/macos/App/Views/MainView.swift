@@ -28,13 +28,15 @@ struct MainView: View {
                     } actions: {
                         if model.projects.isEmpty {
                             VStack(spacing: 12) {
-                                if model.core != nil {
-                                    HStack(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    if model.core != nil {
                                         Button("Add Project…") { model.presentedSheet = .addProject }
                                             .buttonStyle(AccentButtonStyle())
                                         Button("Import Project…") { model.isChoosingImportFile = true }
                                             .buttonStyle(PillButtonStyle())
                                     }
+                                    Button("Connect Your Agents") { model.showConnectAgents() }
+                                        .buttonStyle(PillButtonStyle())
                                 }
                                 KeyTip(before: "Press", keys: "⌘/", after: "to see every keyboard shortcut.")
                             }
@@ -111,6 +113,8 @@ struct MainView: View {
                 ImportProjectForm(document: document, fileName: fileName)
             case .keyboardShortcuts:
                 KeyboardShortcutsView()
+            case .connectAgents:
+                ConnectAgentsView()
             }
         }
         .fileImporter(isPresented: $model.isChoosingImportFile, allowedContentTypes: [.yaml]) { result in

@@ -86,6 +86,7 @@
 				A10000000000000000000051 /* Sources */,
 				A10000000000000000000031 /* Frameworks */,
 				A10000000000000000000061 /* Resources */,
+				A10000000000000000000082 /* Bundle the localhost command */,
 			);
 			buildRules = (
 			);
@@ -171,6 +172,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# The scheme's build pre-action runs scripts/build-core.sh --xcode, which\n# writes this status. Xcode doesn't show the pre-action's output.\nif [ \"$(cat \"$SCRIPT_INPUT_FILE_0\")\" != ok ]; then\n    echo \"error: The Rust core didn't build: $(cat \"$SCRIPT_INPUT_FILE_0\"). See apps/macos/LocalhostCoreFFI/Generated/build.log, or run scripts/build-core.sh in a terminal.\"\n    exit 1\nfi\ntouch \"$SCRIPT_OUTPUT_FILE_0\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A10000000000000000000082 /* Bundle the localhost command */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/LocalhostCoreFFI/Generated/bin/localhost",
+			);
+			name = "Bundle the localhost command";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/localhost",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The `localhost` command coding agents run, built by scripts/build-core.sh.\n# Signed here for local builds; scripts/build-release.sh signs releases.\nhelpers=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers\"\nmkdir -p \"$helpers\"\ncp -f \"$SCRIPT_INPUT_FILE_0\" \"$SCRIPT_OUTPUT_FILE_0\"\nif [ \"$CODE_SIGNING_ALLOWED\" = YES ] && [ -n \"$EXPANDED_CODE_SIGN_IDENTITY\" ]; then\n    codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime \"$SCRIPT_OUTPUT_FILE_0\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

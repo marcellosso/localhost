@@ -17,14 +17,17 @@ The MCP server itself also sends the agent short instructions when it connects, 
 
 ## Install it
 
-Copy the `localhost-mcp` folder (with its `SKILL.md`) to where your agent looks for skills:
+**Connecting an agent from the app installs it**, and Disconnect removes it (see [Coding agents](/docs/mcp#connect-from-the-app)). It goes where each agent documents its skills for you, in every project:
 
 | Agent | For you, in every project | For one project |
 |---|---|---|
 | Claude Code | `~/.claude/skills/localhost-mcp/SKILL.md` | `.claude/skills/localhost-mcp/SKILL.md` |
+| Cursor | `~/.cursor/skills/localhost-mcp/SKILL.md` | `.cursor/skills/localhost-mcp/SKILL.md` |
 | Codex | `~/.agents/skills/localhost-mcp/SKILL.md` | `.agents/skills/localhost-mcp/SKILL.md` |
 
-For example, for Claude Code:
+Cursor also reads Claude Code's and Codex's folders ([Cursor's docs](https://cursor.com/docs/skills)), so while either has the skill, Cursor uses that copy instead of a second one in `~/.cursor/skills`. The app installs the version it comes with, and **Settings → Agents** offers **Update** when the installed one differs. It removes a `localhost-mcp` skill only if it is localhost's (its `name` is `localhost-mcp`).
+
+To install it by hand, copy the `localhost-mcp` folder (with its `SKILL.md`) there. For example, for Claude Code:
 
 ```sh
 mkdir -p ~/.claude/skills/localhost-mcp
@@ -32,7 +35,7 @@ curl -fL -o ~/.claude/skills/localhost-mcp/SKILL.md \
   https://raw.githubusercontent.com/marcellosso/localhost/main/skills/localhost-mcp/SKILL.md
 ```
 
-A skill in a project folder is shared with everyone who works on it once you commit it. Other agents with their own skill or rules formats, such as Cursor, can take the same text; or add these lines to your project's `AGENTS.md`:
+A skill in a project folder is shared with everyone who works on it once you commit it. Other agents with their own skill or rules formats can take the same text; or add these lines to your project's `AGENTS.md`:
 
 ```md
 ## Running the project

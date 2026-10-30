@@ -112,6 +112,12 @@ These are product rules, not implementation details. A change that breaks one ne
 - Secret values live only in the secret store (Keychain, Secret Service, Credential Manager), never in JSON, logs or Project files. The shared core and WSL distros get them in memory, at start: only those the Runs being started read.
 - Removing a Service or Project stops it first and deletes its logs. The Project's folder is never touched.
 
+**Coding agents**
+- Each app bundles the `localhost` command of its own version. Connect your agents (Settings, the command palette, the first-run empty state) adds a `localhost` MCP server running it, and the localhost-mcp skill, to Claude Code, Cursor and Codex, only at the locations each agent documents.
+- Claude Code's servers change through its `claude mcp` command when it is installed, else by editing `~/.claude.json`. Cursor reads Claude Code's and Codex's skill folders, so it gets its own copy only when neither has one.
+- An update asks before disconnecting connected agents, as it asks before stopping Services; then their `localhost mcp` ends.
+- Nothing is written until the user clicks, after seeing the file and the entry. Only localhost's own entries change, the rest of the file byte for byte; each file is backed up before localhost first edits it; Disconnect removes only localhost's entries. A file localhost can't parse is reported, never rewritten.
+
 **Logs**
 - Each Run keeps an in-memory buffer of 10,000 lines for viewers and a log file. The last 5 Runs per Service are kept, up to 10 MB each with rotation. "All services" is a merged view at read time, each line prefixed with its Service's Key. Clearing empties buffers, never files.
 
@@ -162,6 +168,7 @@ All state, process management, logs and persistence live in the core, which neve
 | `remote::shared` | The shared core: the `remote` protocol on a Unix socket in the storage root, or on Windows a named pipe named after it, started by its first client, one per storage root. Only the transport differs per platform. Decides which Runs a disconnecting client takes with it. |
 | `listener` | Finds Listeners (libproc, `/proc`, `GetExtendedTcpTable`, never `lsof`) and attributes them. |
 | `ProjectScanner` + detectors | Reads a folder and returns Suggestions. |
+| `AgentSetup` | Connects coding agents to the bundled `localhost` command: their MCP configuration, the skill, the command on `PATH`. Edits JSON and TOML in place with small built-in editors. |
 | `ProjectDocument` | The YAML Project file. |
 | `platform` | What differs per OS, behind small traits: launching and stopping, Listener scans, process start times and usage, the secret store, storage paths. |
 

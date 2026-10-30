@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Id } from "../bindings";
 import { type CoreView, findService } from "../core";
 import { closeSheet, type Sheet, useUi } from "../ui";
+import { ConnectAgentsSheet } from "./ConnectAgents";
 import { EnvironmentForm } from "./EnvironmentForm";
 import { ImportProjectForm } from "./ImportProjectForm";
 import { ProjectForm } from "./ProjectForm";
@@ -53,5 +54,7 @@ function sheetContent(sheet: Sheet, view: CoreView, onSelectProject: Props["onSe
     }
     case "importProject":
       return <ImportProjectForm file={sheet.file} preview={sheet.preview} onImported={(imported) => onSelectProject(imported.id)} />;
+    case "connectAgents":
+      return <ConnectAgentsSheet onClose={closeSheet} />;
   }
 }

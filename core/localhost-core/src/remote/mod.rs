@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 5;
+pub const PROTOCOL_VERSION: u32 = 6;
 
 /// What a connection is, which decides what its disconnecting stops.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -76,7 +76,7 @@ pub struct Hello {
 
 impl Hello {
     pub fn current() -> Hello {
-        Hello { protocol: PROTOCOL_VERSION, version: env!("CARGO_PKG_VERSION").to_string() }
+        Hello { protocol: PROTOCOL_VERSION, version: crate::VERSION.to_string() }
     }
 }
 
@@ -131,6 +131,13 @@ pub(crate) enum Request {
     /// time: the app is being replaced by an update, and the one it
     /// relaunches should start a core of its own version.
     Retire,
+    /// Replies with how many coding agents (`localhost mcp`) are connected.
+    AgentCount,
+    /// Tells every connected coding agent to end, then closes its
+    /// connection; replies with how many there were. The app is about to be
+    /// replaced by an update: on Windows a running `localhost.exe` couldn't
+    /// be, and everywhere an agent kept on would reach the old core.
+    DisconnectAgents,
     SetAutomaticPortMove {
         is_enabled: bool,
     },
@@ -185,8 +192,23 @@ pub(crate) enum Request {
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum Message {
     Hello(Hello),
-    Reply { id: u64, result: Result<serde_json::Value, LocalhostError> },
-    Event { event: ServiceEvent },
-    RunLog { stream: u64, lines: Vec<OutputLine>, is_finished: bool },
-    ServicesLog { stream: u64, lines: Vec<ServiceOutputLine> },
+    Reply {
+        id: u64,
+        result: Result<serde_json::Value, LocalhostError>,
+    },
+    Event {
+        event: ServiceEvent,
+    },
+    RunLog {
+        stream: u64,
+        lines: Vec<OutputLine>,
+        is_finished: bool,
+    },
+    ServicesLog {
+        stream: u64,
+        lines: Vec<ServiceOutputLine>,
+    },
+    /// The core is closing this connection on the app's request
+    /// (`Request::DisconnectAgents`): the client should end, not reconnect.
+    Dismissed,
 }

@@ -26,7 +26,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'Which coding agents does it work with?',
     answer: [
-      'Any MCP client that starts a server over standard input and output: Claude Code (`claude mcp add localhost -- localhost mcp`), Cursor (`.cursor/mcp.json`), Codex (`codex mcp add localhost -- localhost mcp`), Claude Desktop and others.',
+      'Any MCP client that starts a server over standard input and output. The app connects Claude Code, Cursor and Codex in one click, in Settings → Agents; Claude Desktop and other clients take the same `command` and `args` in their own configuration file.',
     ],
   },
   {
@@ -48,9 +48,9 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
     ],
   },
   {
-    question: 'Is the localhost command in the release downloads?',
+    question: 'Do I need to install anything besides the app?',
     answer: [
-      'Not yet. Build it from source with Rust: `cargo install --path localhost/core/localhost-cli` after cloning the repository. Add your Projects in the app first; the command reads the same Projects.',
+      'No. The app comes with the `localhost` command, the same version, and updates it with itself. Settings → Agents adds the `localhost` MCP server to Claude Code, Cursor or Codex and installs the localhost-mcp skill, showing exactly what changes first; it can also put `localhost` on your PATH for the terminal.',
     ],
   },
 ];

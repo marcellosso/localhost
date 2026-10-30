@@ -28,6 +28,8 @@ final class AppModel {
         case importProject(ProjectDocument, fileName: String)
         /// Every shortcut, grouped (⌘/).
         case keyboardShortcuts
+        /// Connect Your Agents, as in Settings › Agents.
+        case connectAgents
 
         var id: Self { self }
     }
@@ -137,6 +139,8 @@ final class AppModel {
     @ObservationIgnored var showMainWindow: (() -> Void)?
     /// New versions: the sidebar's notice, Check for Updates… and its setting.
     let updates = UpdateController()
+    /// Coding agents connected to `localhost mcp`, and `localhost` in terminals.
+    let agents = AgentsModel(storageRoot: AppModel.storageRoot)
 
     /// Whether a Service may move to a free port when its Port is taken.
     var isAutomaticPortMoveEnabled: Bool {
@@ -292,6 +296,14 @@ final class AppModel {
         NSWorkspace.shared.open(url)
     }
 
+    /// Shows Connect Your Agents, unless another sheet is open: replacing
+    /// it would lose its edits.
+    func showConnectAgents() {
+        guard presentedSheet == nil else { return }
+        isShowingPalette = false
+        presentedSheet = .connectAgents
+    }
+
     /// Shows the Keyboard Shortcuts sheet (⌘/), or closes it. It doesn't
     /// replace another sheet, which may hold unsaved edits.
     func toggleKeyboardShortcuts() {
@@ -338,11 +350,18 @@ final class AppModel {
         await core?.services.stopAll(origin: origin)
     }
 
-    /// Before an update installs: stops every Run, then retires the shared
-    /// core, so the new version starts one of its own.
+    /// Before an update installs: stops every Run, disconnects the coding
+    /// agents (the user agreed to both), then retires the shared core, so
+    /// the new version starts one of its own.
     func prepareForUpdate() async {
         await core?.services.stopAll(origin: .mainWindow)
+        await core?.services.disconnectAgents()
         await core?.services.retireSharedCore()
+    }
+
+    /// How many coding agents are connected through `localhost mcp`.
+    func connectedAgentCount() async -> Int {
+        await core?.services.connectedAgentCount() ?? 0
     }
 
     // MARK: Editing
@@ -589,6 +608,18 @@ final class AppModel {
             return
         }
         await checkForOrphans()
+        offerConnectAgentsOnce()
+    }
+
+    static let hasOfferedAgentsKey = "hasOfferedConnectAgents"
+
+    /// Opens Connect Your Agents by itself once, at the first launch that has
+    /// it; the empty state, the menu and Settings offer it from then on.
+    private func offerConnectAgentsOnce() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.hasOfferedAgentsKey), presentedSheet == nil, !isShowingOrphanAlert else { return }
+        defaults.set(true, forKey: Self.hasOfferedAgentsKey)
+        showConnectAgents()
     }
 
     var unreadableFilesTitle: String {
@@ -607,7 +638,10 @@ final class AppModel {
         if revealing, let file = core?.library.unreadableFiles.first {
             NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: file.movedTo ?? file.path)])
         }
-        Task { await checkForOrphans() }
+        Task {
+            await checkForOrphans()
+            offerConnectAgentsOnce()
+        }
     }
 
     // MARK: Orphans

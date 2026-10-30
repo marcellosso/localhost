@@ -11,7 +11,10 @@
 //! doesn't check at all.
 //!
 //! Installing restarts the app, so, like quitting, it stops every Service
-//! first, after saying which ones are running. Then it retires the shared
+//! first, after saying which ones are running, and disconnects the coding
+//! agents connected through `localhost mcp`, after saying how many: on
+//! Windows the running `localhost.exe` couldn't be replaced, and anywhere an
+//! agent kept on would reach the old core. Then it retires the shared
 //! core, so the new version starts a core of its own instead of reaching
 //! the old one; on Windows the installer would close that core anyway, as
 //! it runs from the app's executable.
@@ -20,7 +23,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
-use localhost_core::{Id, Origin, Project, ServiceStatus};
+use localhost_core::{Id, Origin, Project, ServiceStatus, UpdateConfirmation};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::utils::config::BundleType;
@@ -326,8 +329,9 @@ pub fn download_update(app: AppHandle) {
     });
 }
 
-/// Restart to Update: asks first if any Service is active, since the
-/// restart stops them, then installs and relaunches.
+/// Restart to Update: asks first if any Service is active or any coding
+/// agent is connected, since the restart stops the Services and
+/// disconnects the agents, then installs and relaunches.
 #[tauri::command]
 #[specta::specta]
 pub fn install_update(app: AppHandle) {
@@ -349,38 +353,46 @@ pub fn install_update(app: AppHandle) {
             active_services(&core.library.projects(), &statuses)
         },
     );
-    if active.is_empty() {
-        install(&app);
-        return;
-    }
-    let count = active.iter().map(|(_, services)| services.len()).sum::<usize>();
-    let title = if count == 1 {
-        "Stop 1 service and update?".to_string()
-    } else {
-        format!("Stop {count} services and update?")
-    };
-    let message = format!(
-        "localhost restarts to install version {version}. These services are stopped first:\n\n{}",
-        active
-            .iter()
-            .map(|(project, services)| format!("{project}: {}", services.join(", ")))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-    let mut dialog = app
-        .dialog()
-        .message(message)
-        .title(title)
-        .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom("Stop and Update".into(), "Cancel".into()));
-    if let Some(window) = app.get_webview_window(lifecycle::MAIN_WINDOW) {
-        dialog = dialog.parent(&window);
-    }
     let app = app.clone();
-    dialog.show(move |is_confirmed| {
-        if is_confirmed {
+    tauri::async_runtime::spawn(async move {
+        let agents = match app.state::<AppState>().core() {
+            Ok(core) => core.targets.connected_agent_count().await,
+            Err(_) => 0,
+        };
+        let services = active.iter().map(|(_, services)| services.len()).sum::<usize>();
+        let Some(confirmation) = UpdateConfirmation::new(services, agents) else {
             install(&app);
+            return;
+        };
+        let mut message = format!("localhost restarts to install version {version}.");
+        if !active.is_empty() {
+            message += &format!(
+                " These services are stopped first:\n\n{}",
+                active
+                    .iter()
+                    .map(|(project, services)| format!("{project}: {}", services.join(", ")))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
         }
+        if let Some(note) = &confirmation.agents_note {
+            message += &format!("\n\n{}", note.replace('`', ""));
+        }
+        let mut dialog = app
+            .dialog()
+            .message(message)
+            .title(confirmation.title)
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(confirmation.button, "Cancel".into()));
+        if let Some(window) = app.get_webview_window(lifecycle::MAIN_WINDOW) {
+            dialog = dialog.parent(&window);
+        }
+        let app = app.clone();
+        dialog.show(move |is_confirmed| {
+            if is_confirmed {
+                install(&app);
+            }
+        });
     });
 }
 
@@ -419,6 +431,7 @@ fn install(app: &AppHandle) {
         let state = app.state::<AppState>();
         if let Ok(core) = state.core() {
             core.targets.stop_every_run(Origin::MainWindow).await;
+            core.targets.disconnect_agents().await;
             core.targets.retire_shared_core().await;
         }
         match update.install(&package) {

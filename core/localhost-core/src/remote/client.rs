@@ -44,6 +44,8 @@ struct Inner {
 #[derive(Default)]
 struct State {
     is_connected: bool,
+    /// The core said it is closing this connection on purpose (`Message::Dismissed`).
+    is_dismissed: bool,
     pending: HashMap<u64, oneshot::Sender<Result<serde_json::Value, LocalhostError>>>,
     /// Every Service's status as `localhostd` last reported it.
     statuses: HashMap<Id, ServiceStatus>,
@@ -178,6 +180,7 @@ impl Remote {
                     self.close_stream(stream, false);
                 }
             }
+            Message::Dismissed => state.is_dismissed = true,
         }
     }
 
@@ -231,6 +234,12 @@ impl Remote {
 
     pub fn is_connected(&self) -> bool {
         self.state().is_connected
+    }
+
+    /// Whether the core closed this connection on purpose, before an update:
+    /// the client should end rather than reconnect.
+    pub fn is_dismissed(&self) -> bool {
+        self.state().is_dismissed
     }
 
     /// Returns once the connection is lost.
@@ -309,6 +318,16 @@ impl Remote {
     /// before the app quits to install an update.
     pub async fn retire(&self) -> Result<(), LocalhostError> {
         self.call(Request::Retire).await
+    }
+
+    /// How many coding agents are connected to this core.
+    pub async fn agent_count(&self) -> Result<usize, LocalhostError> {
+        self.call(Request::AgentCount).await
+    }
+
+    /// Tells every connected coding agent to end; returns how many there were.
+    pub async fn disconnect_agents(&self) -> Result<usize, LocalhostError> {
+        self.call(Request::DisconnectAgents).await
     }
 
     pub async fn set_automatic_port_move(&self, is_enabled: bool) -> Result<(), LocalhostError> {

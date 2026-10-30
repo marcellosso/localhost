@@ -77,6 +77,16 @@ private final class TemporaryRoot {
         #expect(try ProjectDocument(yaml: placed.yaml).path == "/tmp/shop")
         #expect(throws: LocalhostError.self) { try ProjectDocument(yaml: "name: Shop") }
     }
+
+    // Only what reads no agent's files: the rest would read the real home folder.
+    @Test func namesAgentsAndKeepsTheirCommand() throws {
+        #expect(AgentClient.claudeCode.name == "Claude Code")
+        #expect(AgentClient.codex.name == "Codex")
+        let root = try TemporaryRoot()
+        let command = root.url.appending(path: "Helpers/localhost")
+        #expect(AgentSetup(command: command, storageRoot: root.url).command == command)
+        #expect(LocalhostError.CommandNotBundled("/x/localhost").message.contains("/x/localhost"))
+    }
 }
 
 @Suite(.serialized) struct LibraryTests {

@@ -63,6 +63,9 @@ struct Stored {
     /// Whether closing the window has said that localhost keeps running (`lifecycle`).
     #[serde(default)]
     has_explained_close: bool,
+    /// Whether Connect your agents has opened by itself, once, at a launch.
+    #[serde(default)]
+    has_offered_agents: bool,
 }
 
 pub struct SettingsStore {
@@ -102,6 +105,20 @@ impl SettingsStore {
         if self.write(stored).is_err() {
             self.stored.lock().unwrap().has_explained_close = true;
         }
+    }
+
+    /// Whether Connect your agents should open by itself: only the first
+    /// time this is asked, remembered from then on (for this session only if
+    /// the file can't be written).
+    pub fn take_agents_offer(&self) -> bool {
+        let stored = self.stored.lock().unwrap().clone();
+        if stored.has_offered_agents {
+            return false;
+        }
+        if self.write(Stored { has_offered_agents: true, ..stored }).is_err() {
+            self.stored.lock().unwrap().has_offered_agents = true;
+        }
+        true
     }
 
     fn write(&self, stored: Stored) -> Result<(), LocalhostError> {

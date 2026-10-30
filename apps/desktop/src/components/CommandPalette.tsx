@@ -11,6 +11,7 @@ import {
   FolderIcon,
   GlobeIcon,
   KeyboardIcon,
+  LinkIcon,
   PlayIcon,
   PlusIcon,
   SearchIcon,
@@ -180,6 +181,8 @@ function ItemIcon({ icon }: { icon: PaletteIcon }) {
       return <PlusIcon size={12} />;
     case "keyboard":
       return <KeyboardIcon size={13} />;
+    case "agents":
+      return <LinkIcon size={13} />;
     case "play":
     case "restart":
       return <PlayIcon size={11} />;

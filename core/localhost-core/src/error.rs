@@ -95,6 +95,28 @@ pub enum LocalhostError {
         field: Vec<String>,
         line: Option<usize>,
     },
+
+    // Coding agents
+    /// The agent (by name) isn't installed on this machine.
+    AgentNotInstalled(String),
+    /// The agent's configuration file (`path`) can't be read, or sets the
+    /// `localhost` server in a way localhost doesn't edit.
+    AgentConfigUnsupported {
+        path: String,
+        reason: String,
+    },
+    /// The app has no `localhost` command at this path: a build without it.
+    CommandNotBundled(String),
+    /// The app runs from a temporary location (a disk image, App
+    /// Translocation), where agents couldn't find its command later.
+    CommandInTemporaryLocation(String),
+    /// Another file is where the `localhost` link would go.
+    CommandPathTaken(String),
+    /// An agent's own command (`claude mcp …`) failed: what it printed.
+    AgentCommandFailed {
+        command: String,
+        output: String,
+    },
 }
 
 impl LocalhostError {
@@ -156,6 +178,18 @@ impl LocalhostError {
                 format!("{path} was saved by a newer version of localhost (schema {version}).")
             }
             PersistenceFailed { path, reason } => format!("Could not read or write {path}: {reason}"),
+            AgentNotInstalled(name) => format!("{name} isn’t installed on this computer."),
+            AgentConfigUnsupported { path, reason } => {
+                format!("localhost can’t edit {path}: {reason}. Fix the file, or set up the server by hand.")
+            }
+            CommandNotBundled(path) => format!(
+                "This build of localhost has no localhost command ({path}). Install localhost from a release to connect agents."
+            ),
+            CommandInTemporaryLocation(_) => "localhost is running from a temporary location. Move it to Applications, open it from there, and try again.".into(),
+            AgentCommandFailed { command, output } => {
+                format!("`{command}` failed: {output}. Try again, or set up the server by hand.")
+            }
+            CommandPathTaken(path) => format!("{path} already exists and isn’t localhost’s. Remove it first, or leave it."),
             InvalidProjectFile { problem, field, line } => {
                 let line = line.map(|line| format!("Line {line}"));
                 let field = (!field.is_empty()).then(|| field.join(" › "));

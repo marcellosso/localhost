@@ -163,6 +163,14 @@ export const ChevronIcon = (props: Props) => (
   </Icon>
 );
 
+/** `link`: connecting agents to localhost. */
+export const LinkIcon = (props: Props) => (
+  <Icon {...props}>
+    <path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.3-2.3a2.6 2.6 0 0 0-3.7-3.7L8.1 4.3" />
+    <path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.2 9.1a2.6 2.6 0 0 0 3.7 3.7l1.1-1.1" />
+  </Icon>
+);
+
 /** `lock.fill`: a Secret. */
 export const LockIcon = (props: Props) => (
   <Icon {...props} strokeWidth={1.3}>

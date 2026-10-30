@@ -31,4 +31,4 @@ Turn off **Check for updates automatically** in **Settings → General**. **Chec
 
 Checking is the only thing localhost asks the network for. Builds you make yourself never check.
 
-The `localhost` command, built from source, doesn't update itself: build it again from a newer checkout.
+The `localhost` command comes with the app and updates with it, so coding agents connected from **Settings → Agents** run the new version from their next session. **Restart to Update** asks first if Services are running or agents are connected, then stops the Services and disconnects the agents: start a new session in each agent afterwards. One you built yourself doesn't update: build it again from a newer checkout.

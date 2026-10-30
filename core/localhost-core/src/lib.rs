@@ -8,6 +8,7 @@
 #[cfg(feature = "ffi")]
 uniffi::setup_scaffolding!("localhost_core");
 
+mod agents;
 mod ansi;
 mod dependencies;
 mod detection;
@@ -41,6 +42,10 @@ mod targets;
 mod validate;
 mod yaml;
 
+pub use agents::{
+    AGENT_SKILL, AgentClient, AgentConnection, AgentSetup, AgentStatus, CommandLineState, CommandLineStatus,
+    UpdateConfirmation,
+};
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use detection::{
     CargoDetector, CommandSyntax, ComposeDetector, NodeDetector, ProjectScanner, PythonDetector, ScannedDirectory,
@@ -87,5 +92,10 @@ pub(crate) struct SerdeSystemTime {
     nanos_since_epoch: u32,
 }
 
-/// Version of the core, surfaced by clients.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Version of the core, surfaced by clients. A release build sets
+/// `LOCALHOST_VERSION` to the app's version, so the `localhost` command it
+/// bundles says the same.
+pub const VERSION: &str = match option_env!("LOCALHOST_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};

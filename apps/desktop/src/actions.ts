@@ -9,7 +9,7 @@ import {
   type Result,
 } from "./bindings";
 import { listenerKey } from "./listeners";
-import { currentUi, setProgress, setStoppingListener, showAlert } from "./ui";
+import { currentUi, setProgress, setStoppingListener, showAlert, showSheet } from "./ui";
 
 // What the main window's buttons do. Failures become an alert; a start
 // blocked by a taken port becomes the question about it.
@@ -66,13 +66,17 @@ export async function stopListener(details: ListenerDetails) {
   setStoppingListener(key, false);
 }
 
-/** What the user must hear about at launch: unreadable Project files, then Orphans. */
+/**
+ * What the user must hear about at launch: unreadable Project files, then
+ * Orphans. The first launch also opens Connect your agents, once.
+ */
 export async function runLaunchChecks() {
   const result = await commands.launchChecks();
   if (result.status === "error") return;
   const { unreadableFiles, orphans } = result.data;
   if (unreadableFiles.length > 0) showAlert({ kind: "unreadableFiles", files: unreadableFiles });
   if (orphans.length > 0 && !isAskingAboutOrphans()) showAlert({ kind: "orphans", orphans });
+  if (!currentUi().sheet && (await commands.takeConnectAgentsOffer())) showSheet({ kind: "connectAgents" });
 }
 
 /** A WSL distro found Orphans as it connected: asks about them, unless the question is already up. */

@@ -81,6 +81,18 @@ extension Targets {
         await ffiRetireSharedCore()
     }
 
+    /// How many coding agents (`localhost mcp`) the shared core serves.
+    public func connectedAgentCount() async -> Int {
+        Int(await ffiConnectedAgentCount())
+    }
+
+    /// Tells the coding agents connected to the shared core to end, before
+    /// an update; returns how many there were.
+    @discardableResult
+    public func disconnectAgents() async -> Int {
+        Int(await ffiDisconnectAgents())
+    }
+
     public func setAutomaticPortMove(_ isEnabled: Bool) {
         ffiSetAutomaticPortMove(isEnabled: isEnabled)
     }

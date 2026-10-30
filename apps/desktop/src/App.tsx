@@ -155,6 +155,9 @@ function MainWindow({ view }: { view: CoreView }) {
                 <button className="button" onClick={() => void importProject()}>
                   Import Project…
                 </button>
+                <button className="button" onClick={() => showSheet({ kind: "connectAgents" })}>
+                  Connect Your Agents
+                </button>
               </EmptyState>
             </section>
             <section className="emptyLog" data-column="detail">

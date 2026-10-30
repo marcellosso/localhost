@@ -37,7 +37,9 @@ timestamp=(--timestamp=none)
 [[ ${DEVELOPER_ID:-} == 1 ]] && timestamp=(--timestamp)
 
 echo "==> Building the Rust core (universal)" >&2
-# The scheme's pre-action would build it too, but hides the output.
+# The scheme's pre-action would build it too, but hides the output. The
+# `localhost` command it builds reports the app's version.
+export LOCALHOST_VERSION=$version
 scripts/build-core.sh release >&2
 
 echo "==> Building localhost $version ($build_number)" >&2
@@ -45,15 +47,19 @@ rm -rf "$output"
 xcodebuild -project apps/macos/localhost.xcodeproj -scheme localhost -configuration Release \
     -destination 'generic/platform=macOS' -derivedDataPath "$derived" \
     CODE_SIGNING_ALLOWED=NO \
-    MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number" \
+    MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number" LOCALHOST_VERSION="$version" \
     -quiet clean build >&2
 
-# The Rust core is linked in statically, so the app binary carries both.
-for arch in arm64 x86_64; do
-    if ! lipo "$app/Contents/MacOS/localhost" -verify_arch "$arch"; then
-        echo "error: the app has no $arch slice" >&2
-        exit 1
-    fi
+# The Rust core is linked in statically, so the app binary carries both; the
+# `localhost` command agents run (Contents/Helpers) too.
+command="$app/Contents/Helpers/localhost"
+for binary in "$app/Contents/MacOS/localhost" "$command"; do
+    for arch in arm64 x86_64; do
+        if ! lipo "$binary" -verify_arch "$arch"; then
+            echo "error: $binary has no $arch slice" >&2
+            exit 1
+        fi
+    done
 done
 
 # Updates (apps/macos/App/Updates.swift): the key apps verify them with, and where they look.
@@ -69,7 +75,8 @@ fi
 
 echo "==> Signing with ${identity/#-/an ad hoc signature}" >&2
 # Hardened runtime as in the Xcode project. Sparkle's helpers first, inside
-# out, then the app; Sparkle's own documentation lists them.
+# out, then the `localhost` command, then the app; Sparkle's own
+# documentation lists its helpers.
 sparkle="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
 sign() { codesign --force --sign "$identity" "${timestamp[@]}" --options runtime "$@" >&2; }
 sign "$sparkle/XPCServices/Installer.xpc"
@@ -77,8 +84,15 @@ sign --preserve-metadata=entitlements "$sparkle/XPCServices/Downloader.xpc"
 sign "$sparkle/Autoupdate"
 sign "$sparkle/Updater.app"
 sign "$app/Contents/Frameworks/Sparkle.framework"
+sign "$command"
 sign --entitlements apps/macos/App/Localhost.entitlements "$app"
 codesign --verify --strict --verbose=2 "$app" >&2
+codesign --verify --strict --verbose=2 "$command" >&2
+# What agents run: the same version as the app, and it starts.
+if [[ $("$command" --version) != "localhost $version" ]]; then
+    echo "error: the bundled command says $("$command" --version), not localhost $version" >&2
+    exit 1
+fi
 
 echo "==> Packing $dmg" >&2
 # dmgbuild lays out the DMG's window (apps/macos/DMG), in a venv of its own.

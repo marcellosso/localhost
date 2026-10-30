@@ -34,7 +34,9 @@ export type Sheet =
   | { kind: "detectServices"; projectId: Id }
   | { kind: "environment"; projectId: Id }
   /** The review step of an import, before anything is saved. */
-  | { kind: "importProject"; file: string; preview: ImportPreview };
+  | { kind: "importProject"; file: string; preview: ImportPreview }
+  /** Connect your agents: Claude Code, Cursor and Codex, and the command in terminals. */
+  | { kind: "connectAgents" };
 
 /** The UI's own state, outside the core. */
 export type UiState = {

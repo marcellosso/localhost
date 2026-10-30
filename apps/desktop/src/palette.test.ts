@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { viewFromSnapshot } from "./core";
 import { emptyQueryResults, paletteItems, rankItems } from "./palette";
 import { project, service, status } from "./test/fixtures";
+import { currentUi, resetUi } from "./ui";
 
 const commands = vi.hoisted(() => ({ fuzzyScores: vi.fn() }));
 vi.mock("./bindings", () => ({ commands }));
@@ -34,6 +35,7 @@ describe("palette", () => {
       ["Ports", "Ctrl+0"],
       ["New Project…", "Ctrl+N"],
       ["Keyboard Shortcuts", "Ctrl+/"],
+      ["Connect Agents…", ""],
     ]);
     expect(items.some((item) => item.title === "Start Hugo" && item.id.startsWith("other:"))).toBe(true);
   });
@@ -49,5 +51,14 @@ describe("palette", () => {
 
     ranked[0].run();
     expect(navigator.selectService).toHaveBeenCalledWith(blog.id, blog.services[0].id);
+  });
+
+  it("offers Connect Agents with an empty query too", () => {
+    resetUi();
+    const item = paletteItems(view, shop, { kind: "all" }, navigator).find((item) => item.title === "Connect Agents…")!;
+    expect(item.id.startsWith("other:")).toBe(false);
+    expect(item.keywords).toContain("mcp");
+    item.run();
+    expect(currentUi().sheet).toEqual({ kind: "connectAgents" });
   });
 });

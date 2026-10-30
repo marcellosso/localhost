@@ -185,6 +185,11 @@ impl Client {
     /// Closes standard input, as a client disconnecting does, and waits for exit.
     fn disconnect(mut self) -> i32 {
         drop(self.stdin.take());
+        self.wait_for_exit("its input closed")
+    }
+
+    /// Its exit code, once it has ended on its own.
+    fn wait_for_exit(&mut self, after: &str) -> i32 {
         let deadline = Instant::now() + PATIENCE;
         loop {
             if let Some(status) = self.child.try_wait().unwrap() {
@@ -192,7 +197,7 @@ impl Client {
             }
             if Instant::now() > deadline {
                 let _ = self.child.kill();
-                panic!("`localhost mcp` did not exit after its input closed");
+                panic!("`localhost mcp` did not exit after {after}");
             }
             std::thread::sleep(Duration::from_millis(20));
         }
@@ -524,6 +529,24 @@ fn the_app_sees_what_an_agent_starts_and_the_reverse() {
     assert_eq!(service(&status, "web")["state"], "stopped", "{status:#}");
 
     agent.disconnect();
+    drop(app);
+}
+
+#[test]
+fn the_app_counts_connected_agents_and_disconnects_them_before_an_update() {
+    let home = Home::new();
+    home.project("Acme", "acme");
+    let mut first = home.mcp();
+    let mut second = home.mcp();
+    let runtime = runtime();
+    let app = runtime.block_on(home.app());
+    assert_eq!(runtime.block_on(app.connected_agent_count()), 2);
+
+    assert_eq!(runtime.block_on(app.disconnect_agents()), 2);
+    // Their input is still open: they end because the core dismissed them.
+    assert_eq!(first.wait_for_exit("the app disconnected it"), 0);
+    assert_eq!(second.wait_for_exit("the app disconnected it"), 0);
+    assert_eq!(runtime.block_on(app.connected_agent_count()), 0);
     drop(app);
 }
 
