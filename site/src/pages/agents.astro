@@ -1,0 +1,416 @@
+---
+import Base from '../layouts/Base.astro';
+import { agentsDefinition, agentsFaq, tools } from '../lib/agents';
+import { html, plain } from '../lib/faq';
+import { lastModified } from '../lib/modified';
+import { href, name, repository } from '../lib/site';
+
+const description =
+  'localhost app’s MCP server lets Claude Code, Cursor and Codex start, stop and read logs of your local dev servers, visible in one desktop window. Free, MIT.';
+const url = new URL(href('agents'), Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'TechArticle',
+    headline: 'localhost app’s MCP server for Claude Code, Cursor and Codex',
+    description: agentsDefinition,
+    url,
+    dateModified: lastModified(['src/pages/agents.astro', 'src/lib/agents.ts']),
+    isPartOf: { '@type': 'WebSite', name, url: new URL('/', Astro.site).toString() },
+    about: { '@type': 'SoftwareApplication', name, url: new URL('/', Astro.site).toString(), applicationCategory: 'DeveloperApplication' },
+    author: { '@type': 'Person', name: 'Marcel Losso' },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name, item: new URL('/', Astro.site).toString() },
+      { '@type': 'ListItem', position: 2, name: 'Coding agents', item: url },
+    ],
+  },
+  {
+    '@type': 'FAQPage',
+    mainEntity: agentsFaq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer.map(plain).join('\n\n') },
+    })),
+  },
+];
+
+const problems = [
+  {
+    title: 'Ports that collide',
+    text: 'An agent runs `pnpm dev` while yours is already up, and the second copy fails on a taken port, or picks another port nobody told you about.',
+  },
+  {
+    title: 'Processes left behind',
+    text: 'A dev server started in the agent’s shell can outlive the chat, holding its port and memory until you go looking for its pid.',
+  },
+  {
+    title: 'Logs nobody can see',
+    text: 'Its output goes to a shell you can’t read, and the agent only sees what it captured, so a crash looks like silence.',
+  },
+];
+
+const workflows = [
+  {
+    title: 'Test a change in the running app',
+    steps: [
+      ['list_projects', 'finds the Project whose folder holds the code'],
+      ['start_service', '{ project: "my-saas", service: "web" } starts its Dependencies first'],
+      ['status', 'only `running` counts as up; it gives the URL'],
+      ['logs', '{ service: "web", lines: 50 } after the request'],
+    ],
+  },
+  {
+    title: 'A port is taken',
+    steps: [
+      ['start_service', 'fails with kind `portConflict`, naming the port, when the Run can’t move to a free one'],
+      ['ports', 'shows who holds it: one of your Services, a process in a Project’s folder, or something unmanaged'],
+      ['start_service', '{ port: 3001 } for this Run only, or the agent tells you and asks'],
+    ],
+  },
+  {
+    title: 'Something failed',
+    steps: [
+      ['status', 'the Failed Service’s reason, such as `commandNotFound`, and its last output'],
+      ['logs', '{ contains: "error", since_seconds: 120 } to read only what matters'],
+    ],
+  },
+];
+
+const cursorConfig = `{
+  "mcpServers": {
+    "localhost": { "command": "localhost", "args": ["mcp"] }
+  }
+}`;
+const codexConfig = `[mcp_servers.localhost]
+command = "localhost"
+args = ["mcp"]`;
+---
+
+<Base title="MCP server for Claude Code, Cursor and Codex" {description} type="article" {structuredData}>
+  <div class="container page">
+    <header>
+      <p class="figure-label">Coding agents</p>
+      <h1 class="display">Let coding agents run your dev servers through localhost</h1>
+      <p class="lede definition">{agentsDefinition}</p>
+      <p class="lede">
+        You configure each Project once in the app. From then on, you and your agent start, stop and read the same Services, with the
+        same Ports, environment and logs, and nothing the agent starts runs where you can’t see it.
+      </p>
+    </header>
+
+    <section>
+      <h2>Why shouldn’t coding agents run dev servers in their own shell?</h2>
+      <div class="cards">
+        {
+          problems.map((problem) => (
+            <div class="card">
+              <h3>{problem.title}</h3>
+              <p set:html={html(problem.text)} />
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section>
+      <h2>How does localhost app fix it?</h2>
+      <ul class="facts">
+        <li>
+          <strong>One core for the app and the agent.</strong> The app and <code>localhost mcp</code> drive one localhost core in the background.
+          A Service the agent starts is Running in the app, with its logs, and one you start in the app is running for the agent. A stop
+          from either stops the same Run, and <code>status</code> says who started each one (<code>"startedBy": "app"</code> or <code>"agent"</code>).
+        </li>
+        <li>
+          <strong>Your commands, run the same way.</strong> Each Service runs in your login shell with its Project’s variables, Environment
+          Profile and Secrets, after its Dependencies, exactly as when you press Start in the app.
+        </li>
+        <li>
+          <strong>Never twice.</strong> A Service that is already running isn’t started again, and one a <code>localhost up</code> runs in a
+          terminal shows as running in another session, so the agent neither starts a second copy nor stops it.
+        </li>
+        <li>
+          <strong>Nothing left behind.</strong> Stopping ends the whole process tree. When the agent disconnects, the Services it started
+          stop, unless the app is open: then they keep running there, until you stop them.
+        </li>
+        <li>
+          <strong>Structured answers.</strong> Results are JSON, failures carry a <code>kind</code> such as <code>portConflict</code> or
+          <code>commandNotFound</code> with a message saying what to do next, and logs are bounded (200 lines by default, at most 2,000).
+        </li>
+        <li>
+          <strong>Your configuration stays yours.</strong> The agent can’t add or change Projects or Services, and it reads only the
+          Secrets of the Services it starts.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Which MCP tools does localhost expose?</h2>
+      <p class="what">Nine tools. Projects and Services are named by their Key, as <code>list_projects</code> shows them.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Tool</th>
+              <th scope="col">What it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              tools.map((tool) => (
+                <tr>
+                  <th scope="row">
+                    <code>{tool.name}</code>
+                  </th>
+                  <td>{tool.text}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Example workflows</h2>
+      <div class="cards">
+        {
+          workflows.map((workflow) => (
+            <div class="card">
+              <h3>{workflow.title}</h3>
+              <ol>
+                {workflow.steps.map(([tool, text]) => (
+                  <li>
+                    <code>{tool}</code> <span set:html={html(text)} />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section id="setup">
+      <h2>How do I connect Claude Code, Cursor or Codex?</h2>
+      <h3>1. Install the <code>localhost</code> command</h3>
+      <p class="what">
+        <code>localhost mcp</code> is part of the <code>localhost</code> command, which isn’t in the release downloads yet. Build it from
+        source with Rust, and add your Projects in the app first: the command reads the same Projects.
+      </p>
+      <pre><code>git clone https://github.com/marcellosso/localhost
+cargo install --path localhost/core/localhost-cli</code></pre>
+
+      <h3>2. Connect your agent</h3>
+      <p class="what"><strong>Claude Code</strong></p>
+      <pre><code>claude mcp add localhost -- localhost mcp</code></pre>
+      <p class="what"><strong>Cursor</strong>: in <code>.cursor/mcp.json</code> in your project, or <code>~/.cursor/mcp.json</code> for every project.</p>
+      <pre><code>{cursorConfig}</code></pre>
+      <p class="what"><strong>Codex</strong>: <code>codex mcp add localhost -- localhost mcp</code>, or in <code>~/.codex/config.toml</code>:</p>
+      <pre><code>{codexConfig}</code></pre>
+      <p class="what">
+        <strong>Other MCP clients</strong>, such as Claude Desktop, take the same <code>command</code> and <code>args</code> in their own
+        configuration file. If one can’t find <code>localhost</code>, give it the full path, e.g. <code>~/.cargo/bin/localhost</code>.
+      </p>
+
+      <h3>3. Give it the skill</h3>
+      <p class="what">
+        The server tells the agent how to use it when it connects. The <a href={href('docs/skills')}>localhost-mcp skill</a> makes it the
+        default: Services through localhost, never a shell; <code>status</code> before saying anything runs; <code>logs</code> and
+        <code>ports</code> when something fails. Copy it to <code>~/.claude/skills/localhost-mcp/</code> for Claude Code or
+        <code>~/.agents/skills/localhost-mcp/</code> for Codex.
+      </p>
+    </section>
+
+    <section>
+      <h2>Does it work on macOS, Linux and Windows?</h2>
+      <p class="what">
+        The background core listens on a socket in localhost’s data folder on macOS and Linux, and on a named pipe on Windows; only your
+        user can open either. On Windows, agents run Projects on Windows itself. A Project in a WSL distro runs only from the app, and an
+        agent asked to start one is told so. On macOS, the Keychain asks the first time <code>localhost mcp</code> reads each Secret, since
+        it is a different program than the app.
+      </p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        {
+          agentsFaq.map((item) => (
+            <div class="faq-item">
+              <h3>{item.question}</h3>
+              {item.answer.map((paragraph) => (
+                <p set:html={html(paragraph)} />
+              ))}
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section>
+      <p class="what">
+        Every detail is in the docs: <a href={href('docs/mcp')}>Coding agents (MCP)</a>, <a href={href('docs/skills')}>Agent skill</a> and
+        <a href={href('docs/install')}>Install</a>. The source is on <a href={repository}>GitHub</a>, MIT licensed.
+      </p>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: 960px;
+    padding-top: 72px;
+  }
+  header {
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: clamp(36px, 5vw, 52px);
+  }
+  .lede {
+    margin-top: 16px;
+  }
+  .definition {
+    color: var(--text);
+  }
+  section {
+    padding: 56px 0 0;
+  }
+  h2 {
+    margin: 0 0 16px;
+    font-size: 26px;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  h3 {
+    margin: 28px 0 8px;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .what {
+    margin: 12px 0 0;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .what strong,
+  .facts strong {
+    color: var(--text);
+  }
+  a:not(.button) {
+    color: var(--accent-text);
+    text-underline-offset: 3px;
+  }
+  code {
+    font-size: 0.88em;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  pre {
+    margin: 12px 0 0;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: var(--code-bg);
+    box-shadow: var(--ring);
+    font-size: 13.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    overflow-wrap: normal;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .card {
+    padding: 22px;
+    border-radius: var(--radius);
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+  }
+  .card h3 {
+    margin: 0;
+  }
+  .card p,
+  .card ol {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .card ol {
+    padding-left: 18px;
+  }
+  .card li {
+    margin-bottom: 6px;
+  }
+  .facts {
+    margin: 0;
+    padding-left: 20px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .facts li {
+    margin-bottom: 12px;
+  }
+  .table-wrap {
+    margin-top: 20px;
+    overflow-x: auto;
+    border-radius: var(--radius);
+    background: var(--page-raised);
+    box-shadow: var(--ring);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th,
+  td {
+    padding: 12px 16px;
+    text-align: left;
+    vertical-align: top;
+    border-top: 1px solid var(--separator);
+  }
+  thead th {
+    border-top: 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+  tbody th {
+    white-space: nowrap;
+  }
+  td {
+    color: var(--text-secondary);
+  }
+  .faq {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px 56px;
+    padding-top: 8px;
+  }
+  .faq-item h3 {
+    margin: 0;
+  }
+  .faq-item p {
+    margin: 8px 0 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  @media (max-width: 860px) {
+    .cards,
+    .faq {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

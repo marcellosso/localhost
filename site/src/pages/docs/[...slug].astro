@@ -23,7 +23,7 @@ const url = (path: string) => new URL(path, Astro.site).toString();
 const structuredData = [
   {
     '@type': 'TechArticle',
-    headline: page.title,
+    headline: page.seoTitle ?? page.title,
     description: page.description,
     url: url(link(page)),
     isPartOf: { '@type': 'WebSite', name, url: url('/') },
@@ -39,7 +39,7 @@ const structuredData = [
 ];
 ---
 
-<Base title={page.title} description={page.description} type="article" {structuredData}>
+<Base title={page.seoTitle ?? page.title} description={page.description} type="article" {structuredData}>
   <div class="container docs">
     <nav class="sidebar" aria-label="Docs">
       <details open>

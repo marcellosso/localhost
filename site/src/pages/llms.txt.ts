@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { agentsDefinition, agentsFaq, tools } from '../lib/agents';
 import { alternatives } from '../lib/compare';
 import { pages } from '../lib/docs';
 import { definition, faq, plain } from '../lib/faq';
@@ -8,13 +9,19 @@ import { releases, repository } from '../lib/site';
 export const GET: APIRoute = ({ site }) => {
   const url = (path: string) => new URL(path, site).toString();
   const lines = [
-    '# localhost',
+    '# localhost app',
     '',
     `> ${definition}`,
     '',
     '## FAQ',
     '',
     ...faq.flatMap((item) => [`### ${item.question}`, '', ...item.answer.map(plain).flatMap((paragraph) => [paragraph, ''])]),
+    '## Coding agents (MCP)',
+    '',
+    `- [localhost for AI coding agents](${url('/agents')}): ${agentsDefinition}`,
+    `- Tools: ${tools.map((tool) => tool.name).join(', ')}.`,
+    '',
+    ...agentsFaq.flatMap((item) => [`### ${item.question}`, '', ...item.answer.map(plain).flatMap((paragraph) => [paragraph, ''])]),
     '## Docs',
     '',
     ...pages.map((page) => `- [${page.title}](${url(page.slug ? `/docs/${page.slug}` : '/docs')}): ${page.description}`),

@@ -1,6 +1,6 @@
 /** The one-sentence answer to "what is localhost?", word for word as the README has it. */
 export const definition =
-  'localhost (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev.';
+  'localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.';
 
 /** The homepage FAQ, also its FAQPage JSON-LD, llms.txt and the README's `## FAQ`.
  * Answers are plain text; `code` spans are written in backticks. */
@@ -22,6 +22,12 @@ export const faq: { question: string; answer: string[] }[] = [
     question: 'How do I run frontend, backend and database together?',
     answer: [
       'Add the Project’s folder and localhost suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. Make the API start after the database, then press Start All (⇧⌘R, or Ctrl+Shift+R on Linux and Windows): each Service waits until its Dependencies are Running, and All services shows every log in one stream.',
+    ],
+  },
+  {
+    question: 'Can AI coding agents start my dev servers through localhost?',
+    answer: [
+      'Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.',
     ],
   },
   {

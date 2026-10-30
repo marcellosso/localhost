@@ -30,3 +30,7 @@ Select **All services** to see every Service's output in one stream, each line p
 Closing the window doesn't stop anything: your Services keep running, and the menu bar icon (the tray icon on Linux and Windows) shows them, with a red dot while one has Failed. Quitting asks first, then stops everything.
 
 ![The menu bar panel: Acme Shop's Services with their states and Start, Restart, Stop and Open in Browser buttons](../../../../.github/assets/menu-bar-light.png)
+
+## 5. Let your coding agent run it too
+
+Connect Claude Code, Cursor, Codex or another MCP client to `localhost mcp`, and it starts, stops and reads the logs of the same Services, instead of a `pnpm dev` in a shell you can't see. What it starts shows in the window. See [Coding agents (MCP)](/docs/mcp) and the [agent skill](/docs/skills).

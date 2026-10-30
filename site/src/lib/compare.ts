@@ -26,6 +26,7 @@ export const alternatives: Alternative[] = [
       'Development on your own machine: a window per Project, Start All in dependency order, one merged log.',
       'Built for development: your login shell’s `PATH` and version managers, Port readiness and Dependencies between Services, instead of production supervision.',
       'Nothing restarts on its own: a Service that fails stays Failed, with the reason and its output.',
+      'Coding agents start and stop the same Services over MCP (`localhost mcp`), and you see what they run in the window.',
     ],
     summary: { wins: 'Supervising production processes on servers', localhost: 'Dev servers on your own machine, with a GUI' },
   },
@@ -96,13 +97,15 @@ export const alternatives: Alternative[] = [
     name: 'devglow, DevWebUI',
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
-      'Both ship an MCP server today, so coding agents such as Claude Code and Cursor can start and stop processes. localhost doesn’t have one yet.',
+      'An MCP server you add without Rust: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost’s, `localhost mcp`, isn’t in the release downloads yet: you build it with Rust’s `cargo`.',
+      'Their agents can also register, edit and delete projects, so an agent can set one up for you. In localhost you add and edit them in the app.',
     ],
     localhost: [
       'MIT license; Linux packages (devglow has none): `.deb`, `.rpm` and AppImage.',
+      'The agent can’t add, change or delete your Projects or Services, reads only the Secrets of the Services it starts (and their Dependencies), and its Services stop when it disconnects unless the app is open.',
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agent control over MCP today', localhost: 'MIT license; Linux packages (devglow has none)' },
+    summary: { wins: 'An MCP server you add without Rust (devglow via `npx devglow-mcp`)', localhost: 'MIT license; Linux packages; agents can’t add, edit or delete Projects' },
   },
 ];
