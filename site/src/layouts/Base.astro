@@ -60,16 +60,6 @@ const image = new URL('/og.png', Astro.site).toString();
       // Dark unless the visitor picked light, applied before the first paint.
       document.documentElement.dataset.theme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
     </script>
-    {
-      // Vercel Web Analytics, without its npm package: Vercel serves the script
-      // from the deployment itself, so it only exists in production builds there.
-      import.meta.env.PROD && (
-        <>
-          <script is:inline>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
-          <script is:inline defer src="/_vercel/insights/script.js"></script>
-        </>
-      )
-    }
   </head>
   <body>
     <a class="skip visually-hidden" href="#content">Skip to content</a>
@@ -79,6 +69,10 @@ const image = new URL('/og.png', Astro.site).toString();
     </main>
     <Footer />
     <InstallDialog />
+    <script>
+      import { startAnalytics } from '../lib/analytics';
+      startAnalytics();
+    </script>
   </body>
 </html>
 
