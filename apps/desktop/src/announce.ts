@@ -41,3 +41,18 @@ export function settledAnnouncements(
 export function currentStates(view: CoreView): Map<Id, ServiceState> {
   return new Map([...view.statuses.values()].map((status) => [status.serviceId, status.state]));
 }
+
+const spokenListeners = new Set<(announcement: Announcement) => void>();
+
+/** Tells a screen reader about the result of an action that changes no Service, e.g. connecting an agent. */
+export function announce(text: string, isUrgent = false) {
+  spokenListeners.forEach((listener) => listener({ text, isUrgent }));
+}
+
+/** Hears each `announce`; returns the unsubscribe. */
+export function onAnnouncement(listener: (announcement: Announcement) => void): () => void {
+  spokenListeners.add(listener);
+  return () => {
+    spokenListeners.delete(listener);
+  };
+}

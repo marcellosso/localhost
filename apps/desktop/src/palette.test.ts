@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { viewFromSnapshot } from "./core";
 import { emptyQueryResults, paletteItems, rankItems } from "./palette";
 import { project, service, status } from "./test/fixtures";
+import { currentUi, resetUi } from "./ui";
 
 const commands = vi.hoisted(() => ({ fuzzyScores: vi.fn() }));
 vi.mock("./bindings", () => ({ commands }));
@@ -49,5 +50,14 @@ describe("palette", () => {
 
     ranked[0].run();
     expect(navigator.selectService).toHaveBeenCalledWith(blog.id, blog.services[0].id);
+  });
+
+  it("opens Connect Agents when typed for", () => {
+    resetUi();
+    const item = paletteItems(view, shop, { kind: "all" }, navigator).find((item) => item.title === "Connect Agents…")!;
+    expect(item.id.startsWith("other:")).toBe(true);
+    expect(item.keywords).toContain("mcp");
+    item.run();
+    expect(currentUi().sheet).toEqual({ kind: "connectAgents" });
   });
 });

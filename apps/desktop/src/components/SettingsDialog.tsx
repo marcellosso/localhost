@@ -2,16 +2,18 @@ import { type ReactNode, useId, useRef, useState } from "react";
 import type { Appearance } from "../bindings";
 import { saveSettings, useSettings } from "../settings";
 import { checkForUpdates } from "../updates";
+import { CONNECT_AGENTS_SUBTITLE, CONNECT_AGENTS_TITLE, ConnectAgents } from "./ConnectAgents";
 import { Dialog, useModal } from "./Dialog";
-import { CircleHalfIcon, GearIcon, GlobeIcon } from "./Icons";
+import { CircleHalfIcon, GearIcon, GlobeIcon, LinkIcon } from "./Icons";
 import styles from "./SettingsDialog.module.css";
 
-type Section = "general" | "appearance" | "ports";
+type Section = "general" | "appearance" | "ports" | "agents";
 
 const sections: { id: Section; title: string; icon: ReactNode }[] = [
   { id: "general", title: "General", icon: <GearIcon size={13} /> },
   { id: "appearance", title: "Appearance", icon: <CircleHalfIcon size={13} /> },
   { id: "ports", title: "Ports", icon: <GlobeIcon size={13} /> },
+  { id: "agents", title: "Agents", icon: <LinkIcon size={13} /> },
 ];
 
 /** The log font sizes offered; settings.rs keeps the same list. */
@@ -59,6 +61,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           {section === "general" && <GeneralSettings />}
           {section === "appearance" && <AppearanceSettings />}
           {section === "ports" && <PortsSettings />}
+          {section === "agents" && (
+            <>
+              <SectionHeader title={CONNECT_AGENTS_TITLE} subtitle={CONNECT_AGENTS_SUBTITLE} />
+              <ConnectAgents headingLevel={4} />
+            </>
+          )}
         </div>
         <button className={`button ${styles.done}`} onClick={onClose}>
           Done

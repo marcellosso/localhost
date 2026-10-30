@@ -19,7 +19,7 @@ export type Navigator = {
 };
 
 export type PaletteIcon =
-  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" | "keyboard" }
+  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" | "keyboard" | "agents" }
   /** A Service: its colour (by position) and state glyph. */
   | { kind: "service"; index: number; state: ServiceState };
 
@@ -90,6 +90,13 @@ export function paletteItems(
     shortcut: label(SHORTCUTS.keyboardShortcuts),
     keywords: "help keys cheat sheet",
     run: () => showAlert({ kind: "keyboardShortcuts" }),
+  });
+  items.push({
+    id: "other:connect-agents",
+    title: "Connect Agents…",
+    icon: { kind: "symbol", name: "agents" },
+    keywords: "mcp claude cursor codex agent skill path terminal cli",
+    run: () => showSheet({ kind: "connectAgents" }),
   });
   items.push({
     id: "other:check-for-updates",
