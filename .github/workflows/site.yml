@@ -54,7 +54,7 @@ jobs:
           VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           if [[ -z $VERCEL_DEPLOY_HOOK ]]; then
-            echo "::warning::No VERCEL_DEPLOY_HOOK secret: the site keeps the previous release's download links until the next push to main."
-            exit 0
+            echo "::error::No VERCEL_DEPLOY_HOOK secret: the site keeps the previous release's version and download links until it is rebuilt. Add the secret and re-run this job."
+            exit 1
           fi
           curl --fail --silent --show-error --retry 3 -X POST "$VERCEL_DEPLOY_HOOK"

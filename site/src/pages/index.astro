@@ -1,10 +1,10 @@
 ---
-import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import AppWindow from '../components/AppWindow.astro';
 import DownloadButton from '../components/DownloadButton.astro';
 import { href, name, releases, repository, tagline } from '../lib/site';
 import { definition, faq, html, plain } from '../lib/faq';
+import { changelog } from '../lib/changelog';
 import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
@@ -57,9 +57,7 @@ const structuredData = [
   },
 ];
 
-const latest = (await getCollection('changelog'))
-  .filter((entry) => entry.data.released)
-  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())[0];
+const latest = (await changelog()).find((entry) => entry.released);
 
 const commands = [
   { runtime: 'Node', command: 'pnpm dev' },
@@ -85,8 +83,8 @@ const pillars = [
         {
           latest && (
             <a class="pill" href={href('changelog')}>
-              <span class="mono">v{latest.data.version}</span>
-              {latest.data.title}
+              <span class="mono">v{latest.version}</span>
+              {latest.title}
               <span aria-hidden="true">→</span>
             </a>
           )
