@@ -78,13 +78,14 @@ const workflows = [
   },
 ];
 
+const command = '/Applications/localhost.app/Contents/Helpers/localhost';
 const cursorConfig = `{
   "mcpServers": {
-    "localhost": { "command": "localhost", "args": ["mcp"] }
+    "localhost": { "type": "stdio", "command": "${command}", "args": ["mcp"] }
   }
 }`;
 const codexConfig = `[mcp_servers.localhost]
-command = "localhost"
+command = "${command}"
 args = ["mcp"]`;
 ---
 
@@ -194,32 +195,33 @@ args = ["mcp"]`;
 
     <section id="setup">
       <h2>How do I connect Claude Code, Cursor or Codex?</h2>
-      <h3>1. Install the <code>localhost</code> command</h3>
+      <h3>1. Install the app</h3>
       <p class="what">
-        <code>localhost mcp</code> is part of the <code>localhost</code> command, which isn’t in the release downloads yet. Build it from
-        source with Rust, and add your Projects in the app first: the command reads the same Projects.
+        It comes with the <code>localhost</code> command, the same version, and updates it with itself. Add your Projects in the app: the
+        agent reads the same Projects.
       </p>
-      <pre><code>git clone https://github.com/marcellosso/localhost
-cargo install --path localhost/core/localhost-cli</code></pre>
 
-      <h3>2. Connect your agent</h3>
-      <p class="what"><strong>Claude Code</strong></p>
-      <pre><code>claude mcp add localhost -- localhost mcp</code></pre>
-      <p class="what"><strong>Cursor</strong>: in <code>.cursor/mcp.json</code> in your project, or <code>~/.cursor/mcp.json</code> for every project.</p>
+      <h3>2. Connect your agents</h3>
+      <p class="what">
+        Open <strong>Settings → Agents</strong>, or <strong>Connect Agents…</strong> in the command palette, and click
+        <strong>Connect</strong> next to Claude Code, Cursor or Codex. Before you click, <strong>What changes</strong> shows exactly what
+        localhost writes: a server named <code>localhost</code> in <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code> or
+        <code>~/.codex/config.toml</code>, running the command inside the app, and the
+        <a href={href('docs/skills')}>localhost-mcp skill</a> in the agent’s skills folder. Every other entry stays as it was, the file
+        is backed up before the first change, and <strong>Disconnect</strong> removes only localhost’s entries. If an agent runs another
+        <code>localhost</code>, such as one in <code>~/.cargo/bin</code>, it offers <strong>Update</strong>.
+      </p>
+
+      <h3>3. Or set it up by hand</h3>
+      <p class="what">
+        For other MCP clients, such as Claude Desktop, give the command inside the app the argument <code>mcp</code>: on macOS
+        <code>/Applications/localhost.app/Contents/Helpers/localhost</code>. Cursor’s <code>~/.cursor/mcp.json</code>:
+      </p>
       <pre><code>{cursorConfig}</code></pre>
-      <p class="what"><strong>Codex</strong>: <code>codex mcp add localhost -- localhost mcp</code>, or in <code>~/.codex/config.toml</code>:</p>
+      <p class="what">Codex’s <code>~/.codex/config.toml</code>:</p>
       <pre><code>{codexConfig}</code></pre>
       <p class="what">
-        <strong>Other MCP clients</strong>, such as Claude Desktop, take the same <code>command</code> and <code>args</code> in their own
-        configuration file. If one can’t find <code>localhost</code>, give it the full path, e.g. <code>~/.cargo/bin/localhost</code>.
-      </p>
-
-      <h3>3. Give it the skill</h3>
-      <p class="what">
-        The server tells the agent how to use it when it connects. The <a href={href('docs/skills')}>localhost-mcp skill</a> makes it the
-        default: Services through localhost, never a shell; <code>status</code> before saying anything runs; <code>logs</code> and
-        <code>ports</code> when something fails. Copy it to <code>~/.claude/skills/localhost-mcp/</code> for Claude Code or
-        <code>~/.agents/skills/localhost-mcp/</code> for Codex.
+        Every platform’s path, and the skill by hand: <a href={href('docs/mcp#set-it-up-by-hand')}>Set it up by hand</a>.
       </p>
     </section>
 

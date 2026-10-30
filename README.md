@@ -256,12 +256,14 @@ Inside that folder:
 - `projects/`: one JSON file per Project. A file that can't be read is renamed to `….unreadable` and reported at launch, never deleted.
 - `logs/`: each Run's output, the last 5 Runs per Service.
 - `runs/`: the Runs active right now, to find leftovers after a crash.
+- `agent-backups/`: each coding agent's configuration file as it was before localhost first connected it.
+- `bin/`: the AppImage's `localhost` command, copied out for coding agents (Linux AppImage only).
 
 The Linux and Windows app keeps its settings in `~/.config/io.github.marcellosso.localhost.desktop` or `%APPDATA%\io.github.marcellosso.localhost.desktop`. Set `LOCALHOST_STORAGE_ROOT` to use another folder, e.g. to try a build without touching your data.
 
 ## The command line
 
-The `localhost` command runs on the same core and the same data as the app: list Projects, see what is running, read the latest logs, or run a Project's Services in the foreground until Ctrl-C. It isn't in the release downloads yet; build it from source, see [core/README.md](core/README.md#the-localhost-command).
+The `localhost` command runs on the same core and the same data as the app: list Projects, see what is running, read the latest logs, or run a Project's Services in the foreground until Ctrl-C. It comes with the app, the same version: **Settings › Agents › Use localhost in a terminal › Add to PATH** links it into `~/.local/bin` on macOS and Linux and adds the app's folder to your user `PATH` on Windows, and **Remove from PATH** undoes it. The Linux `.deb` and `.rpm` install it as `/usr/bin/localhost`. To build it yourself, see [core/README.md](core/README.md#the-localhost-command).
 
 ```sh
 localhost projects
@@ -275,23 +277,31 @@ localhost mcp
 
 `localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. An agent and the app drive the same background core: what one starts is Running in the other, and a stop from either stops it. An agent never starts a second copy of a running Service, can't change your configuration, and reads only the Secrets of the Services it starts. The Services an agent starts stop when it disconnects, unless the app is open.
 
-It comes with the `localhost` command, built from source (see [The command line](#the-command-line)). Then connect your agent:
+**Connect from the app.** Open **Settings › Agents** (or **Connect Agents…** in the command palette) and click **Connect** next to Claude Code, Cursor or Codex. Before you click, **What changes** shows exactly what localhost writes:
 
-- **Claude Code**: `claude mcp add localhost -- localhost mcp`
-- **Codex**: `codex mcp add localhost -- localhost mcp`
-- **Cursor**: add this to `.cursor/mcp.json` (or `~/.cursor/mcp.json`):
+| Agent | MCP server added to | Skill installed in |
+|---|---|---|
+| Claude Code | `~/.claude.json` (user scope, every project) | `~/.claude/skills/localhost-mcp/` |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursor/skills/localhost-mcp/` |
+| Codex | `~/.codex/config.toml` | `~/.agents/skills/localhost-mcp/` |
+
+The entry is a server named `localhost` that runs the command bundled with the app (`localhost.app/Contents/Helpers/localhost` on macOS, `localhost.exe` beside the app on Windows, `/usr/bin/localhost` from the `.deb` and `.rpm`, a copy in localhost's data folder for the AppImage) with `mcp`, so the agent always runs the same version as the app. Only localhost's own entry changes: every other server and setting stays as it was. Each file is backed up to `agent-backups/` in localhost's data folder before the first change, connecting again changes nothing, and **Disconnect** removes only localhost's entry and skill. If an agent's `localhost` server runs another command, such as `~/.cargo/bin/localhost`, the app offers **Update**.
+
+**Or by hand**, for other MCP clients: give the bundled command the argument `mcp`.
+
+- **Claude Code**: `claude mcp add --scope user localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
+- **Codex**: `codex mcp add localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
+- **Cursor**: add this to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in one project):
 
   ```json
   {
     "mcpServers": {
-      "localhost": { "command": "localhost", "args": ["mcp"] }
+      "localhost": { "type": "stdio", "command": "/Applications/localhost.app/Contents/Helpers/localhost", "args": ["mcp"] }
     }
   }
   ```
 
-Other MCP clients take the same `command` and `args`. On Windows it covers Projects on Windows itself; a Project in a WSL distro runs only from the app.
-
-To make your agent use it by default, give it the skill in [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md): copy the `localhost-mcp` folder to `~/.claude/skills/` for Claude Code or `~/.agents/skills/` for Codex. More in the [MCP docs](https://www.getlocalhost.app/docs/mcp), the [skill docs](https://www.getlocalhost.app/docs/skills) and [localhost for AI coding agents](https://www.getlocalhost.app/agents).
+Other MCP clients take the same `command` and `args`. On Windows it covers Projects on Windows itself; a Project in a WSL distro runs only from the app, and agents installed inside a WSL distro are set up by hand. The skill is in [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md): copy the `localhost-mcp` folder to `~/.claude/skills/`, `~/.cursor/skills/` or `~/.agents/skills/`. More in the [MCP docs](https://www.getlocalhost.app/docs/mcp), the [skill docs](https://www.getlocalhost.app/docs/skills) and [localhost for AI coding agents](https://www.getlocalhost.app/agents).
 
 ## FAQ
 
@@ -334,7 +344,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | An MCP server you add without Rust (devglow via `npx devglow-mcp`) | MIT license; Linux packages; agents can’t add, edit or delete Projects |
+| **devglow, DevWebUI** | Agents can register and edit projects | MIT license; Linux packages; agents connected in one click and can’t add, edit or delete Projects |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

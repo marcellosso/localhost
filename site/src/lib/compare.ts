@@ -97,7 +97,7 @@ export const alternatives: Alternative[] = [
     name: 'devglow, DevWebUI',
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
-      'An MCP server you add without Rust: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost’s, `localhost mcp`, isn’t in the release downloads yet: you build it with Rust’s `cargo`.',
+      'Their agents can reach projects in any client that runs an MCP server: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost connects Claude Code, Cursor and Codex from the app; other clients you set up by hand.',
       'Their agents can also register, edit and delete projects, so an agent can set one up for you. In localhost you add and edit them in the app.',
     ],
     localhost: [
@@ -106,6 +106,6 @@ export const alternatives: Alternative[] = [
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'An MCP server you add without Rust (devglow via `npx devglow-mcp`)', localhost: 'MIT license; Linux packages; agents can’t add, edit or delete Projects' },
+    summary: { wins: 'Agents can register and edit projects', localhost: 'MIT license; Linux packages; agents connected in one click and can’t add, edit or delete Projects' },
   },
 ];

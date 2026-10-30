@@ -1,60 +1,84 @@
 Coding agents tend to start dev servers in a shell you can't see: a `pnpm dev` that holds a port, prints nowhere you can read, and lives on after the chat. `localhost mcp` lets them go through localhost instead. The agent starts and stops your Services, reads their status, logs and ports, and you see the same Projects and Services you configured.
 
-It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client.
+It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client. The app comes with it and connects Claude Code, Cursor and Codex in one click.
 
-## Install the command
+## Connect from the app
 
-`localhost mcp` is part of the `localhost` command, which isn't in the release downloads yet. Build it from source with Rust installed:
+The app comes with the `localhost` command and connects your agents for you, no terminal needed. Open **Settings → Agents**, or **Connect Agents…** in the command palette (**Connect Your Agents** before you have any Projects), and click **Connect** next to Claude Code, Cursor or Codex. **What changes** shows exactly what localhost writes before you click:
+
+| Agent | MCP server added to | Skill installed in |
+|---|---|---|
+| Claude Code | `~/.claude.json`, as a user-scope server for every project | `~/.claude/skills/localhost-mcp/` |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursor/skills/localhost-mcp/` |
+| Codex | `~/.codex/config.toml`, shared by the Codex CLI, IDE extension and app | `~/.agents/skills/localhost-mcp/` |
+
+The entry is a server named `localhost` that runs the command inside the app with `mcp`, and the skill is the [localhost-mcp skill](/docs/skills). Then start a new Claude Code session, check **Cursor Settings → MCP**, or restart Codex.
+
+- **Only its own entries.** Every other server and setting in the file stays as it was, comments and order included.
+- **A backup first.** Before it first changes a file, localhost keeps a copy in the `agent-backups` folder of its [data folder](/docs/data), and shows where.
+- **Nothing until you click**, and connecting again changes nothing.
+- **Disconnect** removes the `localhost` entry and the skill, nothing else.
+
+An agent that isn't installed shows as not found. If its file can't be read, or sets up `localhost` in a way localhost doesn't edit, it says so and leaves the file alone: [set it up by hand](#set-it-up-by-hand).
+
+### Keeping it current
+
+The command updates with the app, so agents always run the same version as the app and its background core. If an agent's `localhost` server runs another command, such as one built with `cargo install` in `~/.cargo/bin`, or one that's gone because the app moved, **Settings → Agents** shows **Update**: it points the server at the app's command and keeps the rest of its entry, such as `env`.
+
+Where the command is:
+
+| | |
+|---|---|
+| macOS | `/Applications/localhost.app/Contents/Helpers/localhost` |
+| Windows | `%LOCALAPPDATA%\localhost\localhost.exe` |
+| Linux (.deb, .rpm) | `/usr/bin/localhost` |
+| Linux (AppImage) | `~/.local/share/localhost/bin/localhost`, copied out of the AppImage, which only exists while it runs |
+
+On macOS, move localhost to Applications before connecting: opened from the disk image or a quarantined download, it runs from a temporary location, and localhost asks you to move it first.
+
+Agents that run inside a WSL distro, such as Claude Code installed in Ubuntu, keep their configuration there: the app connects the ones on Windows.
+
+## Use it in a terminal
+
+**Settings → Agents → Use localhost in a terminal → Add to PATH** links `~/.local/bin/localhost` to the app's command on macOS and Linux, and tells you the line to add to your shell profile if `~/.local/bin` isn't on your `PATH`. On Windows it adds the app's folder to your user `PATH`; new terminals find `localhost`. **Remove from PATH** undoes it. The `.deb` and `.rpm` put `localhost` in `/usr/bin` already. Agents don't need it: their configuration names the full path.
+
+## Set it up by hand
+
+For another MCP client, or if you'd rather edit the files yourself, point it at the command above with the argument `mcp`.
+
+**Claude Code**:
 
 ```sh
-git clone https://github.com/marcellosso/localhost
-cargo install --path localhost/core/localhost-cli
+claude mcp add --scope user localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp
 ```
 
-That puts `localhost` in `~/.cargo/bin` (`%USERPROFILE%\.cargo\bin` on Windows). Add your Projects in the app first; the command reads the same Projects.
-
-## Connect Cursor
-
-Add the server to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json` for every project:
+**Cursor**: in `~/.cursor/mcp.json`, or `.cursor/mcp.json` in one project:
 
 ```json
 {
   "mcpServers": {
     "localhost": {
-      "command": "localhost",
+      "type": "stdio",
+      "command": "/Applications/localhost.app/Contents/Helpers/localhost",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-If Cursor says it can't find `localhost`, use the full path instead, e.g. `"command": "/Users/you/.cargo/bin/localhost"`. Apps started from the Dock don't always get your shell's `PATH`. On Windows: `"command": "C:\\Users\\you\\.cargo\\bin\\localhost.exe"`.
+On Windows: `"command": "C:\\Users\\you\\AppData\\Local\\localhost\\localhost.exe"`. Open **Cursor Settings → MCP** to check that **localhost** is connected and lists its tools.
 
-Open **Cursor Settings → MCP** to check that **localhost** is connected and lists its tools.
-
-## Connect Claude Code
-
-```sh
-claude mcp add localhost -- localhost mcp
-```
-
-## Connect Codex
-
-```sh
-codex mcp add localhost -- localhost mcp
-```
-
-Or add it to `~/.codex/config.toml` yourself (`.codex/config.toml` for one trusted project):
+**Codex**: `codex mcp add localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`, or in `~/.codex/config.toml` (`.codex/config.toml` for one trusted project):
 
 ```toml
 [mcp_servers.localhost]
-command = "localhost"
+command = "/Applications/localhost.app/Contents/Helpers/localhost"
 args = ["mcp"]
 ```
 
-## Other clients
+**Other clients**, such as Claude Desktop, take the same `command` and `args` in their own configuration file. Use the full path: apps started from the Dock or a launcher don't always get your shell's `PATH`.
 
-Claude Desktop and most other MCP clients take the same `command` and `args` as Cursor, in their own configuration file. If a client can't find `localhost`, give it the full path, as for Cursor.
+Building localhost yourself? `cargo install --path core/localhost-cli` in a clone of the repository puts `localhost` in `~/.cargo/bin`. It must come from the same version as the app, which otherwise says the two speak to the core differently.
 
 ## Tools
 
@@ -89,13 +113,13 @@ The app and `localhost mcp` share one localhost core that runs in the background
 
 When an agent disconnects, the core stops the Services that only it needed: those it started, and the Dependencies it started them with, unless the app is connected or another agent started them too. When the app quits, it stops everything first, as it always has.
 
-If the app and the `localhost` command come from versions that speak to the core differently, the second one to connect says so. Quit the app and your agents, then open the app again.
+If the app and the `localhost` command come from versions that speak to the core differently, the second one to connect says so. That happens with a command from elsewhere, not the one the app comes with: **Update** the agent in **Settings → Agents**, quit the app and your agents, then open the app again.
 
 On Windows this covers Projects on Windows itself. A Project in a WSL distro runs only from the app, which starts the `localhostd` inside the distro: asked to start one, the agent is told so.
 
 ## Teach your agent
 
-The server tells the agent how to use it when it connects. To make it the default, give your agent the [localhost-mcp skill](/docs/skills), or add these lines to your project's `AGENTS.md`:
+The server tells the agent how to use it when it connects. Connecting from the app also installs the [localhost-mcp skill](/docs/skills), which makes it the default. For other agents, add these lines to your project's `AGENTS.md`:
 
 ```md
 ## Running the project

@@ -30,6 +30,11 @@ cargo install --path localhost-cli                # put `localhost` in ~/.cargo/
 Projects and Services are named by Key, name, or letters of either in order
 (`FuzzyMatch`).
 
+The apps ship this binary, built from the same commit (the macOS app's
+`Contents/Helpers`, beside `localhost-app` on Windows, `/usr/bin` in the
+Linux packages), and `AgentSetup` (`localhost-core/src/agents/`) points
+coding agents' MCP configuration at it.
+
 `localhost mcp` (`src/mcp/`) speaks JSON-RPC lines on stdin/stdout. It runs
 Services in the shared core (below), the one the app drives, with
 `Origin::Agent`. `up` runs its own `ServiceManager` in the foreground; the
