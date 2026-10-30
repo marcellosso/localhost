@@ -253,14 +253,15 @@ pub async fn wait_until(mut condition: impl FnMut() -> bool) {
 /// A port nothing listens on right now (bound once by the kernel's choice,
 /// then released), at least 100 away from any port another test of this
 /// binary was given: tests run in parallel, the kernel picks nearby ports,
-/// and a Service whose Port is taken moves up to 100 ports above it.
+/// and a Service whose Port is taken moves up to 100 ports above it, so
+/// those 100 ports must exist too (Windows hands out ports up to 65535).
 pub fn free_port() -> u16 {
     static HANDED_OUT: Mutex<Option<HashSet<u16>>> = Mutex::new(None);
     loop {
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
         let mut handed_out = HANDED_OUT.lock().unwrap();
         let ports = handed_out.get_or_insert_with(HashSet::new);
-        if ports.iter().all(|other| other.abs_diff(port) > 100) {
+        if port <= u16::MAX - 100 && ports.iter().all(|other| other.abs_diff(port) > 100) {
             ports.insert(port);
             return port;
         }
