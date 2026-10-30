@@ -17,7 +17,7 @@ const current = (section: string) => path.startsWith(href(section));
       <a href={href('docs')} aria-current={current('docs') ? 'page' : undefined}>Docs</a>
       <a href={href('agents')} aria-current={current('agents') ? 'page' : undefined}>Agents</a>
       <a href={href('changelog')} aria-current={current('changelog') ? 'page' : undefined}>Changelog</a>
-      <a href={repository} class="github">GitHub</a>
+      <a href={repository} class="github" data-track="github_clicked" data-track-location="header">GitHub</a>
     </nav>
     <div class="actions">
       <button class="theme" type="button" data-theme-toggle aria-label="Switch to light appearance">
@@ -29,7 +29,7 @@ const current = (section: string) => path.startsWith(href(section));
           <path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"></path>
         </svg>
       </button>
-      <DownloadButton size="small" />
+      <DownloadButton size="small" location="header" />
     </div>
   </div>
 </header>

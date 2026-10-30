@@ -3,8 +3,10 @@ import { latestRelease } from '../lib/release';
 
 interface Props {
   size?: 'small' | 'large';
+  /** Where the button sits, sent with `download_clicked`. */
+  location: string;
 }
-const { size = 'large' } = Astro.props;
+const { size = 'large', location } = Astro.props;
 const release = await latestRelease();
 ---
 
@@ -12,6 +14,8 @@ const release = await latestRelease();
   class:list={['button', 'button-primary', { 'button-small': size === 'small' }]}
   href={release.mac}
   data-download
+  data-track="download_clicked"
+  data-track-location={location}
   data-macos={release.mac}
   data-windows={release.windows}
 >
@@ -31,6 +35,7 @@ const release = await latestRelease();
     if (label.dataset.downloadLabel === 'large') label.textContent = `Download for ${names[platform]}`;
     // Linux has three packages to choose from, so it opens the choice instead of downloading.
     button.href = platform === 'linux' ? '#install' : button.dataset[platform]!;
+    button.dataset.trackPlatform = platform;
     button.addEventListener('click', (event) => {
       const direct = platform !== 'linux' && button.href.includes('/releases/download/');
       if (!direct) event.preventDefault();
