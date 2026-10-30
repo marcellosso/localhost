@@ -271,6 +271,7 @@ Run only what the change touches. `cargo test` in `src-tauri/` regenerates `src/
 - Branch from `main`, one topic per branch; open a PR that says what changed and why, how it was checked, and what was left out, and links the issue. Don't widen the scope beyond the issue without asking.
 - Commits are kept as written (merge commits, no squash): one line saying what the commit does.
 - Releases are cut by tagging `main` (`RELEASING.md`).
+- CI runs each job on a PR only when files it depends on changed, through a job-level `if:` on the workflow's `changes` job, never workflow-level `paths:`, so a skipped job still passes a required check. When a job comes to depend on files outside its folders (as the core embeds `skills/`), add them to its pattern in the `changes` job. The site's paths are also in `site/scripts/ignore-build.sh`, Vercel's Ignored Build Step: change both together.
 
 ## Where it is going
 
