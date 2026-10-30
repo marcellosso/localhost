@@ -5,6 +5,8 @@ export type Platform = 'macos' | 'windows' | 'linux';
 export interface Release {
   /** Without the leading `v`, e.g. `0.3.1`; `<version>` when no release is published. */
   version: string;
+  /** When it was published; missing when no release could be read. */
+  published?: Date;
   /** Direct download links. Each falls back to the Releases page when the asset is missing. */
   mac: string;
   windows: string;
@@ -52,8 +54,8 @@ async function load(): Promise<Release> {
       console.warn(`[release] No published release (${response.status}); download links go to the Releases page.`);
       return fallback;
     }
-    const data = (await response.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] };
-    const release = { ...fallback, files: { ...generic }, version: data.tag_name.replace(/^v/, '') };
+    const data = (await response.json()) as { tag_name: string; published_at: string | null; assets: { name: string; browser_download_url: string }[] };
+    const release = { ...fallback, files: { ...generic }, version: data.tag_name.replace(/^v/, ''), published: data.published_at ? new Date(data.published_at) : undefined };
     for (const [key, pattern] of Object.entries(patterns) as [keyof typeof patterns, RegExp][]) {
       const asset = data.assets.find((candidate) => pattern.test(candidate.name));
       if (asset) {

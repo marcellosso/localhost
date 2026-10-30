@@ -1,12 +1,11 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
+import { changelog } from '../lib/changelog';
 import { releases } from '../lib/site';
 
 const entries = await Promise.all(
-  (await getCollection('changelog'))
-    .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-    .map(async (entry) => ({ ...entry.data, id: entry.id, Content: (await render(entry)).Content })),
+  (await changelog()).map(async ({ entry, ...data }) => ({ ...data, id: entry.id, Content: (await render(entry)).Content })),
 );
 const formatted = (date: Date) => date.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 ---
