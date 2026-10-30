@@ -112,6 +112,11 @@ pub enum LocalhostError {
     CommandInTemporaryLocation(String),
     /// Another file is where the `localhost` link would go.
     CommandPathTaken(String),
+    /// An agent's own command (`claude mcp …`) failed: what it printed.
+    AgentCommandFailed {
+        command: String,
+        output: String,
+    },
 }
 
 impl LocalhostError {
@@ -181,6 +186,9 @@ impl LocalhostError {
                 "This build of localhost has no localhost command ({path}). Install localhost from a release to connect agents."
             ),
             CommandInTemporaryLocation(_) => "localhost is running from a temporary location. Move it to Applications, open it from there, and try again.".into(),
+            AgentCommandFailed { command, output } => {
+                format!("`{command}` failed: {output}. Try again, or set up the server by hand.")
+            }
             CommandPathTaken(path) => format!("{path} already exists and isn’t localhost’s. Remove it first, or leave it."),
             InvalidProjectFile { problem, field, line } => {
                 let line = line.map(|line| format!("Line {line}"));

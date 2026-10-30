@@ -497,6 +497,16 @@ impl Targets {
     }
 
     #[uniffi::method]
+    pub async fn ffi_connected_agent_count(self: Arc<Self>) -> u64 {
+        on_runtime(async move { self.connected_agent_count().await as u64 }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_disconnect_agents(self: Arc<Self>) -> u64 {
+        on_runtime(async move { self.disconnect_agents().await as u64 }).await
+    }
+
+    #[uniffi::method]
     pub fn ffi_set_automatic_port_move(&self, is_enabled: bool) {
         self.set_automatic_port_move(is_enabled)
     }

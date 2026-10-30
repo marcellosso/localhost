@@ -217,3 +217,9 @@ pub fn local_url_first(text: &str) -> Option<String> {
 pub fn agent_client_name(client: AgentClient) -> String {
     client.name().to_string()
 }
+
+/// What Restart to Update asks, for the active Services and connected agents; `None` when nothing needs asking.
+#[uniffi::export]
+pub fn update_confirmation(services: u64, agents: u64) -> Option<crate::UpdateConfirmation> {
+    crate::UpdateConfirmation::new(services as usize, agents as usize)
+}

@@ -132,7 +132,7 @@ impl AgentSetup {
         files::join(&self.home, &[".local", "bin", "localhost"])
     }
 
-    fn terminal_path(&self) -> Option<String> {
+    pub(super) fn terminal_path(&self) -> Option<String> {
         self.terminal_path.get_or_init(platform::terminal_path).clone()
     }
 }

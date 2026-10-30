@@ -44,6 +44,7 @@ mod yaml;
 
 pub use agents::{
     AGENT_SKILL, AgentClient, AgentConnection, AgentSetup, AgentStatus, CommandLineState, CommandLineStatus,
+    UpdateConfirmation,
 };
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use detection::{

@@ -361,3 +361,137 @@ fn the_command_is_linked_into_local_bin_and_unlinked() {
         .with_terminal_path(Some(fixture.command.parent().unwrap().display().to_string()));
     assert_eq!(packaged.command_line().state, CommandLineState::AlreadyOnPath);
 }
+
+#[test]
+fn cursor_reads_the_skill_another_agent_has_instead_of_a_second_copy() {
+    let fixture = Fixture::new();
+    let setup = fixture.setup();
+    let cursor_skill = fixture.home.join(skill(AgentClient::Cursor));
+
+    // Cursor first: its own copy, until Claude Code's folder has one Cursor reads.
+    setup.connect(AgentClient::Cursor).unwrap();
+    assert!(cursor_skill.exists());
+    setup.connect(AgentClient::ClaudeCode).unwrap();
+    assert!(!cursor_skill.parent().unwrap().exists(), "one copy only");
+    let cursor = setup.status(AgentClient::Cursor);
+    assert_eq!(cursor.connection, AgentConnection::Connected, "{}", cursor.summary);
+    assert_eq!(cursor.skill_shared_from.as_deref(), Some("Claude Code"));
+    assert!(cursor.summary.contains("isn’t installed twice"), "{}", cursor.summary);
+
+    // Connecting Cursor again doesn't add one.
+    setup.connect(AgentClient::Cursor).unwrap();
+    assert!(!cursor_skill.exists());
+
+    // Claude Code leaves: Cursor gets its own again.
+    setup.disconnect(AgentClient::ClaudeCode).unwrap();
+    assert_eq!(fixture.read(skill(AgentClient::Cursor)), AGENT_SKILL);
+    assert_eq!(setup.status(AgentClient::Cursor).connection, AgentConnection::Connected);
+
+    // Codex's folder (~/.agents/skills) counts too; disconnecting Cursor never touches it.
+    setup.connect(AgentClient::Codex).unwrap();
+    assert!(!cursor_skill.exists());
+    assert_eq!(setup.status(AgentClient::Cursor).skill_shared_from.as_deref(), Some("Codex"));
+    setup.disconnect(AgentClient::Cursor).unwrap();
+    assert_eq!(fixture.read(skill(AgentClient::Codex)), AGENT_SKILL);
+
+    // A disconnected Cursor gets no copy when another agent leaves.
+    setup.disconnect(AgentClient::Codex).unwrap();
+    assert!(!cursor_skill.exists());
+}
+
+/// A stand-in for Claude Code's `claude`, which logs its arguments and
+/// writes `~/.claude.json` the way `claude mcp add-json` / `remove` would.
+#[cfg(unix)]
+fn fake_claude(fixture: &Fixture) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let script = fixture.home.join("bin/claude");
+    let log = fixture.home.join("claude.log");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    let config = fixture.home.join(".claude.json");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log}'\ncase \"$2\" in\n  add-json) printf '{{\"mcpServers\": {{\"%s\": %s}}}}\\n' \"$5\" \"$6\" > '{config}' ;;\n  remove) printf '{{}}\\n' > '{config}' ;;\nesac\n",
+            log = log.display(),
+            config = config.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    (script, log)
+}
+
+#[cfg(unix)]
+#[test]
+fn claude_code_is_changed_through_its_own_command_when_there_is_one() {
+    let fixture = Fixture::new();
+    let (claude, log) = fake_claude(&fixture);
+    let setup = fixture.setup().with_claude_command(Some(claude));
+    let lines = || fs::read_to_string(&log).unwrap_or_default().lines().map(str::to_string).collect::<Vec<_>>();
+
+    assert_eq!(
+        setup.status(AgentClient::ClaudeCode).via_command.as_deref(),
+        Some("claude mcp add-json --scope user localhost")
+    );
+    let status = setup.connect(AgentClient::ClaudeCode).unwrap();
+    assert_eq!(status.connection, AgentConnection::Connected, "{}", status.summary);
+    let added = lines();
+    assert_eq!(added.len(), 1, "{added:?}");
+    assert!(added[0].starts_with("mcp add-json --scope user localhost {"), "{added:?}");
+    assert!(added[0].contains(&fixture.command()), "{added:?}");
+    // Backed up first, as when it edits the file itself.
+    assert_eq!(fs::read_to_string(status.backup_path.unwrap()).unwrap(), CLAUDE_JSON);
+
+    // Again: nothing to run.
+    setup.connect(AgentClient::ClaudeCode).unwrap();
+    assert_eq!(lines().len(), 1);
+
+    // Repointing removes and adds it back, keeping its `env`.
+    fs::write(
+        fixture.home.join(".claude.json"),
+        r#"{"mcpServers": {"localhost": {"type": "stdio", "command": "/old/localhost", "args": ["mcp"], "env": {"A": "1"}}}}"#,
+    )
+    .unwrap();
+    assert_eq!(setup.status(AgentClient::ClaudeCode).connection, AgentConnection::NeedsUpdate);
+    setup.connect(AgentClient::ClaudeCode).unwrap();
+    let repointed = lines();
+    assert_eq!(repointed[1], "mcp remove --scope user localhost");
+    assert!(repointed[2].contains(r#""env":{"A":"1"}"#) && repointed[2].contains(&fixture.command()), "{repointed:?}");
+
+    setup.disconnect(AgentClient::ClaudeCode).unwrap();
+    assert_eq!(lines()[3], "mcp remove --scope user localhost");
+    assert_eq!(setup.status(AgentClient::ClaudeCode).connection, AgentConnection::NotConnected);
+    // Nothing left to remove: it isn't run again.
+    setup.disconnect(AgentClient::ClaudeCode).unwrap();
+    assert_eq!(lines().len(), 4);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_failing_claude_command_is_reported_and_the_file_left_to_it() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = Fixture::new();
+    let claude = fixture.home.join("bin/claude");
+    fs::create_dir_all(claude.parent().unwrap()).unwrap();
+    fs::write(&claude, "#!/bin/sh\necho 'MCP server localhost already exists' >&2\nexit 1\n").unwrap();
+    fs::set_permissions(&claude, fs::Permissions::from_mode(0o755)).unwrap();
+    let setup = fixture.setup().with_claude_command(Some(claude));
+    match setup.connect(AgentClient::ClaudeCode) {
+        Err(error @ LocalhostError::AgentCommandFailed { .. }) => {
+            assert!(error.message().contains("already exists"), "{}", error.message())
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(fixture.read(".claude.json"), CLAUDE_JSON);
+}
+
+#[test]
+fn without_claude_the_file_is_edited() {
+    let fixture = Fixture::new();
+    let setup = fixture.setup().with_claude_command(None);
+    assert_eq!(setup.status(AgentClient::ClaudeCode).via_command, None);
+    setup.connect(AgentClient::ClaudeCode).unwrap();
+    assert!(fixture.read(".claude.json").contains("\"localhost\""));
+}
