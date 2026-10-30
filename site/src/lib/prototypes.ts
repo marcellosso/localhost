@@ -59,6 +59,3 @@ export function startPrototype() {
     });
   }
 }
-
-/** The Homebrew cask (github.com/marcellosso/homebrew-tap); it also puts `localhost` on the PATH. */
-export const brew = 'brew install --cask marcellosso/tap/localhost';

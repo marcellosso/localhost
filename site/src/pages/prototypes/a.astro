@@ -4,9 +4,8 @@ import AppWindow from '../../components/AppWindow.astro';
 import DownloadButton from '../../components/DownloadButton.astro';
 import Footer from '../../components/Footer.astro';
 import Wordmark from '../../components/Wordmark.astro';
-import { href, repository } from '../../lib/site';
+import { brewInstall, href, repository } from '../../lib/site';
 import { faq, html } from '../../lib/faq';
-import { brew } from '../../lib/prototypes';
 
 /** The Acme Shop Project, as the window below has it. */
 const tickets = [
@@ -75,8 +74,8 @@ const description = 'Prototype A of the localhost landing page redesign.';
         <div class="actions">
           <DownloadButton location="hero" />
           <div class="brew mac-only">
-            <code>{brew}</code>
-            <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="hero">Copy</button>
+            <code>{brewInstall}</code>
+            <button type="button" data-copy-text={brewInstall} data-track="install_command_copied" data-track-command="brew" data-track-location="hero">Copy</button>
           </div>
         </div>
         <p class="fine">Free and open source (MIT) · No account · <a href={href('docs/install')}>macOS, Windows and Linux</a></p>
@@ -274,8 +273,8 @@ const description = 'Prototype A of the localhost landing page redesign.';
             <h3>macOS</h3>
             <p>A native SwiftUI app, with a menu bar companion. Homebrew also puts the <code>localhost</code> command on your PATH.</p>
             <div class="brew">
-              <code>{brew}</code>
-              <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="install">Copy</button>
+              <code>{brewInstall}</code>
+              <button type="button" data-copy-text={brewInstall} data-track="install_command_copied" data-track-command="brew" data-track-location="install">Copy</button>
             </div>
             <button type="button" class="link" data-install-for="macos" data-track="install_opened" data-track-platform="macos">Or download the app</button>
             <span class="req">macOS 15 or later · Apple silicon or Intel</span>
@@ -304,8 +303,8 @@ const description = 'Prototype A of the localhost landing page redesign.';
           <div class="actions">
             <DownloadButton location="closing" />
             <div class="brew mac-only">
-              <code>{brew}</code>
-              <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="closing">Copy</button>
+              <code>{brewInstall}</code>
+              <button type="button" data-copy-text={brewInstall} data-track="install_command_copied" data-track-command="brew" data-track-location="closing">Copy</button>
             </div>
           </div>
         </div>
