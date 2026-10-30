@@ -327,6 +327,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
       # Static, so it runs in any distro whatever its glibc.
       - name: Build localhostd (static, musl)
+        env:
+          LOCALHOST_VERSION: ${{ needs.version.outputs.version }}
         run: cargo build -p localhost-daemon --release --target x86_64-unknown-linux-musl
       - name: Check that it is static and runs
         run: |
@@ -335,7 +337,7 @@ jobs:
           # Older `file` says "statically linked", newer "static-pie linked".
           file "$binary" | grep -Eq 'statically linked|static-pie linked'
           ls -l "$binary"
-          "$binary" --version
+          [[ $("$binary" --version) == "localhostd ${{ needs.version.outputs.version }}" ]]
           LOCALHOST_STORAGE_ROOT=$(mktemp -d) "$binary" --stdio < /dev/null
       - uses: actions/upload-artifact@v4
         with:

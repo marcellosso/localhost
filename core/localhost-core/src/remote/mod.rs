@@ -76,7 +76,7 @@ pub struct Hello {
 
 impl Hello {
     pub fn current() -> Hello {
-        Hello { protocol: PROTOCOL_VERSION, version: env!("CARGO_PKG_VERSION").to_string() }
+        Hello { protocol: PROTOCOL_VERSION, version: crate::VERSION.to_string() }
     }
 }
 
