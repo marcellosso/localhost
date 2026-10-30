@@ -1,0 +1,1517 @@
+---
+import Base from '../../layouts/Base.astro';
+import AppWindow from '../../components/AppWindow.astro';
+import DownloadButton from '../../components/DownloadButton.astro';
+import Footer from '../../components/Footer.astro';
+import Wordmark from '../../components/Wordmark.astro';
+import { href, repository } from '../../lib/site';
+import { faq, html } from '../../lib/faq';
+import { brew } from '../../lib/prototypes';
+
+/** The Acme Shop Project, as the window below has it. */
+const circuits = [
+  { key: 'migrate', name: 'Migrations', command: 'pnpm db:migrate', after: [] as string[], oneShot: true },
+  { key: 'api', name: 'API', command: 'python3 server.py --port $PORT', port: 8000, after: ['migrate'] },
+  { key: 'worker', name: 'Worker', command: 'pnpm dev', after: ['migrate'] },
+  { key: 'web', name: 'Web', command: 'pnpm dev --port $PORT', port: 5173, after: ['api'] },
+  { key: 'storybook', name: 'Storybook', command: 'pnpm storybook --port $PORT', port: 6006, after: [], manual: true },
+];
+
+const directory = [
+  { id: 'commands', label: 'Commands', text: 'Anything your terminal runs' },
+  { id: 'ports', label: 'Ports', text: 'Who is on :3000' },
+  { id: 'environment', label: 'Environment', text: 'Variables, Profiles, Secrets' },
+  { id: 'agents', label: 'Coding agents', text: 'Claude Code, Cursor, Codex' },
+  { id: 'local', label: 'Local-first', text: 'No account, nothing silent' },
+  { id: 'install', label: 'Install', text: 'macOS, Windows, Linux' },
+];
+
+const commands = [
+  ['Node', 'pnpm dev'],
+  ['Bun', 'bun run dev'],
+  ['Python', 'uv run fastapi dev'],
+  ['Rust', 'cargo run'],
+  ['Compose', 'docker compose up postgres'],
+  ['Anything', './bin/dev --port $PORT'],
+];
+
+const problems = [
+  ['Ports that collide', 'An agent runs pnpm dev while yours is already up, and the second copy fails on a taken port, or picks another port nobody told you about.'],
+  ['Processes left behind', 'A dev server started in the agent’s shell can outlive the chat, holding its port and memory until you go looking for its pid.'],
+  ['Logs nobody can see', 'Its output goes to a shell you can’t read, and the agent only sees what it captured, so a crash looks like silence.'],
+];
+
+const description = 'Prototype B of the localhost landing page redesign.';
+---
+
+<Base title="Landing prototype B" {description} noindex bare>
+  <header class="top" slot="header">
+    <div class="wrap top-inner">
+      <a class="home" href={href('/')} aria-label="localhost home">
+        <img src={href('favicon.svg')} width="24" height="24" alt="" />
+        <Wordmark size={16} />
+      </a>
+      <nav aria-label="Site">
+        <a href={href('docs')}>Docs</a>
+        <a href={href('agents')}>Agents</a>
+        <a href={repository} class="hide-narrow" data-track="github_clicked" data-track-location="header">GitHub</a>
+      </nav>
+      <button class="icon-button" type="button" data-theme-toggle aria-label="Switch to light appearance">
+        <svg class="sun" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"></path></svg>
+        <svg class="moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"></path></svg>
+      </button>
+      <DownloadButton size="small" location="header" />
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1 id="hero-title" class="engraved">Trade your terminal tabs for one switch.</h1>
+        <p class="lede">
+          localhost is a free desktop app that remembers how each of your projects runs: commands, ports, environment. Switch a Service
+          on and its Dependencies start first, in one window instead of a row of terminal tabs.
+        </p>
+        <div class="actions">
+          <DownloadButton location="hero" />
+          <div class="brew mac-only">
+            <code>{brew}</code>
+            <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="hero">Copy</button>
+          </div>
+        </div>
+        <p class="fine">Free and open source (MIT) · No account · <a href={href('docs/install')}>macOS, Windows and Linux</a></p>
+      </div>
+
+      <div class="panel switchboard" data-board>
+        <span class="screws" aria-hidden="true"></span>
+        <div class="board-head">
+          <span class="plate-label">Acme Shop</span>
+          <span class="path">~/Code/acme-shop</span>
+        </div>
+        <ul class="circuits" aria-label="Acme Shop's Services">
+          {
+            circuits.map((circuit, index) => (
+              <li class="circuit" data-circuit={circuit.key} data-after={circuit.after.join(' ')} data-port={circuit.port ?? ''} data-one-shot={circuit.oneShot ? '' : undefined} data-manual={circuit.manual ? '' : undefined} data-state="stopped" style={`--service: var(--service-${index})`}>
+                <span class="led" aria-hidden="true"></span>
+                <button type="button" class="lever" role="switch" aria-checked="false" aria-label={`${circuit.name}, stopped`} data-lever>
+                  <span class="handle" aria-hidden="true"></span>
+                </button>
+                <span class="tape">{circuit.key}</span>
+                <span class="meta">
+                  <span class="circuit-name">{circuit.name}</span>
+                  <span class="circuit-state" data-state-label>{circuit.manual ? 'Not in Start All' : 'Stopped'}</span>
+                </span>
+                {circuit.port && <span class="tape port">:{circuit.port}</span>}
+              </li>
+            ))
+          }
+        </ul>
+        <div class="main-switch">
+          <button type="button" class="main" data-main aria-pressed="false">
+            <span class="main-lever" aria-hidden="true"><span class="main-handle"></span></span>
+            <span class="main-label" data-main-label>Start All</span>
+          </button>
+          <p>Each Service waits for its Dependencies. It counts as Running once its Port accepts connections.</p>
+        </div>
+        <p class="visually-hidden" aria-live="polite" data-board-status></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="row meter" aria-labelledby="window-title">
+    <div class="wrap">
+      <div class="row-head">
+        <h2 id="window-title" class="engraved">The window</h2>
+        <p class="lede">Every Service with its state, Port and log, side by side. This one works too: pick a Project, a Service or Ports, and start or stop anything.</p>
+      </div>
+      <div class="bezel">
+        <span class="screws" aria-hidden="true"></span>
+        <AppWindow />
+      </div>
+    </div>
+  </section>
+
+  <nav class="wrap directory" aria-labelledby="directory-title">
+    <div class="card">
+      <h2 id="directory-title" class="card-title">Directory</h2>
+      <ul>
+        {
+          directory.map((item) => (
+            <li>
+              <a href={`#${item.id}`}>
+                <span class="tape word">{item.label}</span>
+                <span class="dir-text">{item.text}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </nav>
+
+  <section class="row" id="commands" aria-labelledby="commands-title">
+    <div class="wrap">
+      <div class="row-head">
+        <h2 id="commands-title" class="engraved">If it runs in your terminal, it runs here.</h2>
+        <div>
+          <p class="lede">
+            A Service is a folder, a command line and its environment, run in your login shell so <code>PATH</code>, version managers,
+            pipes and <code>&amp;&amp;</code> work. Add a Project’s folder and localhost suggests Services from <code>package.json</code>,
+            Compose files, Python apps and Cargo binaries; you check each one before anything is saved.
+          </p>
+          <a class="more" href={href('docs/quick-start')}>Add your first Project</a>
+        </div>
+      </div>
+      <dl class="panel inset strip">
+        {
+          commands.map(([runtime, command]) => (
+            <div>
+              <dt>{runtime}</dt>
+              <dd><code>{command}</code></dd>
+            </div>
+          ))
+        }
+      </dl>
+
+      <div class="pair">
+        <div class="pair-item" id="ports">
+          <h3 class="engraved">Know who’s on :3000.</h3>
+          <p>
+            The Ports view shows every process listening on a TCP port and whose it is. If a Service’s Port is taken, localhost says by whom
+            and can start on the next free one, for that Run only. <a href={href('docs/ports')}>How Ports work</a>
+          </p>
+          <div class="panel inset" aria-hidden="true">
+            <div class="port-row head"><span>Port</span><span>Process</span><span>Belongs to</span></div>
+            <div class="port-row"><code>:8000</code><span>python3</span><span class="owner"><i style="--c: var(--service-1)"></i>Acme Shop › API</span></div>
+            <div class="port-row"><code>:5173</code><span>node</span><span class="owner"><i style="--c: var(--service-3)"></i>Acme Shop › Web</span></div>
+            <div class="port-row taken"><code>:3000</code><span>node</span><span class="owner faint">~/Code/experiments</span></div>
+            <div class="port-row"><code>:6379</code><span>redis-server</span><span class="owner faint">Unmanaged</span></div>
+            <div class="taken-note"><strong>Port 3000 is taken.</strong> Stop it and start, start on 3001, or cancel.</div>
+          </div>
+        </div>
+        <div class="pair-item" id="environment">
+          <h3 class="engraved">Environment without .env juggling.</h3>
+          <p>
+            Variables on the Project, on each Service and in Environment Profiles. Any of them can be a Secret, kept in Keychain, Secret
+            Service or Credential Manager, never in a file. <a href={href('docs/environment')}>Environment and Secrets</a>
+          </p>
+          <div class="panel inset" aria-hidden="true">
+            <div class="env-title">API’s environment <span class="segmented"><b>Development</b><span>Testing</span></span></div>
+            <div class="env-row"><code>PATH</code><code class="value">~/.local/share/mise/shims:…</code><span class="from">login shell</span></div>
+            <div class="env-row"><code>LOG_LEVEL</code><code class="value">debug</code><span class="from">Project</span></div>
+            <div class="env-row"><code>DATABASE_URL</code><code class="value">postgres://localhost:5432/app</code><span class="from">Service</span></div>
+            <div class="env-row"><code>STRIPE_KEY</code><code class="value secret">••••••••••••</code><span class="from accent">Secret</span></div>
+            <div class="env-row"><code>NODE_ENV</code><code class="value">development</code><span class="from">Development</span></div>
+            <div class="env-row"><code>PORT</code><code class="value">8000</code><span class="from">Port</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" id="agents" aria-labelledby="agents-title">
+    <div class="wrap row-grid">
+      <div class="row-copy">
+        <h2 id="agents-title" class="engraved">Your coding agent flips the same switches.</h2>
+        <p class="lede">
+          <code>localhost mcp</code> lets Claude Code, Cursor and Codex start and stop your Services and read their logs and ports.
+          What an agent starts shows in the window; it never starts a second copy, and it stops when the agent leaves, unless the app
+          is open. Connect them from Settings in one click.
+        </p>
+        <a class="more" href={href('agents')}>localhost for coding agents</a>
+      </div>
+      <div class="agent-stack">
+        <dl class="problems">
+          {
+            problems.map(([title, text]) => (
+              <div>
+                <dt>{title}</dt>
+                <dd>{text}</dd>
+              </div>
+            ))
+          }
+        </dl>
+        <div class="transcript" aria-label="A coding agent using localhost mcp">
+          <pre><span class="d">// a coding agent, through localhost mcp</span>
+<span class="p">→</span> start_service <span class="d">{'{ project: "acme-shop", service: "web" }'}</span>
+<span class="g">←</span> web   running  5173  <span class="d">startedBy:</span> agent
+  api   running  8000  <span class="d">startedBy:</span> app</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" id="local" aria-labelledby="local-title">
+    <div class="wrap">
+      <h2 id="local-title" class="engraved">Your machine, your rules.</h2>
+      <ul class="rules">
+        <li><span class="tape word">No account</span><p>No sign-in and no backend. Works offline, on your machine only.</p></li>
+        <li><span class="tape word">Nothing in your repo</span><p>Configuration lives in localhost’s own storage. Export a Project file when you want to share one.</p></li>
+        <li><span class="tape word">Nothing silent</span><p>No automatic restarts, and no Suggestion applied until you check it.</p></li>
+        <li><span class="tape word">Native everywhere</span><p>SwiftUI on macOS, one light app for Linux and Windows, all on one Rust core.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="row" id="install" aria-labelledby="install-title">
+    <div class="wrap">
+      <div class="row-head">
+        <h2 id="install-title" class="engraved">Install</h2>
+        <p class="lede">
+          Releases aren’t notarized or signed by a known publisher yet, so macOS and Windows ask once at first launch. The install steps
+          show exactly what to click.
+        </p>
+      </div>
+      <div class="panel install-panel">
+        <span class="screws" aria-hidden="true"></span>
+        <div class="platform">
+          <h3 class="plate-label">macOS</h3>
+          <div class="brew">
+            <code>{brew}</code>
+            <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="install">Copy</button>
+          </div>
+          <p>Homebrew also puts the <code>localhost</code> command on your PATH.</p>
+          <button type="button" class="link" data-install-for="macos" data-track="install_opened" data-track-platform="macos">Or download the app</button>
+          <span class="req">macOS 15 or later · Apple silicon or Intel</span>
+        </div>
+        <div class="platform">
+          <h3 class="plate-label">Windows</h3>
+          <p>Projects on Windows itself, or inside a WSL 2 distro. Installs for your user only, no administrator rights.</p>
+          <button type="button" class="link" data-install-for="windows" data-track="install_opened" data-track-platform="windows">Install steps for Windows</button>
+          <span class="req">Windows 10 or 11 · x64</span>
+        </div>
+        <div class="platform">
+          <h3 class="plate-label">Linux</h3>
+          <p><code>.deb</code>, <code>.rpm</code> and AppImage, with a tray icon. Secrets in the Secret Service.</p>
+          <button type="button" class="link" data-install-for="linux" data-track="install_opened" data-track-platform="linux">Install steps for Linux</button>
+          <span class="req">Ubuntu 22.04+ · Debian 12+ · Fedora</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="faq-title">
+    <div class="wrap faq-grid">
+      <h2 id="faq-title" class="engraved">Questions</h2>
+      <div class="faq">
+        {
+          faq.map((item) => (
+            <details>
+              <summary>{item.question}</summary>
+              {item.answer.map((paragraph) => (
+                <p set:html={html(paragraph)} />
+              ))}
+            </details>
+          ))
+        }
+        <a class="more" href={href('compare')}>How localhost compares to pm2, tmux, Docker Compose and others</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="close" aria-labelledby="close-title">
+    <div class="wrap">
+      <div class="panel close-panel">
+        <span class="screws" aria-hidden="true"></span>
+        <h2 id="close-title" class="engraved">Close the terminal tabs.</h2>
+        <p class="lede">Configure a Project once. From then on, it is one switch away.</p>
+        <div class="actions">
+          <DownloadButton location="closing" />
+          <div class="brew mac-only">
+            <code>{brew}</code>
+            <button type="button" data-copy-text={brew} data-track="install_command_copied" data-track-command="brew" data-track-location="closing">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Footer slot="footer" />
+</Base>
+
+<script>
+  import { startPrototype } from '../../lib/prototypes';
+  import { openInstall } from '../../lib/platform';
+  import type { Platform } from '../../lib/release';
+
+  startPrototype();
+
+  for (const button of document.querySelectorAll<HTMLElement>('[data-install-for]')) {
+    button.addEventListener('click', () => openInstall(button.dataset.installFor as Platform, false));
+  }
+
+  type State = 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'exited';
+  const labels: Record<State, string> = { stopped: 'Stopped', waiting: 'Waiting for Dependencies', starting: 'Starting', running: 'Running', stopping: 'Stopping', exited: 'Exited · code 0' };
+
+  const board = document.querySelector<HTMLElement>('[data-board]')!;
+  const main = board.querySelector<HTMLButtonElement>('[data-main]')!;
+  const mainLabel = board.querySelector<HTMLElement>('[data-main-label]')!;
+  const status = board.querySelector<HTMLElement>('[data-board-status]')!;
+  const circuits = [...board.querySelectorAll<HTMLElement>('[data-circuit]')];
+  const byKey = new Map(circuits.map((circuit) => [circuit.dataset.circuit!, circuit]));
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const state = (circuit: HTMLElement) => circuit.dataset.state as State;
+  const name = (circuit: HTMLElement) => circuit.querySelector('.circuit-name')!.textContent!;
+  const up = (circuit: HTMLElement) => ['running', 'exited'].includes(state(circuit));
+  const after = (circuit: HTMLElement) => (circuit.dataset.after || '').split(' ').filter(Boolean).map((key) => byKey.get(key)!);
+  const later = (ms: number, fn: () => void) => window.setTimeout(fn, still ? 0 : ms);
+
+  function set(circuit: HTMLElement, next: State) {
+    circuit.dataset.state = next;
+    const on = ['waiting', 'starting', 'running'].includes(next);
+    const lever = circuit.querySelector<HTMLButtonElement>('[data-lever]')!;
+    lever.setAttribute('aria-checked', String(on));
+    lever.setAttribute('aria-label', `${name(circuit)}, ${labels[next].toLowerCase()}`);
+    circuit.querySelector('[data-state-label]')!.textContent = next === 'stopped' && circuit.dataset.manual !== undefined ? 'Not in Start All' : labels[next];
+    if (['running', 'exited', 'stopped'].includes(next)) status.textContent = `${name(circuit)} ${labels[next]}`;
+    sync();
+  }
+
+  // The app's rules, compressed: Dependencies first, Running after 1.5 s alive or once the Port accepts, one-shot steps Exit 0.
+  function request(circuit: HTMLElement) {
+    if (up(circuit) && circuit.dataset.oneShot === undefined) return;
+    if (['waiting', 'starting'].includes(state(circuit))) return;
+    // A Dependency already Running or Exited counts as satisfied; it isn't run again.
+    for (const dependency of after(circuit)) if (!up(dependency)) request(dependency);
+    set(circuit, 'waiting');
+    advance();
+  }
+  function advance() {
+    for (const circuit of circuits) {
+      if (state(circuit) !== 'waiting' || !after(circuit).every(up)) continue;
+      set(circuit, 'starting');
+      const oneShot = circuit.dataset.oneShot !== undefined;
+      later(oneShot ? 800 : circuit.dataset.port ? 1000 : 700, () => {
+        if (state(circuit) !== 'starting') return;
+        set(circuit, oneShot ? 'exited' : 'running');
+        advance();
+      });
+    }
+  }
+  // Stopping a Service leaves its dependents alone, as in the app.
+  function halt(circuit: HTMLElement) {
+    if (!['running', 'starting', 'waiting'].includes(state(circuit))) return;
+    set(circuit, 'stopping');
+    later(500, () => set(circuit, 'stopped'));
+  }
+  function sync() {
+    const active = circuits.some((circuit) => ['waiting', 'starting', 'running'].includes(state(circuit)));
+    main.setAttribute('aria-pressed', String(active));
+    mainLabel.textContent = active ? 'Stop All' : 'Start All';
+  }
+
+  for (const circuit of circuits) {
+    circuit.querySelector('[data-lever]')!.addEventListener('click', () => {
+      if (['waiting', 'starting', 'running'].includes(state(circuit))) halt(circuit);
+      else request(circuit);
+    });
+  }
+  // Start All skips Services marked "Not in Start All"; Stop All goes dependents first.
+  main.addEventListener('click', () => {
+    if (main.getAttribute('aria-pressed') === 'true') {
+      circuits
+        .filter((circuit) => ['waiting', 'starting', 'running'].includes(state(circuit)))
+        .reverse()
+        .forEach((circuit, index) => later(index * 220, () => halt(circuit)));
+    } else {
+      for (const circuit of circuits) if (circuit.dataset.manual === undefined) request(circuit);
+    }
+  });
+
+  // Flips the main switch once, the first time the panel is in view.
+  new IntersectionObserver(
+    (entries, observer) => {
+      if (!entries[0].isIntersecting) return;
+      observer.disconnect();
+      later(600, () => main.getAttribute('aria-pressed') === 'false' && main.click());
+    },
+    { threshold: 0.6 },
+  ).observe(board);
+</script>
+
+<style>
+  @font-face {
+    font-family: 'Barlow Condensed';
+    src: url('/prototypes/fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Barlow Condensed';
+    src: url('/prototypes/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2');
+    font-weight: 800;
+    font-display: swap;
+  }
+
+  :global(:root) {
+    /* Powder-coated enamel: the ground, raised plates, and the inset wells instruments sit in. */
+    --enamel: #dfe1df;
+    --plate: #ecedeb;
+    --well: #f7f7f6;
+    --plate-edge: rgb(0 0 0 / 0.14);
+    --plate-light: rgb(255 255 255 / 0.9);
+    --engrave-light: rgb(255 255 255 / 0.85);
+    --screw: #b4b8bc;
+    --on-tape: #ffffff;
+    --lever: #2a2c30;
+    --lever-track: #c4c7c9;
+  }
+  :global(:root[data-theme='dark']) {
+    --enamel: #18191c;
+    --plate: #222327;
+    --well: #141417;
+    --plate-edge: rgb(0 0 0 / 0.6);
+    --plate-light: rgb(255 255 255 / 0.07);
+    --engrave-light: rgb(255 255 255 / 0.06);
+    --screw: #4a4d53;
+    --on-tape: #111317;
+    --lever: #d8dadd;
+    --lever-track: #0d0e10;
+  }
+  :global(html) {
+    background: var(--enamel);
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 1248px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .engraved {
+    margin: 0;
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    line-height: 0.95;
+    text-wrap: balance;
+    text-shadow: 0 1px 0 var(--engrave-light);
+  }
+  .lede {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    max-width: 60ch;
+  }
+  .lede code,
+  .truths code,
+  .platform code,
+  .faq code {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  .more {
+    display: inline-flex;
+    margin-top: 24px;
+    font-weight: 600;
+    color: var(--accent-text);
+    text-underline-offset: 4px;
+  }
+  .more::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    margin: 0.2em 0 0 6px;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: transform 200ms var(--ease-out);
+  }
+  .more:hover::after {
+    transform: translateX(3px);
+  }
+
+  /* A raised plate with a screw in each corner. */
+  .panel {
+    position: relative;
+    border-radius: 10px;
+    background: var(--plate);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge),
+      0 14px 30px -18px rgb(0 0 0 / 0.55);
+  }
+  /* Four screw heads, one per corner. */
+  .screws {
+    position: absolute;
+    inset: 10px;
+    pointer-events: none;
+    --head: radial-gradient(circle at 50% 50%, var(--screw) 0 3.5px, color-mix(in srgb, var(--screw) 60%, #000) 4px, transparent 4.5px);
+    background:
+      var(--head) top left / 10px 10px no-repeat,
+      var(--head) top right / 10px 10px no-repeat,
+      var(--head) bottom left / 10px 10px no-repeat,
+      var(--head) bottom right / 10px 10px no-repeat;
+  }
+  .inset {
+    background: var(--well);
+    box-shadow:
+      inset 0 2px 4px rgb(0 0 0 / 0.12),
+      0 1px 0 var(--plate-light);
+  }
+
+  .plate-label {
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-shadow: 0 1px 0 var(--engrave-light);
+  }
+  /* Label-maker tape: the Service's own colour, raised letters. */
+  .tape {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 3px;
+    background: var(--service, var(--text-secondary));
+    color: var(--on-tape);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 1px 1px rgb(0 0 0 / 0.25);
+  }
+
+  .tape.word {
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Header */
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--enamel);
+    box-shadow: 0 1px 0 var(--plate-edge);
+  }
+  .top-inner {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+  .top nav {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+  .top nav a {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+  .top nav a:hover {
+    color: var(--text);
+    background: var(--fill);
+  }
+  .icon-button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .icon-button:hover {
+    background: var(--fill);
+    color: var(--text);
+  }
+  :global([data-theme='dark']) .moon,
+  :global([data-theme='light']) .sun {
+    display: none;
+  }
+  @media (max-width: 560px) {
+    .top-inner {
+      gap: 8px;
+    }
+    .home :global(.wordmark),
+    .hide-narrow {
+      display: none;
+    }
+  }
+
+  /* Hero */
+  .hero {
+    padding: 64px 0 24px;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 56px;
+    align-items: center;
+  }
+  .hero h1 {
+    font-size: clamp(50px, 6.4vw, 92px);
+  }
+  .hero .lede {
+    margin-top: 24px;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+  .brew {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 44px;
+    padding: 0 6px 0 14px;
+    border-radius: 8px;
+    background: var(--well);
+    box-shadow:
+      inset 0 2px 3px rgb(0 0 0 / 0.14),
+      0 1px 0 var(--plate-light);
+  }
+  .brew code {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .brew button {
+    flex: none;
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--plate);
+    color: var(--text);
+    font: 600 13px/1 var(--font-sans);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 2px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+  .brew button:active {
+    transform: translateY(1px);
+  }
+  :global([data-platform='windows']) .mac-only,
+  :global([data-platform='linux']) .mac-only,
+  :global([data-device='phone']) .mac-only {
+    display: none;
+  }
+  .fine {
+    margin: 14px 0 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .fine a {
+    color: inherit;
+    text-underline-offset: 3px;
+  }
+  @media (max-width: 960px) {
+    .hero-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+    }
+  }
+  @media (max-width: 560px) {
+    .actions > :global(.button),
+    .actions .brew {
+      width: 100%;
+    }
+    .brew {
+      height: auto;
+      padding: 8px 6px 8px 12px;
+    }
+    .brew code {
+      font-size: 12px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  /* The switchboard */
+  .switchboard {
+    padding: 26px 26px 22px;
+  }
+  .board-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 0 6px 14px;
+  }
+  .path {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .circuits {
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    border-radius: 8px;
+    background: var(--well);
+    box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.14);
+  }
+  .circuit {
+    display: grid;
+    grid-template-columns: 14px 30px auto minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    padding: 9px 16px;
+  }
+  .circuit + .circuit {
+    border-top: 1px solid var(--separator);
+  }
+  .circuit-name {
+    display: block;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .circuit-state {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  .meta {
+    min-width: 0;
+  }
+  .circuit .port {
+    background: var(--fill-strong);
+    color: var(--text);
+    box-shadow: none;
+  }
+
+  /* State glyphs, by shape as in the app: hollow ring, pulsing ring, dot with a halo. Unlit is drawn too. */
+  .led {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--state-stopped);
+    opacity: 0.7;
+  }
+  .circuit[data-state='waiting'] .led,
+  .circuit[data-state='starting'] .led,
+  .circuit[data-state='stopping'] .led {
+    border-color: var(--state-transitioning);
+    opacity: 1;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .circuit[data-state='running'] .led {
+    border: 0;
+    background: var(--state-running);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--state-running) 28%, transparent);
+    opacity: 1;
+  }
+  .circuit[data-state='exited'] .led {
+    opacity: 1;
+  }
+  @keyframes pulse {
+    50% {
+      transform: scale(0.75);
+      opacity: 0.6;
+    }
+  }
+
+  .lever {
+    position: relative;
+    width: 30px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: var(--lever-track);
+    box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.35);
+    cursor: pointer;
+  }
+  .handle {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 22px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--lever);
+    box-shadow:
+      0 2px 3px rgb(0 0 0 / 0.35),
+      inset 0 1px 0 rgb(255 255 255 / 0.25);
+    transition: top 220ms var(--ease-out);
+  }
+  .lever[aria-checked='true'] .handle {
+    top: 4px;
+  }
+  .lever:active .handle {
+    transform: scaleY(0.92);
+  }
+
+  .main-switch {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 0 6px;
+  }
+  .main-switch p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .main {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+  }
+  /* The main breaker: bigger than the others, in the accent, the only one that colour. */
+  .main-lever {
+    position: relative;
+    width: 44px;
+    height: 64px;
+    border-radius: 8px;
+    background: var(--lever-track);
+    box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.4);
+  }
+  .main-handle {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    top: 32px;
+    height: 27px;
+    border-radius: 5px;
+    background: var(--accent);
+    box-shadow:
+      0 3px 4px rgb(0 0 0 / 0.35),
+      inset 0 1px 0 rgb(255 255 255 / 0.3);
+    transition: top 240ms var(--ease-out);
+  }
+  .main[aria-pressed='true'] .main-handle {
+    top: 5px;
+  }
+  .main:active .main-handle {
+    transform: scaleY(0.94);
+  }
+  .main-label {
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .main:focus-visible {
+    outline-offset: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .handle,
+    .main-handle {
+      transition: none;
+    }
+    .circuit .led {
+      animation: none;
+    }
+  }
+  @media (max-width: 560px) {
+    .switchboard {
+      padding: 22px 14px 18px;
+    }
+    .circuit {
+      grid-template-columns: 12px 30px minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 9px 10px;
+    }
+    .circuit > .tape:not(.port) {
+      display: none;
+    }
+    .main-switch {
+      align-items: flex-start;
+    }
+  }
+
+  /* Rows */
+  .row {
+    padding: 96px 0 0;
+  }
+  .row-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 48px;
+    align-items: end;
+    margin-bottom: 32px;
+  }
+  .row h2 {
+    font-size: clamp(40px, 5vw, 68px);
+  }
+  .row-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 64px;
+    align-items: center;
+    padding-top: 40px;
+    border-top: 1px solid var(--separator);
+  }
+  .row-copy .lede {
+    margin-top: 20px;
+  }
+  @media (max-width: 900px) {
+    .row-head,
+    .row-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
+  }
+
+  .bezel {
+    padding: 34px;
+    position: relative;
+    border-radius: 14px;
+    background: var(--plate);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge),
+      0 24px 50px -30px rgb(0 0 0 / 0.6);
+  }
+  @media (max-width: 560px) {
+    .bezel {
+      padding: 26px 10px 10px;
+    }
+  }
+
+  .directory {
+    margin-top: 72px;
+  }
+  .card {
+    padding: 22px 26px 26px;
+    border-radius: 4px;
+    background: #fbfbf9;
+    color: #1f2328;
+    box-shadow: 0 10px 22px -16px rgb(0 0 0 / 0.6);
+  }
+  .card-title {
+    margin: 0 0 14px;
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .card ul {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1.5px solid #1f2328;
+  }
+  .card li {
+    border-bottom: 1px solid rgb(0 0 0 / 0.14);
+  }
+  .card a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 8px 12px 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .card a:hover .dir-text {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .card .tape {
+    background: #1f2328;
+    color: #fff;
+  }
+  :global([data-theme='dark']) .card {
+    background: var(--plate);
+    color: var(--text);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge);
+  }
+  :global([data-theme='dark']) .card ul {
+    border-top-color: var(--separator);
+  }
+  :global([data-theme='dark']) .card li {
+    border-bottom-color: var(--separator);
+  }
+  :global([data-theme='dark']) .card .tape {
+    background: var(--text);
+    color: var(--page);
+  }
+  :global([data-theme='dark']) .dir-text {
+    color: var(--text-secondary);
+  }
+  .dir-text {
+    font-size: 14px;
+    color: #545c66;
+  }
+  @media (max-width: 900px) {
+    .card ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .inset {
+    padding: 10px;
+    border-radius: 10px;
+  }
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+  }
+  .strip div {
+    padding: 16px 16px 18px;
+  }
+  .strip div + div {
+    border-left: 1px solid var(--separator);
+  }
+  .strip dt {
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .strip dd {
+    margin: 6px 0 0;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 900px) {
+    .strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .strip div:nth-child(odd) {
+      border-left: 0;
+    }
+    .strip div:nth-child(n + 3) {
+      border-top: 1px solid var(--separator);
+    }
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 48px;
+    margin-top: 72px;
+  }
+  .pair-item {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-margin-top: 88px;
+  }
+  .pair-item h3 {
+    font-size: clamp(30px, 3.4vw, 44px);
+  }
+  .pair-item > p {
+    margin: 0 0 6px;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .pair-item > p a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-underline-offset: 3px;
+  }
+  @media (max-width: 900px) {
+    .pair {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 56px;
+    }
+  }
+
+  .port-row {
+    display: grid;
+    grid-template-columns: 70px 120px minmax(0, 1fr);
+    align-items: center;
+    height: 38px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--separator);
+    font-size: 14px;
+  }
+  .port-row.head {
+    height: 30px;
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .port-row code {
+    font-weight: 600;
+  }
+  .port-row span:nth-child(2) {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  .port-row.taken {
+    background: color-mix(in srgb, var(--state-failed) 10%, transparent);
+  }
+  .owner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .owner i {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--c);
+  }
+  .faint {
+    color: var(--text-secondary);
+  }
+  .taken-note {
+    padding: 14px 12px 6px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .taken-note strong {
+    color: var(--text);
+  }
+  @media (max-width: 560px) {
+    .port-row {
+      grid-template-columns: 56px minmax(0, 1fr);
+      font-size: 13px;
+    }
+    .port-row > span:nth-child(2) {
+      display: none;
+    }
+  }
+
+  .env-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 12px;
+    font-weight: 600;
+  }
+  .segmented {
+    margin-left: auto;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--fill);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .segmented > * {
+    padding: 3px 10px;
+    border-radius: 5px;
+    color: var(--text-secondary);
+  }
+  .segmented b {
+    background: var(--plate);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  }
+  .env-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    height: 38px;
+    padding: 0 10px;
+    border-top: 1px solid var(--separator);
+    font-size: 13px;
+  }
+  .env-row code {
+    font-size: 12.5px;
+  }
+  .value {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .from {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--fill);
+    color: var(--text-secondary);
+  }
+  .from.accent {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent-text);
+  }
+  @media (max-width: 560px) {
+    .env-row {
+      grid-template-columns: 104px minmax(0, 1fr);
+      row-gap: 4px;
+      height: auto;
+      padding: 8px 10px;
+    }
+    .env-row .from {
+      grid-column: 2;
+      justify-self: start;
+    }
+  }
+
+  .agent-stack {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .problems {
+    margin: 0;
+    display: grid;
+    gap: 2px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .problems div {
+    padding: 14px 18px;
+    background: var(--plate);
+  }
+  .problems dt {
+    font-family: 'Barlow Condensed', var(--font-sans);
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .problems dd {
+    margin: 4px 0 0;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .transcript {
+    border-radius: 10px;
+    background: #0f0f12;
+    color: #e6edf3;
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.5);
+  }
+  .transcript pre {
+    margin: 0;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .transcript .p {
+    color: #ff5c8a;
+  }
+  .transcript .d {
+    color: #8b939c;
+  }
+  .transcript .g {
+    color: #3fb950;
+  }
+
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin: 32px 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--separator);
+  }
+  .rules li {
+    padding: 24px 24px 0 0;
+  }
+  .rules li + li {
+    padding-left: 24px;
+    border-left: 1px solid var(--separator);
+  }
+  .rules .tape {
+    background: var(--text);
+    color: var(--page);
+  }
+  .rules p {
+    margin: 12px 0 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  @media (max-width: 900px) {
+    .rules {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .rules li,
+    .rules li + li {
+      padding: 20px 0 16px;
+      border-left: 0;
+      border-bottom: 1px solid var(--separator);
+    }
+  }
+
+  .install-panel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 34px 10px 26px;
+  }
+  .platform {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 22px;
+    min-width: 0;
+  }
+  .platform + .platform {
+    border-left: 1px solid var(--separator);
+  }
+  .platform h3 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--text);
+  }
+  .platform p {
+    margin: 0;
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+  .platform .brew code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .platform .brew {
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    align-self: stretch;
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    font: 600 15px/1.4 var(--font-sans);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+  .req {
+    margin-top: auto;
+    padding-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  @media (max-width: 900px) {
+    .install-panel {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
+    .platform + .platform {
+      border-left: 0;
+      border-top: 1px solid var(--separator);
+      padding-top: 24px;
+    }
+  }
+
+  .faq-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 48px;
+    padding-top: 40px;
+    border-top: 1px solid var(--separator);
+  }
+  .faq details {
+    border-top: 1px solid var(--separator);
+  }
+  .faq details:last-of-type {
+    border-bottom: 1px solid var(--separator);
+  }
+  .faq summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 0;
+    font-weight: 600;
+    font-size: 17px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary::after {
+    content: '';
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 0.3em;
+    background: var(--text-secondary);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M3 8h10M8 3v10'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: transform 200ms var(--ease-out);
+  }
+  .faq details[open] summary::after {
+    transform: rotate(45deg);
+  }
+  .faq p {
+    margin: 0 0 16px;
+    max-width: 68ch;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  @media (max-width: 900px) {
+    .faq-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+  }
+
+  .close {
+    padding: 112px 0 96px;
+  }
+  .close-panel {
+    padding: 64px 48px;
+    text-align: center;
+  }
+  .close-panel h2 {
+    font-size: clamp(48px, 7vw, 104px);
+  }
+  .close-panel .lede {
+    margin: 16px auto 0;
+  }
+  .close-panel .actions {
+    justify-content: center;
+  }
+  @media (max-width: 560px) {
+    .close-panel {
+      padding: 48px 18px;
+    }
+  }
+</style>

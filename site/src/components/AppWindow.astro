@@ -137,7 +137,7 @@
           key: 'web', name: 'Web', port: 5173, command: 'pnpm dev --port $PORT', process: 'node', after: ['api'],
           boot: [
             [300, ''],
-            [0, '  <b class="g">VITE</b> <i class="g">v6.2.0</i>  ready in <b>412</b> ms'],
+            [0, '  <b class="g">VITE</b>  ready in <b>412</b> ms'],
             [0, ''],
             [0, '  <i class="g">➜</i>  <b>Local</b>:   <i class="u">http://localhost:5173/</i>'],
             [0, '  <i class="g">➜</i>  <b>Network</b>: use <b>--host</b> to expose'],
@@ -159,7 +159,7 @@
           key: 'storybook', name: 'Storybook', port: 6006, command: 'pnpm storybook --port $PORT', process: 'node', manual: true,
           boot: [
             [600, '<i class="d">info</i> => Starting manager..'],
-            [500, '<b class="g">Storybook 9.1</b> for react-vite started'],
+            [500, '<b class="g">Storybook</b> for react-vite started'],
             [0, '  Local:            <i class="u">http://localhost:6006/</i>'],
           ],
           chatter: [() => `<i class="d">info</i> => Rebuilding <i class="d">src/stories/Button.stories.tsx</i>`],
@@ -183,7 +183,7 @@
           key: 'web', name: 'Web', port: 4321, command: 'pnpm astro dev --port $PORT', process: 'node', after: ['search'],
           boot: [
             [350, ''],
-            [0, ' <b class="m">astro</b>  <i class="g">v7.4.0</i> ready in 210 ms'],
+            [0, ' <b class="m">astro</b>  ready in 210 ms'],
             [0, ''],
             [0, '┃ Local    <i class="u">http://localhost:4321/</i>'],
           ],
@@ -208,7 +208,7 @@
           key: 'storybook', name: 'Storybook', port: 6006, command: 'pnpm storybook --port $PORT', process: 'node', after: ['tokens'],
           boot: [
             [600, '<i class="d">info</i> => Starting manager..'],
-            [500, '<b class="g">Storybook 9.1</b> for react-vite started'],
+            [500, '<b class="g">Storybook</b> for react-vite started'],
             [0, '  Local:            <i class="u">http://localhost:6006/</i>'],
           ],
           chatter: [() => `<i class="d">info</i> => Rebuilding <i class="d">src/Button.stories.tsx</i>`],

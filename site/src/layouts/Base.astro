@@ -12,10 +12,12 @@ interface Props {
   type?: 'website' | 'article';
   /** schema.org objects for this page, written as JSON-LD. */
   structuredData?: Record<string, unknown>[];
-  /** Kept out of search results (the 404 page). */
+  /** Kept out of search results (the 404 page, landing prototypes). */
   noindex?: boolean;
+  /** Without the site's header and footer, for pages that draw their own (landing prototypes). */
+  bare?: boolean;
 }
-const { title, description, type = 'website', structuredData = [], noindex = false } = Astro.props;
+const { title, description, type = 'website', structuredData = [], noindex = false, bare = false } = Astro.props;
 const fullTitle = title === name ? 'localhost app: desktop process manager for local dev servers' : `${title} · ${name}`;
 const canonical = new URL(Astro.url.pathname.replace(/(.)\/$/, '$1').replace(/\.html$/, '').replace(/\/index$/, '/'), Astro.site).toString();
 const image = new URL('/og.png', Astro.site).toString();
@@ -63,11 +65,11 @@ const image = new URL('/og.png', Astro.site).toString();
   </head>
   <body>
     <a class="skip visually-hidden" href="#content">Skip to content</a>
-    <Header />
+    {bare ? <slot name="header" /> : <Header />}
     <main id="content">
       <slot />
     </main>
-    <Footer />
+    {bare ? <slot name="footer" /> : <Footer />}
     <InstallDialog />
     <script>
       import { startAnalytics } from '../lib/analytics';
