@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import { agentsDefinition, agentsFaq, tools } from '../lib/agents';
 import { html, plain } from '../lib/faq';
 import { lastModified } from '../lib/modified';
-import { href, name, repository } from '../lib/site';
+import { brewInstall, href, name, repository } from '../lib/site';
 
 const description =
   'localhost app’s MCP server lets Claude Code, Cursor and Codex start, stop and read logs of your local dev servers, visible in one desktop window. Free, MIT.';
@@ -197,8 +197,9 @@ args = ["mcp"]`;
       <h2>How do I connect Claude Code, Cursor or Codex?</h2>
       <h3>1. Install the app</h3>
       <p class="what">
-        It comes with the <code>localhost</code> command, the same version, and updates it with itself. Add your Projects in the app: the
-        agent reads the same Projects.
+        It comes with the <code>localhost</code> command, the same version, and updates it with itself. On macOS,
+        <code>{brewInstall}</code> also puts the command on your <code>PATH</code> (<a href={href('docs/install#homebrew-macos')}>Homebrew</a>).
+        Add your Projects in the app: the agent reads the same Projects.
       </p>
 
       <h3>2. Connect your agents</h3>

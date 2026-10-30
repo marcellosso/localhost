@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import AppWindow from '../components/AppWindow.astro';
 import DownloadButton from '../components/DownloadButton.astro';
-import { href, name, releases, repository, tagline } from '../lib/site';
+import { brewInstall, href, name, releases, repository, tagline } from '../lib/site';
 import { definition, faq, html, plain } from '../lib/faq';
 import { changelog } from '../lib/changelog';
 import { latestRelease } from '../lib/release';
@@ -105,6 +105,7 @@ const pillars = [
           Free, open-source desktop process manager for your local dev servers on <a href={href('docs/install')}>macOS, Windows and Linux</a>.
           A GUI alternative to pm2 and tmux.
         </p>
+        <p class="brew">On macOS, also with <a href={href('docs/install#homebrew-macos')}>Homebrew</a>: <code>{brewInstall}</code></p>
       </div>
       <div class="stage">
         <div class="glow" aria-hidden="true"></div>
@@ -385,7 +386,7 @@ storybook  Storybook   not running  6006
       <div class="platform-grid">
         <a class="platform" href={href('docs/macos')}>
           <h3>macOS</h3>
-          <p>A native SwiftUI app with a menu bar companion. Secrets in the Keychain.</p>
+          <p>A native SwiftUI app with a menu bar companion, from the DMG or Homebrew. Secrets in the Keychain.</p>
           <span class="req">macOS 15 or later · Apple silicon or Intel</span>
         </a>
         <a class="platform" href={href('docs/windows')}>
@@ -521,9 +522,19 @@ storybook  Storybook   not running  6006
     font-size: 14px;
     color: var(--text-tertiary);
   }
-  .platforms a {
+  .platforms a,
+  .brew a {
     color: var(--text-secondary);
     text-underline-offset: 3px;
+  }
+  .brew {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+  .brew code {
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
   }
   .pill {
     display: inline-flex;

@@ -1,6 +1,6 @@
 ---
 import { latestRelease, type Release } from '../lib/release';
-import { href, releases } from '../lib/site';
+import { brewInstall, href, releases } from '../lib/site';
 
 const release = await latestRelease();
 const { files } = release;
@@ -34,6 +34,11 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
           <h3>Drag it to Applications</h3>
           <p>Open <code>{files.mac}</code> and drag <strong>localhost</strong> to <strong>Applications</strong>.</p>
           <a class="file" {...download('mac')} data-again>Download <code>{files.mac}</code></a>
+          <p class="or">Or install it with Homebrew, which also puts the <code>localhost</code> command in your terminal:</p>
+          <div class="command">
+            <code>{brewInstall}</code>
+            <button type="button" data-copy={brewInstall} data-track="install_command_copied" data-track-command="brew">Copy</button>
+          </div>
           {release.mac !== releases && (
             <>
               <p class="or">Or download it from Terminal, which macOS doesn’t block, so you can skip step 2:</p>

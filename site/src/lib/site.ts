@@ -1,5 +1,7 @@
 export const repository = 'https://github.com/marcellosso/localhost';
 export const releases = `${repository}/releases/latest`;
+/** The macOS app from the Homebrew tap, the same app as the DMG. */
+export const brewInstall = 'brew install --cask marcellosso/tap/localhost';
 
 export const name = 'localhost app';
 export const tagline = 'Every local project, one place to run it.';

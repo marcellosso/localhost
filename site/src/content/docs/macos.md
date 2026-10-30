@@ -1,4 +1,4 @@
-localhost on macOS is a native SwiftUI app with a menu bar companion. It needs macOS 15 or later, on Apple silicon or Intel. For the first launch of a build that isn't notarized, see [Install](/docs/install#first-launch).
+localhost on macOS is a native SwiftUI app with a menu bar companion. It needs macOS 15 or later, on Apple silicon or Intel. Install it from the DMG or [with Homebrew](/docs/install#homebrew-macos); for the first launch of a build that isn't notarized, see [Install](/docs/install#first-launch).
 
 ## Keychain prompts for Secrets
 
@@ -10,3 +10,9 @@ Secret values live in your login Keychain. macOS lets the app that saved them re
 - **`localhost mcp`** is another program than the app, so macOS asks it separately the first time it reads each Secret. It reads only the Secrets of the Services an agent starts, and of their Dependencies, as it starts them.
 
 **Deny** isn't remembered: Services that use that Secret fail to start, and the next start asks again.
+
+## Uninstall
+
+Quit localhost, and if you used **Add to PATH**, click **Remove from PATH** first (**Settings → Agents**). Then move localhost from **Applications** to the Trash. Installed with Homebrew, run `brew uninstall --cask localhost` instead; with `--zap` it also deletes localhost's data folder.
+
+Your Projects and logs stay in `~/Library/Application Support/localhost` until you delete it, and Secrets stay in the Keychain under `io.github.marcellosso.localhost.secret`.
