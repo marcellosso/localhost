@@ -10,4 +10,4 @@ localhost mcp
 
 Projects and Services are named by their **Key**. `localhost mcp` serves them to coding agents; see [Coding agents (MCP)](/docs/mcp).
 
-It comes with the app, the same version. To run it in a terminal, use **Settings → Agents → Use localhost in a terminal → Add to PATH** (see [Use it in a terminal](/docs/mcp#use-it-in-a-terminal)); the Linux `.deb` and `.rpm` put it in `/usr/bin` already. To build it yourself, see [core/README.md](https://github.com/marcellosso/localhost/blob/main/core/README.md#the-localhost-command).
+It comes with the app, the same version. To run it in a terminal, use **Settings → Agents → Use localhost in a terminal → Add to PATH** (see [Use it in a terminal](/docs/mcp#use-it-in-a-terminal)); the Linux `.deb` and `.rpm` put it in `/usr/bin` already, and the [Homebrew cask](/docs/install#homebrew-macos) links it into Homebrew's `bin`. To build it yourself, see [core/README.md](https://github.com/marcellosso/localhost/blob/main/core/README.md#the-localhost-command).

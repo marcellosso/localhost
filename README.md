@@ -52,6 +52,14 @@ Download the latest release from [GitHub Releases](https://github.com/marcelloss
 
 Releases aren't notarized or code-signed by a known publisher yet, so the first launch needs one extra step on macOS and Windows; see [First launch](#first-launch). There are no Flatpak or Snap packages: their sandboxes can't run your project's commands.
 
+### Homebrew (macOS)
+
+```sh
+brew install --cask marcellosso/tap/localhost
+```
+
+The same app, from the same release, in **Applications**. Homebrew also links its `localhost` command into its own `bin`, so terminals can run `localhost` without Add to PATH. The app keeps updating itself, so `brew upgrade` leaves it alone. `brew uninstall --cask localhost` removes it; with `--zap` it also deletes localhost's data folder (your Projects and logs; Secrets stay in the Keychain). Homebrew marks what it downloads as quarantined, as a browser does, so the first launch needs the same extra step: see [First launch](#first-launch).
+
 ### Updates
 
 localhost checks GitHub Releases for a new version at launch and every 6 hours. When there is one, a notice at the bottom of the sidebar says “localhost X.Y.Z is available”, with its release notes:
@@ -59,7 +67,7 @@ localhost checks GitHub Releases for a new version at launch and every 6 hours. 
 - **Update Now** downloads it in the background, and **Restart to Update** installs it and opens the new version. **Later** hides the notice until the next version. On macOS, an update that has downloaded also installs when you quit localhost.
 - **Restarting stops every running Service first**, as quitting does, after listing them and asking. Start them again once the new version opens.
 - Each update is signed, and localhost checks the signature before installing it.
-- **`.deb` and `.rpm`**: your package manager installs updates, so the notice's **Download** opens the release instead. The AppImage and the Windows installer update themselves; on macOS, so does the app.
+- **`.deb` and `.rpm`**: your package manager installs updates, so the notice's **Download** opens the release instead. The AppImage and the Windows installer update themselves; on macOS, so does the app, also when installed with Homebrew.
 
 Turn automatic checks off in **Settings → General**; **Check for Updates…** (in the localhost menu on macOS, in Settings or the command palette) checks at any time. Checking is the only thing localhost asks the network for, and builds you make yourself never check. More in the [Updates docs](https://www.getlocalhost.app/docs/updates).
 
@@ -263,7 +271,7 @@ The Linux and Windows app keeps its settings in `~/.config/io.github.marcellosso
 
 ## The command line
 
-The `localhost` command runs on the same core and the same data as the app: list Projects, see what is running, read the latest logs, or run a Project's Services in the foreground until Ctrl-C. It comes with the app, the same version: **Settings › Agents › Use localhost in a terminal › Add to PATH** links it into `~/.local/bin` on macOS and Linux and adds the app's folder to your user `PATH` on Windows, and **Remove from PATH** undoes it. The Linux `.deb` and `.rpm` install it as `/usr/bin/localhost`. To build it yourself, see [core/README.md](core/README.md#the-localhost-command).
+The `localhost` command runs on the same core and the same data as the app: list Projects, see what is running, read the latest logs, or run a Project's Services in the foreground until Ctrl-C. It comes with the app, the same version: **Settings › Agents › Use localhost in a terminal › Add to PATH** links it into `~/.local/bin` on macOS and Linux and adds the app's folder to your user `PATH` on Windows, and **Remove from PATH** undoes it. The Linux `.deb` and `.rpm` install it as `/usr/bin/localhost`, and the [Homebrew](#homebrew-macos) cask links it into Homebrew's `bin`. To build it yourself, see [core/README.md](core/README.md#the-localhost-command).
 
 ```sh
 localhost projects

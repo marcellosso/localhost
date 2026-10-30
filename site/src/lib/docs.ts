@@ -16,7 +16,7 @@ export const sections: { title: string; pages: DocPage[] }[] = [
     title: 'Getting started',
     pages: [
       { slug: '', title: 'Introduction', description: 'What localhost app is: a desktop process manager that starts, stops and watches your local dev servers, and the words it uses, such as Project and Service.', collection: 'docs', id: 'introduction' },
-      { slug: 'install', title: 'Install', description: "Download localhost app for macOS, Linux (.deb, .rpm, AppImage) or Windows, what each needs, and how to open it the first time while it isn't notarized.", collection: 'docs', id: 'install' },
+      { slug: 'install', title: 'Install', description: "Download localhost app for macOS (DMG or Homebrew), Linux (.deb, .rpm, AppImage) or Windows, what each needs, and how to open it the first time while it isn't notarized.", collection: 'docs', id: 'install' },
       { slug: 'quick-start', title: 'Quick start', description: 'Add your first Project to localhost app: scan its folder for Services, check the suggestions, press Start All, then let a coding agent run it too.', collection: 'docs', id: 'quick-start' },
     ],
   },
