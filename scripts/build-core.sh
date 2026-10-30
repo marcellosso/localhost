@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds the Rust core (core/localhost-ffi) for the macOS app and generates
-# its Swift bindings. Xcode and CI both call this.
+# its Swift bindings, and the `localhost` command the app bundles. Xcode and
+# CI both call this.
 #
 #   scripts/build-core.sh [debug|release]   build (default: release)
 #   scripts/build-core.sh --check           fail if the output is missing or
@@ -15,6 +16,7 @@
 # Output, inside the Swift package that wraps it (git-ignored):
 #   apps/macos/LocalhostCoreFFI/Generated/LocalhostCoreFFI.xcframework
 #   apps/macos/LocalhostCoreFFI/Sources/LocalhostCore/Generated/LocalhostCore+FFI.swift
+#   apps/macos/LocalhostCoreFFI/Generated/bin/localhost   (copied into the app's Contents/Helpers)
 #
 # Needs a Rust toolchain (rustup); see CONTRIBUTING.md.
 set -euo pipefail
@@ -36,9 +38,12 @@ fi
 sources_hash() {
     (
         cd "$ROOT"
-        find core -path core/target -prune -o -type f \( -name '*.rs' -o -name '*.toml' -o -name '*.c' -o -name Cargo.lock \) -print |
+        { find core -path core/target -prune -o -type f \( -name '*.rs' -o -name '*.toml' -o -name '*.c' -o -name Cargo.lock \) -print
+          find skills -type f; } |
             LC_ALL=C sort | xargs shasum
         shasum scripts/build-core.sh
+        # The version the bundled command reports (scripts/build-release.sh).
+        echo "${LOCALHOST_VERSION:-}"
     ) | shasum | cut -d' ' -f1
 }
 
@@ -97,7 +102,7 @@ if ! command -v cargo >/dev/null; then
 fi
 
 HASH="$(sources_hash)"
-if [ -d "$GENERATED/LocalhostCoreFFI.xcframework" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$HASH"$'\n'"$PROFILE" ]; then
+if [ -d "$GENERATED/LocalhostCoreFFI.xcframework" ] && [ -x "$GENERATED/bin/localhost" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$HASH"$'\n'"$PROFILE" ]; then
     echo "Rust core is up to date ($PROFILE)."
     exit 0
 fi
@@ -114,15 +119,19 @@ CARGO_PROFILE_FLAG=()
 [ "$PROFILE" = release ] && CARGO_PROFILE_FLAG=(--release)
 
 LIBRARIES=()
+COMMANDS=()
 for target in "${TARGETS[@]}"; do
-    echo "Building localhost-ffi for $target ($PROFILE)…"
+    echo "Building localhost-ffi and the localhost command for $target ($PROFILE)…"
     cargo build --manifest-path "$CORE/Cargo.toml" -p localhost-ffi --lib --target "$target" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"}
+    cargo build --manifest-path "$CORE/Cargo.toml" -p localhost-cli --bin localhost --target "$target" ${CARGO_PROFILE_FLAG[@]+"${CARGO_PROFILE_FLAG[@]}"}
     LIBRARIES+=("$CORE/target/$target/$PROFILE/liblocalhost_ffi.a")
+    COMMANDS+=("$CORE/target/$target/$PROFILE/localhost")
 done
 
 WORK="$(mktemp -d)"
 
 lipo -create "${LIBRARIES[@]}" -output "$WORK/liblocalhost_ffi.a"
+lipo -create "${COMMANDS[@]}" -output "$WORK/localhost"
 
 echo "Generating the Swift bindings…"
 # It reads the crate's uniffi.toml through `cargo metadata`, run from core/.
@@ -143,6 +152,9 @@ xcodebuild -create-xcframework \
 if ! cmp -s "$WORK/bindings/localhost_core.swift" "$SWIFT_OUT/LocalhostCore+FFI.swift"; then
     cp "$WORK/bindings/localhost_core.swift" "$SWIFT_OUT/LocalhostCore+FFI.swift"
 fi
+
+mkdir -p "$GENERATED/bin"
+mv "$WORK/localhost" "$GENERATED/bin/localhost"
 
 printf '%s\n%s\n' "$HASH" "$PROFILE" >"$STAMP"
 echo "Rust core built: $GENERATED/LocalhostCoreFFI.xcframework ($(lipo -archs "$WORK/liblocalhost_ffi.a"))."
