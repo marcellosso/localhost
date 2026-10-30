@@ -13,6 +13,10 @@
 //! disconnects (standard input closes) or the process is told to end, the
 //! core stops the Runs it started, unless the app is open, or another
 //! connected client needs them too. Standard output carries the protocol only.
+//!
+//! Before an update, the app may dismiss connected agents, after asking the
+//! user: the server then ends, so the update can replace this command and
+//! the agent's next session starts the new version.
 
 mod tools;
 
@@ -53,7 +57,12 @@ pub fn run(library: ProjectLibrary) -> Result<ExitCode, String> {
         .enable_all()
         .build()
         .map_err(|error| format!("Couldn't start: {error}"))?;
-    runtime.block_on(serve(library))?;
+    let served = runtime.block_on(serve(library));
+    // Standard input is read on a blocking thread, which waits for input
+    // forever when the server ended without it closing (dismissed, or a
+    // signal): the runtime mustn't wait for it.
+    runtime.shutdown_timeout(std::time::Duration::from_secs(1));
+    served?;
     Ok(ExitCode::SUCCESS)
 }
 
@@ -66,6 +75,10 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
     // Now, so the first tool call doesn't wait for the core to start. If it
     // can't, each call that needs it says why.
     let _ = targets.connect(&ExecutionTarget::ThisMachine).await;
+    let mut dismissed = {
+        let targets = targets.clone();
+        tokio::spawn(async move { targets.dismissed().await })
+    };
     let tools = Arc::new(Tools::new(library, targets, logs, storage_root));
 
     let (replies, mut outgoing) = mpsc::unbounded_channel::<Value>();
@@ -99,9 +112,14 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
                 });
             }
             _ = signals.next() => break,
+            _ = &mut dismissed => {
+                eprintln!("localhost: disconnected by the localhost app to install an update. Start a new session to reconnect.");
+                break;
+            }
             Some(_) = requests.join_next(), if !requests.is_empty() => {}
         }
     }
+    dismissed.abort();
 
     // Closing the connection tells the core to stop what only this agent needed.
     requests.abort_all();

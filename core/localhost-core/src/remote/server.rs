@@ -46,6 +46,8 @@ pub(crate) struct Core {
 struct Connections {
     next_id: u64,
     clients: HashMap<u64, Client>,
+    /// How to reach each connection to dismiss it: its output, and what ends its reading.
+    dismissers: HashMap<u64, (mpsc::UnboundedSender<Message>, Arc<tokio::sync::Notify>)>,
     /// The connections that need each Service's Run: the one that started
     /// it, and those that started a Service depending on it.
     holders: HashMap<Id, HashSet<u64>>,
@@ -97,6 +99,12 @@ impl Core {
         self.connections.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// The connections of coding agents.
+    fn agents(&self) -> Vec<u64> {
+        let connections = self.connections();
+        connections.clients.iter().filter(|(_, client)| **client == Client::Agent).map(|(id, _)| *id).collect()
+    }
+
     pub(crate) fn connection_count(&self) -> usize {
         self.connections().clients.len()
     }
@@ -120,11 +128,13 @@ impl Core {
         let (sender, receiver) = mpsc::unbounded_channel();
         let mut writer = tokio::spawn(write_messages(receiver, output));
         let _ = sender.send(Message::Hello(Hello::current()));
+        let dismissed = Arc::new(tokio::sync::Notify::new());
         let id = {
             let mut connections = self.connections();
             connections.next_id += 1;
             let id = connections.next_id;
             connections.clients.insert(id, Client::default());
+            connections.dismissers.insert(id, (sender.clone(), dismissed.clone()));
             id
         };
         let connection = Arc::new(Connection {
@@ -136,7 +146,12 @@ impl Core {
         });
 
         let mut lines = BufReader::new(input).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
+        loop {
+            let line = tokio::select! {
+                line = lines.next_line() => line,
+                _ = dismissed.notified() => break,
+            };
+            let Ok(Some(line)) = line else { break };
             match serde_json::from_str::<Call>(&line) {
                 Ok(Call { id, request }) => {
                     let connection = connection.clone();
@@ -169,6 +184,7 @@ impl Core {
     async fn release(&self, id: u64) {
         let (held, origin) = {
             let mut connections = self.connections();
+            connections.dismissers.remove(&id);
             let client = connections.clients.remove(&id).unwrap_or_default();
             for holders in connections.holders.values_mut() {
                 holders.remove(&id);
@@ -314,6 +330,18 @@ impl Connection {
             Request::Retire => {
                 core.is_retiring.store(true, Ordering::Relaxed);
                 done()
+            }
+            Request::AgentCount => value(core.agents().len()),
+            Request::DisconnectAgents => {
+                let agents = core.agents();
+                let connections = core.connections();
+                for id in &agents {
+                    if let Some((output, dismissed)) = connections.dismissers.get(id) {
+                        let _ = output.send(Message::Dismissed);
+                        dismissed.notify_one();
+                    }
+                }
+                value(agents.len())
             }
             Request::SetAutomaticPortMove { is_enabled } => {
                 // An app setting: an agent's or the command's default doesn't override it.

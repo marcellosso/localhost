@@ -284,6 +284,44 @@ impl Targets {
         }
     }
 
+    /// How many coding agents (`localhost mcp`) this machine's shared core
+    /// serves. None when it isn't connected, or runs in this process.
+    pub async fn connected_agent_count(&self) -> usize {
+        match self.shared_core() {
+            Some(remote) => remote.agent_count().await.unwrap_or(0),
+            None => 0,
+        }
+    }
+
+    /// Tells the coding agents connected to this machine's shared core to
+    /// end, before an update replaces the command they run; returns how many
+    /// there were. Their Runs are the app's to stop.
+    pub async fn disconnect_agents(&self) -> usize {
+        match self.shared_core() {
+            Some(remote) => remote.disconnect_agents().await.unwrap_or(0),
+            None => 0,
+        }
+    }
+
+    /// Returns once this machine's shared core has dismissed this client
+    /// (`disconnect_agents`, from the app), which should then end.
+    pub async fn dismissed(&self) {
+        loop {
+            if let Some(remote) = self.shared_core() {
+                remote.closed().await;
+                if remote.is_dismissed() {
+                    return;
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    }
+
+    fn shared_core(&self) -> Option<Remote> {
+        let shared = self.inner.connected().into_iter().find(|(target, _)| *target == ExecutionTarget::ThisMachine);
+        shared.map(|(_, remote)| remote)
+    }
+
     /// An app setting, on by default; a target connected later gets it too.
     /// May be called outside the runtime.
     pub fn set_automatic_port_move(&self, is_enabled: bool) {
