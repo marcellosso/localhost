@@ -1,0 +1,74 @@
+name: Linux packages
+
+# Builds the .deb, .rpm and AppImage as the release does, unsigned, and
+# checks the localhost command in each (scripts/check-linux-packages.sh), so
+# a pull request that changes how they are built finds out before a tag does.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/packages.yml
+      - .github/workflows/release.yml
+      - scripts/check-linux-packages.sh
+      - apps/desktop/src-tauri/tauri*.json
+      - apps/desktop/src-tauri/Cargo.toml
+      - apps/desktop/src-tauri/src/agents.rs
+      - core/localhost-cli/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Build and check the Linux packages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      # Any version: the check compares the command's to it.
+      VERSION: 0.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the webview and tray libraries, and the package tools
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm cpio
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            core
+            apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # As in release.yml.
+      - name: Build the localhost command
+        env:
+          LOCALHOST_VERSION: ${{ env.VERSION }}
+        run: |
+          cargo build --manifest-path ../../core/Cargo.toml -p localhost-cli --bin localhost --release
+          target=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p src-tauri/binaries
+          cp ../../core/target/release/localhost "src-tauri/binaries/localhost-$target"
+
+      - name: Build the .deb, .rpm and AppImage (unsigned)
+        run: |
+          config=$(jq -nc --arg version "$VERSION" '{version: $version, bundle: {externalBin: ["binaries/localhost"]}}')
+          pnpm tauri build --bundles deb,rpm,appimage --config "$config"
+
+      - name: Check the localhost command in every package
+        run: ../../scripts/check-linux-packages.sh src-tauri/target/release/bundle "$VERSION"
