@@ -56,7 +56,7 @@ extension AppModel {
                                  shortcut: "⌘/", keywords: "help keys cheat sheet") { [weak self] in
             self?.presentedSheet = .keyboardShortcuts
         })
-        items.append(PaletteItem(id: "other:connect-agents", title: "Connect Agents…", icon: .symbol("link"),
+        items.append(PaletteItem(id: "connect-agents", title: "Connect Agents…", icon: .symbol("link"),
                                  keywords: "mcp claude cursor codex agent skill path terminal cli") { [weak self] in
             self?.showConnectAgents()
         })

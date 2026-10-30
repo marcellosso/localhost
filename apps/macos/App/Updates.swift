@@ -1,4 +1,5 @@
 import AppKit
+import LocalhostCore
 import Observation
 import Sparkle
 
@@ -12,7 +13,9 @@ import Sparkle
 /// Info.plist; Restart to Update installs it.
 ///
 /// Installing quits the app, so, like quitting, it stops every Service
-/// first, after saying which ones are running. Then it retires the shared
+/// first, after saying which ones are running, and disconnects the coding
+/// agents connected through `localhost mcp`, after saying how many, so none
+/// keeps reaching the old core. Then it retires the shared
 /// core, which runs from the app's own executable, so the new version
 /// starts a core of its own instead of reaching the old one.
 ///
@@ -120,24 +123,34 @@ final class UpdateController: NSObject {
         state = .none
     }
 
-    /// Restart to Update: asks first if any Service is active, since quitting
-    /// stops them, then lets Sparkle install and relaunch.
+    /// Restart to Update: asks first if any Service is active or any coding
+    /// agent connected, since quitting stops the Services and the update
+    /// disconnects the agents, then lets Sparkle install and relaunch.
     func install() {
-        guard let reply = readyReply, case .ready(let version, _) = state else { return }
-        let active = model?.activeServicesByProject ?? []
-        if !active.isEmpty {
-            let count = active.reduce(0) { $0 + $1.services.count }
-            NSApp.activate()
-            let alert = NSAlert()
-            alert.messageText = count == 1 ? "Stop 1 service and update?" : "Stop \(count) services and update?"
-            let list = active.map { "\($0.project): \($0.services.formatted(.list(type: .and)))" }.joined(separator: "\n")
-            alert.informativeText = "localhost restarts to install version \(version). These services are stopped first:\n\n\(list)"
-            alert.addButton(withTitle: "Stop and Update")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-        readyReply = nil
+        guard readyReply != nil, case .ready(let version, _) = state else { return }
         Task {
+            let active = model?.activeServicesByProject ?? []
+            let agents = await model?.connectedAgentCount() ?? 0
+            let count = active.reduce(0) { $0 + $1.services.count }
+            if let confirmation = updateConfirmation(services: UInt64(count), agents: UInt64(agents)) {
+                NSApp.activate()
+                let alert = NSAlert()
+                alert.messageText = confirmation.title
+                var text = "localhost restarts to install version \(version)."
+                if !active.isEmpty {
+                    let list = active.map { "\($0.project): \($0.services.formatted(.list(type: .and)))" }.joined(separator: "\n")
+                    text += " These services are stopped first:\n\n\(list)"
+                }
+                if let note = confirmation.agentsNote {
+                    text += "\n\n" + note.replacingOccurrences(of: "`", with: "")
+                }
+                alert.informativeText = text
+                alert.addButton(withTitle: confirmation.button)
+                alert.addButton(withTitle: "Cancel")
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            }
+            guard let reply = readyReply else { return }
+            readyReply = nil
             await model?.prepareForUpdate()
             reply(.install)
         }

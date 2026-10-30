@@ -228,7 +228,14 @@ private struct AgentRow: View {
 
             if isShowingChanges {
                 VStack(alignment: .leading, spacing: 6) {
-                    pathLine("Adds to", status.configPath, after: ":")
+                    if let command = status.viaCommand {
+                        Text("Adds to \(Text((status.configPath as NSString).abbreviatingWithTildeInPath).monospaced()) with \(Text(command).monospaced()):")
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        pathLine("Adds to", status.configPath, after: ":")
+                    }
                     Text(status.entry)
                         .font(.system(size: 11, design: .monospaced))
                         .textSelection(.enabled)
@@ -237,7 +244,11 @@ private struct AgentRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.primary.opacity(0.05), in: .rect(cornerRadius: 6))
                         .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08)) }
-                    pathLine("Installs the skill at", status.skillPath)
+                    if let from = status.skillSharedFrom {
+                        pathLine("Uses the skill \(from) has at", status.skillPath, after: ", instead of a second copy")
+                    } else {
+                        pathLine("Installs the skill at", status.skillPath)
+                    }
                     if let configured = status.configuredCommand, configured != model.agents.command.path(percentEncoded: false) {
                         pathLine("Now runs", configured)
                     }

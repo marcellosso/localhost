@@ -350,11 +350,18 @@ final class AppModel {
         await core?.services.stopAll(origin: origin)
     }
 
-    /// Before an update installs: stops every Run, then retires the shared
-    /// core, so the new version starts one of its own.
+    /// Before an update installs: stops every Run, disconnects the coding
+    /// agents (the user agreed to both), then retires the shared core, so
+    /// the new version starts one of its own.
     func prepareForUpdate() async {
         await core?.services.stopAll(origin: .mainWindow)
+        await core?.services.disconnectAgents()
         await core?.services.retireSharedCore()
+    }
+
+    /// How many coding agents are connected through `localhost mcp`.
+    func connectedAgentCount() async -> Int {
+        await core?.services.connectedAgentCount() ?? 0
     }
 
     // MARK: Editing
@@ -601,6 +608,18 @@ final class AppModel {
             return
         }
         await checkForOrphans()
+        offerConnectAgentsOnce()
+    }
+
+    static let hasOfferedAgentsKey = "hasOfferedConnectAgents"
+
+    /// Opens Connect Your Agents by itself once, at the first launch that has
+    /// it; the empty state, the menu and Settings offer it from then on.
+    private func offerConnectAgentsOnce() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.hasOfferedAgentsKey), presentedSheet == nil, !isShowingOrphanAlert else { return }
+        defaults.set(true, forKey: Self.hasOfferedAgentsKey)
+        showConnectAgents()
     }
 
     var unreadableFilesTitle: String {
@@ -619,7 +638,10 @@ final class AppModel {
         if revealing, let file = core?.library.unreadableFiles.first {
             NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: file.movedTo ?? file.path)])
         }
-        Task { await checkForOrphans() }
+        Task {
+            await checkForOrphans()
+            offerConnectAgentsOnce()
+        }
     }
 
     // MARK: Orphans
