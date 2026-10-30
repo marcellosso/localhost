@@ -6,14 +6,16 @@ name: Site
 # Vercel, which builds site/ itself on every push to main. The download links
 # are read from the latest release at build time, so publishing a release asks
 # Vercel for a fresh build through its deploy hook.
+#
+# A pull request builds the site only when one of those changed, gated by a
+# job-level `if:` like the CI workflow, so the check reports as passing when
+# skipped. Pushes to main and releases always build it.
 on:
   release:
     types: [published]
   push:
     branches: [main]
-    paths: [site/**, docs/**, .github/assets/**, apps/desktop/src/styles/tokens.css, .github/workflows/site.yml]
   pull_request:
-    paths: [site/**, docs/**, .github/assets/**, apps/desktop/src/styles/tokens.css, .github/workflows/site.yml]
 
 permissions:
   contents: read
@@ -23,8 +25,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed files
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      site: ${{ steps.filter.outputs.site }}
+    steps:
+      # The merge into the base: its first parent is the base.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: filter
+        env:
+          SITE: '^(site/|docs/|\.github/assets/|apps/desktop/src/styles/tokens\.css$|\.github/workflows/site\.yml$)'
+        run: |
+          files=$(git diff --name-only HEAD^1 HEAD)
+          echo "$files"
+          { grep -qE "$SITE" <<<"$files" && echo site=true || echo site=false; } | tee -a "$GITHUB_OUTPUT"
+
   build:
     name: Build the site
+    needs: changes
+    # `changes` runs only on pull requests: pushes and releases always build.
+    if: "!cancelled() && (needs.changes.result == 'skipped' || needs.changes.outputs.site == 'true')"
     runs-on: ubuntu-latest
     defaults:
       run:

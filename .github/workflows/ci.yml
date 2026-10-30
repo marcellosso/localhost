@@ -1,20 +1,58 @@
 name: CI
 
+# Each job runs on a pull request only when files it depends on changed, and
+# on every push to main. The gating is a job-level `if:` on the `changes` job's
+# outputs, never workflow-level `paths:`: a skipped job reports as passing, so a
+# required check never waits for a run that didn't start. A job that starts
+# depending on files elsewhere (the core embeds skills/ through include_str!)
+# adds them to its pattern below.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore: ["**.md", "docs/**"]
   push:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**"]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      macos: ${{ steps.filter.outputs.macos }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+    steps:
+      # A pull request checks out its merge into the base: the first parent is
+      # the base, so the diff is what merging would change.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: filter
+        env:
+          CORE: '^(core/|skills/|\.github/workflows/ci\.yml$)'
+          MACOS: '^(apps/macos/|scripts/build-core\.sh$)'
+          DESKTOP: '^(apps/desktop/|scripts/(test-updater-scripts|updater-manifest|appcast|sparkle-public-key)\.sh$)'
+        run: |
+          if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
+            files=$(git diff --name-only HEAD^1 HEAD)
+          else
+            files=everything
+          fi
+          echo "$files"
+          changed() { [[ $files == everything ]] || grep -qE "$1" <<<"$files"; }
+          {
+            changed "$CORE" && echo core=true || echo core=false
+            changed "$CORE|$MACOS" && echo macos=true || echo macos=false
+            changed "$CORE|$DESKTOP" && echo desktop=true || echo desktop=false
+          } | tee -a "$GITHUB_OUTPUT"
+
   linux:
     name: Rust core (Linux)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
     runs-on: ubuntu-latest
     # A hung test fails the job instead of holding the runner.
     timeout-minutes: 15
@@ -40,6 +78,8 @@ jobs:
 
   windows:
     name: Rust core (Windows)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
     runs-on: windows-latest
     # A hung test fails the job instead of holding the runner.
     timeout-minutes: 15
@@ -66,7 +106,8 @@ jobs:
 
   macos:
     name: Rust core and app (macOS)
-    if: github.event_name == 'push' || !github.event.pull_request.draft
+    needs: changes
+    if: needs.changes.outputs.macos == 'true' && (github.event_name == 'push' || !github.event.pull_request.draft)
     runs-on: macos-26
     # A hung test fails the job instead of holding the runner.
     timeout-minutes: 30
@@ -101,6 +142,8 @@ jobs:
 
   desktop:
     name: Desktop app (Linux)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     # The oldest Ubuntu the packages target.
     runs-on: ubuntu-22.04
     # A hung test fails the job instead of holding the runner.
@@ -144,3 +187,17 @@ jobs:
           cargo test
       - name: Check the TypeScript bindings are up to date
         run: git diff --exit-code src/bindings.ts
+
+  # One check that stands for the whole workflow, for a ruleset to require:
+  # skipped jobs pass, failed or cancelled ones (the change detection too) fail it.
+  result:
+    name: CI result
+    if: always()
+    needs: [changes, linux, windows, macos, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          [[ " $RESULTS " != *" failure "* && " $RESULTS " != *" cancelled "* ]]
