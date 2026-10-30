@@ -9,7 +9,9 @@ name: Site
 #
 # A pull request builds the site only when one of those changed, gated by a
 # job-level `if:` like the CI workflow, so the check reports as passing when
-# skipped. Pushes to main and releases always build it.
+# skipped. Pushes to main and releases always build it. Vercel's preview
+# builds follow the same paths through site/scripts/ignore-build.sh: change
+# both together.
 on:
   release:
     types: [published]
