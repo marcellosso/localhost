@@ -5,3 +5,6 @@ src-tauri/gen/
 
 # localhostd for WSL, put here to be bundled into the Windows installer (release.yml)
 src-tauri/wsl/
+
+# The localhost command, put here to be bundled as a sidecar (release.yml)
+src-tauri/binaries/

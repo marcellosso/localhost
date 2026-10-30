@@ -545,6 +545,56 @@ async downloadUpdate() : Promise<void> {
  */
 async installUpdate() : Promise<void> {
     await TAURI_INVOKE("install_update");
+},
+/**
+ * Each agent and where it stands.
+ */
+async agentStatuses() : Promise<AgentStatus[]> {
+    return await TAURI_INVOKE("agent_statuses");
+},
+/**
+ * Adds or updates the `localhost` server in the agent's configuration, and its skill.
+ */
+async connectAgent(client: AgentClient) : Promise<Result<AgentStatus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("connect_agent", { client }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Removes localhost's entries from the agent's configuration.
+ */
+async disconnectAgent(client: AgentClient) : Promise<Result<AgentStatus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("disconnect_agent", { client }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether terminals find the `localhost` command.
+ */
+async commandLineStatus() : Promise<CommandLineStatus> {
+    return await TAURI_INVOKE("command_line_status");
+},
+async addCommandToPath() : Promise<Result<CommandLineStatus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_command_to_path") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeCommandFromPath() : Promise<Result<CommandLineStatus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_command_from_path") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -567,6 +617,65 @@ updateState: "update-state"
 
 /** user-defined types **/
 
+/**
+ * A coding agent localhost can connect to its MCP server.
+ */
+export type AgentClient = "claudeCode" | "cursor" | "codex"
+/**
+ * Where an agent stands with localhost.
+ */
+export type AgentConnection = 
+/**
+ * Its configuration folder isn't on this machine.
+ */
+"notInstalled" | 
+/**
+ * It has no `localhost` MCP server.
+ */
+"notConnected" | 
+/**
+ * Its `localhost` server runs this app's command, and the skill is installed.
+ */
+"connected" | 
+/**
+ * Its `localhost` server runs another `localhost` command, one that is
+ * gone, or the skill is missing or older: Connect updates it.
+ */
+"needsUpdate" | 
+/**
+ * Its configuration file can't be read, or sets the server in a way
+ * localhost doesn't edit.
+ */
+"unreadable"
+/**
+ * One agent, as the Connect screen shows it: where it stands, and exactly
+ * what Connect would write.
+ */
+export type AgentStatus = { client: AgentClient; name: string; connection: AgentConnection; 
+/**
+ * What is the case and what to do next, in a sentence or two.
+ */
+summary: string; 
+/**
+ * The configuration file holding its MCP servers.
+ */
+configPath: string; 
+/**
+ * The `localhost` server as Connect writes it in that file.
+ */
+entry: string; 
+/**
+ * Where Connect installs the localhost-mcp skill.
+ */
+skillPath: string; 
+/**
+ * The command its `localhost` server runs now, if it has one.
+ */
+configuredCommand: string | null; isSkillInstalled: boolean; 
+/**
+ * The configuration file as it was before localhost first changed it.
+ */
+backupPath: string | null }
 /**
  * A colour from an ANSI SGR sequence. Clients map indexed colours to their theme.
  */
@@ -601,6 +710,32 @@ dependents: string[] }
  * A command's failure: the core's typed error, and its message for the user.
  */
 export type CommandError = { error: LocalhostError; message: string }
+export type CommandLineState = 
+/**
+ * localhost put it there; Remove takes it away.
+ */
+"added" | "notAdded" | 
+/**
+ * It is there without localhost's help, e.g. the Linux packages' `/usr/bin/localhost`.
+ */
+"alreadyOnPath" | 
+/**
+ * Another file is where the link would go; localhost leaves it alone.
+ */
+"taken"
+export type CommandLineStatus = { state: CommandLineState; 
+/**
+ * The link (macOS, Linux), or the folder added to the user's `Path` (Windows).
+ */
+path: string; 
+/**
+ * The command it runs.
+ */
+command: string; 
+/**
+ * What is the case and what to do next.
+ */
+summary: string }
 export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } | 
 /**
  * A Service's state changed (Runs starting and ending show up here too),
@@ -851,7 +986,29 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  * A Project file can't be imported: `problem`, at `field` (e.g.
  * `["services", "web", "port"]`) on `line`, when known.
  */
-{ kind: "invalidProjectFile"; detail: { problem: ProjectFileProblem; field: string[]; line: number | null } }
+{ kind: "invalidProjectFile"; detail: { problem: ProjectFileProblem; field: string[]; line: number | null } } | 
+/**
+ * The agent (by name) isn't installed on this machine.
+ */
+{ kind: "agentNotInstalled"; detail: string } | 
+/**
+ * The agent's configuration file (`path`) can't be read, or sets the
+ * `localhost` server in a way localhost doesn't edit.
+ */
+{ kind: "agentConfigUnsupported"; detail: { path: string; reason: string } } | 
+/**
+ * The app has no `localhost` command at this path: a build without it.
+ */
+{ kind: "commandNotBundled"; detail: string } | 
+/**
+ * The app runs from a temporary location (a disk image, App
+ * Translocation), where agents couldn't find its command later.
+ */
+{ kind: "commandInTemporaryLocation"; detail: string } | 
+/**
+ * Another file is where the `localhost` link would go.
+ */
+{ kind: "commandPathTaken"; detail: string }
 export type LogBatch = { lines: LogLine[]; 
 /**
  * Lines that arrived but were left out because the batch kept only its

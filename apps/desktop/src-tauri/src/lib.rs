@@ -6,6 +6,7 @@
 //! Execution Target: this machine through the shared core, a WSL distro
 //! through its `localhostd` (`targets`).
 
+mod agents;
 mod bridge;
 mod desktop;
 mod dialogs;
@@ -157,6 +158,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             updates::put_off_update,
             updates::download_update,
             updates::install_update,
+            agents::agent_statuses,
+            agents::connect_agent,
+            agents::disconnect_agent,
+            agents::command_line_status,
+            agents::add_command_to_path,
+            agents::remove_command_from_path,
         ])
         .events(collect_events![lifecycle::Reveal, launch::OrphansFound, updates::UpdateState])
 }
@@ -206,6 +213,7 @@ pub fn run() {
                 lifecycle::prepare(&window);
             }
             tray::install(app)?;
+            agents::prepare();
             launch::watch_found_orphans(app.handle());
             if !is_measuring {
                 updates::watch(app.handle());
