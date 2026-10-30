@@ -28,6 +28,8 @@ function agent(client: AgentStatus["client"], name: string, changes: Partial<Age
     configPath: `/home/me/.${client}/config.json`,
     entry: `"localhost": { "command": "/usr/bin/localhost", "args": ["mcp"] }`,
     skillPath: `/home/me/.${client}/skills/localhost-mcp`,
+    viaCommand: null,
+    skillSharedFrom: null,
     configuredCommand: null,
     isSkillInstalled: false,
     backupPath: null,
@@ -92,6 +94,18 @@ describe("ConnectAgents", () => {
     expect(changes.getByText(cursor.skillPath)).toBeTruthy();
     expect(changes.getByText(cursor.backupPath!)).toBeTruthy();
     expect(changes.queryByText(/Now runs/)).toBeNull();
+  });
+
+  it("says when a command makes the change and where a shared skill is", async () => {
+    commands.agentStatuses.mockResolvedValue([
+      { ...claude, viaCommand: "claude mcp add-json --scope user localhost" },
+      { ...cursor, skillSharedFrom: "Claude Code", skillPath: "/home/me/.claude/skills/localhost-mcp/SKILL.md" },
+    ]);
+    render(<ConnectAgents />);
+    fireEvent.click(await screen.findByRole("button", { name: "What changes for Claude Code" }));
+    expect(group("Claude Code").getByText("claude mcp add-json --scope user localhost")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "What changes for Cursor" }));
+    expect(group("Cursor").getByText(/Uses the skill Claude Code has at/)).toBeTruthy();
   });
 
   it("names the other command an agent runs before an update", async () => {

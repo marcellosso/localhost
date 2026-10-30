@@ -92,7 +92,7 @@ export function paletteItems(
     run: () => showAlert({ kind: "keyboardShortcuts" }),
   });
   items.push({
-    id: "other:connect-agents",
+    id: "connect-agents",
     title: "Connect Agents…",
     icon: { kind: "symbol", name: "agents" },
     keywords: "mcp claude cursor codex agent skill path terminal cli",

@@ -35,6 +35,7 @@ describe("palette", () => {
       ["Ports", "Ctrl+0"],
       ["New Project…", "Ctrl+N"],
       ["Keyboard Shortcuts", "Ctrl+/"],
+      ["Connect Agents…", ""],
     ]);
     expect(items.some((item) => item.title === "Start Hugo" && item.id.startsWith("other:"))).toBe(true);
   });
@@ -52,10 +53,10 @@ describe("palette", () => {
     expect(navigator.selectService).toHaveBeenCalledWith(blog.id, blog.services[0].id);
   });
 
-  it("opens Connect Agents when typed for", () => {
+  it("offers Connect Agents with an empty query too", () => {
     resetUi();
     const item = paletteItems(view, shop, { kind: "all" }, navigator).find((item) => item.title === "Connect Agents…")!;
-    expect(item.id.startsWith("other:")).toBe(true);
+    expect(item.id.startsWith("other:")).toBe(false);
     expect(item.keywords).toContain("mcp");
     item.run();
     expect(currentUi().sheet).toEqual({ kind: "connectAgents" });

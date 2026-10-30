@@ -141,12 +141,26 @@ function AgentRow({ agent, onChange }: { agent: AgentStatus; onChange: (status: 
           {isShowingChanges && (
             <div id={changesId} className={styles.changes}>
               <p>
-                Adds to <span className="mono">{tildePath(agent.configPath)}</span>:
+                Adds to <span className="mono">{tildePath(agent.configPath)}</span>
+                {agent.viaCommand && (
+                  <>
+                    {" "}
+                    with <span className="mono">{agent.viaCommand}</span>
+                  </>
+                )}
+                :
               </p>
               <pre className={`${styles.entry} mono`}>{agent.entry}</pre>
-              <p>
-                Installs the skill at <span className="mono">{tildePath(agent.skillPath)}</span>
-              </p>
+              {agent.skillSharedFrom ? (
+                <p>
+                  Uses the skill {agent.skillSharedFrom} has at{" "}
+                  <span className="mono">{tildePath(agent.skillPath)}</span>, instead of a second copy
+                </p>
+              ) : (
+                <p>
+                  Installs the skill at <span className="mono">{tildePath(agent.skillPath)}</span>
+                </p>
+              )}
               {agent.configuredCommand && agent.connection === "needsUpdate" && (
                 <p>
                   Now runs <span className="mono">{agent.configuredCommand}</span>
