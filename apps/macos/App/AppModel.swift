@@ -28,6 +28,8 @@ final class AppModel {
         case importProject(ProjectDocument, fileName: String)
         /// Every shortcut, grouped (⌘/).
         case keyboardShortcuts
+        /// Connect Your Agents, as in Settings › Agents.
+        case connectAgents
 
         var id: Self { self }
     }
@@ -137,6 +139,8 @@ final class AppModel {
     @ObservationIgnored var showMainWindow: (() -> Void)?
     /// New versions: the sidebar's notice, Check for Updates… and its setting.
     let updates = UpdateController()
+    /// Coding agents connected to `localhost mcp`, and `localhost` in terminals.
+    let agents = AgentsModel(storageRoot: AppModel.storageRoot)
 
     /// Whether a Service may move to a free port when its Port is taken.
     var isAutomaticPortMoveEnabled: Bool {
@@ -290,6 +294,14 @@ final class AppModel {
     func openURL(of serviceID: UUID) {
         guard let (_, service) = service(serviceID), let url = urlToOpen(service) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Shows Connect Your Agents, unless another sheet is open: replacing
+    /// it would lose its edits.
+    func showConnectAgents() {
+        guard presentedSheet == nil else { return }
+        isShowingPalette = false
+        presentedSheet = .connectAgents
     }
 
     /// Shows the Keyboard Shortcuts sheet (⌘/), or closes it. It doesn't

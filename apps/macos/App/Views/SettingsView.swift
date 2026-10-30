@@ -5,7 +5,7 @@ import SwiftUI
 /// the sidebar's glass and the selected section beside it.
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, ports
+        case general, appearance, ports, agents
 
         var id: Self { self }
 
@@ -14,6 +14,7 @@ struct SettingsView: View {
             case .general: "General"
             case .appearance: "Appearance"
             case .ports: "Ports"
+            case .agents: "Agents"
             }
         }
 
@@ -22,6 +23,7 @@ struct SettingsView: View {
             case .general: "gearshape"
             case .appearance: "circle.lefthalf.filled"
             case .ports: "network"
+            case .agents: "link"
             }
         }
     }
@@ -38,6 +40,7 @@ struct SettingsView: View {
                     case .general: GeneralSettings()
                     case .appearance: AppearanceSettings()
                     case .ports: PortsSettings()
+                    case .agents: AgentsSettings()
                     }
                 }
                 .padding(.horizontal, 26)
@@ -288,6 +291,17 @@ private struct PortsSettings: View {
                     .toggleStyle(.switch)
                     .tint(Theme.accent)
             }
+        }
+    }
+}
+
+private struct AgentsSettings: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeader(title: ConnectAgentsView.title, subtitle: ConnectAgentsView.subtitle)
+            AgentsContent()
+            SetUpByHandLink()
+                .padding(.top, 14)
         }
     }
 }
