@@ -1,11 +1,12 @@
 ---
 import Base from '../layouts/Base.astro';
+import Comparison from '../components/Comparison.astro';
 import { alternatives } from '../lib/compare';
 import { html } from '../lib/faq';
 import { href, name } from '../lib/site';
 
 const description =
-  'An honest comparison of localhost with pm2, foreman, overmind, honcho, tmux, tmuxinator, Docker Compose, concurrently, devglow and DevWebUI: where each one wins, and where localhost fits better.';
+  'An honest comparison of localhost with pm2, foreman, overmind, tmux, Docker Compose, concurrently, devglow and DevWebUI: where each wins, where localhost fits.';
 const url = new URL(href('compare'), Astro.site).toString();
 const structuredData = [
   {
@@ -14,6 +15,22 @@ const structuredData = [
     description,
     url,
     isPartOf: { '@type': 'WebSite', name, url: new URL('/', Astro.site).toString() },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: alternatives.map((tool, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: `localhost vs ${tool.name}`,
+        url: new URL(href(`compare/${tool.slug}`), Astro.site).toString(),
+      })),
+    },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name, item: new URL('/', Astro.site).toString() },
+      { '@type': 'ListItem', position: 2, name: 'Compare', item: url },
+    ],
   },
 ];
 ---
@@ -61,25 +78,8 @@ const structuredData = [
       alternatives.map((tool) => (
         <section class="tool" id={tool.id}>
           <h2 class="engraved">localhost vs {tool.name}</h2>
-          <p class="what" set:html={html(tool.what)} />
-          <div class="columns">
-            <div>
-              <h3 class="plate-label">Where {tool.name} {tool.name.includes(',') ? 'win' : 'wins'}</h3>
-              <ul class="theirs">
-                {tool.wins.map((line) => (
-                  <li set:html={html(line)} />
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 class="plate-label ours">Where localhost fits better</h3>
-              <ul class="ours">
-                {tool.localhost.map((line) => (
-                  <li set:html={html(line)} />
-                ))}
-              </ul>
-            </div>
-          </div>
+          <Comparison {tool} />
+          <a class="more" href={href(`compare/${tool.slug}`)}>{tool.seoTitle}</a>
         </section>
       ))
     }
@@ -92,8 +92,8 @@ const structuredData = [
         commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
       </p>
       <p class="what">
-        <a href={href('docs/install')}>Install localhost</a>, read the <a href={href('docs')}>docs</a>,
-        or see how <a href={href('agents')}>coding agents use it</a>.
+        <a href={href('docs/install')}>Install localhost</a>, read the <a href={href('docs')}>docs</a> and
+        the <a href={href('guides')}>guides</a>, or see how <a href={href('agents')}>coding agents use it</a>.
       </p>
     </section>
   </div>
@@ -243,6 +243,9 @@ const structuredData = [
   .tool h2 {
     font-size: clamp(32px, 4vw, 48px);
   }
+  .tool .more {
+    margin-top: 20px;
+  }
   .what {
     max-width: 68ch;
     margin: 14px 0 0;
@@ -254,53 +257,6 @@ const structuredData = [
     font-weight: 600;
     text-underline-offset: 3px;
   }
-  .columns {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 40px;
-    margin-top: 28px;
-  }
-  h3.ours {
-    color: var(--accent-text);
-  }
-  ul {
-    margin: 12px 0 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--separator);
-    line-height: 1.6;
-    color: var(--text-secondary);
-  }
-  ul.ours {
-    color: var(--text);
-  }
-  li {
-    position: relative;
-    padding: 10px 0 10px 22px;
-    border-bottom: 1px solid var(--separator);
-  }
-  /* Marks by shape, not colour alone: a hollow square for the other tool, a filled one for localhost. */
-  li::before {
-    content: '';
-    position: absolute;
-    left: 2px;
-    top: calc(10px + 0.8em - 4px);
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    box-shadow: inset 0 0 0 1.5px var(--text-secondary);
-  }
-  ul.ours li::before {
-    background: var(--accent);
-    box-shadow: none;
-  }
-  @media (max-width: 720px) {
-    .columns {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 28px;
-    }
-  }
-
   .isnt {
     margin-top: 96px;
     padding: 48px 44px 44px;
