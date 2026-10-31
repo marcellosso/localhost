@@ -120,8 +120,22 @@ Checking the app for Windows from macOS or Linux works like the core's check abo
 2. Run the checks for what you touched (AGENTS.md, Verifying a change), then build and run the app.
 3. Open a PR describing what changed and why, how you checked it, and anything you left out. Link the issue it addresses.
 
-CI runs the core's tests on Linux, macOS and Windows, the Swift layer's tests, an unsigned app build, and the desktop app's checks (TypeScript, Vitest, clippy, its Rust tests, up-to-date bindings), and the npm package's tests; all must pass. On a PR each job runs only when files it depends on changed, and is skipped otherwise: the core's jobs for `core/` and `skills/` (the core embeds the localhost-mcp skill), the macOS job for those and `apps/macos/`, the desktop job for those and `apps/desktop/`, the npm package's (`packages/cli/`, on Linux, macOS and Windows) for it, `skills/` and the site's install links, and each for the scripts it runs. The site builds only for `site/`, `docs/`, `.github/assets/` and the desktop tokens, and Vercel's preview of a PR follows the same paths (`site/scripts/ignore-build.sh`), so other PRs show it as Ignored; production on `main` and the release's deploy hook always build. Changing a workflow runs everything in it, and every push to `main` runs everything; release packages are built only by a release tag. A skipped job counts as passing, and the `CI result` check fails if any CI job failed. The macOS job also skips draft PRs (macOS minutes cost the most), so mark yours ready for review when you want the full run. CI on a PR from a fork starts once a maintainer approves the run, and every PR needs a maintainer's approving review before it merges. Commits are kept as written (merge commits, no squash), so make each commit message say what it does in one line.
+CI runs the core's tests on Linux, macOS and Windows, the Swift layer's tests, an unsigned app build, and the desktop app's checks (TypeScript, Vitest, clippy, its Rust tests, up-to-date bindings), and the npm package's tests; all must pass. On a PR each job runs only when files it depends on changed, and is skipped otherwise: the core's jobs for `core/` and `skills/` (the core embeds the localhost-mcp skill), the macOS job for those and `apps/macos/`, the desktop job for those and `apps/desktop/`, the npm package's (`packages/cli/`, on Linux, macOS and Windows) for it, `skills/` and the site's install links, and each for the scripts it runs. The site builds only for `site/`, `docs/`, `.github/assets/` and the desktop tokens, and Vercel's preview of a PR follows the same paths (`site/scripts/ignore-build.sh`), so other PRs show it as Ignored; production on `main` and the release's deploy hook always build. Changing a workflow runs everything in it, and every push to `main` runs everything; release packages are built only by a release tag, and the npm package is published only by running its workflow by hand. A skipped job counts as passing, and the `CI result` check fails if any CI job failed. The macOS job also skips draft PRs (macOS minutes cost the most), so mark yours ready for review when you want the full run. CI on a PR from a fork starts once a maintainer approves the run, and every PR needs a maintainer's approving review before it merges. Commits are kept as written (merge commits, no squash), so make each commit message say what it does in one line.
 
 Releases are cut by tagging `main`; see [RELEASING.md](RELEASING.md).
 
 By contributing, you agree your contributions are licensed under the MIT license in [LICENSE](LICENSE).
+
+## Publishing the npm package
+
+`@getlocalhost/cli` (`packages/cli/`) is published to npm from CI by the [Publish the npm package](.github/workflows/publish-cli.yml) workflow, run by hand. npm trusts that workflow through trusted publishing, so there is no npm token. With each app release:
+
+1. Bump `version` in `packages/cli/package.json` and merge it into `main`. npm never accepts a version twice.
+2. Run the workflow on `main`, first as a dry run:
+
+   ```sh
+   gh workflow run publish-cli.yml -R marcellosso/localhost --ref main -f dry-run=true
+   gh workflow run publish-cli.yml -R marcellosso/localhost --ref main
+   ```
+
+It runs the package's tests, fails if the version is already on npm, checks the package includes the skill, and publishes it with provenance. A dry run does all but the publishing, from any branch; publishing runs only from `main`.

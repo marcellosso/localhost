@@ -1,0 +1,79 @@
+name: Publish the npm package
+
+# Publishes packages/cli, @getlocalhost/cli, to npm at the version in its
+# package.json, after its tests. Run by hand, from main (CONTRIBUTING.md,
+# Publishing the npm package):
+#   gh workflow run publish-cli.yml -R marcellosso/localhost --ref main
+# With -f dry-run=true it does everything but publish, from any branch.
+#
+# npm trusts this workflow through trusted publishing (OIDC): the package's
+# settings on npmjs.com name this repository and this file, and npm checks
+# the run's id-token against them. There is no npm token, and publishing adds
+# a provenance statement linking the package to this run and commit.
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Check and pack, without publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-cli
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @getlocalhost/cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/cli
+    env:
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - name: Publish only from main
+        if: ${{ !inputs.dry-run && github.ref != 'refs/heads/main' }}
+        working-directory: .
+        run: |
+          echo "::error::Publishing runs only from main, not $GITHUB_REF. Run it on main, or with dry-run."
+          exit 1
+      - uses: actions/checkout@v4
+      # Trusted publishing needs npm 11.5.1 or later.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g npm@11
+      - run: npm --version
+      - run: npm test
+      - name: Check the version isn't on npm yet
+        run: |
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          # A version npm doesn't have is a 404; any other failure stops here.
+          if out=$(npm view "$name@$version" version 2>&1); then
+            if [[ -n $out ]]; then
+              echo "::error::$name $version is already on npm. Bump the version in packages/cli/package.json first."
+              exit 1
+            fi
+          elif ! grep -q E404 <<<"$out"; then
+            echo "$out"
+            exit 1
+          fi
+          echo "Publishing $name $version" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Pack
+        run: npm pack --dry-run 2>&1 | tee pack.txt && grep -q 'skill/SKILL.md' pack.txt
+      - name: Publish
+        run: |
+          if [[ $DRY_RUN == true ]]; then
+            npm publish --access public --dry-run
+          else
+            npm publish --access public --provenance
+          fi
