@@ -7,7 +7,7 @@ The localhost repository ships an **agent skill**, [`skills/localhost-mcp/SKILL.
 - **Check `status` before saying something is running.** Only `running` means running.
 - **Read before retrying**: `status` and `logs` when a start fails, `ports` on a `portConflict`, then tell you or start on a free port for that Run.
 - **Respect what you started**: a Service you started in the app shows `"startedBy": "app"`, and the agent asks before stopping it. One a `localhost up` runs in a terminal isn't started twice.
-- **Don't invent Projects.** The MCP server can't add or edit them, so the agent asks you to add a missing one in the app.
+- **Add what's missing, and say so.** When a folder has no Project, or a Service it needs isn't there, the agent adds it with `create_project` and `create_service` and tells you; it shows in the app at once. It removes Projects and Services only when you ask. With a [read-only](/docs/mcp#read-only) server, it asks you to add them in the app instead.
 
 ## When an agent uses it
 

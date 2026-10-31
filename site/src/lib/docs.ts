@@ -44,7 +44,7 @@ export const sections: { title: string; pages: DocPage[] }[] = [
     title: 'Reference',
     pages: [
       { slug: 'cli', title: 'Command line', description: "The localhost command: list Projects, see what is running, read the latest logs and run a Project's Services in the foreground, on the app's own data.", collection: 'docs', id: 'cli' },
-      { slug: 'mcp', title: 'Coding agents (MCP)', seoTitle: 'MCP server for AI coding agents', description: "localhost mcp, the MCP server of localhost app: connect Claude Code, Cursor or Codex, its nine tools for agents, and how they share the app's Services.", collection: 'docs', id: 'mcp' },
+      { slug: 'mcp', title: 'Coding agents (MCP)', seoTitle: 'MCP server for AI coding agents', description: "localhost mcp, the MCP server of localhost app: connect Claude Code, Cursor or Codex, its tools to run, add and edit Projects and Services, and how agents share the app's Services.", collection: 'docs', id: 'mcp' },
       { slug: 'skills', title: 'Agent skill', seoTitle: 'localhost-mcp agent skill for Claude Code and Codex', description: 'The localhost-mcp agent skill: what it teaches Claude Code, Codex and other agents about running dev servers through localhost app, and how to install it.', collection: 'docs', id: 'skills' },
       { slug: 'data', title: 'Data and storage', description: 'Where localhost app keeps configuration, logs, Run records and Secrets on macOS, Linux and Windows, and how to point it at another folder to try a build.', collection: 'docs', id: 'data' },
     ],
