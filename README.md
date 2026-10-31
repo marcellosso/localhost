@@ -329,7 +329,7 @@ Add the Project’s folder and localhost suggests Services from `package.json` s
 
 ### Can AI coding agents start my dev servers through localhost?
 
-Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
+Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. They can also add, edit and remove Projects and Services, checked as the app checks them: removing needs `confirm: true` and never touches a Project’s folder, and `localhost mcp --read-only` leaves those tools out. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
 
 ### Is it free and open source?
 
@@ -352,7 +352,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agents can register and edit projects | MIT license; Linux packages; agents connected in one click and can’t add, edit or delete Projects |
+| **devglow, DevWebUI** | Agents reach them from any MCP client; DevWebUI’s config in the repo | MIT license; Linux packages; agents connected in one click, with confirmed deletes and a read-only mode |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 
