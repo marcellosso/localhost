@@ -12,12 +12,10 @@ interface Props {
   type?: 'website' | 'article';
   /** schema.org objects for this page, written as JSON-LD. */
   structuredData?: Record<string, unknown>[];
-  /** Kept out of search results (the 404 page, landing prototypes). */
+  /** Kept out of search results (the 404 page). */
   noindex?: boolean;
-  /** Without the site's header and footer, for pages that draw their own (landing prototypes). */
-  bare?: boolean;
 }
-const { title, description, type = 'website', structuredData = [], noindex = false, bare = false } = Astro.props;
+const { title, description, type = 'website', structuredData = [], noindex = false } = Astro.props;
 const fullTitle = title === name ? 'localhost app: desktop process manager for local dev servers' : `${title} · ${name}`;
 const canonical = new URL(Astro.url.pathname.replace(/(.)\/$/, '$1').replace(/\.html$/, '').replace(/\/index$/, '/'), Astro.site).toString();
 const image = new URL('/og.png', Astro.site).toString();
@@ -39,8 +37,8 @@ const image = new URL('/og.png', Astro.site).toString();
     <link rel="manifest" href={href('site.webmanifest')} />
     <link rel="sitemap" href={href('sitemap.xml')} />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#0c0c0f" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#18191c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#dfe1df" media="(prefers-color-scheme: light)" />
 
     <meta property="og:site_name" content={name} />
     <meta property="og:type" content={type} />
@@ -65,15 +63,17 @@ const image = new URL('/og.png', Astro.site).toString();
   </head>
   <body>
     <a class="skip visually-hidden" href="#content">Skip to content</a>
-    {bare ? <slot name="header" /> : <Header />}
+    <Header />
     <main id="content">
       <slot />
     </main>
-    {bare ? <slot name="footer" /> : <Footer />}
+    <Footer />
     <InstallDialog />
     <script>
       import { startAnalytics } from '../lib/analytics';
+      import { startPage } from '../lib/page';
       startAnalytics();
+      startPage();
     </script>
   </body>
 </html>

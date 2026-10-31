@@ -11,7 +11,7 @@ import { href, releases, repository } from '../lib/site';
     </div>
     <nav aria-label="Footer">
       <div>
-        <h2>Product</h2>
+        <h2 class="plate-label">Product</h2>
         <a href={releases} data-track="download_clicked" data-track-location="footer">Download</a>
         <a href={href('changelog')}>Changelog</a>
         <a href={href('docs/install')}>Install</a>
@@ -19,7 +19,7 @@ import { href, releases, repository } from '../lib/site';
         <a href={href('compare')}>Compare</a>
       </div>
       <div>
-        <h2>Docs</h2>
+        <h2 class="plate-label">Docs</h2>
         <a href={href('docs/quick-start')}>Quick start</a>
         <a href={href('docs/project-files')}>Project files</a>
         <a href={href('docs/cli')}>Command line</a>
@@ -27,7 +27,7 @@ import { href, releases, repository } from '../lib/site';
         <a href={href('docs/updates')}>Updates</a>
       </div>
       <div>
-        <h2>Open source</h2>
+        <h2 class="plate-label">Open source</h2>
         <a href={repository} data-track="github_clicked" data-track-location="footer">GitHub</a>
         <a href={`${repository}/issues`}>Issues</a>
         <a href={`${repository}/blob/main/SECURITY.md`}>Security</a>
@@ -38,10 +38,10 @@ import { href, releases, repository } from '../lib/site';
 
 <style>
   .footer {
-    border-top: 1px solid var(--separator);
-    margin-top: 96px;
+    margin-top: 112px;
     padding: 48px 0 64px;
     font-size: 14px;
+    box-shadow: inset 0 1px 0 var(--plate-edge), inset 0 2px 0 var(--plate-light);
   }
   .inner {
     display: flex;
@@ -66,9 +66,7 @@ import { href, releases, repository } from '../lib/site';
   }
   h2 {
     margin: 0 0 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
+    font-size: 14px;
   }
   a {
     color: var(--text-secondary);
@@ -76,5 +74,10 @@ import { href, releases, repository } from '../lib/site';
   }
   a:hover {
     color: var(--text);
+  }
+  @media (max-width: 560px) {
+    nav {
+      gap: 32px 48px;
+    }
   }
 </style>

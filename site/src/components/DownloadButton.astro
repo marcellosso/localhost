@@ -26,12 +26,20 @@ const release = await latestRelease();
 </a>
 
 <script>
-  import { detectPlatform, names, openInstall } from '../lib/platform';
+  import { detectPlatform, isPhone, names, openInstall } from '../lib/platform';
+  import { href } from '../lib/site';
 
   // The page is static, so the visitor's platform is only known here.
   const platform = detectPlatform();
   for (const button of document.querySelectorAll<HTMLAnchorElement>('[data-download]')) {
     const label = button.querySelector<HTMLElement>('[data-download-label]')!;
+    // A phone can't open a DMG or an installer: it gets the install guide, to read or send to a computer.
+    if (isPhone()) {
+      if (label.dataset.downloadLabel === 'large') label.textContent = 'Get it for your computer';
+      button.href = href('docs/install');
+      button.dataset.trackPlatform = 'phone';
+      continue;
+    }
     if (label.dataset.downloadLabel === 'large') label.textContent = `Download for ${names[platform]}`;
     // Linux has three packages to choose from, so it opens the choice instead of downloading.
     button.href = platform === 'linux' ? '#install' : button.dataset[platform]!;
