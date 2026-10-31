@@ -8,6 +8,10 @@ import { brewInstall, href, name, repository } from '../lib/site';
 const description =
   'localhost app’s MCP server lets Claude Code, Cursor and Codex start, stop and read logs of your local dev servers, visible in one desktop window. Free, MIT.';
 const url = new URL(href('agents'), Astro.site).toString();
+const image = {
+  path: '/og-agents.png',
+  alt: 'localhost: Your coding agent runs the same dev servers. A coding agent starts the web Service through localhost mcp, and status lists every Service as running, whoever started it.',
+};
 const structuredData = [
   {
     '@type': 'TechArticle',
@@ -91,7 +95,7 @@ command = "${command}"
 args = ["mcp"]`;
 ---
 
-<Base title="MCP server for Claude Code, Cursor and Codex" {description} type="article" {structuredData}>
+<Base title="MCP server for Claude Code, Cursor and Codex" {description} type="article" {structuredData} {image}>
   <header class="container intro">
     <p class="plate-label">Coding agents</p>
     <h1 class="engraved">Let coding agents run your dev servers through localhost</h1>
