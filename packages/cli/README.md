@@ -32,7 +32,7 @@ npx @getlocalhost/cli mcp status      # where each agent stands
 | Option | |
 |---|---|
 | `--client <agent>` | `claude-code`, `claude-desktop`, `cursor` or `codex`; `claude` for both Claude apps. Repeat it, or separate with commas, for more than one. Without it: every agent found on this computer. |
-| `--read-only` | The server runs `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services. Needs a localhost app that has it. Installing again without it keeps a read-only server read-only. |
+| `--read-only` | The server runs `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services. Needs a localhost app that has it (from the release after 0.3.0). Installing again without it keeps a read-only server read-only. |
 | `--dry-run` | Prints what would change, as a diff, and changes nothing. |
 
 Then start a new Claude Code session, quit and reopen Claude Desktop, check **Cursor Settings → MCP**, or restart Codex.

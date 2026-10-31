@@ -56,6 +56,7 @@ It writes what **Connect** writes, to the same files and with the same rules (on
 | `npx @getlocalhost/cli mcp uninstall` | Removes them, and nothing else. |
 | `npx @getlocalhost/cli mcp status` | Says where each agent stands, as **Settings → Agents** does. |
 | `--client <agent>` | Only `claude-code`, `claude-desktop`, `cursor` or `codex` (`claude` for both Claude apps). Repeat it for more than one. |
+| `--read-only` | Sets up `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services ([Read-only](#read-only)). Installing again without it keeps a read-only server read-only. |
 | `--dry-run` | Prints what would change, as a diff, and changes nothing. |
 
 The package doesn't contain the app or the `localhost` command: agents run the one inside the app, [where it is](#keeping-it-current) on each OS. Without the app it changes nothing and says how to install it: Homebrew or the disk image on macOS, the installer on Windows, the packages on Linux (see [Install](/docs/install)). It needs Node 18 or later, and only edits files: no network, apart from `npx` downloading it.
@@ -128,7 +129,7 @@ Results are JSON. The tools that add or edit return the Project or Service as sa
 
 ## Read-only
 
-Run `localhost mcp --read-only` to leave out the six tools that add, edit and remove Projects and Services: the agent can still list, start, stop and inspect them. Add the option to the server's `args` (`["mcp", "--read-only"]`) in the agent's configuration, or to the `claude mcp add` and `codex mcp add` commands above. The app recognizes a read-only server as connected, and **Update** keeps it read-only.
+Run `localhost mcp --read-only` to leave out the six tools that add, edit and remove Projects and Services: the agent can still list, start, stop and inspect them. Add the option to the server's `args` (`["mcp", "--read-only"]`) in the agent's configuration, to the `claude mcp add` and `codex mcp add` commands above, or connect with `npx @getlocalhost/cli mcp install --read-only`. The app recognizes a read-only server as connected, and **Update** keeps it read-only.
 
 ## How it runs your Services
 
