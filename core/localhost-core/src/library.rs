@@ -142,22 +142,21 @@ impl ProjectLibrary {
     /// validated where they are kept. Announces each one added, changed or
     /// removed, so a Service manager notices changed Configurations.
     pub fn replace_projects(&self, projects: Vec<Project>, origin: Origin) {
+        replace(&mut self.state(), projects, origin);
+    }
+
+    /// Takes in the Project Configuration as stored now, after another
+    /// localhost changed it (a coding agent, through `localhost mcp`), and
+    /// announces each Project added, changed or removed, as
+    /// `replace_projects` does. Files that can't be loaded are left out, as
+    /// at launch. A mirror has nothing to reload.
+    pub fn reload(&self, origin: Origin) -> Result<(), LocalhostError> {
+        let Some(storage) = &self.storage else { return Ok(()) };
+        // Locked while reading, so no change made here falls between.
         let mut state = self.state();
-        let mut removed: HashMap<Id, Project> = std::mem::take(&mut state.projects);
-        for project in projects {
-            let event = match removed.remove(&project.id) {
-                Some(old) if old == project => None,
-                Some(_) => Some(ProjectLibraryEvent::ProjectUpdated { project: project.clone(), origin }),
-                None => Some(ProjectLibraryEvent::ProjectAdded { project: project.clone(), origin }),
-            };
-            state.projects.insert(project.id, project);
-            if let Some(event) = event {
-                broadcast(&mut state, event);
-            }
-        }
-        for id in removed.into_keys() {
-            broadcast(&mut state, ProjectLibraryEvent::ProjectRemoved { id, origin });
-        }
+        let (projects, _) = storage.load_all()?;
+        replace(&mut state, projects, origin);
+        Ok(())
     }
 
     /// The stored value, by account (`VariableLayer::secret_account`), of
@@ -705,6 +704,24 @@ fn sorted(projects: &HashMap<Id, Project>) -> Vec<Project> {
     let mut projects: Vec<Project> = projects.values().cloned().collect();
     projects.sort_by(|a, b| (a.sort_order, &a.name).cmp(&(b.sort_order, &b.name)));
     projects
+}
+
+fn replace(state: &mut State, projects: Vec<Project>, origin: Origin) {
+    let mut removed: HashMap<Id, Project> = std::mem::take(&mut state.projects);
+    for project in projects {
+        let event = match removed.remove(&project.id) {
+            Some(old) if old == project => None,
+            Some(_) => Some(ProjectLibraryEvent::ProjectUpdated { project: project.clone(), origin }),
+            None => Some(ProjectLibraryEvent::ProjectAdded { project: project.clone(), origin }),
+        };
+        state.projects.insert(project.id, project);
+        if let Some(event) = event {
+            broadcast(state, event);
+        }
+    }
+    for id in removed.into_keys() {
+        broadcast(state, ProjectLibraryEvent::ProjectRemoved { id, origin });
+    }
 }
 
 fn broadcast(state: &mut State, event: ProjectLibraryEvent) {

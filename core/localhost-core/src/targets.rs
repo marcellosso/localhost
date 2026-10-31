@@ -12,6 +12,10 @@
 //! about to run, which on macOS keeps Keychain prompts to those Secrets.
 //! The statuses and events of every target are merged, so a client
 //! observes them as it would one `ServiceManager`.
+//!
+//! When another client of a core says it saved the Project Configuration
+//! (`announce_projects_saved`), the library reads it again from disk, so
+//! its Projects change here as they would after an edit in this client.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -181,6 +185,17 @@ impl Targets {
     /// has show at once.
     pub async fn connect(&self, target: &ExecutionTarget) -> Result<(), LocalhostError> {
         self.inner.reach(target, None).await.map(|_| ())
+    }
+
+    /// Tells the other clients of this machine's shared core, an open app
+    /// among them, that this one saved the Project Configuration, so they
+    /// read it again. Nothing to tell when this machine's Services run in
+    /// this process.
+    pub async fn announce_projects_saved(&self, origin: Origin) -> Result<(), LocalhostError> {
+        match self.inner.reach(&ExecutionTarget::ThisMachine, None).await? {
+            Reached::Local(_) => Ok(()),
+            Reached::Remote(remote) => remote.announce_projects_saved(origin).await,
+        }
     }
 
     // MARK: Observing
@@ -614,6 +629,7 @@ impl Inner {
         self.send_projects(target, &remote, starting.unwrap_or_default()).await?;
         let orphans = remote.orphans().await?;
         self.attach(remote.subscribe(), Some(target.clone()));
+        self.follow_saves(&remote);
         *slot.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(remote.clone());
         drop(one_at_a_time);
         if !orphans.is_empty() {
@@ -621,6 +637,24 @@ impl Inner {
             self.hub().orphan_subscribers.retain(|subscriber| subscriber.send(found.clone()).is_ok());
         }
         Ok(Reached::Remote(remote))
+    }
+
+    /// Reads the Project Configuration again whenever another client of
+    /// `remote` saved it. Several saves in a row are read once.
+    fn follow_saves(self: &Arc<Self>, remote: &Remote) {
+        let mut saves = remote.projects_saved();
+        let weak = Arc::downgrade(self);
+        tokio::spawn(async move {
+            while let Some(mut origin) = saves.recv().await {
+                while let Ok(later) = saves.try_recv() {
+                    origin = later;
+                }
+                let Some(inner) = weak.upgrade() else { return };
+                let library = inner.library.clone();
+                drop(inner);
+                let _ = tokio::task::spawn_blocking(move || library.reload(origin)).await;
+            }
+        });
     }
 
     fn connected(&self) -> Vec<(ExecutionTarget, Remote)> {

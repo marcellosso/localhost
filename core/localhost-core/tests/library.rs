@@ -223,6 +223,42 @@ fn a_mirror_takes_projects_as_given_and_announces_what_changed() {
 }
 
 #[test]
+fn reload_takes_in_what_another_library_saved_and_announces_it() {
+    let fixture = Fixture::new();
+    let app = fixture.library();
+    let agent = fixture.library();
+    let kept = app.add_project("Kept", key("kept"), "/tmp/kept", vec![], Origin::MainWindow).unwrap();
+    let gone = app.add_project("Gone", key("gone"), "/tmp/gone", vec![], Origin::MainWindow).unwrap();
+    agent.reload(Origin::Agent).unwrap();
+    let mut events = app.events();
+
+    let added = agent.add_project("New", key("new"), "/tmp/new", vec![], Origin::Agent).unwrap();
+    let service = agent.add_service(kept.id, web("pnpm dev"), vec![], vec![], Origin::Agent).unwrap();
+    agent.remove_project(gone.id, Origin::Agent).unwrap();
+    assert!(events.try_recv().is_err(), "nothing changes until it reloads");
+
+    app.reload(Origin::Agent).unwrap();
+    let mut announced = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        announced.push(match event {
+            ProjectLibraryEvent::ProjectAdded { project, origin: Origin::Agent } => format!("added {}", project.name),
+            ProjectLibraryEvent::ProjectUpdated { project, origin: Origin::Agent } => {
+                format!("updated {} with {}", project.name, project.services.len())
+            }
+            ProjectLibraryEvent::ProjectRemoved { id, origin: Origin::Agent } if id == gone.id => "removed Gone".into(),
+            other => panic!("unexpected {other:?}"),
+        });
+    }
+    announced.sort();
+    assert_eq!(announced, ["added New", "removed Gone", "updated Kept with 1"]);
+    assert_eq!(app.project(added.id).unwrap(), added);
+    assert_eq!(app.service(service.id).unwrap().1, service);
+
+    app.reload(Origin::Agent).unwrap();
+    assert!(events.try_recv().is_err(), "an unchanged Configuration announces nothing");
+}
+
+#[test]
 fn reads_only_the_secrets_runs_of_the_services_and_their_dependencies_read() {
     let fixture = Fixture::new();
     let library = fixture.library();
