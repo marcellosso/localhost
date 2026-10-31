@@ -108,25 +108,22 @@ const problems = [
           <p class="fine">
             Free and open source (MIT) · No account · <a
               href={href('docs/macos')}
-              data-install-for="macos"
-              data-track="install_opened"
+              data-track="platform_docs_clicked"
               data-track-platform="macos"
               data-track-location="hero"
-              aria-label="Install on macOS">macOS</a>,{' '}
+              aria-label="localhost on macOS">macOS</a>,{' '}
             <a
               href={href('docs/windows')}
-              data-install-for="windows"
-              data-track="install_opened"
+              data-track="platform_docs_clicked"
               data-track-platform="windows"
               data-track-location="hero"
-              aria-label="Install on Windows">Windows</a>{' '}and{' '}
+              aria-label="localhost on Windows">Windows</a>{' '}and{' '}
             <a
               href={href('docs/linux')}
-              data-install-for="linux"
-              data-track="install_opened"
+              data-track="platform_docs_clicked"
               data-track-platform="linux"
               data-track-location="hero"
-              aria-label="Install on Linux">Linux</a>
+              aria-label="localhost on Linux">Linux</a>
           </p>
         </div>
       </div>
@@ -341,7 +338,6 @@ const problems = [
   import { openInstall } from '../lib/platform';
   import type { Platform } from '../lib/release';
 
-  // The hero's platforms are links to their docs, so they still lead somewhere without the dialog.
   for (const button of document.querySelectorAll<HTMLElement>('[data-install-for]')) {
     button.addEventListener('click', (event) => {
       event.preventDefault();
