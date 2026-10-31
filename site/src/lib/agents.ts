@@ -48,6 +48,12 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
     ],
   },
   {
+    question: 'Why does Claude Code start a second dev server, or leave one running?',
+    answer: [
+      'It can’t see your terminal, so it doesn’t know your `pnpm dev` is already up, and a dev server never exits, so the agent runs its own copy in the background, where it takes another port and can outlive the chat. Cursor and Codex do the same, for the same reason. Through `localhost mcp` the agent sees what already runs, whoever started it, and doesn’t start a second copy; `start_service` returns once the Service is Running, and the Services it started stop with their whole process tree when it disconnects, unless the app is open.',
+    ],
+  },
+  {
     question: 'Can an agent change my configuration or read my Secrets?',
     answer: [
       'It can add, edit and remove Projects and Services, checked as the app checks them, and the open app shows each change at once. It removes only with `confirm: true`, which it should pass once you agreed, never touches a Project’s folder, and sets plain variables only: Secrets are set in the app. Run `localhost mcp --read-only` to leave those tools out.',

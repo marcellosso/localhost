@@ -1,0 +1,121 @@
+---
+import Base from '../../layouts/Base.astro';
+import { guides } from '../../lib/guides';
+import { href, name } from '../../lib/site';
+
+const description =
+  'Fixes for everyday local dev problems: a port already in use, leftover dev servers, duplicate servers from Claude Code, and too many terminal tabs.';
+const url = (path: string) => new URL(path, Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'CollectionPage',
+    name: 'Guides to running local dev servers',
+    description,
+    url: url('/guides'),
+    isPartOf: { '@type': 'WebSite', name, url: url('/') },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: guides.map((guide, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: guide.title,
+        url: url(href(`guides/${guide.slug}`)),
+      })),
+    },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name, item: url('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guides', item: url('/guides') },
+    ],
+  },
+];
+---
+
+<Base title="Guides: ports, leftover servers, dev commands" {description} {structuredData}>
+  <div class="container page">
+    <header>
+      <p class="plate-label">Guides</p>
+      <h1 class="engraved">Fixes for running local dev servers</h1>
+      <p class="lede">
+        The problems that come with running a project on your own machine, each answered first with the command that fixes it today, then
+        with how localhost keeps it fixed.
+      </p>
+    </header>
+
+    <ul class="list">
+      {
+        guides.map((guide) => (
+          <li>
+            <a href={href(`guides/${guide.slug}`)}>
+              <h2 class="engraved">{guide.title}</h2>
+              <p>{guide.summary}</p>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="next">
+      Looking for how a feature works? Read the <a href={href('docs')}>docs</a>, or see
+      <a href={href('compare')}>how localhost compares</a> to pm2, tmux, Docker Compose and others.
+    </p>
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: 960px;
+    padding-top: 72px;
+    padding-bottom: 96px;
+  }
+  header {
+    margin-bottom: 48px;
+  }
+  h1 {
+    margin-top: 14px;
+    max-width: 20ch;
+    font-size: clamp(40px, 4.8vw, 68px);
+  }
+  .lede {
+    max-width: 62ch;
+    margin-top: 20px;
+  }
+  .list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--separator);
+  }
+  .list li {
+    border-bottom: 1px solid var(--separator);
+  }
+  .list a {
+    display: block;
+    padding: 28px 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .list h2 {
+    font-size: clamp(28px, 3.2vw, 40px);
+  }
+  .list a:hover h2 {
+    color: var(--accent-text);
+  }
+  .list p {
+    max-width: 68ch;
+    margin: 10px 0 0;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .next {
+    margin: 40px 0 0;
+    color: var(--text-secondary);
+  }
+  .next a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-underline-offset: 3px;
+  }
+</style>

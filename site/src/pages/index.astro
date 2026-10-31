@@ -8,7 +8,7 @@ import { latestRelease } from '../lib/release';
 
 const release = await latestRelease();
 const description =
-  'localhost app: free, open-source desktop process manager for local dev servers on macOS, Windows and Linux, with an MCP server for Claude Code, Cursor and Codex.';
+  'Free, open-source desktop process manager that runs your own dev commands, no Docker required, on macOS, Windows and Linux, with an MCP server for agents.';
 const alternateName = ['localhost app', 'getlocalhost'];
 const structuredData = [
   { '@type': 'WebSite', name, alternateName, url: Astro.site!.toString(), description: tagline },
@@ -25,6 +25,7 @@ const structuredData = [
     downloadUrl: releases,
     featureList: [
       'Start, stop and restart dev servers, workers and databases from one window',
+      'Runs your own commands natively, no Docker or containers required',
       'Start All in dependency order, with one merged log',
       'Services counted as Running once their Port accepts connections',
       'A Ports view of every process listening on a TCP port',
@@ -163,7 +164,8 @@ const problems = [
           <p class="lede">
             A Service is a folder, a command line and its environment, run in your login shell so <code>PATH</code>, version managers,
             pipes and <code>&amp;&amp;</code> work. Add a Project’s folder and localhost suggests Services from <code>package.json</code>,
-            Compose files, Python apps and Cargo binaries; you check each one before anything is saved.
+            Compose files, Python apps and Cargo binaries; you check each one before anything is saved. No Docker or containers
+            required: a Compose service is just one more Service.
           </p>
           <a class="more" href={href('docs/quick-start')}>Add your first Project</a>
         </div>
@@ -184,7 +186,8 @@ const problems = [
           <h3 class="engraved">Know who’s on :3000.</h3>
           <p>
             The Ports view shows every process listening on a TCP port and whose it is. If a Service’s Port is taken, localhost says by whom
-            and can start on the next free one, for that Run only. <a href={href('docs/ports')}>How Ports work</a>
+            and can start on the next free one, for that Run only. <a href={href('docs/ports')}>How Ports work</a> ·
+            <a href={href('guides/port-already-in-use')}>Port already in use?</a>
           </p>
           <div class="panel inset" aria-hidden="true">
             <div class="port-row head"><span>Port</span><span>Process</span><span>Belongs to</span></div>
@@ -222,7 +225,7 @@ const problems = [
         <p class="lede">
           <code>localhost mcp</code> lets Claude Code, Cursor and Codex start and stop your Services and read their logs and ports.
           What an agent starts shows in the window; it never starts a second copy, and it stops when the agent leaves, unless the app
-          is open. Connect them from Settings in one click.
+          is open. Connect them from Settings in one click, or with <code>npx @getlocalhost/cli mcp install</code>.
         </p>
         <a class="more" href={href('agents')}>localhost for coding agents</a>
       </div>
@@ -311,6 +314,7 @@ const problems = [
           ))
         }
         <a class="more" href={href('compare')}>How localhost compares to pm2, tmux, Docker Compose and others</a>
+        <a class="more" href={href('guides')}>Guides: ports in use, leftover dev servers, duplicate servers from agents</a>
       </div>
     </div>
   </section>
@@ -361,6 +365,13 @@ const problems = [
   }
   .more {
     margin-top: 24px;
+  }
+  .faq .more {
+    display: flex;
+    width: fit-content;
+  }
+  .faq .more + .more {
+    margin-top: 12px;
   }
 
   /* Hero: the headline and the way in, then the live window, already in the first viewport. */

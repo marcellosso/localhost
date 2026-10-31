@@ -17,3 +17,5 @@ Settings turns the automatic move off; a Service's **Port can change** switch tu
 ## The Ports view
 
 The **Ports** view (**⌘0**) lists every process listening on a TCP port and whom it belongs to: one of your Services, a process running inside one of your Projects' folders, or nothing localhost knows (other apps and system services are folded below). Select one and press ⌘. to stop it; localhost asks first for anything it didn't start.
+
+Hit "port already in use" outside localhost? [Port 3000 is already in use](/guides/port-already-in-use) has the commands for macOS, Linux and Windows.

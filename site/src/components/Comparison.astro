@@ -1,0 +1,92 @@
+---
+import type { Alternative } from '../lib/compare';
+import { html } from '../lib/faq';
+
+interface Props {
+  tool: Alternative;
+  /** The columns' headings: `h3` under a section's `h2` on /compare, `h2` on the tool's own page. */
+  level?: 'h2' | 'h3';
+}
+const { tool, level = 'h3' } = Astro.props;
+const Heading = level;
+const wins = `Where ${tool.name} ${tool.name.includes(',') ? 'win' : 'wins'}`;
+---
+
+<p class="what" set:html={html(tool.what)} />
+<div class="columns">
+  <div>
+    <Heading class="plate-label">{wins}</Heading>
+    <ul class="theirs">
+      {tool.wins.map((line) => <li set:html={html(line)} />)}
+    </ul>
+  </div>
+  <div>
+    <Heading class="plate-label ours">Where localhost fits better</Heading>
+    <ul class="ours">
+      {tool.localhost.map((line) => <li set:html={html(line)} />)}
+    </ul>
+  </div>
+</div>
+
+<style>
+  .what {
+    max-width: 68ch;
+    margin: 14px 0 0;
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+  .what :global(code),
+  li :global(code) {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 28px;
+  }
+  .plate-label.ours {
+    color: var(--accent-text);
+  }
+  ul {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--separator);
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  ul.ours {
+    color: var(--text);
+  }
+  li {
+    position: relative;
+    padding: 10px 0 10px 22px;
+    border-bottom: 1px solid var(--separator);
+  }
+  /* Marks by shape, not colour alone: a hollow square for the other tool, a filled one for localhost. */
+  li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: calc(10px + 0.8em - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1.5px var(--text-secondary);
+  }
+  ul.ours li::before {
+    background: var(--accent);
+    box-shadow: none;
+  }
+  @media (max-width: 720px) {
+    .columns {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 28px;
+    }
+  }
+</style>

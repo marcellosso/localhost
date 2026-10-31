@@ -1,0 +1,173 @@
+<!doctype html>
+<!-- The /agents page's social image (public/og-agents.png), 1280×640 like og.png. Render it with scripts/og.sh. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: 'Barlow Condensed';
+        src: url('../../public/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2');
+        font-weight: 800;
+      }
+      :root {
+        --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+        --sans: system-ui, -apple-system, sans-serif;
+        --accent: #ff5c8a;
+        --text: #eef0f2;
+        --dim: #8b9099;
+        --green: #4fd18b;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1280px;
+        height: 640px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        font-family: var(--sans);
+        color: var(--text);
+        background:
+          radial-gradient(900px 520px at 78% -10%, rgb(120 40 60 / 0.55), transparent 70%),
+          linear-gradient(135deg, #1b1c20 0%, #121316 60%, #17181c 100%);
+      }
+      .left {
+        position: absolute;
+        left: 80px;
+        top: 72px;
+        width: 580px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand img {
+        width: 76px;
+        height: 76px;
+      }
+      .wordmark {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .wordmark b {
+        color: var(--accent);
+      }
+      h1 {
+        margin: 48px 0 0;
+        font: 800 70px/0.95 'Barlow Condensed', var(--sans);
+        text-transform: uppercase;
+        letter-spacing: 0.005em;
+      }
+      p {
+        margin: 24px 0 0;
+        font-size: 25px;
+        line-height: 1.35;
+        color: #c3c7ce;
+      }
+      .agents {
+        position: absolute;
+        left: 80px;
+        bottom: 64px;
+        font: 22px/1 var(--mono);
+        color: var(--dim);
+        letter-spacing: 0.01em;
+      }
+      .agents span {
+        color: var(--text);
+      }
+      .panel {
+        position: absolute;
+        right: -40px;
+        top: 150px;
+        width: 590px;
+        border-radius: 14px;
+        background: #0f0f12;
+        box-shadow:
+          0 0 0 1px rgb(255 255 255 / 0.09),
+          0 40px 80px -20px rgb(0 0 0 / 0.8);
+        font: 17px/1.75 var(--mono);
+        overflow: hidden;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        padding: 14px 18px;
+        background: #1d1e22;
+        box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.06);
+      }
+      .bar i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #3a3c42;
+      }
+      .body {
+        padding: 18px 24px 22px;
+      }
+      .d {
+        color: var(--dim);
+      }
+      .p {
+        color: var(--accent);
+      }
+      .g {
+        color: var(--green);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 22px 92px 120px 76px 1fr;
+        align-items: center;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 4px rgb(79 209 139 / 0.18);
+      }
+      .tape {
+        justify-self: start;
+        padding: 0 7px;
+        border-radius: 3px;
+        line-height: 24px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #111317;
+      }
+      hr {
+        margin: 14px 0;
+        border: 0;
+        border-top: 1px solid rgb(255 255 255 / 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="left">
+      <div class="brand">
+        <img src="../../public/icon-256.png" alt="" />
+        <span class="wordmark">localhost<b>:</b></span>
+      </div>
+      <h1>Your coding agent runs the same dev servers</h1>
+      <p>Through localhost mcp, in the window you already watch.</p>
+    </div>
+    <div class="agents">localhost mcp · <span>Claude Code</span> · <span>Cursor</span> · <span>Codex</span></div>
+
+    <div class="panel">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="d">// a coding agent, through localhost mcp</div>
+        <div><span class="p">→</span> start_service <span class="d">{ service: "web" }</span></div>
+        <div><span class="g">←</span> web running <span class="d">port</span> 5173 <span class="d">startedBy</span> agent</div>
+        <div><span class="p">→</span> status <span class="d">{ project: "acme-shop" }</span></div>
+        <div class="d">  every Service, whoever started it:</div>
+        <hr />
+        <div class="row"><i class="dot"></i><span>web</span><span class="d">running</span><span class="tape" style="background: #f78c6c">5173</span><span class="d">agent</span></div>
+        <div class="row"><i class="dot"></i><span>api</span><span class="d">running</span><span class="tape" style="background: #b392f0">8000</span><span class="d">app</span></div>
+        <div class="row"><i class="dot"></i><span>worker</span><span class="d">running</span><span></span><span class="d">app</span></div>
+        <div class="row"><i class="dot"></i><span>db</span><span class="d">running</span><span class="tape" style="background: #56d4dd">5432</span><span class="d">app</span></div>
+      </div>
+    </div>
+  </body>
+</html>

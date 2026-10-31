@@ -2,15 +2,44 @@
 import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import { changelog } from '../lib/changelog';
-import { releases } from '../lib/site';
+import { href, name, releases } from '../lib/site';
 
 const entries = await Promise.all(
   (await changelog()).map(async ({ entry, ...data }) => ({ ...data, id: entry.id, Content: (await render(entry)).Content })),
 );
+const description =
+  'What changed in each release of localhost app, the free desktop process manager for local dev servers: new features, fixes and platform notes, newest first.';
+const url = (path: string) => new URL(path, Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'WebPage',
+    name: 'localhost changelog',
+    description,
+    url: url(href('changelog')),
+    isPartOf: { '@type': 'WebSite', name, url: url('/') },
+    about: { '@type': 'SoftwareApplication', name, url: url('/'), applicationCategory: 'DeveloperApplication' },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: entries.map((entry, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: entry.released ? `localhost ${entry.version}: ${entry.title}` : `Unreleased: ${entry.title}`,
+        url: url(`${href('changelog')}#${entry.version}`),
+      })),
+    },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name, item: url('/') },
+      { '@type': 'ListItem', position: 2, name: 'Changelog', item: url(href('changelog')) },
+    ],
+  },
+];
 const formatted = (date: Date) => date.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 ---
 
-<Base title="Changelog" description="What changed in each release of localhost, the app that runs every local project from one place." type="article">
+<Base title="Changelog" {description} type="article" {structuredData}>
   <div class="container page">
     <header>
       <p class="plate-label">Changelog</p>

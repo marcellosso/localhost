@@ -1,0 +1,183 @@
+---
+import Base from '../../layouts/Base.astro';
+import Comparison from '../../components/Comparison.astro';
+import { alternatives, type Alternative } from '../../lib/compare';
+import { html } from '../../lib/faq';
+import { lastModified } from '../../lib/modified';
+import { href, name } from '../../lib/site';
+
+export function getStaticPaths() {
+  return alternatives.map((tool) => ({ params: { slug: tool.slug }, props: { tool } }));
+}
+
+const { tool } = Astro.props as { tool: Alternative };
+const others = alternatives.filter((other) => other !== tool);
+const url = (path: string) => new URL(path, Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'WebPage',
+    name: tool.seoTitle,
+    description: tool.description,
+    url: url(href(`compare/${tool.slug}`)),
+    dateModified: lastModified(['src/lib/compare.ts']),
+    isPartOf: { '@type': 'WebSite', name, url: url('/') },
+    about: { '@type': 'SoftwareApplication', name, url: url('/'), applicationCategory: 'DeveloperApplication' },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Compare', item: url('/compare') },
+      { '@type': 'ListItem', position: 2, name: `localhost vs ${tool.name}`, item: url(href(`compare/${tool.slug}`)) },
+    ],
+  },
+];
+---
+
+<Base title={tool.seoTitle} description={tool.description} {structuredData}>
+  <div class="container page">
+    <header>
+      <nav class="plate-label crumbs" aria-label="Breadcrumb"><a href={href('compare')}>Compare</a></nav>
+      <h1 class="engraved">localhost vs {tool.name}</h1>
+      <p class="lede">{tool.description}</p>
+    </header>
+
+    <section class="tool" aria-label={`localhost vs ${tool.name}`}>
+      <Comparison {tool} level="h2" />
+    </section>
+
+    <section class="panel summary" aria-labelledby="summary-title">
+      <span class="screws" aria-hidden="true"></span>
+      <h2 id="summary-title" class="plate-label">In one line</h2>
+      <dl>
+        <div>
+          <dt>Choose {tool.name} for</dt>
+          <dd set:html={html(tool.summary.wins)} />
+        </div>
+        <div>
+          <dt class="ours">Choose localhost for</dt>
+          <dd set:html={html(tool.summary.localhost)} />
+        </div>
+      </dl>
+      <p>
+        localhost is a free, open-source desktop app that runs your own commands, no Docker required, and isn’t a production or
+        remote-server dashboard. <a href={href('docs/install')}>Install it</a>, start with the <a href={href('docs/quick-start')}>quick start</a>,
+        or read the <a href={href('guides')}>guides</a>.
+      </p>
+    </section>
+
+    <nav class="others" aria-labelledby="others-title">
+      <h2 id="others-title" class="plate-label">Other comparisons</h2>
+      <ul>
+        {
+          others.map((other) => (
+            <li>
+              <a href={href(`compare/${other.slug}`)}>localhost vs {other.name}</a>
+            </li>
+          ))
+        }
+        <li><a href={href('compare')}>All of them, side by side</a></li>
+      </ul>
+    </nav>
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: calc(1040px + 48px);
+    padding-top: 72px;
+    padding-bottom: 96px;
+  }
+  .crumbs a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .crumbs a:hover {
+    color: var(--text);
+  }
+  h1 {
+    margin-top: 14px;
+    max-width: 24ch;
+    font-size: clamp(40px, 4.8vw, 68px);
+  }
+  .lede {
+    max-width: 62ch;
+    margin-top: 20px;
+  }
+  .tool {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid var(--separator);
+  }
+
+  .summary {
+    margin-top: 72px;
+    padding: 36px 40px;
+  }
+  .summary h2 {
+    font-size: 15px;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px;
+    margin: 16px 0 0;
+  }
+  dt {
+    font-weight: 600;
+  }
+  dt.ours {
+    color: var(--accent-text);
+  }
+  dd {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  dd :global(code) {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  .summary p {
+    max-width: 68ch;
+    margin: 24px 0 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--separator);
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+  .summary a,
+  .others a {
+    color: var(--accent-text);
+    text-underline-offset: 3px;
+  }
+  .summary a {
+    font-weight: 600;
+  }
+
+  .others {
+    margin-top: 56px;
+  }
+  .others h2 {
+    font-size: 15px;
+  }
+  .others ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (max-width: 720px) {
+    .summary {
+      padding: 32px 22px 26px;
+    }
+    dl {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+  }
+</style>

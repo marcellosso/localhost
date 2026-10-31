@@ -14,11 +14,14 @@ interface Props {
   structuredData?: Record<string, unknown>[];
   /** Kept out of search results (the 404 page). */
   noindex?: boolean;
+  /** The social card, 1280×640 in public/, when the page has its own; og.png otherwise. */
+  image?: { path: string; alt: string };
 }
-const { title, description, type = 'website', structuredData = [], noindex = false } = Astro.props;
+const defaultImage = { path: '/og.png', alt: 'The localhost app icon and window, with the words: Every local project, one place to run it.' };
+const { title, description, type = 'website', structuredData = [], noindex = false, image: card = defaultImage } = Astro.props;
 const fullTitle = title === name ? 'localhost app: desktop process manager for local dev servers' : `${title} · ${name}`;
 const canonical = new URL(Astro.url.pathname.replace(/(.)\/$/, '$1').replace(/\.html$/, '').replace(/\/index$/, '/'), Astro.site).toString();
-const image = new URL('/og.png', Astro.site).toString();
+const image = new URL(card.path, Astro.site).toString();
 ---
 
 <!doctype html>
@@ -48,12 +51,13 @@ const image = new URL('/og.png', Astro.site).toString();
     <meta property="og:image" content={image} />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="640" />
-    <meta property="og:image:alt" content="The localhost app icon and window, with the words: Every local project, one place to run it." />
+    <meta property="og:image:alt" content={card.alt} />
     <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={card.alt} />
 
     {structuredData.map((data) => <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', ...data })} />)}
     <script is:inline>

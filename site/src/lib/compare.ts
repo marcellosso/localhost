@@ -1,8 +1,15 @@
-/** The /compare page, its summary in llms.txt and the README's `## How it compares`.
- * Claims about other tools stay to what their own pages say; `code` is in backticks. */
+/** The /compare page, a /compare/<slug> page per tool, their summary in llms.txt and the README's
+ * `## How it compares`. Claims about other tools stay to what their own pages say; `code` is in backticks. */
 export interface Alternative {
+  /** The anchor on /compare. */
   id: string;
+  /** The tool's own page, /compare/<slug>. */
+  slug: string;
   name: string;
+  /** The tool page's `<title>`, as people search for it, without the site's name. */
+  seoTitle: string;
+  /** 140–160 characters: the tool page's search snippet. */
+  description: string;
   what: string;
   /** Where it is the better choice. */
   wins: string[];
@@ -15,7 +22,10 @@ export interface Alternative {
 export const alternatives: Alternative[] = [
   {
     id: 'pm2',
+    slug: 'pm2',
     name: 'pm2',
+    seoTitle: 'pm2 alternative for local dev servers',
+    description: 'pm2 keeps production apps alive on servers. localhost runs the dev servers on your own machine from one window: Dependencies, Ports and one merged log.',
     what: 'A production process manager, mainly for Node.js/Bun apps, driven from the command line.',
     wins: [
       'Keeping apps alive on a server: it restarts them when they crash and starts them again at boot.',
@@ -32,7 +42,10 @@ export const alternatives: Alternative[] = [
   },
   {
     id: 'procfile',
+    slug: 'foreman-overmind-honcho',
     name: 'foreman, overmind, honcho',
+    seoTitle: 'GUI for Procfile runners: foreman, overmind',
+    description: 'foreman, overmind and honcho start a Procfile from one terminal. localhost gives each Service its own start, stop, Port readiness and log, in a window.',
     what: 'Procfile runners: one command starts every process listed in a `Procfile`, with their output in one terminal. Overmind runs each process in tmux, so you can attach to it.',
     wins: [
       'The `Procfile` is committed with the code, so the whole team starts the same processes.',
@@ -48,7 +61,10 @@ export const alternatives: Alternative[] = [
   },
   {
     id: 'tmux',
+    slug: 'tmux',
     name: 'tmux, tmuxinator',
+    seoTitle: 'tmux alternative for running dev servers',
+    description: 'tmux keeps terminal sessions alive, on any server. localhost shows every dev server’s state, Port and log in one window, and stops whole process trees.',
     what: 'A terminal multiplexer: panes and windows in one terminal, in sessions that outlive it. tmuxinator describes a project’s panes in a YAML file.',
     wins: [
       'Sessions survive closing the terminal and dropped SSH connections, on any server.',
@@ -64,7 +80,10 @@ export const alternatives: Alternative[] = [
   },
   {
     id: 'docker-compose',
+    slug: 'docker-compose',
     name: 'Docker Compose',
+    seoTitle: 'Dev servers without Docker, next to Compose',
+    description: 'Docker Compose runs reproducible containers. localhost runs your own commands natively, no Docker required, and runs Compose services right beside them.',
     what: 'Defines and runs a multi-container application from a `compose.yaml`.',
     wins: [
       'Reproducible, isolated environments: the same images on every machine and in CI.',
@@ -79,7 +98,10 @@ export const alternatives: Alternative[] = [
   },
   {
     id: 'concurrently',
+    slug: 'concurrently',
     name: 'concurrently',
+    seoTitle: 'concurrently alternative with a GUI',
+    description: 'concurrently starts every dev command in one terminal. localhost starts, stops and restarts each one on its own, in dependency order, with logs kept per Run.',
     what: 'An npm package that runs several commands at once in one terminal, each output line prefixed with its name.',
     wins: [
       'It lives in `package.json`, so everyone on the team gets it with `npm install`.',
@@ -94,10 +116,13 @@ export const alternatives: Alternative[] = [
   },
   {
     id: 'gui-managers',
+    slug: 'devglow-devwebui',
     name: 'devglow, DevWebUI',
+    seoTitle: 'Open-source devglow and DevWebUI alternative',
+    description: 'devglow and DevWebUI are other GUIs for local dev servers. How localhost compares: MIT license, Linux packages, and an MCP server agents install with npx.',
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
-      'Their agents can reach projects in any client that runs an MCP server: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost connects Claude Code, Cursor and Codex from the app; other clients you set up by hand.',
+      'Both have an MCP server for coding agents: devglow’s runs with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost’s installs the same way: `npx @getlocalhost/cli mcp install` connects Claude Code, Cursor, Codex and Claude Desktop (the app must be installed), and any other stdio MCP client can run `localhost mcp`.',
       'DevWebUI’s `.devwebui` file lives in the repository, so it can be committed and shared with the code.',
     ],
     localhost: [
@@ -107,6 +132,6 @@ export const alternatives: Alternative[] = [
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agents reach them from any MCP client; DevWebUI’s config in the repo', localhost: 'MIT license; Linux packages; agents connected in one click, with confirmed deletes and a read-only mode' },
+    summary: { wins: 'DevWebUI’s config file in the repo, shared with the code', localhost: 'MIT license; Linux packages; agents connected from the app or `npx @getlocalhost/cli mcp install`, with confirmed deletes and a read-only mode' },
   },
 ];

@@ -7,7 +7,7 @@
 
 <p align="center">Every local project, one place to run it. For macOS, Linux and Windows.</p>
 
-localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
+localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. It runs your own commands, such as npm run dev, uv run or cargo run, with no Docker or containers required; Compose services can be one of them. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
 
 <p align="center"><a href="https://www.getlocalhost.app">www.getlocalhost.app</a> · <a href="https://www.getlocalhost.app/docs">Docs</a> · <a href="https://www.getlocalhost.app/agents">Coding agents (MCP)</a> · <a href="https://www.getlocalhost.app/changelog">Changelog</a></p>
 
@@ -37,6 +37,14 @@ A **Project** is a folder. A **Service** is one long-running command in it: `pnp
 A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside a WSL 2 distro. All of them, the `localhost` command and the MCP server run on one Rust core.
 
 ![The localhost window on macOS: the Acme Shop Project with its Services (Migrations exited, API, Web and Worker running, Storybook manual) and their merged log](.github/assets/main-window-dark.png)
+
+## Why
+
+- **Too many terminal tabs.** A frontend, an API, a worker and a database each want a tab, in the right order, every morning. localhost starts them with one Start All, in dependency order, with one merged log. See [Run frontend and backend together](https://www.getlocalhost.app/guides/run-frontend-and-backend-together).
+- **Port already in use.** `EADDRINUSE: address already in use :::3000`, and a hunt for the PID. localhost says who holds a Port before it starts, offers the next free one, and the Ports view lists every listener. See [Port 3000 is already in use](https://www.getlocalhost.app/guides/port-already-in-use).
+- **Dev servers left running.** A closed tab, a parent killed without its children, and the server lives on. Stop in localhost ends the whole process tree. See [Kill leftover dev servers](https://www.getlocalhost.app/guides/kill-leftover-dev-servers).
+- **Claude Code starting duplicate dev servers.** An agent can't see your terminal, so it runs its own `npm run dev`. Through `localhost mcp` it sees what already runs and starts nothing twice. See [Claude Code started a second dev server](https://www.getlocalhost.app/guides/claude-code-dev-server).
+- **Forgetting how to run a project.** localhost remembers each Project's commands, ports and environment. See [How do I run this project again?](https://www.getlocalhost.app/guides/how-to-run-my-project)
 
 ## Install
 
@@ -298,12 +306,14 @@ The entry is a server named `localhost` that runs the command bundled with the a
 **Or from a terminal**, with the app installed:
 
 ```sh
-npx @getlocalhost/cli mcp install
+npx @getlocalhost/cli mcp install     # add the server and the skill
+npx @getlocalhost/cli mcp status      # where each agent stands
+npx @getlocalhost/cli mcp uninstall   # remove them, and nothing else
 ```
 
 It writes the same entries as **Connect** for every agent it finds, and Claude Desktop's `claude_desktop_config.json` too (macOS, Windows); `mcp uninstall` removes them, `mcp status` shows where each agent stands, `--client cursor` picks one, `--read-only` sets up `localhost mcp --read-only` and `--dry-run` prints the diff instead. Without the app it changes nothing and says how to install it. See [packages/cli](packages/cli/README.md).
 
-**Or by hand**, for other MCP clients: give the bundled command the argument `mcp` (or `mcp --read-only` for a server that can't change your configuration).
+**Or by hand**, for any other MCP client that starts a server over stdio: give the bundled command the argument `mcp` (or `mcp --read-only` for a server that can't change your configuration).
 
 - **Claude Code**: `claude mcp add --scope user localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
 - **Codex**: `codex mcp add localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
@@ -323,9 +333,13 @@ Other MCP clients take the same `command` and `args`. On Windows it covers Proje
 
 ### What is localhost app?
 
-localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
+localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. It runs your own commands, such as npm run dev, uv run or cargo run, with no Docker or containers required; Compose services can be one of them. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.
 
 A Project is a folder; a Service is one long-running command in it, such as `pnpm dev`, `uv run fastapi dev` or `docker compose up postgres`. localhost runs it in your login shell, keeps its output, knows when it is up, and stops its whole process tree when you ask.
+
+### Do I need Docker to use localhost?
+
+No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one per service in your Compose file, and if Docker isn’t running, the Service fails with that reason.
 
 ### Is localhost a pm2 alternative?
 
@@ -351,7 +365,7 @@ Releases aren’t notarized yet, so the first launch on macOS needs one extra st
 
 ## How it compares
 
-Plenty of good tools overlap with localhost, and several are the better choice for some jobs. The full comparison, with where each one wins, is at [getlocalhost.app/compare](https://www.getlocalhost.app/compare).
+Plenty of good tools overlap with localhost, and several are the better choice for some jobs. The full comparison, with where each one wins, is at [getlocalhost.app/compare](https://www.getlocalhost.app/compare), with a page per tool.
 
 | Tool | Where it wins | Where localhost fits better |
 |---|---|---|
@@ -360,7 +374,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agents reach them from any MCP client; DevWebUI’s config in the repo | MIT license; Linux packages; agents connected in one click, with confirmed deletes and a read-only mode |
+| **devglow, DevWebUI** | DevWebUI’s config file in the repo, shared with the code | MIT license; Linux packages; agents connected from the app or `npx @getlocalhost/cli mcp install`, with confirmed deletes and a read-only mode |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

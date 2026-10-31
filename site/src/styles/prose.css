@@ -1,0 +1,118 @@
+/* Markdown prose, shared by the docs and the guides. Prose stays sans for reading; section titles are
+ * engraved, smaller than the page's. */
+.prose {
+  font-size: 16px;
+  line-height: 1.7;
+}
+.prose h2 {
+  margin: 56px 0 14px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow: 0 1px 0 var(--engrave-light);
+}
+.prose h3 {
+  margin: 32px 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+.prose p,
+.prose ul,
+.prose ol {
+  margin: 0 0 16px;
+}
+.prose li {
+  margin-bottom: 6px;
+}
+.prose a {
+  color: var(--accent-text);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.prose :not(pre) > code {
+  font-size: 0.88em;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--fill);
+  overflow-wrap: anywhere;
+}
+
+/* Instruments sit in wells: code blocks and tables. */
+.prose pre {
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--page-sunken) !important;
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.12),
+    0 1px 0 var(--plate-light);
+  font-size: 13.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.prose table {
+  display: block;
+  width: 100%;
+  margin: 0 0 28px;
+  padding: 4px 16px 8px;
+  border-collapse: collapse;
+  border-radius: var(--radius);
+  background: var(--page-sunken);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.12),
+    0 1px 0 var(--plate-light);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.prose th,
+.prose td {
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid var(--separator);
+  text-align: left;
+  vertical-align: top;
+}
+/* Field and key names in a table's first column read whole; the well scrolls if it must. */
+.prose td:first-child code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.prose tr:last-child td {
+  border-bottom: 0;
+}
+.prose th {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.prose img {
+  display: block;
+  margin: 8px auto 32px;
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 var(--plate-edge),
+    0 18px 36px -20px rgb(0 0 0 / 0.6);
+}
+.prose blockquote {
+  margin: 0 0 20px;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  background: var(--page-raised);
+  box-shadow:
+    inset 0 1px 0 var(--plate-light),
+    0 1px 0 var(--plate-edge);
+  color: var(--text-secondary);
+}
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
