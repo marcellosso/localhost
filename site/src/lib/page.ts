@@ -1,10 +1,5 @@
-import { detectPlatform, isPhone } from './platform';
-
-/** Behaviour every page shares: the visitor's platform for CSS (`.mac-only`), and copy buttons. */
+/** Behaviour every page shares: copy buttons. The visitor's platform for CSS is set in Base.astro's head. */
 export function startPage() {
-  document.documentElement.dataset.platform = detectPlatform();
-  if (isPhone()) document.documentElement.dataset.device = 'phone';
-
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy-text]')) {
     const label = button.textContent;
     button.addEventListener('click', () => {

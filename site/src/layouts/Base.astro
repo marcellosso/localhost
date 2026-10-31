@@ -59,6 +59,15 @@ const image = new URL('/og.png', Astro.site).toString();
     <script is:inline>
       // Dark unless the visitor picked light, applied before the first paint.
       document.documentElement.dataset.theme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
+      // The visitor's platform, before the first paint too, so macOS-only bits (.mac-only) never flash elsewhere.
+      // Mirrors detectPlatform() and isPhone() in lib/platform.ts, which can't be imported into an inline script.
+      (() => {
+        const ua = navigator.userAgent;
+        const platform = navigator.userAgentData?.platform ?? ua;
+        const root = document.documentElement.dataset;
+        root.platform = /win/i.test(platform) ? 'windows' : /linux|x11|cros/i.test(platform) && !/android/i.test(platform) ? 'linux' : 'macos';
+        if (/iPhone|iPod|Android.+Mobile/i.test(ua)) root.device = 'phone';
+      })();
     </script>
   </head>
   <body>
