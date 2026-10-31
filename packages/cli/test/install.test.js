@@ -171,7 +171,8 @@ test('--dry-run prints the change and writes nothing', () => {
   assert.match(out, /Would add .*SKILL\.md/);
   assert.equal(home.read('.cursor', 'mcp.json'), '{\n  "mcpServers": {\n    "github": { "command": "gh" }\n  }\n}\n');
   assert.equal(home.read('.cursor', 'skills', 'localhost-mcp', 'SKILL.md'), null);
-  assert.equal(fs.existsSync(home.env.LOCALHOST_STORAGE_ROOT), false);
+  // No backup either. (On Linux the data folder exists already: the fixture's app command is the AppImage's copy in it.)
+  assert.equal(fs.existsSync(path.join(home.env.LOCALHOST_STORAGE_ROOT, 'agent-backups')), false);
 });
 
 test('changes Claude Code’s servers through claude mcp when it is installed', () => {
