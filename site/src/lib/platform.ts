@@ -9,6 +9,11 @@ export function detectPlatform(): Platform {
   return 'macos';
 }
 
+/** localhost is a desktop app; detectPlatform() reads an iPhone as macOS and Android as neither, so phones are told apart here. */
+export function isPhone(): boolean {
+  return /iPhone|iPod|Android.+Mobile/i.test(navigator.userAgent);
+}
+
 /** Opens the install dialog (InstallDialog.astro) on a platform's steps. */
 export function openInstall(platform: Platform, started: boolean) {
   document.dispatchEvent(new CustomEvent('install:open', { detail: { platform, started } }));

@@ -21,56 +21,59 @@ const structuredData = [
 <Base title="Compared to pm2, tmux and Docker Compose" {description} {structuredData}>
   <div class="container page">
     <header>
-      <p class="figure-label">Compare</p>
-      <h1 class="display">localhost compared to pm2, tmux, Docker Compose and others</h1>
+      <p class="plate-label">Compare</p>
+      <h1 class="engraved">localhost compared to pm2, tmux, Docker Compose and others</h1>
       <p class="lede">
         localhost runs the dev servers, workers and databases of your local projects from one window. Plenty of good tools overlap with
         it, and several of them are the better choice for some jobs. Here is where each one wins, and where localhost fits better.
       </p>
     </header>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Tool</th>
-            <th scope="col">Where it wins</th>
-            <th scope="col">Where localhost fits better</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            alternatives.map((tool) => (
-              <tr>
-                <th scope="row">
-                  <a href={`#${tool.id}`}>{tool.name}</a>
-                </th>
-                <td set:html={html(tool.summary.wins)} />
-                <td set:html={html(tool.summary.localhost)} />
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
+    <div class="panel summary">
+      <span class="screws" aria-hidden="true"></span>
+      <div class="inset table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Tool</th>
+              <th scope="col">Where it wins</th>
+              <th scope="col" class="ours">Where localhost fits better</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              alternatives.map((tool) => (
+                <tr>
+                  <th scope="row">
+                    <a href={`#${tool.id}`}>{tool.name}</a>
+                  </th>
+                  <td data-label="Where it wins" set:html={html(tool.summary.wins)} />
+                  <td class="ours" data-label="Where localhost fits better" set:html={html(tool.summary.localhost)} />
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {
       alternatives.map((tool) => (
         <section class="tool" id={tool.id}>
-          <h2>localhost vs {tool.name}</h2>
+          <h2 class="engraved">localhost vs {tool.name}</h2>
           <p class="what" set:html={html(tool.what)} />
           <div class="columns">
             <div>
-              <h3>Where {tool.name} {tool.name.includes(',') ? 'win' : 'wins'}</h3>
-              <ul>
+              <h3 class="plate-label">Where {tool.name} {tool.name.includes(',') ? 'win' : 'wins'}</h3>
+              <ul class="theirs">
                 {tool.wins.map((line) => (
                   <li set:html={html(line)} />
                 ))}
               </ul>
             </div>
             <div>
-              <h3>Where localhost fits better</h3>
-              <ul>
+              <h3 class="plate-label ours">Where localhost fits better</h3>
+              <ul class="ours">
                 {tool.localhost.map((line) => (
                   <li set:html={html(line)} />
                 ))}
@@ -81,15 +84,16 @@ const structuredData = [
       ))
     }
 
-    <section class="tool">
-      <h2>What localhost isn’t</h2>
+    <section class="panel isnt">
+      <span class="screws" aria-hidden="true"></span>
+      <h2 class="engraved">What localhost isn’t</h2>
       <p class="what">
         It isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs
         commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
       </p>
       <p class="what">
-        <a href={href('docs/install')}>Install localhost</a>, read the <a href={href('docs')}>docs</a>, or see how
-        <a href={href('agents')}>coding agents use it</a>.
+        <a href={href('docs/install')}>Install localhost</a>, read the <a href={href('docs')}>docs</a>,
+        or see how <a href={href('agents')}>coding agents use it</a>.
       </p>
     </section>
   </div>
@@ -97,41 +101,70 @@ const structuredData = [
 
 <style>
   .page {
-    max-width: 960px;
+    max-width: calc(1040px + 48px);
     padding-top: 72px;
+    padding-bottom: 96px;
   }
   header {
-    margin-bottom: 48px;
+    margin-bottom: 40px;
   }
   h1 {
-    font-size: clamp(36px, 5vw, 52px);
+    margin-top: 14px;
+    max-width: 24ch;
+    font-size: clamp(40px, 4.8vw, 68px);
   }
   .lede {
-    margin-top: 16px;
+    max-width: 62ch;
+    margin-top: 20px;
+  }
+  code {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+
+  /* The summary is an instrument: a well set into a screwed plate, localhost's column lit faintly in the accent. */
+  .summary {
+    padding: 30px;
   }
   .table-wrap {
     overflow-x: auto;
-    border-radius: var(--radius);
-    background: var(--page-raised);
-    box-shadow: var(--ring);
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 14.5px;
+    line-height: 1.5;
   }
   th,
   td {
-    padding: 12px 16px;
+    padding: 14px 18px;
     text-align: left;
     vertical-align: top;
     border-top: 1px solid var(--separator);
   }
   thead th {
+    padding-top: 14px;
+    padding-bottom: 12px;
     border-top: 0;
-    font-size: 13px;
-    color: var(--text-tertiary);
-    font-weight: 500;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-shadow: 0 1px 0 var(--engrave-light);
+  }
+  th.ours,
+  td.ours {
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+  }
+  thead th.ours {
+    color: var(--accent-text);
+    box-shadow: inset 0 2px 0 var(--accent);
   }
   tbody th {
     font-weight: 600;
@@ -148,53 +181,136 @@ const structuredData = [
   td {
     color: var(--text-secondary);
   }
-  .tool {
-    padding: 48px 0 0;
+  td.ours {
+    color: var(--text);
   }
-  h2 {
-    margin: 0;
-    font-size: 26px;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
+  /* On a phone each tool becomes its own block, the column heads repeated as labels. */
+  @media (max-width: 720px) {
+    .summary {
+      padding: 26px 10px 10px;
+    }
+    table,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+    thead {
+      display: none;
+    }
+    tbody tr + tr {
+      border-top: 1px solid var(--separator);
+    }
+    tbody th,
+    td {
+      border-top: 0;
+      padding: 0 14px;
+    }
+    tbody th {
+      padding-top: 16px;
+      white-space: normal;
+    }
+    td {
+      padding-top: 10px;
+    }
+    td.ours {
+      margin-top: 10px;
+      padding-bottom: 12px;
+    }
+    td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 2px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    td.ours::before {
+      color: var(--accent-text);
+    }
+  }
+
+  .tool {
+    margin-top: 72px;
+    padding-top: 40px;
+    border-top: 1px solid var(--separator);
+    scroll-margin-top: 88px;
+  }
+  .tool h2 {
+    font-size: clamp(32px, 4vw, 48px);
   }
   .what {
-    margin: 12px 0 0;
-    line-height: 1.7;
+    max-width: 68ch;
+    margin: 14px 0 0;
+    line-height: 1.65;
     color: var(--text-secondary);
   }
   .what a {
     color: var(--accent-text);
+    font-weight: 600;
     text-underline-offset: 3px;
   }
   .columns {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-    margin-top: 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 28px;
   }
-  h3 {
-    margin: 0;
-    font-size: 15px;
+  h3.ours {
+    color: var(--accent-text);
   }
   ul {
-    margin: 8px 0 0;
-    padding-left: 20px;
-    line-height: 1.7;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--separator);
+    line-height: 1.6;
     color: var(--text-secondary);
   }
-  li {
-    margin-bottom: 6px;
+  ul.ours {
+    color: var(--text);
   }
-  code {
-    font-size: 0.88em;
-    padding: 2px 5px;
-    border-radius: 5px;
-    background: var(--fill);
+  li {
+    position: relative;
+    padding: 10px 0 10px 22px;
+    border-bottom: 1px solid var(--separator);
+  }
+  /* Marks by shape, not colour alone: a hollow square for the other tool, a filled one for localhost. */
+  li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: calc(10px + 0.8em - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1.5px var(--text-secondary);
+  }
+  ul.ours li::before {
+    background: var(--accent);
+    box-shadow: none;
   }
   @media (max-width: 720px) {
     .columns {
-      grid-template-columns: 1fr;
-      gap: 16px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 28px;
+    }
+  }
+
+  .isnt {
+    margin-top: 96px;
+    padding: 48px 44px 44px;
+  }
+  .isnt h2 {
+    font-size: clamp(32px, 4vw, 48px);
+  }
+  @media (max-width: 560px) {
+    .isnt {
+      padding: 40px 22px 32px;
     }
   }
 </style>
