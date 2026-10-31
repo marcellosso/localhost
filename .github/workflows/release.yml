@@ -100,7 +100,7 @@ jobs:
       SPARKLE_VERSION: 2.10.1
       SPARKLE_SHA256: 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.90
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
@@ -213,7 +213,7 @@ jobs:
           cat "$appcast"
           echo "path=$appcast" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: |
@@ -236,7 +236,7 @@ jobs:
       run:
         working-directory: apps/desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # With the AppIndicator library installed, the bundler adds the tray,
       # webview and GTK libraries to the packages' dependencies itself.
       - name: Install the webview and tray libraries
@@ -244,10 +244,10 @@ jobs:
           sudo apt-get update && sudo apt-get install -y
           libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libarchive-tools
       - uses: dtolnay/rust-toolchain@1.90
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: apps/desktop/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -311,13 +311,13 @@ jobs:
           for file in *; do sha256sum "$file" > "$file.sha256"; done
           ls -l . "$RUNNER_TEMP/signatures"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux
           path: ${{ runner.temp }}/linux/*
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: signatures-linux
           path: ${{ runner.temp }}/signatures/*
@@ -332,7 +332,7 @@ jobs:
       run:
         working-directory: core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.90
         with:
           targets: x86_64-unknown-linux-musl
@@ -351,7 +351,7 @@ jobs:
           ls -l "$binary"
           [[ $("$binary" --version) == "localhostd ${{ needs.version.outputs.version }}" ]]
           LOCALHOST_STORAGE_ROOT=$(mktemp -d) "$binary" --stdio < /dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: localhostd
           path: core/target/x86_64-unknown-linux-musl/release/localhostd
@@ -371,12 +371,12 @@ jobs:
         working-directory: apps/desktop
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.90
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: apps/desktop/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -384,7 +384,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Installed beside localhost-app.exe, where the app looks for it (src-tauri/src/wsl.rs).
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: localhostd
           path: apps/desktop/src-tauri/wsl
@@ -473,13 +473,13 @@ jobs:
           for file in *; do sha256sum "$file" > "$file.sha256"; done
           ls -l . "$RUNNER_TEMP/signatures"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: ${{ runner.temp }}/windows/*
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: signatures-windows
           path: ${{ runner.temp }}/signatures/*
@@ -496,11 +496,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # For scripts/updater-manifest.sh.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: scripts
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
@@ -560,7 +560,7 @@ jobs:
           fi
 
       # For scripts/homebrew-cask.sh and its template.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             scripts
