@@ -1,0 +1,39 @@
+{
+  "name": "@getlocalhost/cli",
+  "version": "0.1.0",
+  "description": "Connect Claude Code, Claude Desktop, Cursor and Codex to localhost mcp, the MCP server of the localhost app, from a terminal.",
+  "keywords": [
+    "localhost",
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "cursor",
+    "codex",
+    "dev-server"
+  ],
+  "homepage": "https://www.getlocalhost.app/docs/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcellosso/localhost.git",
+    "directory": "packages/cli"
+  },
+  "bugs": "https://github.com/marcellosso/localhost/issues",
+  "license": "MIT",
+  "author": "Marcel Losso",
+  "type": "module",
+  "bin": {
+    "getlocalhost": "bin/getlocalhost.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepack": "node -e \"const fs = require('fs'); fs.cpSync('../../skills/localhost-mcp', 'skill', { recursive: true }); fs.copyFileSync('../../LICENSE', 'LICENSE')\""
+  }
+}

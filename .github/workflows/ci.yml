@@ -24,6 +24,7 @@ jobs:
       core: ${{ steps.filter.outputs.core }}
       macos: ${{ steps.filter.outputs.macos }}
       desktop: ${{ steps.filter.outputs.desktop }}
+      cli: ${{ steps.filter.outputs.cli }}
     steps:
       # A pull request checks out its merge into the base: the first parent is
       # the base, so the diff is what merging would change.
@@ -35,6 +36,8 @@ jobs:
           CORE: '^(core/|skills/|\.github/workflows/ci\.yml$)'
           MACOS: '^(apps/macos/|scripts/build-core\.sh$)'
           DESKTOP: '^(apps/desktop/|scripts/(test-updater-scripts|updater-manifest|appcast|sparkle-public-key)\.sh$)'
+          # The package's tests read the skill and the site's install links.
+          CLI: '^(packages/cli/|skills/|site/src/lib/(site|release)\.ts$|site/src/components/InstallDialog\.astro$|site/astro\.config\.mjs$|\.github/workflows/ci\.yml$)'
         run: |
           if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
             files=$(git diff --name-only HEAD^1 HEAD)
@@ -47,6 +50,7 @@ jobs:
             changed "$CORE" && echo core=true || echo core=false
             changed "$CORE|$MACOS" && echo macos=true || echo macos=false
             changed "$CORE|$DESKTOP" && echo desktop=true || echo desktop=false
+            changed "$CLI" && echo cli=true || echo cli=false
           } | tee -a "$GITHUB_OUTPUT"
 
   linux:
@@ -188,12 +192,40 @@ jobs:
       - name: Check the TypeScript bindings are up to date
         run: git diff --exit-code src/bindings.ts
 
+  # The npm package, on each OS its paths differ on, and on the oldest Node it supports.
+  cli:
+    name: npm package (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22]
+        include:
+          - os: ubuntu-latest
+            node: 18
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - name: Pack
+        shell: bash
+        run: npm pack --dry-run 2>&1 | tee pack.txt && grep -q 'skill/SKILL.md' pack.txt
+
   # One check that stands for the whole workflow, for a ruleset to require:
   # skipped jobs pass, failed or cancelled ones (the change detection too) fail it.
   result:
     name: CI result
     if: always()
-    needs: [changes, linux, windows, macos, desktop]
+    needs: [changes, linux, windows, macos, desktop, cli]
     runs-on: ubuntu-latest
     steps:
       - env:

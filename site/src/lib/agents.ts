@@ -32,7 +32,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'Which coding agents does it work with?',
     answer: [
-      'Any MCP client that starts a server over standard input and output. The app connects Claude Code, Cursor and Codex in one click, in Settings → Agents; Claude Desktop and other clients take the same `command` and `args` in their own configuration file.',
+      'Any MCP client that starts a server over standard input and output. The app connects Claude Code, Cursor and Codex in one click, in Settings → Agents; from a terminal, `npx @getlocalhost/cli mcp install` connects those and Claude Desktop. Other clients take the same `command` and `args` in their own configuration file.',
     ],
   },
   {
@@ -58,6 +58,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
     question: 'Do I need to install anything besides the app?',
     answer: [
       'No. The app comes with the `localhost` command, the same version, and updates it with itself. Settings → Agents adds the `localhost` MCP server to Claude Code, Cursor or Codex and installs the localhost-mcp skill, showing exactly what changes first; it can also put `localhost` on your PATH for the terminal. On macOS, installing with Homebrew (`brew install --cask marcellosso/tap/localhost`) puts it there already.',
+      'From a terminal, `npx @getlocalhost/cli mcp install` writes the same entries for every agent it finds, Claude Desktop too, and `mcp uninstall` removes them. It needs the app installed, and says how to install it if it isn’t.',
     ],
   },
 ];
