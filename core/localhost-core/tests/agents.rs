@@ -496,3 +496,47 @@ fn without_claude_the_file_is_edited() {
     setup.connect(AgentClient::ClaudeCode).unwrap();
     assert!(fixture.read(".claude.json").contains("\"localhost\""));
 }
+
+#[test]
+fn a_server_made_read_only_by_hand_is_connected_and_connect_keeps_it_read_only() {
+    let fixture = Fixture::new();
+    let setup = fixture.setup();
+    let command = fixture.command();
+    fs::write(
+        fixture.home.join(".cursor/mcp.json"),
+        format!(r#"{{"mcpServers": {{"localhost": {{"type": "stdio", "command": "{command}", "args": ["mcp", "--read-only"]}}}}}}"#),
+    )
+    .unwrap();
+    fs::write(
+        fixture.home.join(".codex/config.toml"),
+        "[mcp_servers.localhost]\ncommand = \"/old/localhost\"\nargs = [\"mcp\", \"--read-only\"]\n",
+    )
+    .unwrap();
+
+    setup.connect(AgentClient::Cursor).unwrap();
+    let status = setup.status(AgentClient::Cursor);
+    assert_eq!(status.connection, AgentConnection::Connected, "{}", status.summary);
+    assert!(status.summary.contains("read-only"), "{}", status.summary);
+    let cursor_args = || {
+        let text = fs::read_to_string(fixture.home.join(".cursor/mcp.json")).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["mcpServers"]["localhost"]["args"].clone()
+    };
+    assert_eq!(cursor_args(), serde_json::json!(["mcp", "--read-only"]));
+
+    // Updating a server that runs another command keeps it read-only.
+    assert_eq!(setup.status(AgentClient::Codex).connection, AgentConnection::NeedsUpdate);
+    setup.connect(AgentClient::Codex).unwrap();
+    let codex = fs::read_to_string(fixture.home.join(".codex/config.toml")).unwrap();
+    assert!(codex.contains(r#"args = ["mcp", "--read-only"]"#), "{codex}");
+    assert_eq!(setup.status(AgentClient::Codex).connection, AgentConnection::Connected);
+
+    // Any other arguments still need an update, which makes them `mcp`.
+    fs::write(
+        fixture.home.join(".cursor/mcp.json"),
+        format!(r#"{{"mcpServers": {{"localhost": {{"type": "stdio", "command": "{command}", "args": ["mcp", "--verbose"]}}}}}}"#),
+    )
+    .unwrap();
+    assert_eq!(setup.status(AgentClient::Cursor).connection, AgentConnection::NeedsUpdate);
+    setup.connect(AgentClient::Cursor).unwrap();
+    assert_eq!(cursor_args(), serde_json::json!(["mcp"]));
+}
