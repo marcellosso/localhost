@@ -57,7 +57,7 @@ fn run(command: Command, terminal: &Terminal) -> Result<ExitCode, String> {
         Command::Status { project } => status::run(&open()?, &project, terminal)?,
         Command::Logs { project, service } => logs::run(&open()?, &project, service.as_deref(), terminal)?,
         Command::Up { project, services } => return up::run(open()?, &project, &services, terminal),
-        Command::Mcp => return mcp::run(open()?),
+        Command::Mcp { read_only } => return mcp::run(open()?, read_only),
         Command::Daemon { storage_root } => localhost_core::remote::shared::run(storage_root.as_ref())?,
     }
     Ok(ExitCode::SUCCESS)
