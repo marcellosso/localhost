@@ -19,7 +19,7 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
 
 <dialog class="install" data-install aria-labelledby="install-title">
   <div class="head">
-    <h2 id="install-title">Install localhost <span data-platform-name>for macOS</span></h2>
+    <h2 id="install-title" class="engraved">Install localhost <span data-platform-name>for macOS</span></h2>
     <button type="button" class="close" data-close aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="m3 3 8 8M11 3l-8 8"></path></svg>
     </button>
@@ -35,14 +35,14 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
           <p>Open <code>{files.mac}</code> and drag <strong>localhost</strong> to <strong>Applications</strong>.</p>
           <a class="file" {...download('mac')} data-again>Download <code>{files.mac}</code></a>
           <p class="or">Or install it with Homebrew, which also puts the <code>localhost</code> command in your terminal:</p>
-          <div class="command">
+          <div class="copy-command">
             <code>{brewInstall}</code>
             <button type="button" data-copy={brewInstall} data-track="install_command_copied" data-track-command="brew">Copy</button>
           </div>
           {release.mac !== releases && (
             <>
               <p class="or">Or download it from Terminal, which macOS doesn’t block, so you can skip step 2:</p>
-              <div class="command">
+              <div class="copy-command">
                 <code>{curl}</code>
                 <button type="button" data-copy={curl} data-track="install_command_copied" data-track-command="curl">Copy</button>
               </div>
@@ -61,7 +61,7 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
             <li>Click <strong>Open Anyway</strong>, and confirm with your password or Touch ID.</li>
           </ol>
           <p class="or">Or run this in Terminal, then open localhost:</p>
-          <div class="command">
+          <div class="copy-command">
             <code>xattr -dr com.apple.quarantine /Applications/localhost.app</code>
             <button type="button" data-copy="xattr -dr com.apple.quarantine /Applications/localhost.app" data-track="install_command_copied" data-track-command="xattr">Copy</button>
           </div>
@@ -115,15 +115,15 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
         <div>
           <h3>Install it</h3>
           <p>From the folder you downloaded it to:</p>
-          <div class="command">
+          <div class="copy-command">
             <code>sudo apt install ./{files.deb}</code>
             <button type="button" data-copy={`sudo apt install ./${files.deb}`} data-track="install_command_copied" data-track-command="apt">Copy</button>
           </div>
-          <div class="command">
+          <div class="copy-command">
             <code>sudo dnf install ./{files.rpm}</code>
             <button type="button" data-copy={`sudo dnf install ./${files.rpm}`} data-track="install_command_copied" data-track-command="dnf">Copy</button>
           </div>
-          <div class="command">
+          <div class="copy-command">
             <code>chmod +x {files.appImage} &amp;&amp; ./{files.appImage}</code>
             <button type="button" data-copy={`chmod +x ${files.appImage} && ./${files.appImage}`} data-track="install_command_copied" data-track-command="appimage">Copy</button>
           </div>
@@ -191,15 +191,26 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
 </script>
 
 <style>
+  /* A screwed plate over the page. The screw heads are its background rather than a .screws span, so
+   * they stay in the corners while a long platform's steps scroll. */
   .install {
-    width: min(560px, calc(100vw - 32px));
-    max-height: calc(100vh - 48px);
-    padding: 28px;
+    --head: radial-gradient(circle at 50% 50%, var(--screw) 0 3.5px, color-mix(in srgb, var(--screw) 60%, #000) 4px, transparent 4.5px);
+    width: min(580px, calc(100vw - 24px));
+    max-height: calc(100dvh - 32px);
+    padding: 34px 34px 26px;
     border: 0;
-    border-radius: 20px;
-    background: var(--page-raised);
+    border-radius: 14px;
+    background:
+      var(--head) left 10px top 10px / 10px 10px no-repeat,
+      var(--head) right 10px top 10px / 10px 10px no-repeat,
+      var(--head) left 10px bottom 10px / 10px 10px no-repeat,
+      var(--head) right 10px bottom 10px / 10px 10px no-repeat,
+      var(--page-raised);
     color: var(--text);
-    box-shadow: var(--ring-strong);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge),
+      0 30px 70px -20px rgb(0 0 0 / 0.6);
     overflow-y: auto;
   }
   .install[open] {
@@ -224,78 +235,102 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
       }
     }
   }
+  @media (max-width: 520px) {
+    .install {
+      padding: 30px 20px 20px;
+    }
+  }
   .head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 16px;
   }
   h2 {
-    margin: 0;
-    font: 700 24px/1.2 var(--font-display);
-    letter-spacing: -0.025em;
+    font-size: clamp(30px, 6vw, 40px);
+  }
+  h2 span {
+    color: var(--text-secondary);
   }
   .close {
+    flex: none;
     width: 32px;
     height: 32px;
     display: grid;
     place-items: center;
     border: 0;
-    border-radius: 8px;
-    background: transparent;
+    border-radius: 7px;
+    background: var(--page-raised);
     color: var(--text-secondary);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 2px rgb(0 0 0 / 0.3);
     cursor: pointer;
   }
   .close:hover {
-    background: var(--fill);
     color: var(--text);
   }
+  .close:active {
+    transform: translateY(1px);
+  }
   .sub {
-    margin: 6px 0 20px;
+    margin: 10px 0 22px;
     color: var(--text-secondary);
     font-size: 15px;
   }
 
-
+  /* Steps read down the plate, each numbered on ink tape. */
   .steps {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    border-top: 1px solid var(--separator);
   }
   .step {
     display: grid;
-    grid-template-columns: 26px 1fr;
-    gap: 14px;
-    padding: 18px;
-    border-radius: 14px;
-    box-shadow: var(--ring);
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 16px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--separator);
   }
   .step > div {
     min-width: 0;
   }
-  .step.first {
-    background: var(--page-sunken);
-  }
   .number {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     display: grid;
     place-items: center;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-size: 13px;
-    font-weight: 700;
+    border-radius: 3px;
+    background: var(--text);
+    color: var(--page);
+    font: 800 18px/1 var(--font-display);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 1px 1px rgb(0 0 0 / 0.25);
+  }
+  /* On a phone the number sits beside the title and the step takes the full width under it. */
+  @media (max-width: 520px) {
+    .step {
+      display: block;
+    }
+    .number {
+      float: left;
+      margin-right: 12px;
+    }
   }
   h3 {
-    margin: 2px 0 6px;
-    font-size: 16px;
+    margin: 2px 0 8px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 21px;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    text-transform: uppercase;
   }
   .step p {
     margin: 0;
-    font-size: 14px;
+    font-size: 14.5px;
     line-height: 1.55;
     color: var(--text-secondary);
   }
@@ -308,162 +343,178 @@ const curl = `curl -fLO ${release.mac} && open ${files.mac}`;
     padding: 1px 5px;
     border-radius: 5px;
     background: var(--fill);
-    color: var(--accent-text);
     overflow-wrap: anywhere;
   }
   .substeps {
-    margin: 8px 0 0;
-    padding-left: 18px;
-    font-size: 14px;
+    margin: 10px 0 0;
+    padding-left: 20px;
+    font-size: 14.5px;
     line-height: 1.55;
     color: var(--text-secondary);
   }
   .substeps li + li {
     margin-top: 4px;
   }
+  .substeps li::marker {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
   .step .or {
-    margin-top: 12px;
-    font-size: 13px;
+    margin-top: 14px;
+    font-size: 13.5px;
   }
   .or a {
     color: var(--accent-text);
+    font-weight: 600;
+    text-underline-offset: 3px;
   }
   .file {
     display: inline-block;
-    margin-top: 10px;
-    font-size: 13px;
-    color: var(--text-secondary);
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-text);
+    text-underline-offset: 3px;
   }
   .file code {
     color: inherit;
     background: none;
     padding: 0;
+    font-weight: 500;
   }
-  .command {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .copy-command {
     margin-top: 8px;
-    padding: 6px 6px 6px 12px;
-    border-radius: 10px;
-    background: var(--page-sunken);
-    box-shadow: var(--ring);
   }
-  .command code {
-    flex: 1;
-    min-width: 0;
+  .step .copy-command code {
     padding: 0;
     background: none;
     color: var(--text);
     font-size: 12.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .command button {
-    flex: none;
-    height: 30px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: 7px;
-    background: var(--fill-strong);
-    color: var(--text);
-    font: 600 12.5px/1 var(--font-sans);
-    cursor: pointer;
+  .copy-command button:hover {
+    color: var(--accent-text);
   }
-  .command button:hover {
-    background: color-mix(in srgb, var(--fill-strong) 70%, var(--text) 10%);
-  }
+
+  /* The packages are keys on the plate: raised, and lit in the accent under the pointer. */
   .packages {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-top: 4px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 6px;
   }
   .package {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--page-raised);
-    box-shadow: var(--ring);
-    font-size: 13px;
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge),
+      0 2px 5px rgb(0 0 0 / 0.16);
+    font-size: 13.5px;
     text-decoration: none;
     transition: box-shadow 150ms ease;
   }
   .package:hover {
-    box-shadow: 0 0 0 1.5px var(--accent);
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 0 0 1.5px var(--accent);
   }
-  .package code {
+  .package:active {
+    transform: translateY(1px);
+  }
+  .step .package code {
     align-self: flex-start;
+    color: var(--text-secondary);
   }
   @media (max-width: 520px) {
     .packages {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
   .needs {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 20px 0 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--separator);
-    font-size: 13px;
+    gap: 10px;
+    margin: 16px 0 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
     color: var(--text-secondary);
   }
   .check {
+    flex: none;
+    position: relative;
     width: 14px;
     height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    position: relative;
   }
   .check::after {
     content: '';
     position: absolute;
-    left: 4px;
-    top: 3.5px;
-    width: 5px;
-    height: 3px;
-    border: solid var(--on-accent);
-    border-width: 0 0 1.5px 1.5px;
+    left: 2px;
+    top: 2.5px;
+    width: 9px;
+    height: 5px;
+    border: solid var(--text-secondary);
+    border-width: 0 0 2px 2px;
     transform: rotate(-45deg);
   }
-  h2 span {
-    color: var(--text-secondary);
-  }
+
+  /* The other platforms, as switches in a row under a plate label. */
   .other {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 12px;
-    margin: 12px 0 0;
-    font-size: 13px;
-    color: var(--text-tertiary);
+    gap: 8px;
+    margin: 22px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--separator);
   }
-  .other button,
-  .other a {
-    padding: 0;
-    border: 0;
-    background: none;
+  .other span {
+    margin-right: 4px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     color: var(--text-secondary);
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    text-shadow: 0 1px 0 var(--engrave-light);
+  }
+  .other button {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--page-raised);
+    color: var(--text);
+    font: 600 15px/1 var(--font-display);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow:
+      inset 0 1px 0 var(--plate-light),
+      0 1px 0 var(--plate-edge),
+      0 1px 3px rgb(0 0 0 / 0.18);
     cursor: pointer;
   }
-  .other button:hover,
-  .other a:hover {
-    color: var(--text);
+  .other button:hover {
+    color: var(--accent-text);
+  }
+  .other button:active {
+    transform: translateY(1px);
   }
   .other button[hidden] {
     display: none;
   }
   .other a {
     margin-left: auto;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--accent-text);
     text-decoration: none;
+  }
+  .other a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 </style>

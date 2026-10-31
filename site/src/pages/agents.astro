@@ -90,33 +90,37 @@ args = ["mcp"]`;
 ---
 
 <Base title="MCP server for Claude Code, Cursor and Codex" {description} type="article" {structuredData}>
-  <div class="container page">
-    <header>
-      <p class="figure-label">Coding agents</p>
-      <h1 class="display">Let coding agents run your dev servers through localhost</h1>
+  <header class="container intro">
+    <p class="plate-label">Coding agents</p>
+    <h1 class="engraved">Let coding agents run your dev servers through localhost</h1>
+    <div class="intro-copy">
       <p class="lede definition">{agentsDefinition}</p>
       <p class="lede">
         You configure each Project once in the app. From then on, you and your agent start, stop and read the same Services, with the
         same Ports, environment and logs, and nothing the agent starts runs where you can’t see it.
       </p>
-    </header>
+    </div>
+  </header>
 
-    <section>
-      <h2>Why shouldn’t coding agents run dev servers in their own shell?</h2>
-      <div class="cards">
+  <section class="row" aria-labelledby="problems-title">
+    <div class="container">
+      <h2 id="problems-title" class="engraved">Why shouldn’t coding agents run dev servers in their own shell?</h2>
+      <ul class="rules">
         {
           problems.map((problem) => (
-            <div class="card">
+            <li>
               <h3>{problem.title}</h3>
               <p set:html={html(problem.text)} />
-            </div>
+            </li>
           ))
         }
-      </div>
-    </section>
+      </ul>
+    </div>
+  </section>
 
-    <section>
-      <h2>How does localhost app fix it?</h2>
+  <section class="row" aria-labelledby="fix-title">
+    <div class="container">
+      <h2 id="fix-title" class="engraved">How does localhost app fix it?</h2>
       <ul class="facts">
         <li>
           <strong>One core for the app and the agent.</strong> The app and <code>localhost mcp</code> drive one localhost core in the background.
@@ -136,20 +140,24 @@ args = ["mcp"]`;
           stop, unless the app is open: then they keep running there, until you stop them.
         </li>
         <li>
-          <strong>Structured answers.</strong> Results are JSON, failures carry a <code>kind</code> such as <code>portConflict</code> or
-          <code>commandNotFound</code> with a message saying what to do next, and logs are bounded (200 lines by default, at most 2,000).
+          <strong>Structured answers.</strong> Results are JSON, failures carry a <code>kind</code> such as <code>portConflict</code>
+          or <code>commandNotFound</code> with a message saying what to do next, and logs are bounded (200 lines by default, at most 2,000).
         </li>
         <li>
           <strong>Your configuration stays yours.</strong> The agent can’t add or change Projects or Services, and it reads only the
           Secrets of the Services it starts.
         </li>
       </ul>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <h2>Which MCP tools does localhost expose?</h2>
-      <p class="what">Nine tools. Projects and Services are named by their Key, as <code>list_projects</code> shows them.</p>
-      <div class="table-wrap">
+  <section class="row" aria-labelledby="tools-title">
+    <div class="container">
+      <div class="row-head">
+        <h2 id="tools-title" class="engraved">Which MCP tools does localhost expose?</h2>
+        <p class="lede">Nine tools. Projects and Services are named by their Key, as <code>list_projects</code> shows them.</p>
+      </div>
+      <div class="inset table-wrap">
         <table>
           <thead>
             <tr>
@@ -162,7 +170,7 @@ args = ["mcp"]`;
               tools.map((tool) => (
                 <tr>
                   <th scope="row">
-                    <code>{tool.name}</code>
+                    <code class="tape tool">{tool.name}</code>
                   </th>
                   <td>{tool.text}</td>
                 </tr>
@@ -171,19 +179,22 @@ args = ["mcp"]`;
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <h2>Example workflows</h2>
-      <div class="cards">
+  <section class="row" aria-labelledby="workflows-title">
+    <div class="container">
+      <h2 id="workflows-title" class="engraved">Example workflows</h2>
+      <div class="workflows">
         {
           workflows.map((workflow) => (
-            <div class="card">
-              <h3>{workflow.title}</h3>
-              <ol>
+            <div class="workflow">
+              <h3 class="plate-label">{workflow.title}</h3>
+              <ol class="transcript">
                 {workflow.steps.map(([tool, text]) => (
                   <li>
-                    <code>{tool}</code> <span set:html={html(text)} />
+                    <span class="p" aria-hidden="true">→</span>
+                    <span><code class="call">{tool}</code> <span class="d" set:html={html(text)} /></span>
                   </li>
                 ))}
               </ol>
@@ -191,53 +202,75 @@ args = ["mcp"]`;
           ))
         }
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section id="setup">
-      <h2>How do I connect Claude Code, Cursor or Codex?</h2>
-      <h3>1. Install the app</h3>
-      <p class="what">
-        It comes with the <code>localhost</code> command, the same version, and updates it with itself. On macOS,
-        <code>{brewInstall}</code> also puts the command on your <code>PATH</code> (<a href={href('docs/install#homebrew-macos')}>Homebrew</a>).
-        Add your Projects in the app: the agent reads the same Projects.
-      </p>
+  <section class="row" id="setup" aria-labelledby="setup-title">
+    <div class="container">
+      <h2 id="setup-title" class="engraved">How do I connect Claude Code, Cursor or Codex?</h2>
+      <div class="panel setup">
+        <span class="screws" aria-hidden="true"></span>
+        <div class="step">
+          <h3><span class="tape word">1</span> Install the app</h3>
+          <p>
+            It comes with the <code>localhost</code> command, the same version, and updates it with itself. On
+            macOS, <code>{brewInstall}</code> also puts the command on your <code>PATH</code> (<a href={href('docs/install#homebrew-macos')}>Homebrew</a>).
+            Add your Projects in the app: the agent reads the same Projects.
+          </p>
+        </div>
 
-      <h3>2. Connect your agents</h3>
-      <p class="what">
-        Open <strong>Settings → Agents</strong>, or <strong>Connect Agents…</strong> in the command palette, and click
-        <strong>Connect</strong> next to Claude Code, Cursor or Codex. Before you click, <strong>What changes</strong> shows exactly what
-        localhost writes: a server named <code>localhost</code> in <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code> or
-        <code>~/.codex/config.toml</code>, running the command inside the app, and the
-        <a href={href('docs/skills')}>localhost-mcp skill</a> in the agent’s skills folder. Every other entry stays as it was, the file
-        is backed up before the first change, and <strong>Disconnect</strong> removes only localhost’s entries. If an agent runs another
-        <code>localhost</code>, such as one in <code>~/.cargo/bin</code>, it offers <strong>Update</strong>.
-      </p>
+        <div class="step">
+          <h3><span class="tape word">2</span> Connect your agents</h3>
+          <p>
+            Open <strong>Settings → Agents</strong>, or <strong>Connect Agents…</strong> in the command palette, and
+            click <strong>Connect</strong> next to Claude Code, Cursor or Codex. Before you click, <strong>What changes</strong> shows exactly what
+            localhost writes: a server named <code>localhost</code> in <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code>
+            or <code>~/.codex/config.toml</code>, running the command inside the app, and
+            the <a href={href('docs/skills')}>localhost-mcp skill</a> in the agent’s skills folder. Every other entry stays as it was, the file
+            is backed up before the first change, and <strong>Disconnect</strong> removes only localhost’s entries. If an agent runs
+            another <code>localhost</code>, such as one in <code>~/.cargo/bin</code>, it offers <strong>Update</strong>.
+          </p>
+        </div>
 
-      <h3>3. Or set it up by hand</h3>
-      <p class="what">
-        For other MCP clients, such as Claude Desktop, give the command inside the app the argument <code>mcp</code>: on macOS
-        <code>/Applications/localhost.app/Contents/Helpers/localhost</code>. Cursor’s <code>~/.cursor/mcp.json</code>:
-      </p>
-      <pre><code>{cursorConfig}</code></pre>
-      <p class="what">Codex’s <code>~/.codex/config.toml</code>:</p>
-      <pre><code>{codexConfig}</code></pre>
-      <p class="what">
-        Every platform’s path, and the skill by hand: <a href={href('docs/mcp#set-it-up-by-hand')}>Set it up by hand</a>.
-      </p>
-    </section>
+        <div class="step by-hand">
+          <h3><span class="tape word">3</span> Or set it up by hand</h3>
+          <p>
+            For other MCP clients, such as Claude Desktop, give the command inside the app the argument <code>mcp</code>: on
+            macOS <code>/Applications/localhost.app/Contents/Helpers/localhost</code>.
+          </p>
+          <div class="configs">
+            <div>
+              <p>Cursor’s <code>~/.cursor/mcp.json</code>:</p>
+              <pre class="inset"><code>{cursorConfig}</code></pre>
+            </div>
+            <div>
+              <p>Codex’s <code>~/.codex/config.toml</code>:</p>
+              <pre class="inset"><code>{codexConfig}</code></pre>
+            </div>
+          </div>
+          <p>
+            Every platform’s path, and the skill by hand: <a href={href('docs/mcp#set-it-up-by-hand')}>Set it up by hand</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <section>
-      <h2>Does it work on macOS, Linux and Windows?</h2>
-      <p class="what">
+  <section class="row" aria-labelledby="platforms-title">
+    <div class="container row-grid">
+      <h2 id="platforms-title" class="engraved">Does it work on macOS, Linux and Windows?</h2>
+      <p class="lede">
         The background core listens on a socket in localhost’s data folder on macOS and Linux, and on a named pipe on Windows; only your
         user can open either. On Windows, agents run Projects on Windows itself. A Project in a WSL distro runs only from the app, and an
         agent asked to start one is told so. On macOS, the Keychain asks the first time <code>localhost mcp</code> reads each Secret, since
         it is a different program than the app.
       </p>
-    </section>
+    </div>
+  </section>
 
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
+  <section class="row" aria-labelledby="faq">
+    <div class="container faq-grid">
+      <h2 id="faq" class="engraved">FAQ</h2>
       <div class="faq">
         {
           agentsFaq.map((item) => (
@@ -250,170 +283,439 @@ args = ["mcp"]`;
           ))
         }
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <p class="what">
-        Every detail is in the docs: <a href={href('docs/mcp')}>Coding agents (MCP)</a>, <a href={href('docs/skills')}>Agent skill</a> and
-        <a href={href('docs/install')}>Install</a>. The source is on <a href={repository}>GitHub</a>, MIT licensed.
+  <section class="close">
+    <div class="container">
+      <p class="docs">
+        Every detail is in the docs: <a href={href('docs/mcp')}>Coding agents (MCP)</a>, <a href={href('docs/skills')}>Agent skill</a>
+        and <a href={href('docs/install')}>Install</a>. The source is on <a href={repository}>GitHub</a>, MIT licensed.
       </p>
-    </section>
-  </div>
+    </div>
+  </section>
 </Base>
 
 <style>
-  .page {
-    max-width: 960px;
-    padding-top: 72px;
-  }
-  header {
-    margin-bottom: 8px;
-  }
-  h1 {
-    font-size: clamp(36px, 5vw, 52px);
-  }
   .lede {
-    margin-top: 16px;
+    max-width: 62ch;
   }
-  .definition {
-    color: var(--text);
+  .lede code,
+  .rules :global(code),
+  .facts code,
+  .table-wrap td,
+  .step p code,
+  .faq :global(code) {
+    overflow-wrap: anywhere;
   }
-  section {
-    padding: 56px 0 0;
-  }
-  h2 {
-    margin: 0 0 16px;
-    font-size: 26px;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-  }
-  h3 {
-    margin: 28px 0 8px;
-    font-size: 17px;
-    letter-spacing: -0.01em;
-  }
-  .what {
-    margin: 12px 0 0;
-    line-height: 1.7;
-    color: var(--text-secondary);
-  }
-  .what strong,
-  .facts strong {
-    color: var(--text);
+  .lede code,
+  .rules :global(code),
+  .facts code,
+  .step p code,
+  .faq :global(code) {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--fill);
   }
   a:not(.button) {
     color: var(--accent-text);
     text-underline-offset: 3px;
   }
-  code {
-    font-size: 0.88em;
-    padding: 2px 5px;
-    border-radius: 5px;
-    background: var(--fill);
-    overflow-wrap: anywhere;
+
+  /* Intro: the page's title, then what localhost mcp is. */
+  .intro {
+    padding-top: 72px;
   }
-  pre {
-    margin: 12px 0 0;
-    padding: 16px 18px;
-    border-radius: 10px;
-    background: var(--code-bg);
-    box-shadow: var(--ring);
-    font-size: 13.5px;
-    line-height: 1.6;
-    overflow-x: auto;
+  .intro h1 {
+    margin-top: 14px;
+    max-width: 26ch;
+    font-size: clamp(40px, 4.8vw, 68px);
   }
-  pre code {
-    padding: 0;
-    background: none;
-    font-size: inherit;
-    overflow-wrap: normal;
-  }
-  .cards {
+  .intro-copy {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid var(--separator);
   }
-  .card {
-    padding: 22px;
-    border-radius: var(--radius);
-    background: var(--page-raised);
-    box-shadow: var(--ring);
+  .intro .lede {
+    font-size: 17px;
   }
-  .card h3 {
+  .definition {
+    color: var(--text);
+  }
+  @media (max-width: 900px) {
+    .intro {
+      padding-top: 48px;
+    }
+    .intro-copy {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+  }
+
+  /* Rows */
+  .row {
+    padding: 96px 0 0;
+  }
+  .row h2 {
+    max-width: 24ch;
+    font-size: clamp(32px, 3.6vw, 50px);
+  }
+  .row-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: end;
+    margin-bottom: 32px;
+  }
+  .row-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 64px;
+    align-items: start;
+    padding-top: 40px;
+    border-top: 1px solid var(--separator);
+  }
+  @media (max-width: 900px) {
+    .row-head,
+    .row-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+  }
+
+  .rules,
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 32px 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--separator);
+  }
+  .rules li {
+    padding: 24px 24px 0 0;
+  }
+  .rules li + li {
+    padding-left: 24px;
+    border-left: 1px solid var(--separator);
+  }
+  .rules h3 {
     margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-transform: uppercase;
   }
-  .card p,
-  .card ol {
-    margin: 8px 0 0;
-    font-size: 14px;
+  .rules p {
+    margin: 10px 0 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+
+  /* Six answers, two rows of three: the lead in engraved caps, the rest in the sans face. */
+  .facts li {
+    padding: 24px 24px 28px;
+    font-size: 15px;
     line-height: 1.6;
     color: var(--text-secondary);
+    border-bottom: 1px solid var(--separator);
   }
-  .card ol {
-    padding-left: 18px;
+  .facts li:nth-child(3n + 1) {
+    padding-left: 0;
   }
-  .card li {
-    margin-bottom: 6px;
+  .facts li:not(:nth-child(3n + 1)) {
+    border-left: 1px solid var(--separator);
   }
-  .facts {
-    margin: 0;
-    padding-left: 20px;
-    line-height: 1.7;
-    color: var(--text-secondary);
+  .facts strong {
+    display: block;
+    margin-bottom: 10px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--text);
   }
-  .facts li {
-    margin-bottom: 12px;
+  @media (max-width: 900px) {
+    .rules,
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .rules li,
+    .rules li + li,
+    .facts li,
+    .facts li:nth-child(3n + 1) {
+      padding: 20px 0 16px;
+      border-left: 0;
+    }
+    .rules li {
+      border-bottom: 1px solid var(--separator);
+    }
+    .facts li:not(:nth-child(3n + 1)) {
+      border-left: 0;
+    }
   }
+
+  /* The tools, set in a well. */
   .table-wrap {
-    margin-top: 20px;
+    padding: 6px 10px;
     overflow-x: auto;
-    border-radius: var(--radius);
-    background: var(--page-raised);
-    box-shadow: var(--ring);
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 15px;
   }
   th,
   td {
-    padding: 12px 16px;
+    padding: 12px 14px;
     text-align: left;
     vertical-align: top;
     border-top: 1px solid var(--separator);
   }
   thead th {
     border-top: 0;
-    font-size: 13px;
-    color: var(--text-tertiary);
-    font-weight: 500;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
   }
   tbody th {
+    width: 1%;
     white-space: nowrap;
   }
   td {
+    line-height: 1.55;
     color: var(--text-secondary);
   }
-  .faq {
+  .tool {
+    background: var(--text);
+    color: var(--page);
+    font-size: 12.5px;
+  }
+  @media (max-width: 560px) {
+    table,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+    thead {
+      display: none;
+    }
+    tbody tr + tr {
+      border-top: 1px solid var(--separator);
+    }
+    th,
+    td {
+      padding: 0 4px;
+      border-top: 0;
+    }
+    tbody th {
+      width: auto;
+      padding-top: 14px;
+    }
+    td {
+      padding: 8px 4px 14px;
+      font-size: 14.5px;
+    }
+  }
+
+  /* Workflows as an agent's calls, on the same dark glass as the landing's transcript. */
+  .workflows {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px 56px;
-    padding-top: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 32px;
+  }
+  .workflow {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .workflow h3 {
+    font-size: 17px;
+    color: var(--text);
+  }
+  .transcript {
+    flex: 1;
+    margin: 0;
+    padding: 18px 20px;
+    list-style: none;
+    border-radius: 10px;
+    background: var(--terminal);
+    color: #e6edf3;
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.5);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .transcript li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+  }
+  .transcript li + li {
+    margin-top: 10px;
+  }
+  .transcript .p {
+    color: #ff5c8a;
+  }
+  .transcript .call {
+    font-weight: 600;
+    color: #e6edf3;
+  }
+  .transcript .d {
+    color: #8b939c;
+    overflow-wrap: anywhere;
+  }
+  .transcript .d :global(code) {
+    color: #e6edf3;
+  }
+  @media (max-width: 900px) {
+    .workflows {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* Setup: the one framed plate, since it is what to do next. */
+  .setup {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 32px;
+    padding: 40px 18px 34px;
+  }
+  .step {
+    min-width: 0;
+    padding: 0 22px;
+  }
+  .step + .step:not(.by-hand) {
+    border-left: 1px solid var(--separator);
+  }
+  .by-hand {
+    grid-column: 1 / -1;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--separator);
+  }
+  .step h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 28px;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 var(--engrave-light);
+  }
+  .step h3 .tape {
+    text-shadow: none;
+  }
+  .step p {
+    margin: 14px 0 0;
+    font-size: 15.5px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+  .step strong {
+    color: var(--text);
+  }
+  .configs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 920px;
+    gap: 20px;
+  }
+  .configs > div {
+    min-width: 0;
+  }
+  pre {
+    margin: 10px 0 0;
+    padding: 16px 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  @media (max-width: 900px) {
+    .setup,
+    .configs {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .setup {
+      padding: 36px 4px 26px;
+    }
+    .step + .step,
+    .step + .step:not(.by-hand) {
+      border-left: 0;
+      margin-top: 28px;
+      padding-top: 28px;
+      border-top: 1px solid var(--separator);
+    }
+  }
+  @media (max-width: 560px) {
+    .step {
+      padding: 0 14px;
+    }
+  }
+
+  .faq-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 48px;
+    padding-top: 40px;
+    border-top: 1px solid var(--separator);
+  }
+  .faq-item {
+    padding: 18px 0 20px;
+    border-top: 1px solid var(--separator);
+  }
+  .faq-item:last-child {
+    border-bottom: 1px solid var(--separator);
   }
   .faq-item h3 {
     margin: 0;
+    font-size: 17px;
+    line-height: 1.4;
   }
   .faq-item p {
     margin: 8px 0 0;
-    font-size: 15px;
+    max-width: 68ch;
     line-height: 1.6;
     color: var(--text-secondary);
   }
-  @media (max-width: 860px) {
-    .cards,
-    .faq {
-      grid-template-columns: 1fr;
+  @media (max-width: 900px) {
+    .faq-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
     }
+  }
+
+  .close {
+    padding: 72px 0 96px;
+  }
+  .docs {
+    margin: 0;
+    max-width: 68ch;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .docs a {
+    font-weight: 600;
   }
 </style>
