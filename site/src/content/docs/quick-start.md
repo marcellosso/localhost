@@ -33,4 +33,4 @@ Closing the window doesn't stop anything: your Services keep running, and the me
 
 ## 5. Let your coding agent run it too
 
-Connect Claude Code, Cursor, Codex or another MCP client to `localhost mcp`, and it starts, stops and reads the logs of the same Services, instead of a `pnpm dev` in a shell you can't see. What it starts shows in the window. See [Coding agents (MCP)](/docs/mcp) and the [agent skill](/docs/skills).
+Connect Claude Code, Cursor, Codex or another MCP client to `localhost mcp`, from **Settings → Agents** or with `npx @getlocalhost/cli mcp install` in a terminal, and it starts, stops and reads the logs of the same Services, instead of a `pnpm dev` in a shell you can't see. What it starts shows in the window. See [Coding agents (MCP)](/docs/mcp) and the [agent skill](/docs/skills).

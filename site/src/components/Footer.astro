@@ -1,5 +1,6 @@
 ---
 import Wordmark from './Wordmark.astro';
+import { guides } from '../lib/guides';
 import { href, releases, repository } from '../lib/site';
 ---
 
@@ -25,6 +26,11 @@ import { href, releases, repository } from '../lib/site';
         <a href={href('docs/cli')}>Command line</a>
         <a href={href('docs/mcp')}>MCP server</a>
         <a href={href('docs/updates')}>Updates</a>
+      </div>
+      <div>
+        <h2 class="plate-label">Guides</h2>
+        {guides.map((guide) => <a href={href(`guides/${guide.slug}`)}>{guide.label}</a>)}
+        <a href={href('guides')}>All guides</a>
       </div>
       <div>
         <h2 class="plate-label">Open source</h2>

@@ -99,7 +99,7 @@ command = "/Applications/localhost.app/Contents/Helpers/localhost"
 args = ["mcp"]
 ```
 
-**Other clients**, such as Claude Desktop, take the same `command` and `args` in their own configuration file. Use the full path: apps started from the Dock or a launcher don't always get your shell's `PATH`.
+**Other clients** take the same `command` and `args` in their own configuration file: any client that starts an MCP server over standard input and output can run `localhost mcp`. For Claude Desktop, `npx @getlocalhost/cli mcp install --client claude-desktop` writes it for you. Use the full path: apps started from the Dock or a launcher don't always get your shell's `PATH`.
 
 Building localhost yourself? `cargo install --path core/localhost-cli` in a clone of the repository puts `localhost` in `~/.cargo/bin`. It must come from the same version as the app, which otherwise says the two speak to the core differently.
 
@@ -163,4 +163,4 @@ start_service / start_project to run, status before saying anything is running,
 logs and ports when something fails or a port is taken.
 ```
 
-Why this matters, and what agents do with it: [localhost for AI coding agents](/agents).
+Why this matters, and what agents do with it: [localhost for AI coding agents](/agents). An agent already started a second copy of your dev server? [Claude Code started a second dev server](/guides/claude-code-dev-server).
