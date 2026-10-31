@@ -1,6 +1,7 @@
 //! `localhost mcp`: a Model Context Protocol server on standard input and
 //! output, so a coding agent starts, stops and inspects Services through
-//! localhost instead of a shell the user can't see.
+//! localhost instead of a shell the user can't see, and adds, edits and
+//! removes Projects and Services, unless it runs with `--read-only`.
 //!
 //! The protocol is JSON-RPC 2.0, one message per line. Only what tools need
 //! is implemented: `initialize`, `ping`, `tools/list` and `tools/call`.
@@ -52,12 +53,18 @@ When a start fails or a Port is taken, read logs and ports before trying again. 
 The developer's localhost app shows the Services you start, and you see those it started. \
 Services you start here stop when this connection ends, unless the localhost app is open.";
 
-pub fn run(library: ProjectLibrary) -> Result<ExitCode, String> {
+/// What the agent is told besides, when it may change the Configuration.
+const EDITING_INSTRUCTIONS: &str = "\
+When a Project or Service you need isn't configured yet, add it with create_project and create_service rather than running its command in a shell; \
+the developer's app shows it at once. \
+Never delete a Project or Service without asking the developer first.";
+
+pub fn run(library: ProjectLibrary, read_only: bool) -> Result<ExitCode, String> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .map_err(|error| format!("Couldn't start: {error}"))?;
-    let served = runtime.block_on(serve(library));
+    let served = runtime.block_on(serve(library, read_only));
     // Standard input is read on a blocking thread, which waits for input
     // forever when the server ended without it closing (dismissed, or a
     // signal): the runtime mustn't wait for it.
@@ -66,7 +73,7 @@ pub fn run(library: ProjectLibrary) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
-async fn serve(library: ProjectLibrary) -> Result<(), String> {
+async fn serve(library: ProjectLibrary, read_only: bool) -> Result<(), String> {
     let storage_root = default_storage_root();
     let library = Arc::new(library);
     let logs = Arc::new(LogStore::new(&storage_root));
@@ -79,7 +86,7 @@ async fn serve(library: ProjectLibrary) -> Result<(), String> {
         let targets = targets.clone();
         tokio::spawn(async move { targets.dismissed().await })
     };
-    let tools = Arc::new(Tools::new(library, targets, logs, storage_root));
+    let tools = Arc::new(Tools::new(library, targets, logs, storage_root, read_only));
 
     let (replies, mut outgoing) = mpsc::unbounded_channel::<Value>();
     let writer = tokio::spawn(async move {
@@ -162,9 +169,9 @@ async fn handle(tools: &Tools, line: &str) -> Option<Value> {
     let id = id?;
     let params = message.get("params").cloned().unwrap_or(Value::Null);
     let result = match method {
-        "initialize" => Ok(initialize(&params)),
+        "initialize" => Ok(initialize(&params, tools.is_read_only())),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": tools::definitions() })),
+        "tools/list" => Ok(json!({ "tools": tools::definitions(tools.is_read_only()) })),
         "tools/call" => match params.get("name").and_then(Value::as_str) {
             Some(name) => Ok(tools.call(name, params.get("arguments").unwrap_or(&Value::Null)).await),
             None => Err((-32602, "Invalid params: tools/call needs a tool name.".to_string())),
@@ -177,14 +184,17 @@ async fn handle(tools: &Tools, line: &str) -> Option<Value> {
     })
 }
 
-fn initialize(params: &Value) -> Value {
+fn initialize(params: &Value, read_only: bool) -> Value {
     let requested = params.get("protocolVersion").and_then(Value::as_str);
     let version = PROTOCOL_VERSIONS.into_iter().find(|version| Some(*version) == requested);
     json!({
         "protocolVersion": version.unwrap_or(PROTOCOL_VERSIONS[0]),
         "capabilities": { "tools": { "listChanged": false } },
         "serverInfo": { "name": "localhost", "title": "localhost", "version": localhost_core::VERSION },
-        "instructions": INSTRUCTIONS,
+        "instructions": match read_only {
+            true => INSTRUCTIONS.to_string(),
+            false => format!("{INSTRUCTIONS} {EDITING_INSTRUCTIONS}"),
+        },
     })
 }
 
@@ -198,12 +208,19 @@ mod tests {
 
     #[test]
     fn initialize_agrees_on_a_version_it_speaks() {
-        let reply = initialize(&json!({ "protocolVersion": "2025-03-26" }));
+        let reply = initialize(&json!({ "protocolVersion": "2025-03-26" }), false);
         assert_eq!(reply["protocolVersion"], "2025-03-26");
         assert_eq!(reply["serverInfo"]["name"], "localhost");
         assert!(reply["capabilities"]["tools"].is_object());
 
-        let reply = initialize(&json!({ "protocolVersion": "1999-01-01" }));
+        let reply = initialize(&json!({ "protocolVersion": "1999-01-01" }), false);
         assert_eq!(reply["protocolVersion"], PROTOCOL_VERSIONS[0]);
+    }
+
+    #[test]
+    fn only_a_server_that_may_edit_mentions_editing() {
+        let instructions = |read_only| initialize(&json!({}), read_only)["instructions"].as_str().unwrap().to_string();
+        assert!(instructions(false).contains("create_project"));
+        assert!(!instructions(true).contains("create_project"));
     }
 }

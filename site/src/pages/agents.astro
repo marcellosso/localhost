@@ -144,8 +144,10 @@ args = ["mcp"]`;
           or <code>commandNotFound</code> with a message saying what to do next, and logs are bounded (200 lines by default, at most 2,000).
         </li>
         <li>
-          <strong>Your configuration stays yours.</strong> The agent can’t add or change Projects or Services, and it reads only the
-          Secrets of the Services it starts.
+          <strong>Changes you can see.</strong> The agent can add, edit and remove Projects and Services, checked as the app checks them,
+          and the open app shows each change at once. It removes only with <code>confirm: true</code>, never touches a Project’s folder,
+          sets no Secrets, and reads only the Secrets of the Services it starts. <code>localhost mcp --read-only</code> leaves the
+          editing tools out.
         </li>
       </ul>
     </div>
@@ -155,7 +157,7 @@ args = ["mcp"]`;
     <div class="container">
       <div class="row-head">
         <h2 id="tools-title" class="engraved">Which MCP tools does localhost expose?</h2>
-        <p class="lede">Nine tools. Projects and Services are named by their Key, as <code>list_projects</code> shows them.</p>
+        <p class="lede">Fifteen tools: nine to run and inspect, six to add, edit and remove. Projects and Services are named by their Key, as <code>list_projects</code> shows them.</p>
       </div>
       <div class="inset table-wrap">
         <table>

@@ -6,7 +6,7 @@ import SwiftUI
 /// shows the same `AgentsContent`.
 struct ConnectAgentsView: View {
     static let title = "Connect your agents"
-    static let subtitle = "Let Claude Code, Cursor and Codex start, stop and read your Services through localhost. Nothing changes until you click Connect."
+    static let subtitle = "Let Claude Code, Cursor and Codex start, stop and read your Services through localhost, and add the ones they need. Nothing changes until you click Connect."
 
     @Environment(\.dismiss) private var dismiss
 

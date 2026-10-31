@@ -52,6 +52,7 @@ struct State {
     subscribers: Vec<mpsc::UnboundedSender<ServiceEvent>>,
     run_logs: HashMap<u64, mpsc::UnboundedSender<OutputLine>>,
     services_logs: HashMap<u64, mpsc::UnboundedSender<ServiceOutputLine>>,
+    projects_saved: Vec<mpsc::UnboundedSender<Origin>>,
 }
 
 const LOST: &str = "the connection to localhostd closed";
@@ -180,6 +181,9 @@ impl Remote {
                     self.close_stream(stream, false);
                 }
             }
+            Message::ProjectsSaved { origin } => {
+                state.projects_saved.retain(|subscriber| subscriber.send(origin).is_ok());
+            }
             Message::Dismissed => state.is_dismissed = true,
         }
     }
@@ -203,6 +207,7 @@ impl Remote {
         state.subscribers.clear();
         state.run_logs.clear();
         state.services_logs.clear();
+        state.projects_saved.clear();
     }
 
     async fn call<T: DeserializeOwned>(&self, request: Request) -> Result<T, LocalhostError> {
@@ -266,6 +271,23 @@ impl Remote {
         secrets: HashMap<String, Option<String>>,
     ) -> Result<(), LocalhostError> {
         self.call(Request::SetProjects { projects, secrets }).await
+    }
+
+    /// Tells the core's other clients that this one saved the Project
+    /// Configuration, so they read it again.
+    pub async fn announce_projects_saved(&self, origin: Origin) -> Result<(), LocalhostError> {
+        self.call(Request::ProjectsSaved { origin }).await
+    }
+
+    /// Who saved the Project Configuration, each time another client of the
+    /// core says it did. The stream ends if the connection is lost.
+    pub fn projects_saved(&self) -> mpsc::UnboundedReceiver<Origin> {
+        let mut state = self.state();
+        let (sender, receiver) = mpsc::unbounded_channel();
+        if state.is_connected {
+            state.projects_saved.push(sender);
+        }
+        receiver
     }
 
     // MARK: Services, as `ServiceManager`

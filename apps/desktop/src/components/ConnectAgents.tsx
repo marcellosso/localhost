@@ -9,7 +9,7 @@ import styles from "./ConnectAgents.module.css";
 
 export const CONNECT_AGENTS_TITLE = "Connect your agents";
 export const CONNECT_AGENTS_SUBTITLE =
-  "Let Claude Code, Cursor and Codex start, stop and read your Services through localhost. Nothing changes until you click Connect.";
+  "Let Claude Code, Cursor and Codex start, stop and read your Services through localhost, and add the ones they need. Nothing changes until you click Connect.";
 
 const MANUAL_SETUP_URL = "https://www.getlocalhost.app/docs/mcp";
 

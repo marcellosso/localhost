@@ -2,7 +2,8 @@
 //! Services named by Key, structured results, bounded log reads.
 //!
 //! Every call reads the Project Configuration from disk again, so Projects
-//! added or edited in the app since the agent connected are seen.
+//! added or edited in the app since the agent connected are seen. Unless
+//! the server is read-only, `edits` adds tools that change it.
 //!
 //! Services run in the shared core the app drives too, so the app's Runs are
 //! this session's as well (`"session": "shared"`, with who started them).
@@ -16,13 +17,15 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use localhost_core::{
-    Ansi, Id, Listener, ListenerOwner, LocalhostError, LogStore, MemorySecretStore, Origin, Orphan, OutputChannel,
-    Project, ProjectLibrary, RunRegistry, Service, ServiceState, ServiceStatus, Targets,
+    Ansi, Id, Listener, ListenerOwner, LocalhostError, LogStore, Origin, Orphan, OutputChannel, Project,
+    ProjectLibrary, RunRegistry, Service, ServiceState, ServiceStatus, Targets,
 };
 use serde_json::{Map, Value, json};
 
 use crate::resolve;
 use crate::up::with_dependencies;
+
+mod edits;
 
 /// How long a start waits for its Services to settle (Running, Exited,
 /// Failed) before it answers with them still Starting. A Service with a
@@ -36,8 +39,18 @@ const MAX_LOG_LINES: u64 = 2000;
 /// includes, so the agent sees why without a second call.
 const FAILURE_OUTPUT_LINES: usize = 20;
 
-/// The definition of every tool, for `tools/list`.
-pub fn definitions() -> Value {
+/// The definition of every tool, for `tools/list`: without those that
+/// change the Project Configuration when `read_only`.
+pub fn definitions(read_only: bool) -> Value {
+    let mut tools = operating_definitions();
+    if !read_only && let Value::Array(tools) = &mut tools {
+        tools.extend(edits::definitions());
+    }
+    tools
+}
+
+/// The tools that read and run what is configured.
+fn operating_definitions() -> Value {
     let project =
         json!({ "type": "string", "description": "The Project's Key (as list_projects shows it), or its name." });
     let service =
@@ -181,11 +194,23 @@ pub struct Tools {
     /// Read from disk only: the shared core writes the Runs' log files.
     logs: Arc<LogStore>,
     storage_root: PathBuf,
+    /// Without the tools in `edits`.
+    read_only: bool,
 }
 
 impl Tools {
-    pub fn new(library: Arc<ProjectLibrary>, targets: Targets, logs: Arc<LogStore>, storage_root: PathBuf) -> Tools {
-        Tools { library, targets, logs, storage_root }
+    pub fn new(
+        library: Arc<ProjectLibrary>,
+        targets: Targets,
+        logs: Arc<LogStore>,
+        storage_root: PathBuf,
+        read_only: bool,
+    ) -> Tools {
+        Tools { library, targets, logs, storage_root, read_only }
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
     }
 
     /// The result of `tools/call`: the tool's answer, or its failure marked
@@ -208,6 +233,7 @@ impl Tools {
             "stop_project" => self.stop_project(arguments).await,
             "logs" => return self.logs(arguments).unwrap_or_else(failure),
             "ports" => self.ports(arguments).await,
+            name if edits::NAMES.contains(&name) && !self.read_only => self.edit(name, arguments).await,
             _ => Err(ToolError::new("unknownTool", format!("There is no tool “{name}”."))),
         };
         match result {
@@ -219,9 +245,7 @@ impl Tools {
     /// Takes in the Project Configuration as stored now. A file that can't
     /// be read leaves the Projects as they were.
     fn refresh(&self) {
-        if let Ok(stored) = ProjectLibrary::open(&self.storage_root, Arc::new(MemorySecretStore::new())) {
-            self.library.replace_projects(stored.projects(), Origin::Agent);
-        }
+        let _ = self.library.reload(Origin::Agent);
     }
 
     // MARK: Reading
@@ -732,7 +756,7 @@ mod tests {
 
     #[test]
     fn every_tool_has_a_name_a_description_and_an_object_schema() {
-        let definitions = definitions();
+        let definitions = definitions(false);
         let tools = definitions.as_array().unwrap();
         let names: HashSet<&str> = tools.iter().map(|tool| tool["name"].as_str().unwrap()).collect();
         assert_eq!(names.len(), tools.len());
@@ -746,13 +770,27 @@ mod tests {
             "stop_project",
             "logs",
             "ports",
-        ] {
+        ]
+        .into_iter()
+        .chain(edits::NAMES)
+        {
             assert!(names.contains(name), "{name}");
         }
         for tool in tools {
             assert!(!tool["description"].as_str().unwrap().is_empty());
             assert_eq!(tool["inputSchema"]["type"], "object");
         }
+    }
+
+    #[test]
+    fn read_only_leaves_out_every_tool_that_changes_the_configuration() {
+        let all = definitions(false);
+        let read_only = definitions(true);
+        let names = |tools: &Value| -> HashSet<String> {
+            tools.as_array().unwrap().iter().map(|tool| tool["name"].as_str().unwrap().to_string()).collect()
+        };
+        let removed: HashSet<String> = names(&all).difference(&names(&read_only)).cloned().collect();
+        assert_eq!(removed, edits::NAMES.iter().map(|name| name.to_string()).collect());
     }
 
     #[test]

@@ -14,6 +14,11 @@
 //! memory only, the latest a client sent winning. A value stays until a
 //! client sends another, or no Project names its Secret.
 //!
+//! The Project Configuration is saved by clients, on disk. A client that
+//! changed it says so ([`Request::ProjectsSaved`]), and the core tells every
+//! other connection ([`Message::ProjectsSaved`]), which reads it again: an
+//! open app shows what a coding agent added through `localhost mcp`.
+//!
 //! Runs belong to the core, not to a connection. A client says what it is
 //! ([`Client`]); when one disconnects, the Runs nobody needs any more stop:
 //! those it started, unless an app is still connected, or another
@@ -37,7 +42,7 @@ use crate::{
 };
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// What a connection is, which decides what its disconnecting stops.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -100,6 +105,10 @@ pub(crate) enum Request {
     SetProjects {
         projects: Vec<Project>,
         secrets: HashMap<String, Option<String>>,
+    },
+    /// This client saved the Project Configuration: tell the others.
+    ProjectsSaved {
+        origin: Origin,
     },
     /// Replies with every status; then every Service event follows.
     Subscribe,
@@ -207,6 +216,10 @@ pub(crate) enum Message {
     ServicesLog {
         stream: u64,
         lines: Vec<ServiceOutputLine>,
+    },
+    /// Another client saved the Project Configuration: read it again.
+    ProjectsSaved {
+        origin: Origin,
     },
     /// The core is closing this connection on the app's request
     /// (`Request::DisconnectAgents`): the client should end, not reconnect.
