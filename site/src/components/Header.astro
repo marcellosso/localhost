@@ -73,6 +73,14 @@ const current = (section: string) => path.startsWith(href(section));
   });
   matchMedia('(min-width: 761px)').addEventListener('change', () => setOpen(false));
 
+  // Two Downloads in view compete: the header's stays quiet until the hero's leaves the screen.
+  const heroCta = document.querySelector('[data-hero-cta]');
+  if (heroCta) {
+    new IntersectionObserver(([entry]) => header.toggleAttribute('data-hero-cta-hidden', !entry.isIntersecting), {
+      rootMargin: `-${header.offsetHeight}px 0px 0px 0px`,
+    }).observe(heroCta);
+  }
+
   const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
@@ -144,6 +152,28 @@ const current = (section: string) => path.startsWith(href(section));
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  .actions > :global(.button-primary) {
+    transition:
+      transform 160ms var(--ease-out),
+      color 200ms ease,
+      background-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+  /* Set from the first paint by CSS, so the page never loads with the header's Download lit. Same box
+   * as the primary button, so switching moves nothing. */
+  :global(html:has([data-hero-cta])) .header:not([data-hero-cta-hidden]) .actions > :global(.button-primary) {
+    background: transparent;
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent);
+  }
+  :global(html:has([data-hero-cta])) .header:not([data-hero-cta-hidden]) .actions > :global(.button-primary:hover) {
+    background: var(--fill);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .actions > :global(.button-primary) {
+      transition: none;
+    }
   }
   .theme {
     width: 34px;
