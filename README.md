@@ -283,7 +283,7 @@ localhost mcp
 
 ## Coding agents (MCP)
 
-`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. An agent and the app drive the same background core: what one starts is Running in the other, and a stop from either stops it. An agent never starts a second copy of a running Service, can't change your configuration, and reads only the Secrets of the Services it starts. The Services an agent starts stop when it disconnects, unless the app is open.
+`localhost mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout. Coding agents use it to start, stop and inspect your Services instead of starting dev servers in a shell you can't see: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`. They can also add, edit and remove Projects and Services: `create_project`, `update_project`, `delete_project`, `create_service`, `update_service` and `delete_service`, checked as the app's editors check them and shown in the open app at once. Removing needs `confirm: true` and never touches a Project's folder; `localhost mcp --read-only` leaves these six tools out. An agent and the app drive the same background core: what one starts is Running in the other, and a stop from either stops it. An agent never starts a second copy of a running Service, sets no Secrets, and reads only the Secrets of the Services it starts. The Services an agent starts stop when it disconnects, unless the app is open.
 
 **Connect from the app.** Open **Settings › Agents** (or **Connect Agents…** in the command palette) and click **Connect** next to Claude Code, Cursor or Codex. Before you click, **What changes** shows exactly what localhost writes:
 
@@ -301,9 +301,9 @@ The entry is a server named `localhost` that runs the command bundled with the a
 npx @getlocalhost/cli mcp install
 ```
 
-It writes the same entries as **Connect** for every agent it finds, and Claude Desktop's `claude_desktop_config.json` too (macOS, Windows); `mcp uninstall` removes them, `mcp status` shows where each agent stands, `--client cursor` picks one and `--dry-run` prints the diff instead. Without the app it changes nothing and says how to install it. See [packages/cli](packages/cli/README.md).
+It writes the same entries as **Connect** for every agent it finds, and Claude Desktop's `claude_desktop_config.json` too (macOS, Windows); `mcp uninstall` removes them, `mcp status` shows where each agent stands, `--client cursor` picks one, `--read-only` sets up `localhost mcp --read-only` and `--dry-run` prints the diff instead. Without the app it changes nothing and says how to install it. See [packages/cli](packages/cli/README.md).
 
-**Or by hand**, for other MCP clients: give the bundled command the argument `mcp`.
+**Or by hand**, for other MCP clients: give the bundled command the argument `mcp` (or `mcp --read-only` for a server that can't change your configuration).
 
 - **Claude Code**: `claude mcp add --scope user localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
 - **Codex**: `codex mcp add localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`
@@ -337,7 +337,7 @@ Add the Project’s folder and localhost suggests Services from `package.json` s
 
 ### Can AI coding agents start my dev servers through localhost?
 
-Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
+Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. They can also add, edit and remove Projects and Services, checked as the app checks them: removing needs `confirm: true` and never touches a Project’s folder, and `localhost mcp --read-only` leaves those tools out. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
 
 ### Is it free and open source?
 
@@ -360,7 +360,7 @@ Plenty of good tools overlap with localhost, and several are the better choice f
 | **tmux, tmuxinator** | Remote and headless work, interactive programs | State, Ports and process trees managed for you |
 | **Docker Compose** | Containerized, reproducible stacks | Native commands next to your Compose services |
 | **concurrently** | A one-line `npm run dev` for the whole team, in CI too | Per-Service control, Dependencies and kept logs |
-| **devglow, DevWebUI** | Agents can register and edit projects | MIT license; Linux packages; agents connected in one click and can’t add, edit or delete Projects |
+| **devglow, DevWebUI** | Agents reach them from any MCP client; DevWebUI’s config in the repo | MIT license; Linux packages; agents connected in one click, with confirmed deletes and a read-only mode |
 
 localhost isn’t a production or remote-server dashboard, a container or Kubernetes tool, a terminal emulator or a cloud service. It runs commands on your own machine, the way you would in a terminal, and remembers how each Project runs.
 

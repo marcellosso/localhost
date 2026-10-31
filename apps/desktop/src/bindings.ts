@@ -945,7 +945,11 @@ export type ListenerOwner =
  * Every failure the core reports. Clients match on these cases; they are
  * never flattened into strings inside the core.
  */
-export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "invalidName" } | { kind: "invalidProjectPath"; detail: string } | { kind: "invalidDistroName"; detail: string } | { kind: "invalidWorkingDirectory"; detail: string } | { kind: "emptyCommandLine" } | { kind: "invalidEnvironmentVariableName"; detail: string } | { kind: "duplicateVariableName"; detail: string } | { kind: "duplicateProfileName"; detail: string } | { kind: "invalidPort"; detail: number } | { kind: "invalidUrl"; detail: string } | { kind: "duplicateProjectKey"; detail: Key } | { kind: "duplicateServiceKey"; detail: { key: Key; project_id: Id } } | 
+export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "invalidName" } | { kind: "invalidProjectPath"; detail: string } | 
+/**
+ * No folder is at the Project's path on this machine.
+ */
+{ kind: "projectFolderMissing"; detail: string } | { kind: "invalidDistroName"; detail: string } | { kind: "invalidWorkingDirectory"; detail: string } | { kind: "emptyCommandLine" } | { kind: "invalidEnvironmentVariableName"; detail: string } | { kind: "duplicateVariableName"; detail: string } | { kind: "duplicateProfileName"; detail: string } | { kind: "invalidPort"; detail: number } | { kind: "invalidUrl"; detail: string } | { kind: "duplicateProjectKey"; detail: Key } | { kind: "duplicateServiceKey"; detail: { key: Key; project_id: Id } } | 
 /**
  * The Dependency would make a Service depend on itself, e.g. `[api, worker, api]`.
  */

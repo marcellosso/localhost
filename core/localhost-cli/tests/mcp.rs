@@ -80,8 +80,12 @@ impl Home {
     }
 
     fn mcp(&self) -> Client {
+        self.mcp_with(&["mcp"])
+    }
+
+    fn mcp_with(&self, arguments: &[&str]) -> Client {
         let mut child = self
-            .command(&["mcp"])
+            .command(arguments)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
@@ -592,4 +596,185 @@ fn an_agent_disconnecting_leaves_running_what_another_agent_started() {
     assert!(process_group_exists(db_group), "the second agent's Run goes on");
     second.disconnect();
     wait_until(|| !process_group_exists(db_group), "the second agent's Run to stop");
+}
+
+// MARK: Changing the Project Configuration
+
+/// Waits until the app's library has what `check` looks for, without the
+/// app reading the Configuration itself: the core tells it.
+fn wait_for_app(app: &Targets, check: impl Fn(&[Project]) -> bool, what: &str) {
+    wait_until(|| check(&app.library().projects()), what);
+}
+
+#[test]
+fn an_agent_adds_edits_and_removes_projects_and_services_and_the_open_app_shows_each_change() {
+    let home = Home::new();
+    let folder = home.path().join("code").join("shop");
+    std::fs::create_dir_all(&folder).unwrap();
+    let mut agent = home.mcp();
+    let runtime = runtime();
+    let app = runtime.block_on(home.app());
+
+    let created =
+        agent.call("create_project", json!({ "name": "Acme Shop", "path": folder, "env": { "MODE": "dev" } }));
+    let project = &created["project"];
+    assert_eq!(project["key"], "acme-shop", "{created:#}");
+    assert_eq!(project["env"], json!({ "MODE": "dev" }));
+    let project_id: Id = project["id"].as_str().unwrap().parse().unwrap();
+    wait_for_app(&app, |projects| projects.iter().any(|project| project.id == project_id), "the new Project");
+
+    let db = agent.call(
+        "create_service",
+        json!({ "project": "acme-shop", "name": "Postgres", "key": "db", "command_line": "docker compose up db", "port": 5432, "port_can_change": false }),
+    );
+    assert_eq!(db["service"]["key"], "db", "{db:#}");
+    let web = agent.call(
+        "create_service",
+        json!({ "project": "acme-shop", "name": "Web", "command_line": "pnpm dev", "working_directory": "./apps/web/", "port": 3000, "dependencies": ["db"], "env": { "DEBUG": 1 } }),
+    );
+    let web = &web["service"];
+    assert_eq!(web["workingDirectory"], "apps/web", "{web:#}");
+    assert_eq!(web["dependencies"], json!(["db"]));
+    assert_eq!(web["env"], json!({ "DEBUG": "1" }));
+    let web_id: Id = web["id"].as_str().unwrap().parse().unwrap();
+    wait_for_app(
+        &app,
+        |projects| projects.iter().any(|project| project.services.iter().any(|service| service.id == web_id)),
+        "the new Services",
+    );
+    let (_, saved) = app.library().service(web_id).unwrap();
+    assert_eq!(saved.command_line, "pnpm dev");
+    assert_eq!(saved.port, Some(3000));
+    assert!(!std::fs::read_dir(&folder).unwrap().any(|_| true), "nothing is written into the folder");
+
+    let edited = agent.call(
+        "update_service",
+        json!({ "project": "acme-shop", "service": "web", "port": null, "command_line": "pnpm start" }),
+    );
+    assert_eq!(edited["service"]["port"], Value::Null, "{edited:#}");
+    assert_eq!(edited["service"]["dependencies"], json!(["db"]), "fields left out stay");
+    wait_for_app(
+        &app,
+        |_| app.library().service(web_id).is_ok_and(|(_, service)| service.command_line == "pnpm start"),
+        "the edited Service",
+    );
+    let renamed = agent
+        .call("update_project", json!({ "project": "acme-shop", "name": "Acme", "key": "acme", "favorite": true }));
+    assert_eq!(renamed["project"]["key"], "acme", "{renamed:#}");
+    assert_eq!(renamed["project"]["env"], json!({ "MODE": "dev" }));
+    wait_for_app(
+        &app,
+        |projects| projects.iter().any(|project| project.key.as_str() == "acme" && project.is_favorite),
+        "the edited Project",
+    );
+
+    let removed = agent.call("delete_service", json!({ "project": "acme", "service": "db", "confirm": true }));
+    assert_eq!(removed["removed"]["key"], "db", "{removed:#}");
+    assert_eq!(removed["note"], "No longer a Dependency of: web.");
+    wait_for_app(&app, |projects| projects.iter().all(|project| project.services.len() == 1), "the removed Service");
+    assert!(app.library().service(web_id).unwrap().1.dependencies.is_empty());
+
+    let removed = agent.call("delete_project", json!({ "project": "acme", "confirm": true }));
+    assert_eq!(removed["removed"]["services"], json!(["web"]), "{removed:#}");
+    wait_for_app(&app, |projects| projects.is_empty(), "the removed Project");
+    assert!(folder.is_dir(), "the folder is left as it was");
+    assert!(home.library().projects().is_empty());
+
+    agent.disconnect();
+    drop(app);
+}
+
+#[test]
+fn removing_needs_confirmation_and_stops_what_runs() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    home.service(&project, "web", &long_running(&home, "web"), None, vec![]);
+    let mut agent = home.mcp();
+
+    let error = agent.call_error("delete_service", json!({ "project": "acme", "service": "web" }));
+    assert_eq!(error["kind"], "confirmationRequired");
+    assert!(error["message"].as_str().unwrap().contains("confirm: true"), "{error:#}");
+    let error = agent.call_error("delete_project", json!({ "project": "acme", "confirm": false }));
+    assert_eq!(error["kind"], "confirmationRequired");
+    assert_eq!(home.library().projects()[0].services.len(), 1, "nothing was removed");
+
+    agent.call("start_service", json!({ "project": "acme", "service": "web" }));
+    let group = home.wait_for_pid("web");
+    let removed = agent.call("delete_service", json!({ "project": "acme", "service": "web", "confirm": true }));
+    assert_eq!(removed["stopped"], json!(["web"]), "{removed:#}");
+    assert!(!process_group_exists(group));
+    assert!(home.library().projects()[0].services.is_empty());
+    agent.disconnect();
+}
+
+#[test]
+fn changes_are_checked_as_the_apps_editors_check_them() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    home.service(&project, "web", "pnpm dev", None, vec![]);
+    let mut agent = home.mcp();
+    let folder = home.path().join("code").join("acme");
+
+    let missing = home.path().join("missing");
+    let error = agent.call_error("create_project", json!({ "name": "Gone", "path": missing }));
+    assert_eq!(error["kind"], "projectFolderMissing", "{error:#}");
+    let error = agent.call_error("create_project", json!({ "name": "Relative", "path": "code/acme" }));
+    assert_eq!(error["kind"], "invalidProjectPath");
+    let error = agent.call_error("create_project", json!({ "name": "Again", "key": "acme", "path": folder }));
+    assert_eq!(error["kind"], "duplicateProjectKey");
+    let error =
+        agent.call_error("create_project", json!({ "name": "Bad", "path": folder, "env": { "NOT-A-NAME": "x" } }));
+    assert_eq!(error["kind"], "invalidEnvironmentVariableName");
+    assert_eq!(home.library().projects().len(), 1, "a failed create leaves nothing behind");
+
+    let error = agent.call_error("create_service", json!({ "project": "acme", "name": "Api", "command_line": "  " }));
+    assert_eq!(error["message"], "`command_line` must be a non-empty string.");
+    let error = agent
+        .call_error("create_service", json!({ "project": "acme", "name": "Api", "command_line": "x", "port": 70000 }));
+    assert_eq!(error["kind"], "invalidPort");
+    let error = agent
+        .call_error("create_service", json!({ "project": "acme", "name": "Web", "key": "web", "command_line": "x" }));
+    assert_eq!(error["kind"], "duplicateServiceKey");
+    let error =
+        agent.call_error("update_service", json!({ "project": "acme", "service": "web", "working_directory": "/srv" }));
+    assert_eq!(error["kind"], "invalidWorkingDirectory");
+    let error =
+        agent.call_error("update_service", json!({ "project": "acme", "service": "web", "dependencies": ["web"] }));
+    assert_eq!(error["kind"], "dependencyCycle");
+    let error =
+        agent.call_error("update_service", json!({ "project": "acme", "service": "web", "url": "localhost:3000" }));
+    assert_eq!(error["kind"], "invalidUrl");
+
+    let added = agent.call("create_service", json!({ "project": "acme", "name": "Web", "command_line": "x" }));
+    assert_eq!(added["service"]["key"], "web-2", "a Key made from the name is free");
+    agent.disconnect();
+}
+
+#[test]
+fn read_only_offers_only_the_tools_that_read_and_run() {
+    let home = Home::new();
+    home.project("Acme", "acme");
+    let mut client = home.mcp_with(&["mcp", "--read-only"]);
+
+    let tools = client.request("tools/list", json!({}));
+    let names: Vec<&str> =
+        tools["result"]["tools"].as_array().unwrap().iter().map(|tool| tool["name"].as_str().unwrap()).collect();
+    assert_eq!(
+        names,
+        [
+            "list_projects",
+            "list_services",
+            "status",
+            "start_service",
+            "stop_service",
+            "start_project",
+            "stop_project",
+            "logs",
+            "ports"
+        ]
+    );
+    let error = client.call_error("delete_project", json!({ "project": "acme", "confirm": true }));
+    assert_eq!(error["kind"], "unknownTool");
+    assert_eq!(home.library().projects().len(), 1);
+    client.disconnect();
 }

@@ -1,4 +1,4 @@
-A Project runs on its **Execution Target**: Windows itself (the default), or a WSL distro such as Ubuntu. Add Project asks which.
+localhost on Windows installs for your user only, on Windows 10 or 11 (x64); see [Install](/docs/install). A Project runs on its **Execution Target**: Windows itself (the default), or a WSL distro such as Ubuntu. Add Project asks which.
 
 ## On Windows itself
 

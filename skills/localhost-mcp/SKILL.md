@@ -28,6 +28,10 @@ stop_service  { project: "my-saas", service: "web" }   when you are done
 
 ## When there is no Project or Service for it
 
-The MCP server can't add or edit Projects. If the folder has no Project, or the Service you need is missing, tell the developer and suggest adding it in the localhost app (it scans the folder and suggests Services). Only fall back to a shell if they say so.
+If the folder has no Project, add it with `create_project` (`name`, and the folder's absolute `path`), then each Service it needs with `create_service` (`name`, `command_line`, and a `port` if it listens on one; the command gets it as `$PORT`). Fix a wrong command or Port with `update_service`. Tell the developer what you added: it shows in their localhost app at once. Adding stores the command without running it; start it as usual.
+
+Never remove a Project or Service unless the developer asks: `delete_project` and `delete_service` need `confirm: true`, which you pass only once they agreed. Removing never touches the Project's files.
+
+If these tools aren't there, the server is read-only: tell the developer what to add in the localhost app (it can scan the folder and suggest Services). Only fall back to a shell if they say so.
 
 Services you started stop when your session ends, unless the localhost app is open: then they keep running there. Tell the developer what is still running when you finish.

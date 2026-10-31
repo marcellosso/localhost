@@ -21,6 +21,8 @@ cd site && PUBLIC_POSTHOG_HOST=https://us.i.posthog.com pnpm build && pnpm previ
 |---|---|---|
 | `download_clicked` | A Download button or link | `location` (`header`, `hero`, `closing`, `footer`, `install_dialog`); `platform` (`macos`, `windows`, `linux`) on the Download buttons; `package` (`mac`, `windows`, `deb`, `rpm`, `appimage`) in the install dialog |
 | `install_command_copied` | A Copy button in the install dialog | `command` (`curl`, `xattr`, `apt`, `dnf`, `appimage`) |
+| `install_opened` | A platform's link in the landing page's install section, opening the install dialog | `platform` (`macos`, `windows`, `linux`) |
+| `platform_docs_clicked` | A platform's name in the hero, linking to its docs page | `platform` (`macos`, `windows`, `linux`); `location` (`hero`) |
 | `github_clicked` | A link to the repository | `location` (`header`, `hero`, `footer`) |
 
 An event is declared in the markup: `data-track="<event>"` on the element, and a `data-track-<property>="<value>"` attribute per property. Keep names in `snake_case`, as `<object>_<past-tense verb>`, and add new ones to this table.

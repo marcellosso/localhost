@@ -26,7 +26,7 @@ export const alternatives: Alternative[] = [
       'Development on your own machine: a window per Project, Start All in dependency order, one merged log.',
       'Built for development: your login shell’s `PATH` and version managers, Port readiness and Dependencies between Services, instead of production supervision.',
       'Nothing restarts on its own: a Service that fails stays Failed, with the reason and its output.',
-      'Coding agents start and stop the same Services over MCP (`localhost mcp`), and you see what they run in the window.',
+      'Coding agents start, stop, add and edit the same Services over MCP (`localhost mcp`), and you see what they run and change in the window.',
     ],
     summary: { wins: 'Supervising production processes on servers', localhost: 'Dev servers on your own machine, with a GUI' },
   },
@@ -98,14 +98,15 @@ export const alternatives: Alternative[] = [
     what: 'Other GUIs for local dev servers. devglow is a paid desktop app ($9.99 lifetime after a 7-day trial) for macOS and Windows. DevWebUI is a control panel served from a local daemon, under a noncommercial license, reading a `.devwebui` file in the repository.',
     wins: [
       'Their agents can reach projects in any client that runs an MCP server: devglow’s with `npx devglow-mcp`, DevWebUI’s with Bun from its source checkout or as `devwebui mcp`. localhost connects Claude Code, Cursor and Codex from the app; other clients you set up by hand.',
-      'Their agents can also register, edit and delete projects, so an agent can set one up for you. In localhost you add and edit them in the app.',
+      'DevWebUI’s `.devwebui` file lives in the repository, so it can be committed and shared with the code.',
     ],
     localhost: [
       'MIT license; Linux packages (devglow has none): `.deb`, `.rpm` and AppImage.',
-      'The agent can’t add, change or delete your Projects or Services, reads only the Secrets of the Services it starts (and their Dependencies), and its Services stop when it disconnects unless the app is open.',
+      'Agents add, edit and remove Projects and Services through the same checks as the app’s editors, and the open app shows each change at once. Removing needs `confirm: true` and never touches a Project’s folder; `localhost mcp --read-only` leaves the editing tools out.',
+      'The agent sets no Secrets, reads only those of the Services it starts (and their Dependencies), and its Services stop when it disconnects unless the app is open.',
       'A native SwiftUI app on macOS and one app for Linux and Windows.',
       'Environment Profiles, and Secrets kept in Keychain, Secret Service or Credential Manager.',
     ],
-    summary: { wins: 'Agents can register and edit projects', localhost: 'MIT license; Linux packages; agents connected in one click and can’t add, edit or delete Projects' },
+    summary: { wins: 'Agents reach them from any MCP client; DevWebUI’s config in the repo', localhost: 'MIT license; Linux packages; agents connected in one click, with confirmed deletes and a read-only mode' },
   },
 ];

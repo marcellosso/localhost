@@ -15,6 +15,8 @@ pub enum LocalhostError {
     InvalidKey(String),
     InvalidName,
     InvalidProjectPath(String),
+    /// No folder is at the Project's path on this machine.
+    ProjectFolderMissing(String),
     InvalidDistroName(String),
     InvalidWorkingDirectory(String),
     EmptyCommandLine,
@@ -129,6 +131,7 @@ impl LocalhostError {
             }
             InvalidName => "Enter a name.".into(),
             InvalidProjectPath(_) => "The project folder must be an absolute path.".into(),
+            ProjectFolderMissing(path) => format!("There is no folder at {path}. Use an existing project folder."),
             InvalidDistroName(name) => format!("“{name}” is not the name of a WSL distro."),
             InvalidWorkingDirectory(_) => "The working directory must be relative to the project folder.".into(),
             EmptyCommandLine => "Enter a command line.".into(),

@@ -39,6 +39,11 @@ const SERVER: &str = "localhost";
 const SKILL_FOLDER: &str = "localhost-mcp";
 const JSON_PATH: [&str; 2] = ["mcpServers", SERVER];
 const TOML_PATH: [&str; 2] = ["mcp_servers", SERVER];
+/// What the `localhost` server runs: `localhost mcp`, or with the tools
+/// that change the Project Configuration left out, which a user may choose
+/// by hand and Connect keeps.
+const ARGUMENTS: &[&str] = &["mcp"];
+const READ_ONLY_ARGUMENTS: &[&str] = &["mcp", "--read-only"];
 
 /// A coding agent localhost can connect to its MCP server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -301,6 +306,9 @@ impl AgentSetup {
             None => {
                 status.connection = AgentConnection::Connected;
                 status.summary = format!("Connected. {}", client.next_step());
+                if entry.is_read_only {
+                    status.summary += " It is read-only: it can’t add, edit or remove Projects and Services.";
+                }
                 if let Some((from, path)) = shared_from {
                     let folder = display(path.parent().and_then(Path::parent).unwrap_or(&path), &self.home);
                     status.summary += &format!(
@@ -325,10 +333,11 @@ impl AgentSetup {
         let original = files::read(&path)?;
         let text = original.as_deref().unwrap_or("");
         let command = self.command.to_string_lossy();
+        let arguments = self.arguments(client);
         if client == AgentClient::ClaudeCode
             && let Some(claude) = self.claude_command()
         {
-            self.connect_with_claude(&claude, text, &path)?;
+            self.connect_with_claude(&claude, text, &path, arguments)?;
             self.install_skill(client)?;
             return Ok(self.status(client));
         }
@@ -336,7 +345,7 @@ impl AgentSetup {
             AgentClient::Codex => toml_edit::set(
                 text,
                 &TOML_PATH,
-                &[("command", toml_edit::render_string(&command)), ("args", toml_edit::render_strings(&["mcp"]))],
+                &[("command", toml_edit::render_string(&command)), ("args", toml_edit::render_strings(arguments))],
             ),
             AgentClient::ClaudeCode | AgentClient::Cursor => {
                 match json_edit::get(text, &JSON_PATH) {
@@ -345,7 +354,7 @@ impl AgentSetup {
                         if !entry.contains_key("url") && entry.get("type").is_none_or(|kind| kind == "stdio") =>
                     {
                         json_edit::set(text, &[JSON_PATH[0], SERVER, "command"], &json!(command))
-                            .and_then(|text| json_edit::set(&text, &[JSON_PATH[0], SERVER, "args"], &json!(["mcp"])))
+                            .and_then(|text| json_edit::set(&text, &[JSON_PATH[0], SERVER, "args"], &json!(arguments)))
                     }
                     Ok(_) => json_edit::set(text, &JSON_PATH, &self.entry()),
                     Err(reason) => Err(reason),
@@ -364,7 +373,13 @@ impl AgentSetup {
     /// Adds or repoints Claude Code's `localhost` server with `claude mcp`:
     /// `add-json` refuses a name that exists, so a server to repoint is
     /// removed first, then added back with its other keys (`env`, …).
-    fn connect_with_claude(&self, claude: &Path, text: &str, path: &Path) -> Result<(), LocalhostError> {
+    fn connect_with_claude(
+        &self,
+        claude: &Path,
+        text: &str,
+        path: &Path,
+        arguments: &[&str],
+    ) -> Result<(), LocalhostError> {
         let current = json_edit::get(text, &JSON_PATH).ok().flatten();
         let mut desired = serde_json::to_value(self.entry()).expect("an entry serializes");
         if let Some(Value::Object(entry)) = &current
@@ -373,7 +388,7 @@ impl AgentSetup {
         {
             let mut merged = entry.clone();
             merged.insert("command".into(), json!(self.command.to_string_lossy()));
-            merged.insert("args".into(), json!(["mcp"]));
+            merged.insert("args".into(), json!(arguments));
             desired = Value::Object(merged);
         }
         if current.as_ref() == Some(&desired) {
@@ -495,7 +510,15 @@ impl AgentSetup {
     }
 
     fn entry(&self) -> ServerEntry {
-        ServerEntry { kind: "stdio", command: self.command.to_string_lossy().into_owned(), args: ["mcp"] }
+        ServerEntry { kind: "stdio", command: self.command.to_string_lossy().into_owned(), args: ARGUMENTS }
+    }
+
+    /// What Connect points the agent's server at: read-only if it is now.
+    fn arguments(&self, client: AgentClient) -> &'static [&'static str] {
+        match self.read_entry(client) {
+            Ok(Some(entry)) if entry.is_read_only => READ_ONLY_ARGUMENTS,
+            _ => ARGUMENTS,
+        }
     }
 
     /// The entry as it reads in the file.
@@ -508,7 +531,7 @@ impl AgentSetup {
             AgentClient::Codex => format!(
                 "[mcp_servers.localhost]\ncommand = {}\nargs = {}\n",
                 toml_edit::render_string(&command),
-                toml_edit::render_strings(&["mcp"])
+                toml_edit::render_strings(ARGUMENTS)
             ),
         }
         .trim_end()
@@ -524,16 +547,15 @@ impl AgentSetup {
             Err(error) => return Err(error.message()),
         };
         match client {
-            AgentClient::Codex => Ok(toml_edit::table(&text, &TOML_PATH)?.map(|table| Entry {
-                command: table.string("command"),
-                has_mcp_arguments: table.strings("args").is_some_and(|args| args == ["mcp"]),
+            AgentClient::Codex => Ok(toml_edit::table(&text, &TOML_PATH)?
+                .map(|table| Entry::new(table.string("command"), table.strings("args").unwrap_or_default()))),
+            AgentClient::ClaudeCode | AgentClient::Cursor => Ok(json_edit::get(&text, &JSON_PATH)?.map(|entry| {
+                let arguments = entry.get("args").and_then(|args| serde_json::from_value(args.clone()).ok());
+                Entry::new(
+                    entry.get("command").and_then(Value::as_str).map(str::to_string),
+                    arguments.unwrap_or_default(),
+                )
             })),
-            AgentClient::ClaudeCode | AgentClient::Cursor => {
-                Ok(json_edit::get(&text, &JSON_PATH)?.map(|entry| Entry {
-                    command: entry.get("command").and_then(Value::as_str).map(str::to_string),
-                    has_mcp_arguments: entry.get("args") == Some(&json!(["mcp"])),
-                }))
-            }
         }
     }
 }
@@ -544,12 +566,21 @@ struct ServerEntry {
     #[serde(rename = "type")]
     kind: &'static str,
     command: String,
-    args: [&'static str; 1],
+    args: &'static [&'static str],
 }
 
 struct Entry {
     command: Option<String>,
     has_mcp_arguments: bool,
+    /// It runs `localhost mcp --read-only`.
+    is_read_only: bool,
+}
+
+impl Entry {
+    fn new(command: Option<String>, arguments: Vec<String>) -> Entry {
+        let is_read_only = arguments == READ_ONLY_ARGUMENTS;
+        Entry { command, has_mcp_arguments: is_read_only || arguments == ARGUMENTS, is_read_only }
+    }
 }
 
 /// What an update asks before it restarts the app: it stops the active

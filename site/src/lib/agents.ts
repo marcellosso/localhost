@@ -1,7 +1,7 @@
 /** The /agents page's definition and FAQ, also its FAQPage JSON-LD and llms.txt.
  * Answers are plain text; `code` spans are written in backticks. */
 export const agentsDefinition =
-  'localhost mcp is the Model Context Protocol (MCP) server of localhost app (getlocalhost.app), the free, MIT-licensed desktop process manager for local dev servers on macOS, Windows and Linux. It lets AI coding agents such as Claude Code, Cursor and Codex list, start, stop and inspect the dev servers, databases and workers of your local Projects through localhost instead of a shell, while you see and control the same Services in the localhost app.';
+  'localhost mcp is the Model Context Protocol (MCP) server of localhost app (getlocalhost.app), the free, MIT-licensed desktop process manager for local dev servers on macOS, Windows and Linux. It lets AI coding agents such as Claude Code, Cursor and Codex list, start, stop and inspect the dev servers, databases and workers of your local Projects through localhost instead of a shell, and add, edit or remove those Projects and Services, while you see and control the same Services in the localhost app.';
 
 /** The MCP tools, as `localhost mcp` lists them. */
 export const tools: { name: string; text: string }[] = [
@@ -14,13 +14,19 @@ export const tools: { name: string; text: string }[] = [
   { name: 'stop_project', text: 'Stops every running Service of the Project, dependents first.' },
   { name: 'logs', text: 'The latest Run’s output of one Service or the whole Project: the last 200 lines by default (at most 2,000), optionally only recent lines or lines containing some text.' },
   { name: 'ports', text: 'Who listens on which port: one of your Services, a process in a Project’s folder, or something unmanaged.' },
+  { name: 'create_project', text: 'Adds a Project for an existing folder. Nothing is written into the folder.' },
+  { name: 'update_project', text: 'Changes a Project’s name, Key, folder, favourite or plain variables.' },
+  { name: 'delete_project', text: 'Removes a Project from localhost after stopping its Services; its folder is never touched. Needs confirm: true.' },
+  { name: 'create_service', text: 'Adds a Service: command line, working directory, Port, URL, Dependencies, variables. Stored, not run.' },
+  { name: 'update_service', text: 'Changes the given fields of a Service; a running one picks them up when it restarts.' },
+  { name: 'delete_service', text: 'Stops a Service if it runs, then removes it. Needs confirm: true.' },
 ];
 
 export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'What is localhost mcp?',
     answer: [
-      '`localhost mcp` is the MCP server of localhost app, run over stdio (standard input and output) by your coding agent. It gives the agent nine tools (`list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`) over the Projects and Services you configured in the localhost app.',
+      '`localhost mcp` is the MCP server of localhost app, run over stdio (standard input and output) by your coding agent. It gives the agent tools to run and inspect the Projects and Services you configured in the localhost app (`list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs` and `ports`), and to add, edit and remove them (`create_project`, `update_project`, `delete_project`, `create_service`, `update_service`, `delete_service`). `localhost mcp --read-only` leaves out the last six.',
     ],
   },
   {
@@ -44,7 +50,8 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'Can an agent change my configuration or read my Secrets?',
     answer: [
-      'It can’t add or change Projects or Services. Secrets reach only the Services it starts, and their Dependencies; listing, `status`, `logs` and `ports` read none. On macOS, the Keychain asks before `localhost mcp` reads each Secret the first time.',
+      'It can add, edit and remove Projects and Services, checked as the app checks them, and the open app shows each change at once. It removes only with `confirm: true`, which it should pass once you agreed, never touches a Project’s folder, and sets plain variables only: Secrets are set in the app. Run `localhost mcp --read-only` to leave those tools out.',
+      'Secrets reach only the Services it starts, and their Dependencies; listing, `status`, `logs` and `ports` read none. On macOS, the Keychain asks before `localhost mcp` reads each Secret the first time.',
     ],
   },
   {

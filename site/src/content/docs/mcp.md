@@ -1,4 +1,4 @@
-Coding agents tend to start dev servers in a shell you can't see: a `pnpm dev` that holds a port, prints nowhere you can read, and lives on after the chat. `localhost mcp` lets them go through localhost instead. The agent starts and stops your Services, reads their status, logs and ports, and you see the same Projects and Services you configured.
+Coding agents tend to start dev servers in a shell you can't see: a `pnpm dev` that holds a port, prints nowhere you can read, and lives on after the chat. `localhost mcp` lets them go through localhost instead. The agent starts and stops your Services, reads their status, logs and ports, adds the Projects and Services it needs, and you see the same Projects and Services in the app.
 
 It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client. The app comes with it and connects Claude Code, Cursor and Codex in one click, or from a terminal with `npx @getlocalhost/cli mcp install`.
 
@@ -117,8 +117,18 @@ Projects and Services are named by their **Key**, as `list_projects` and `list_s
 | `stop_project` | Stops every Service of the Project, dependents first. |
 | `logs` | The latest Run's output of one Service or the whole Project, merged by time: the last `lines` lines (200 by default, at most 2,000), optionally only from the last `since_seconds` or `contains` some text. |
 | `ports` | Who listens on which port: one of your Services, a process in a Project's folder, or something unmanaged. With a Project, also whoever holds one of its Ports. |
+| `create_project` | Adds a Project: a `name` and the absolute `path` of an existing folder, optionally a `key`, `favorite` and plain variables (`env`). |
+| `update_project` | Changes the given fields of a Project: `name`, `key`, `path`, `favorite`, `env`. |
+| `delete_project` | Removes a Project from localhost, after stopping its running Services; deletes their logs. Needs `confirm: true`. |
+| `create_service` | Adds a Service: `name` and `command_line`, optionally `key`, `working_directory`, `port`, `url`, `port_can_change`, `in_start_all`, `dependencies` (Keys) and `env`. |
+| `update_service` | Changes the given fields of a Service; `port` or `url` set to `null` removes them. |
+| `delete_service` | Removes a Service, stopping it first if it runs, and drops it from other Services' Dependencies. Needs `confirm: true`. |
 
-Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `commandNotFound`, `notFound`, …) and a message saying what to do next.
+Results are JSON. The tools that add or edit return the Project or Service as saved, with its Key and `id`; those that remove return what they removed. Failures name what went wrong with a `kind` (`portConflict`, `commandNotFound`, `notFound`, …) and a message saying what to do next.
+
+## Read-only
+
+Run `localhost mcp --read-only` to leave out the six tools that add, edit and remove Projects and Services: the agent can still list, start, stop and inspect them. Add the option to the server's `args` (`["mcp", "--read-only"]`) in the agent's configuration, or to the `claude mcp add` and `codex mcp add` commands above. The app recognizes a read-only server as connected, and **Update** keeps it read-only.
 
 ## How it runs your Services
 
@@ -126,7 +136,9 @@ Results are JSON. Failures name what went wrong with a `kind` (`portConflict`, `
 - **In the app too.** The agent and the app drive the same localhost core, so a Service the agent starts is Running in the app, with its logs, and one you start in the app is running for the agent. A stop from either stops the same Run. `status` says who started each one (`"startedBy": "app"` or `"agent"`).
 - **For as long as someone needs it.** When the agent disconnects or quits, the Services it started stop, unless the app is open: then they keep running there, and you stop them when you like. Nothing keeps running unseen. Quitting the app stops every Service after asking, whoever started it.
 - **Never twice.** If a `localhost up` in a terminal already runs a Service, `status` shows it running (`"session": "other"`), with its pid and uptime. The agent won't start a second copy, and won't stop it: stop it where it runs.
-- **Configuration stays yours.** The agent can't add or change Projects or Services. Changes you make in the app apply to its next start.
+- **Changes show in the app at once.** What the agent adds, edits or removes is saved where the app keeps your Projects, checked the way the app's editors check it (Keys, ports, URLs, working directories, Dependency cycles), and the open app shows it without a restart: the agent tells the background core, which tells the app to read the Projects again. A change to a running Service applies when it restarts, as one made in the app does. Changes you make in the app reach the agent at its next call.
+- **Your files stay yours.** A command is stored as given, never run when it's added. Removing a Project never touches its folder. The agent sets plain variables only: Secrets are set in the app, and the agent's `env` keeps every Secret there is.
+- **Removing needs your yes.** `delete_project` and `delete_service` fail unless the agent passes `confirm: true`, which it should do only once you agreed. Without it, nothing is removed and the agent is told to ask.
 - **On macOS**, starting a Service that uses a Secret may ask for access to the Keychain: `localhost mcp` is another program than the app, so macOS asks it separately, once for each Secret, as described in [macOS](/docs/macos). It reads only the Secrets of what it starts: the Service, its Dependencies, or for `start_project` the Services that start. Listing, `status`, `logs` and `ports` read none. A Secret you change in the app reaches a running Service when it next starts.
 
 ## The background core

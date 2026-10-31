@@ -1,5 +1,6 @@
-//! The command line. Six commands with positional arguments only, so it is
-//! parsed by hand rather than with an argument-parsing crate.
+//! The command line. Six commands with positional arguments, and one option
+//! (`mcp --read-only`), so it is parsed by hand rather than with an
+//! argument-parsing crate.
 
 use std::ffi::OsString;
 
@@ -12,8 +13,10 @@ Commands:
   logs <project> [service]   Print the output of the latest Run of a Project's Services
   up <project> [service…]    Run a Project's Services, or some of them with their
                              Dependencies, until Ctrl-C stops them all
-  mcp                        Serve Projects to a coding agent over MCP, on stdin
-                             and stdout (see https://www.getlocalhost.app/docs/mcp)
+  mcp [--read-only]          Serve Projects to a coding agent over MCP, on stdin
+                             and stdout (see https://www.getlocalhost.app/docs/mcp).
+                             --read-only leaves out the tools that add, edit or
+                             remove Projects and Services
 
 A Project or Service is named by its Key, its name, or letters of either in
 order: `localhost up ashop web` finds Acme Shop and its Service web.
@@ -38,7 +41,10 @@ pub enum Command {
         project: String,
         services: Vec<String>,
     },
-    Mcp,
+    Mcp {
+        /// Without the tools that change the Project Configuration.
+        read_only: bool,
+    },
     /// The shared core of a storage root, which `localhost mcp` and the
     /// app start when it isn't running: not for people, so not in the usage.
     Daemon {
@@ -60,18 +66,20 @@ pub fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, S
         ("-h" | "--help" | "help", []) => Ok(Command::Help),
         ("-V" | "--version", []) => Ok(Command::Version),
         ("projects", []) => Ok(Command::Projects),
-        ("mcp", []) => Ok(Command::Mcp),
+        ("mcp", []) => Ok(Command::Mcp { read_only: false }),
+        ("mcp", [option]) if option == "--read-only" => Ok(Command::Mcp { read_only: true }),
         ("daemon", [storage_root]) => Ok(Command::Daemon { storage_root: storage_root.clone() }),
         ("status", [project]) => Ok(Command::Status { project: project.clone() }),
         ("logs", [project]) => Ok(Command::Logs { project: project.clone(), service: None }),
         ("logs", [project, service]) => Ok(Command::Logs { project: project.clone(), service: Some(service.clone()) }),
         ("up", [project, services @ ..]) => Ok(Command::Up { project: project.clone(), services: services.to_vec() }),
-        ("projects" | "mcp" | "-h" | "--help" | "help" | "-V" | "--version", _) => {
+        ("projects" | "-h" | "--help" | "help" | "-V" | "--version", _) => {
             Err(format!("`{command}` takes no arguments."))
         }
         ("status", _) => Err("Usage: localhost status <project>".into()),
         ("logs", _) => Err("Usage: localhost logs <project> [service]".into()),
         ("up", _) => Err("Usage: localhost up <project> [service…]".into()),
+        ("mcp", _) => Err("Usage: localhost mcp [--read-only]".into()),
         ("daemon", _) => Err("Usage: localhost daemon <storage root>".into()),
         _ => Err(format!("Unknown command `{command}`.")),
     }
@@ -99,7 +107,8 @@ mod tests {
             parsed(&["up", "acme", "web", "api"]),
             Ok(Command::Up { project: "acme".into(), services: vec!["web".into(), "api".into()] })
         );
-        assert_eq!(parsed(&["mcp"]), Ok(Command::Mcp));
+        assert_eq!(parsed(&["mcp"]), Ok(Command::Mcp { read_only: false }));
+        assert_eq!(parsed(&["mcp", "--read-only"]), Ok(Command::Mcp { read_only: true }));
         assert_eq!(parsed(&["daemon", "/tmp/root"]), Ok(Command::Daemon { storage_root: "/tmp/root".into() }));
         assert_eq!(parsed(&["--help"]), Ok(Command::Help));
         assert_eq!(parsed(&["-V"]), Ok(Command::Version));
@@ -118,6 +127,7 @@ mod tests {
         assert_eq!(parsed(&["logs", "a", "b", "c"]), Err("Usage: localhost logs <project> [service]".into()));
         assert_eq!(parsed(&["up"]), Err("Usage: localhost up <project> [service…]".into()));
         assert_eq!(parsed(&["projects", "extra"]), Err("`projects` takes no arguments.".into()));
+        assert_eq!(parsed(&["mcp", "--write"]), Err("Usage: localhost mcp [--read-only]".into()));
         assert!(parsed(&[]).unwrap_err().starts_with("Usage: localhost <command>"));
     }
 }

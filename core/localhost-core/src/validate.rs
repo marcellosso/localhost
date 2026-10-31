@@ -26,6 +26,17 @@ pub(crate) fn project_path(raw: &str, target: &ExecutionTarget) -> Result<String
     }
 }
 
+/// A Project path on this machine, as `project_path` makes it, that is an
+/// existing folder. Only a Project added without a folder picker (by a
+/// coding agent) is checked: an imported one may come from another machine.
+pub fn existing_project_folder(raw: &str) -> Result<String, LocalhostError> {
+    let path = project_path(raw, &ExecutionTarget::ThisMachine)?;
+    if !std::path::Path::new(&path).is_dir() {
+        return Err(LocalhostError::ProjectFolderMissing(path));
+    }
+    Ok(path)
+}
+
 fn posix_path(path: &str) -> Option<String> {
     path.starts_with('/').then(|| standardize_posix(path))
 }
@@ -133,6 +144,25 @@ mod tests {
         for invalid in ["shop", "/home/me/shop", r"C:shop"] {
             assert_eq!(project_path(invalid, &this_machine), Err(LocalhostError::InvalidProjectPath(invalid.into())));
         }
+    }
+
+    #[test]
+    fn an_existing_project_folder_is_an_absolute_path_to_a_folder() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().to_str().unwrap();
+        assert_eq!(existing_project_folder(path), project_path(path, &ExecutionTarget::ThisMachine));
+        let missing = folder.path().join("missing");
+        assert!(matches!(
+            existing_project_folder(missing.to_str().unwrap()),
+            Err(LocalhostError::ProjectFolderMissing(_))
+        ));
+        let file = folder.path().join("file");
+        std::fs::write(&file, "").unwrap();
+        assert!(matches!(
+            existing_project_folder(file.to_str().unwrap()),
+            Err(LocalhostError::ProjectFolderMissing(_))
+        ));
+        assert!(matches!(existing_project_folder("relative"), Err(LocalhostError::InvalidProjectPath(_))));
     }
 
     #[test]

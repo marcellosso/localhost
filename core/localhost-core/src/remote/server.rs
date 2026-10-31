@@ -46,7 +46,8 @@ pub(crate) struct Core {
 struct Connections {
     next_id: u64,
     clients: HashMap<u64, Client>,
-    /// How to reach each connection to dismiss it: its output, and what ends its reading.
+    /// How to reach each connection, to tell it something or dismiss it:
+    /// its output, and what ends its reading.
     dismissers: HashMap<u64, (mpsc::UnboundedSender<Message>, Arc<tokio::sync::Notify>)>,
     /// The connections that need each Service's Run: the one that started
     /// it, and those that started a Service depending on it.
@@ -294,6 +295,15 @@ impl Connection {
                 let named: HashSet<String> = projects.iter().flat_map(all_secret_accounts).collect();
                 core.secrets.update(secrets, &named);
                 core.library.replace_projects(projects, self.client().origin());
+                done()
+            }
+            Request::ProjectsSaved { origin } => {
+                let connections = core.connections();
+                for (id, (output, _)) in &connections.dismissers {
+                    if *id != self.id {
+                        let _ = output.send(Message::ProjectsSaved { origin });
+                    }
+                }
                 done()
             }
             Request::Start { service_id, on_port, origin } => {
