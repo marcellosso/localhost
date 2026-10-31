@@ -295,6 +295,14 @@ localhost mcp
 
 The entry is a server named `localhost` that runs the command bundled with the app (`localhost.app/Contents/Helpers/localhost` on macOS, `localhost.exe` beside the app on Windows, `/usr/bin/localhost` from the `.deb` and `.rpm`, a copy in localhost's data folder for the AppImage) with `mcp`, so the agent always runs the same version as the app. Only localhost's own entry changes: every other server and setting stays as it was. With Claude Code installed, localhost runs `claude mcp add-json` / `claude mcp remove` instead of editing `~/.claude.json` itself. The app opens this screen by itself once, at its first launch. Restart to Update asks before it disconnects connected agents, along with stopping your Services, so the update can replace the command they run. Each file is backed up to `agent-backups/` in localhost's data folder before the first change, connecting again changes nothing, and **Disconnect** removes only localhost's entry and skill. If an agent's `localhost` server runs another command, such as `~/.cargo/bin/localhost`, the app offers **Update**.
 
+**Or from a terminal**, with the app installed:
+
+```sh
+npx @getlocalhost/cli mcp install
+```
+
+It writes the same entries as **Connect** for every agent it finds, and Claude Desktop's `claude_desktop_config.json` too (macOS, Windows); `mcp uninstall` removes them, `mcp status` shows where each agent stands, `--client cursor` picks one and `--dry-run` prints the diff instead. Without the app it changes nothing and says how to install it. See [packages/cli](packages/cli/README.md).
+
 **Or by hand**, for other MCP clients: give the bundled command the argument `mcp`.
 
 - **Claude Code**: `claude mcp add --scope user localhost -- /Applications/localhost.app/Contents/Helpers/localhost mcp`

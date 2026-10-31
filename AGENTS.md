@@ -37,6 +37,7 @@ apps/macos/              the macOS app
 apps/desktop/            the Linux and Windows app (Tauri 2)
   src/                   React + TypeScript UI; src/bindings.ts is generated, never edited
   src-tauri/             Rust shell hosting the core
+packages/cli/            `npx @getlocalhost/cli mcp install`: connects agents from a terminal (Node, no dependencies)
 skills/                  agent skills, e.g. using localhost's MCP server
 site/                    the website (Astro): landing page, docs, changelog; reads docs/ and the desktop tokens
 scripts/                 build-core.sh, build-release.sh, signing and installer artwork
@@ -115,7 +116,7 @@ These are product rules, not implementation details. A change that breaks one ne
 
 **Coding agents**
 - Each app bundles the `localhost` command of its own version. Connect your agents (Settings, the command palette, the first-run empty state) adds a `localhost` MCP server running it, and the localhost-mcp skill, to Claude Code, Cursor and Codex, only at the locations each agent documents.
-- Claude Code's servers change through its `claude mcp` command when it is installed, else by editing `~/.claude.json`. Cursor reads Claude Code's and Codex's skill folders, so it gets its own copy only when neither has one.
+- Claude Code's servers change through its `claude mcp` command when it is installed, else by editing `~/.claude.json`. `npx @getlocalhost/cli mcp install` (`packages/cli/`) writes the same entries from a terminal, under the same rules, and Claude Desktop's too; its JSON and TOML editors mirror the core's, so change them together. Cursor reads Claude Code's and Codex's skill folders, so it gets its own copy only when neither has one.
 - An update asks before disconnecting connected agents, as it asks before stopping Services; then their `localhost mcp` ends.
 - Nothing is written until the user clicks, after seeing the file and the entry. Only localhost's own entries change, the rest of the file byte for byte; each file is backed up before localhost first edits it; Disconnect removes only localhost's entries. A file localhost can't parse is reported, never rewritten.
 
@@ -261,6 +262,8 @@ xcodebuild -project apps/macos/localhost.xcodeproj -scheme localhost -configurat
 
 cd apps/desktop && pnpm install && pnpm typecheck && pnpm test
 pnpm build && (cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings)
+
+cd packages/cli && npm test
 ```
 
 Run only what the change touches. `cargo test` in `src-tauri/` regenerates `src/bindings.ts`; commit it, CI fails if it is stale. Try changes without touching real data with `LOCALHOST_STORAGE_ROOT=/tmp/localhost-dev`.

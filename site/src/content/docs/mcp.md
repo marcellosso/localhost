@@ -1,6 +1,6 @@
 Coding agents tend to start dev servers in a shell you can't see: a `pnpm dev` that holds a port, prints nowhere you can read, and lives on after the chat. `localhost mcp` lets them go through localhost instead. The agent starts and stops your Services, reads their status, logs and ports, and you see the same Projects and Services you configured.
 
-It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client. The app comes with it and connects Claude Code, Cursor and Codex in one click.
+It is a [Model Context Protocol](https://modelcontextprotocol.io) server on standard input and output, so it works with Claude Code, Cursor, Codex, Claude Desktop and any other MCP client. The app comes with it and connects Claude Code, Cursor and Codex in one click, or from a terminal with `npx @getlocalhost/cli mcp install`.
 
 ## Connect from the app
 
@@ -39,6 +39,26 @@ Where the command is:
 On macOS, move localhost to Applications before connecting: opened from the disk image or a quarantined download, it runs from a temporary location, and localhost asks you to move it first.
 
 Agents that run inside a WSL distro, such as Claude Code installed in Ubuntu, keep their configuration there: the app connects the ones on Windows.
+
+## Connect from a terminal
+
+With the app installed, one command connects every agent it finds on this computer:
+
+```sh
+npx @getlocalhost/cli mcp install
+```
+
+It writes what **Connect** writes, to the same files and with the same rules (only its own entries, Claude Code's `claude mcp` when it is installed, one copy of the skill, a backup first, nothing new the second time), so the app shows those agents as connected. It also connects **Claude Desktop** on macOS and Windows: a `localhost` server in `claude_desktop_config.json`, without the skill, which Claude Desktop has no folder for. Then start a new Claude Code session, quit and reopen Claude Desktop, check **Cursor Settings → MCP**, or restart Codex.
+
+| | |
+|---|---|
+| `npx @getlocalhost/cli mcp install` | Adds the `localhost` server and the skill. |
+| `npx @getlocalhost/cli mcp uninstall` | Removes them, and nothing else. |
+| `npx @getlocalhost/cli mcp status` | Says where each agent stands, as **Settings → Agents** does. |
+| `--client <agent>` | Only `claude-code`, `claude-desktop`, `cursor` or `codex` (`claude` for both Claude apps). Repeat it for more than one. |
+| `--dry-run` | Prints what would change, as a diff, and changes nothing. |
+
+The package doesn't contain the app or the `localhost` command: agents run the one inside the app, [where it is](#keeping-it-current) on each OS. Without the app it changes nothing and says how to install it: Homebrew or the disk image on macOS, the installer on Windows, the packages on Linux (see [Install](/docs/install)). It needs Node 18 or later, and only edits files: no network, apart from `npx` downloading it.
 
 ## Use it in a terminal
 

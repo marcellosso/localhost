@@ -17,7 +17,7 @@ The MCP server itself also sends the agent short instructions when it connects, 
 
 ## Install it
 
-**Connecting an agent from the app installs it**, and Disconnect removes it (see [Coding agents](/docs/mcp#connect-from-the-app)). It goes where each agent documents its skills for you, in every project:
+**Connecting an agent from the app installs it**, and Disconnect removes it (see [Coding agents](/docs/mcp#connect-from-the-app)); so do `npx @getlocalhost/cli mcp install` and `mcp uninstall` from a terminal ([Connect from a terminal](/docs/mcp#connect-from-a-terminal)). It goes where each agent documents its skills for you, in every project:
 
 | Agent | For you, in every project | For one project |
 |---|---|---|
