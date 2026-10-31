@@ -1,6 +1,6 @@
 /** The one-sentence answer to "what is localhost?", word for word as the README has it. */
 export const definition =
-  'localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.';
+  'localhost app (getlocalhost.app) is a free, open-source desktop process manager for local development: it starts, stops and watches all your dev servers, workers and databases from one window instead of terminal tabs. It runs your own commands, such as npm run dev, uv run or cargo run, with no Docker or containers required; Compose services can be one of them. Native on macOS, built with Tauri for Windows and Linux. A GUI alternative to pm2, foreman and tmux for local dev. It also has an MCP server, localhost mcp, so AI coding agents (Claude Code, Cursor, Codex) run the same Services.';
 
 /** The homepage FAQ, also its FAQPage JSON-LD, llms.txt and the README's `## FAQ`.
  * Answers are plain text; `code` spans are written in backticks. */
@@ -10,6 +10,12 @@ export const faq: { question: string; answer: string[] }[] = [
     answer: [
       definition,
       'A Project is a folder; a Service is one long-running command in it, such as `pnpm dev`, `uv run fastapi dev` or `docker compose up postgres`. localhost runs it in your login shell, keeps its output, knows when it is up, and stops its whole process tree when you ask.',
+    ],
+  },
+  {
+    question: 'Do I need Docker to use localhost?',
+    answer: [
+      'No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one per service in your Compose file, and if Docker isn’t running, the Service fails with that reason.',
     ],
   },
   {

@@ -84,6 +84,8 @@ const cursorConfig = `{
     "localhost": { "type": "stdio", "command": "${command}", "args": ["mcp"] }
   }
 }`;
+const claudeCommand = `claude mcp add --scope user localhost -- ${command} mcp`;
+const npxInstall = 'npx @getlocalhost/cli mcp install';
 const codexConfig = `[mcp_servers.localhost]
 command = "${command}"
 args = ["mcp"]`;
@@ -232,18 +234,33 @@ args = ["mcp"]`;
             is backed up before the first change, and <strong>Disconnect</strong> removes only localhost’s entries. If an agent runs
             another <code>localhost</code>, such as one in <code>~/.cargo/bin</code>, it offers <strong>Update</strong>.
           </p>
+        </div>
+
+        <div class="step wide" id="npx">
+          <h3><span class="tape word">3</span> Or install with npx</h3>
           <p>
-            Or from a terminal: <code>npx @getlocalhost/cli mcp install</code> writes the same entries for every agent it finds, Claude Desktop
-            too (<a href={href('docs/mcp#connect-from-a-terminal')}>Connect from a terminal</a>).
+            From a terminal, with the app installed, one command connects every agent it finds: Claude Code, Cursor, Codex and Claude Desktop.
+            It writes the same entries as <strong>Connect</strong>, so the app shows them as connected.
+          </p>
+          <div class="copy-command">
+            <code>{npxInstall}</code>
+            <button type="button" data-copy-text={npxInstall} data-track="install_command_copied" data-track-command="npx" data-track-location="agents">Copy</button>
+          </div>
+          <p>
+            <code>mcp status</code> shows where each agent stands, <code>mcp uninstall</code> removes localhost’s entries and nothing else,
+            <code>--client cursor</code> picks one agent, <code>--read-only</code> leaves out the editing tools and <code>--dry-run</code> prints
+            the diff instead. Without the app it changes nothing and says how to install it. Every option: <a href={href('docs/mcp#connect-from-a-terminal')}>Connect from a terminal</a>.
           </p>
         </div>
 
-        <div class="step by-hand">
-          <h3><span class="tape word">3</span> Or set it up by hand</h3>
+        <div class="step wide">
+          <h3><span class="tape word">4</span> Or set it up by hand</h3>
           <p>
-            For other MCP clients, such as Claude Desktop, give the command inside the app the argument <code>mcp</code>: on
-            macOS <code>/Applications/localhost.app/Contents/Helpers/localhost</code>.
+            Any other MCP client that starts a server over standard input and output runs <code>localhost mcp</code>: give the command inside
+            the app the argument <code>mcp</code>. On macOS that is <code>/Applications/localhost.app/Contents/Helpers/localhost</code>, so
+            for Claude Code:
           </p>
+          <pre class="inset"><code>{claudeCommand}</code></pre>
           <div class="configs">
             <div>
               <p>Cursor’s <code>~/.cursor/mcp.json</code>:</p>
@@ -296,7 +313,10 @@ args = ["mcp"]`;
     <div class="container">
       <p class="docs">
         Every detail is in the docs: <a href={href('docs/mcp')}>Coding agents (MCP)</a>, <a href={href('docs/skills')}>Agent skill</a>
-        and <a href={href('docs/install')}>Install</a>. The source is on <a href={repository}>GitHub</a>, MIT licensed.
+        and <a href={href('docs/install')}>Install</a>. Already fighting a duplicate or a leftover server? See
+        <a href={href('guides/claude-code-dev-server')}>Claude Code started a second dev server</a> and
+        <a href={href('guides/kill-leftover-dev-servers')}>Kill leftover dev servers</a>. The source is on <a href={repository}>GitHub</a>,
+        MIT licensed.
       </p>
     </div>
   </section>
@@ -607,10 +627,10 @@ args = ["mcp"]`;
     min-width: 0;
     padding: 0 22px;
   }
-  .step + .step:not(.by-hand) {
+  .step + .step:not(.wide) {
     border-left: 1px solid var(--separator);
   }
-  .by-hand {
+  .wide {
     grid-column: 1 / -1;
     margin-top: 32px;
     padding-top: 32px;
@@ -641,6 +661,10 @@ args = ["mcp"]`;
   .step strong {
     color: var(--text);
   }
+  .step .copy-command {
+    max-width: 560px;
+    margin-top: 14px;
+  }
   .configs {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -666,7 +690,7 @@ args = ["mcp"]`;
       padding: 36px 4px 26px;
     }
     .step + .step,
-    .step + .step:not(.by-hand) {
+    .step + .step:not(.wide) {
       border-left: 0;
       margin-top: 28px;
       padding-top: 28px;

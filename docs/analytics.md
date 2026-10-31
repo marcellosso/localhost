@@ -20,7 +20,7 @@ cd site && PUBLIC_POSTHOG_HOST=https://us.i.posthog.com pnpm build && pnpm previ
 | Event | When | Properties |
 |---|---|---|
 | `download_clicked` | A Download button or link | `location` (`header`, `hero`, `closing`, `footer`, `install_dialog`); `platform` (`macos`, `windows`, `linux`) on the Download buttons; `package` (`mac`, `windows`, `deb`, `rpm`, `appimage`) in the install dialog |
-| `install_command_copied` | A Copy button in the install dialog | `command` (`curl`, `xattr`, `apt`, `dnf`, `appimage`) |
+| `install_command_copied` | A Copy button in the install dialog, the landing page or /agents | `command` (`curl`, `xattr`, `apt`, `dnf`, `appimage`, `brew`, `npx`); `location` where the page sets it |
 | `install_opened` | A platform's link in the landing page's install section, opening the install dialog | `platform` (`macos`, `windows`, `linux`) |
 | `platform_docs_clicked` | A platform's name in the hero, linking to its docs page | `platform` (`macos`, `windows`, `linux`); `location` (`hero`) |
 | `github_clicked` | A link to the repository | `location` (`header`, `hero`, `footer`) |
