@@ -24,12 +24,16 @@ function fakeSpawn() {
   return { calls, spawn: spawnServer };
 }
 
-/** Runs `mcp serve` against a fixture, with a fake `spawn`, signals and re-raise. */
-function serve({ argv = [], app = true, readOnly = true, platform = 'linux', io = {} } = {}) {
+/**
+ * Runs `mcp serve` as on `platform`, with a fake `spawn`, signals and re-raise. The fixture's command is where this computer's app would
+ * put it, a real path here, and is the one candidate, so only what `serve` does differs by `platform`.
+ */
+function serve({ argv = [], app = true, readOnly = true, platform = 'linux' } = {}) {
   const spawned = fakeSpawn();
   const signals = new EventEmitter();
   const raised = [];
-  const home = fixture({ app, readOnly, platform, io: { spawn: spawned.spawn, signals, raise: (signal) => raised.push(signal), ...io } });
+  const io = { platform, candidates: () => [home.command], spawn: spawned.spawn, signals, raise: (signal) => raised.push(signal) };
+  const home = fixture({ app, readOnly, io });
   const running = home.run('mcp', 'serve', ...argv);
   return { home, running, calls: spawned.calls, signals, raised };
 }
@@ -97,9 +101,7 @@ test('forwards SIGINT, SIGTERM and SIGHUP to the server, and stops listening onc
 });
 
 test('on Windows, leaves Ctrl-C to the console the server shares', async () => {
-  // The Linux fixture's command, found as if this were Windows: a Windows path wouldn't be one on this computer.
-  const linuxCommand = (context) => [path.join(context.env.LOCALHOST_STORAGE_ROOT, 'bin', 'localhost')];
-  const { running, calls, signals } = serve({ io: { platform: 'win32', candidates: linuxCommand } });
+  const { running, calls, signals } = serve({ platform: 'win32' });
   signals.emit('SIGINT', 'SIGINT');
   assert.deepEqual(calls[0].child.killed, []);
   calls[0].child.emit('exit', 0, null);
@@ -122,8 +124,42 @@ test('a server that can’t be started is an error on stderr', async () => {
   assert.equal(err, `Couldn’t run ${home.command}: spawn EACCES`);
 });
 
-// A real server: a `localhost` script that answers --version and --help as the app's does, and echoes stdin as `mcp`.
-test('end to end: stdout carries only the server’s output', { skip: process.platform === 'win32' && 'the fake command is a shell script' }, async () => {
+/** Runs `node -e script -- ...argv` in `cwd`, writing `input` to its stdin: `{ code, out, err }`. */
+async function runNode(script, argv, { cwd, input }) {
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script, '--', ...argv], { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = '';
+  let err = '';
+  child.stdout.on('data', (chunk) => (out += chunk));
+  child.stderr.on('data', (chunk) => (err += chunk));
+  child.stdin.end(input);
+  const code = await new Promise((resolve) => child.on('close', resolve));
+  return { code, out, err };
+}
+
+const cli = new URL('../src/cli.js', import.meta.url).href;
+const request = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n';
+
+// A real server on every OS: Node itself as the app's command, which `mcp` makes run the script named mcp in the working folder. It echoes
+// stdin and exits with 3 once stdin ends.
+test('end to end: runs the server with the client’s stdin and stdout, and exits as it does', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'getlocalhost-serve-'));
+  fs.writeFileSync(
+    path.join(folder, 'mcp'),
+    "process.stderr.write(`args: ${['mcp', ...process.argv.slice(2)].join(' ')}\\n`);\nprocess.stdin.on('end', () => (process.exitCode = 3));\nprocess.stdin.pipe(process.stdout);\n",
+  );
+  const script = `import { main } from ${JSON.stringify(cli)};
+const probe = (command, args) => ({ output: args[0] === '--version' ? 'localhost 9.9.9\\n' : '  mcp [--read-only]   Serve Projects\\n' });
+process.exitCode = await main(['mcp', 'serve', ...process.argv.slice(1)], { candidates: () => [process.execPath], spotlight: () => [], probe });`;
+  for (const argv of [[], ['--read-only']]) {
+    const { code, out, err } = await runNode(script, argv, { cwd: folder, input: request });
+    assert.equal(code, 3, err);
+    assert.equal(out, request);
+    assert.equal(err.trim(), `args: ${['mcp', ...argv].join(' ')}`);
+  }
+});
+
+// The app's command as findApp checks it: a `localhost` script that answers --version and --help as the app's does, and echoes stdin as `mcp`.
+test('end to end: finds and runs a localhost command', { skip: process.platform === 'win32' && 'the fake command is a shell script; the test above runs on Windows' }, async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'getlocalhost-serve-'));
   const command = path.join(folder, 'localhost');
   fs.writeFileSync(
@@ -140,19 +176,11 @@ test('end to end: stdout carries only the server’s output', { skip: process.pl
     ].join('\n'),
     { mode: 0o755 },
   );
-  const cli = new URL('../src/cli.js', import.meta.url).href;
   const script = `import { main } from ${JSON.stringify(cli)};
 process.exitCode = await main(['mcp', 'serve', ...process.argv.slice(1)], { candidates: () => [${JSON.stringify(command)}], spotlight: () => [] });`;
-  const request = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n';
 
   for (const argv of [[], ['--read-only']]) {
-    const child = spawn(process.execPath, ['--input-type=module', '-e', script, '--', ...argv], { stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (chunk) => (out += chunk));
-    child.stderr.on('data', (chunk) => (err += chunk));
-    child.stdin.end(request);
-    const code = await new Promise((resolve) => child.on('close', resolve));
+    const { code, out, err } = await runNode(script, argv, { input: request });
     assert.equal(code, 0, err);
     assert.equal(out, request);
     assert.equal(err.trim(), `args: ${['mcp', ...argv].join(' ')}`);
