@@ -329,6 +329,44 @@ It writes the same entries as **Connect** for every agent it finds, and Claude D
 
 Other MCP clients take the same `command` and `args`. On Windows it covers Projects on Windows itself; a Project in a WSL distro runs only from the app, and agents installed inside a WSL distro are set up by hand. The skill is in [skills/localhost-mcp/SKILL.md](skills/localhost-mcp/SKILL.md): copy the `localhost-mcp` folder to `~/.claude/skills/`, `~/.cursor/skills/` or `~/.agents/skills/`. More in the [MCP docs](https://www.getlocalhost.app/docs/mcp), the [skill docs](https://www.getlocalhost.app/docs/skills) and [localhost for AI coding agents](https://www.getlocalhost.app/agents).
 
+### MCP server
+
+`npx -y @getlocalhost/cli mcp serve` runs `localhost mcp` from any MCP client's configuration: it finds the command that comes with the app and hands it the client's stdin and stdout (`mcp serve --read-only` runs `localhost mcp --read-only`). It needs the localhost app: install it from [getlocalhost.app](https://www.getlocalhost.app). Without it, the server exits and says on stderr how to install it.
+
+Connect every agent on this computer at once:
+
+```sh
+npx -y @getlocalhost/cli mcp install
+npx -y @getlocalhost/cli mcp install --read-only   # without the tools that add, edit or remove
+```
+
+Or add the server to one agent:
+
+- **Claude Code**: `claude mcp add --scope user localhost -- npx -y @getlocalhost/cli mcp serve`
+- **Codex**: `codex mcp add localhost -- npx -y @getlocalhost/cli mcp serve`, or in `~/.codex/config.toml`:
+
+  ```toml
+  [mcp_servers.localhost]
+  command = "npx"
+  args = ["-y", "@getlocalhost/cli", "mcp", "serve"]
+  ```
+
+- **Cursor, Claude Desktop and other clients**: in `~/.cursor/mcp.json` (or `.cursor/mcp.json` in one project), `claude_desktop_config.json`, or the client's own file:
+
+  ```json
+  {
+    "mcpServers": {
+      "localhost": { "command": "npx", "args": ["-y", "@getlocalhost/cli", "mcp", "serve"] }
+    }
+  }
+  ```
+
+Tools: `list_projects`, `list_services`, `status`, `start_service`, `stop_service`, `start_project`, `stop_project`, `logs`, `ports`, `create_project`, `update_project`, `delete_project`, `create_service`, `update_service` and `delete_service`; `--read-only` leaves out the last six.
+
+[`server.json`](server.json) describes this server for the [MCP Registry](https://registry.modelcontextprotocol.io), and [`.mcp.json`](.mcp.json) is the configuration above. The [`Dockerfile`](Dockerfile) is only for MCP directories that inspect a server's tools: in a container, `localhost mcp` sees no Projects and can't start or stop anything on your computer.
+
+<!-- mcp-name: io.github.marcellosso/localhost -->
+
 ## FAQ
 
 ### What is localhost app?

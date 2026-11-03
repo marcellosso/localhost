@@ -32,7 +32,7 @@ export const agentsFaq: { question: string; answer: string[] }[] = [
   {
     question: 'Which coding agents does it work with?',
     answer: [
-      'Any MCP client that starts a server over standard input and output. The app connects Claude Code, Cursor and Codex in one click, in Settings → Agents; from a terminal, `npx @getlocalhost/cli mcp install` connects those and Claude Desktop. Other clients take the same `command` and `args` in their own configuration file.',
+      'Any MCP client that starts a server over standard input and output. The app connects Claude Code, Cursor and Codex in one click, in Settings → Agents; from a terminal, `npx @getlocalhost/cli mcp install` connects those and Claude Desktop. Other clients take the same `command` and `args` in their own configuration file, or run `npx -y @getlocalhost/cli mcp serve`, which finds the app’s command for them.',
     ],
   },
   {

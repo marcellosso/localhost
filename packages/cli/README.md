@@ -27,15 +27,30 @@ It writes what **Settings → Agents** in the app writes, and the app shows thes
 npx @getlocalhost/cli mcp install     # add the server and the skill
 npx @getlocalhost/cli mcp uninstall   # remove them, and nothing else
 npx @getlocalhost/cli mcp status      # where each agent stands
+npx @getlocalhost/cli mcp serve       # run the server, for an MCP client's configuration
 ```
 
 | Option | |
 |---|---|
 | `--client <agent>` | `claude-code`, `claude-desktop`, `cursor` or `codex`; `claude` for both Claude apps. Repeat it, or separate with commas, for more than one. Without it: every agent found on this computer. |
-| `--read-only` | The server runs `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services. Needs a localhost app that has it (from the release after 0.3.0). Installing again without it keeps a read-only server read-only. |
+| `--read-only` | For `mcp install` and `mcp serve`. The server runs `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services. Needs a localhost app that has it (0.4.0 or later). Installing again without it keeps a read-only server read-only. |
 | `--dry-run` | Prints what would change, as a diff, and changes nothing. |
 
 Then start a new Claude Code session, quit and reopen Claude Desktop, check **Cursor Settings → MCP**, or restart Codex.
+
+## Any MCP client
+
+`mcp serve` is the server itself, for any client that starts MCP servers over stdio:
+
+```json
+{
+  "mcpServers": {
+    "localhost": { "command": "npx", "args": ["-y", "@getlocalhost/cli", "mcp", "serve"] }
+  }
+}
+```
+
+It finds the app's `localhost` command as `mcp install` does and runs `localhost mcp` with the client's stdin and stdout, passing on Ctrl-C and other signals and exiting as the server does. `mcp serve --read-only` runs `localhost mcp --read-only`. It writes nothing to stdout itself, since that is the client's channel: without the app, or with an app whose command doesn't run, it says why on stderr and exits with 1. `claude mcp add --scope user localhost -- npx -y @getlocalhost/cli mcp serve` and `codex mcp add localhost -- npx -y @getlocalhost/cli mcp serve` add it from a terminal.
 
 More in the [MCP docs](https://www.getlocalhost.app/docs/mcp). Node 18 or later; no dependencies.
 

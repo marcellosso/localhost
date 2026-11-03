@@ -55,8 +55,9 @@ It writes what **Connect** writes, to the same files and with the same rules (on
 | `npx @getlocalhost/cli mcp install` | Adds the `localhost` server and the skill. |
 | `npx @getlocalhost/cli mcp uninstall` | Removes them, and nothing else. |
 | `npx @getlocalhost/cli mcp status` | Says where each agent stands, as **Settings → Agents** does. |
+| `npx -y @getlocalhost/cli mcp serve` | Runs the server itself, for an agent's configuration: see [With npx](#with-npx). |
 | `--client <agent>` | Only `claude-code`, `claude-desktop`, `cursor` or `codex` (`claude` for both Claude apps). Repeat it for more than one. |
-| `--read-only` | Sets up `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services ([Read-only](#read-only)). Installing again without it keeps a read-only server read-only. |
+| `--read-only` | For `mcp install` and `mcp serve`: sets up `localhost mcp --read-only`, without the tools that add, edit or remove Projects and Services ([Read-only](#read-only)). Installing again without it keeps a read-only server read-only. |
 | `--dry-run` | Prints what would change, as a diff, and changes nothing. |
 
 The package doesn't contain the app or the `localhost` command: agents run the one inside the app, [where it is](#keeping-it-current) on each OS. Without the app it changes nothing and says how to install it: Homebrew or the disk image on macOS, the installer on Windows, the packages on Linux (see [Install](/docs/install)). It needs Node 18 or later, and only edits files: no network, apart from `npx` downloading it.
@@ -102,6 +103,20 @@ args = ["mcp"]
 **Other clients** take the same `command` and `args` in their own configuration file: any client that starts an MCP server over standard input and output can run `localhost mcp`. For Claude Desktop, `npx @getlocalhost/cli mcp install --client claude-desktop` writes it for you. Use the full path: apps started from the Dock or a launcher don't always get your shell's `PATH`.
 
 Building localhost yourself? `cargo install --path core/localhost-cli` in a clone of the repository puts `localhost` in `~/.cargo/bin`. It must come from the same version as the app, which otherwise says the two speak to the core differently.
+
+### With npx
+
+Instead of the command's path, a client can run `npx -y @getlocalhost/cli mcp serve`, the same in every client and on every OS:
+
+```json
+{
+  "mcpServers": {
+    "localhost": { "command": "npx", "args": ["-y", "@getlocalhost/cli", "mcp", "serve"] }
+  }
+}
+```
+
+From a terminal: `claude mcp add --scope user localhost -- npx -y @getlocalhost/cli mcp serve`, or `codex mcp add localhost -- npx -y @getlocalhost/cli mcp serve`. It finds the app's command [where it is](#keeping-it-current) and runs `localhost mcp` with the client's input and output; `mcp serve --read-only` runs `localhost mcp --read-only`. The app must be installed: without it, the server exits at once and says how to install it, on standard error, as the client's log shows. Each start goes through `npx`, so the full path above starts faster and works offline.
 
 ## Tools
 
