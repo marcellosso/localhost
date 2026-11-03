@@ -106,6 +106,8 @@ Building localhost yourself? `cargo install --path core/localhost-cli` in a clon
 
 ### With npx
 
+`npx -y @getlocalhost/cli mcp serve` is the same MCP server, run through npm, so one configuration works in every client and on every OS.
+
 Instead of the command's path, a client can run `npx -y @getlocalhost/cli mcp serve`, the same in every client and on every OS:
 
 ```json

@@ -4,13 +4,15 @@
 # install the app (https://www.getlocalhost.app) and connect your agents with
 # `npx -y @getlocalhost/cli mcp install`.
 #
-# The `localhost` command from the latest release's .deb, or from VERSION:
+# The `localhost` command from release VERSION's .deb; VERSION=latest takes the latest release:
 #   docker build --platform=linux/amd64 -t localhost-mcp .
-#   docker build --platform=linux/amd64 --build-arg VERSION=0.3.0 -t localhost-mcp .
+#   docker build --platform=linux/amd64 --build-arg VERSION=latest -t localhost-mcp .
 # The Linux app is amd64 only.
+#
+# Bump VERSION with each release, so directories list that release's tools.
 FROM debian:bookworm-slim
 
-ARG VERSION=latest
+ARG VERSION=0.4.0
 RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends curl ca-certificates; \
