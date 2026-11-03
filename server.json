@@ -4,6 +4,13 @@
   "title": "localhost app",
   "description": "Start, stop and read logs of your local dev servers from Claude Code, Cursor and Codex.",
   "websiteUrl": "https://www.getlocalhost.app/docs/mcp",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/marcellosso/localhost/main/assets/logo-400.png",
+      "mimeType": "image/png",
+      "sizes": ["400x400"]
+    }
+  ],
   "repository": {
     "url": "https://github.com/marcellosso/localhost",
     "source": "github",
