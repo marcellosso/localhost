@@ -1,6 +1,8 @@
 // `npx @getlocalhost/cli mcp install|uninstall|status`: connects coding agents
 // to `localhost mcp` from a terminal, as Settings → Agents does in the app.
+// `mcp serve` runs that server itself, for MCP clients configured with npx.
 
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 
@@ -20,13 +22,15 @@ Commands:
                     to your agents. Every other server and setting stays.
   mcp uninstall     Remove them, and nothing else
   mcp status        Show where each agent stands
+  mcp serve         Run the app's localhost mcp on stdin and stdout, for any
+                    MCP client: npx -y @getlocalhost/cli mcp serve
 
 Options:
   --client <agent>  claude-code, claude-desktop, cursor or codex; claude for
                     both Claude apps. Repeat for more than one. Without it:
                     every agent found on this computer
   --read-only       Leave out the tools that add, edit or remove Projects and
-                    Services (localhost mcp --read-only)
+                    Services (localhost mcp --read-only). For install and serve
   --dry-run         Print what would change, and change nothing
   -h, --help        Show this
   -V, --version     Show this package's version
@@ -63,16 +67,18 @@ export function parse(argv) {
     } else if (argument.startsWith('-')) return { error: `Unknown option ${argument}.` };
     else words.push(argument);
   }
-  if (words[0] !== 'mcp' || words.length !== 2 || !['install', 'uninstall', 'status'].includes(words[1])) {
+  if (words[0] !== 'mcp' || words.length !== 2 || !['install', 'uninstall', 'status', 'serve'].includes(words[1])) {
     return { error: words.length === 0 ? USAGE : `Unknown command “${words.join(' ')}”.\n\n${USAGE}` };
   }
-  if (options.readOnly && words[1] !== 'install') return { error: '--read-only is for mcp install.' };
+  if (options.readOnly && !['install', 'serve'].includes(words[1])) return { error: '--read-only is for mcp install and mcp serve.' };
+  if (words[1] === 'serve' && (options.clients.length > 0 || options.dryRun)) return { error: 'mcp serve takes only --read-only.' };
   return { command: words[1], ...options };
 }
 
 /**
- * Runs the command line, writing to `io.out` and `io.err`; returns the exit code. `io` also carries what tests replace: `platform`, `home`,
- * `env`, and the `candidates`, `probe`, `spotlight`, `claude` and `runClaude` of `findApp` and `Agents`.
+ * Runs the command line, writing to `io.out` and `io.err`; returns the exit code, or for `mcp serve` a promise of it. `io` also carries what
+ * tests replace: `platform`, `home`, `env`, the `candidates`, `probe`, `spotlight`, `claude` and `runClaude` of `findApp` and `Agents`, and
+ * the `spawn`, `signals` and `raise` of `serve`.
  */
 export function main(argv, io = {}) {
   const out = io.out ?? ((line) => process.stdout.write(`${line}\n`));
@@ -92,6 +98,7 @@ export function main(argv, io = {}) {
   const env = io.env ?? process.env;
   const context = { platform, home, env, probe: io.probe, spotlight: io.spotlight, candidates: io.candidates };
   const app = findApp(context);
+  if (parsed.command === 'serve') return serve(app, parsed, { ...io, err, platform, env });
   const files = new Files({ dryRun: parsed.dryRun });
   const agents = new Agents({
     ...context,
@@ -166,6 +173,44 @@ export function main(argv, io = {}) {
     }
   }
   return failed ? 1 : 0;
+}
+
+const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
+/**
+ * Runs the app's `localhost mcp` with this process's stdin and stdout, which are the client's JSON-RPC channel: nothing else may write to
+ * stdout, so every problem goes to stderr. Resolves to the exit code to leave with, once the server has ended.
+ */
+function serve(app, parsed, { err, platform, env, spawn: start = spawn, signals = process, raise = (signal) => process.kill(process.pid, signal) }) {
+  const refusal = refuse(app, parsed, platform, env);
+  if (refusal) {
+    refusal.forEach((line) => err(line));
+    return Promise.resolve(1);
+  }
+  return new Promise((resolve) => {
+    const child = start(app.command, ['mcp', ...(parsed.readOnly ? ['--read-only'] : [])], { stdio: 'inherit', windowsHide: true });
+    // On Windows the server shares the console, which sends it Ctrl-C itself, and a forwarded signal would only terminate it. Listening
+    // keeps this process alive until the server has ended, either way.
+    const forward = (signal) => platform !== 'win32' && child.kill(signal);
+    for (const signal of FORWARDED) signals.on(signal, forward);
+    let done = false;
+    const finish = (code) => {
+      if (done) return;
+      done = true;
+      for (const signal of FORWARDED) signals.off(signal, forward);
+      resolve(code);
+    };
+    child.on('error', (error) => {
+      err(`Couldn’t run ${app.command}: ${error.message}`);
+      finish(1);
+    });
+    child.on('exit', (code, signal) => {
+      if (signal === null) return finish(code ?? 1);
+      // Ended the way the server did, so whoever started this sees the signal; 128 + its number if it doesn't end this process.
+      finish(128 + (os.constants.signals[signal] ?? 0));
+      raise(signal);
+    });
+  });
 }
 
 /** What happened to one agent, in a sentence. */

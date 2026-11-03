@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "localhost": {
+      "command": "npx",
+      "args": ["-y", "@getlocalhost/cli", "mcp", "serve"]
+    }
+  }
+}

@@ -1,7 +1,8 @@
 {
   "name": "@getlocalhost/cli",
-  "version": "0.1.0",
-  "description": "Connect Claude Code, Claude Desktop, Cursor and Codex to localhost mcp, the MCP server of the localhost app, from a terminal.",
+  "version": "0.2.0",
+  "mcpName": "io.github.marcellosso/localhost",
+  "description": "Connect Claude Code, Claude Desktop, Cursor and Codex to localhost mcp, the MCP server of the localhost app, from a terminal, or run it from any MCP client with npx.",
   "keywords": [
     "localhost",
     "mcp",

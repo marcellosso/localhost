@@ -11,9 +11,9 @@ export const SKILL = '---\nname: localhost-mcp\ndescription: test\n---\n\nUse lo
 
 /**
  * `agents`: the agents' folders to create. `app`: whether the app is installed; `readOnly`: whether its command has `mcp --read-only`.
- * `claude`: the `claude` command Claude Code is changed with (`null`: edit the file).
+ * `claude`: the `claude` command Claude Code is changed with (`null`: edit the file). `io`: more of `main`'s `io`, such as `serve`'s `spawn`.
  */
-export function fixture({ agents = ['.claude', '.cursor', '.codex'], app = true, readOnly = true, claude = null, platform = process.platform } = {}) {
+export function fixture({ agents = ['.claude', '.cursor', '.codex'], app = true, readOnly = true, claude = null, platform = process.platform, io = {} } = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'getlocalhost-'));
   const env = {
     PATH: '',
@@ -39,7 +39,7 @@ export function fixture({ agents = ['.claude', '.cursor', '.codex'], app = true,
     file,
     read: (...parts) => (fs.existsSync(file(...parts)) ? fs.readFileSync(file(...parts), 'utf8') : null),
     write: (parts, text) => write(file(...parts), text),
-    /** Runs the command line; `{ code, out, err }`, each a string. */
+    /** Runs the command line; `{ code, out, err }`, each a string, or for `mcp serve` a promise of it. */
     run(...argv) {
       const out = [];
       const err = [];
@@ -60,8 +60,10 @@ export function fixture({ agents = ['.claude', '.cursor', '.codex'], app = true,
         runClaude: (claudeCommand, args) => claudeCalls.push([claudeCommand, ...args]),
         out: (line) => out.push(line),
         err: (line) => err.push(line),
+        ...io,
       });
-      return { code, out: out.join('\n'), err: err.join('\n') };
+      const result = (exit) => ({ code: exit, out: out.join('\n'), err: err.join('\n') });
+      return code instanceof Promise ? code.then(result) : result(code);
     },
   };
 }

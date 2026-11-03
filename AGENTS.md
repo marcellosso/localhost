@@ -37,12 +37,14 @@ apps/macos/              the macOS app
 apps/desktop/            the Linux and Windows app (Tauri 2)
   src/                   React + TypeScript UI; src/bindings.ts is generated, never edited
   src-tauri/             Rust shell hosting the core
-packages/cli/            `npx @getlocalhost/cli mcp install`: connects agents from a terminal (Node, no dependencies)
+packages/cli/            `npx @getlocalhost/cli mcp install`: connects agents from a terminal; `mcp serve` runs the app's server (Node, no dependencies)
 skills/                  agent skills, e.g. using localhost's MCP server
 site/                    the website (Astro): landing page, docs, changelog; reads docs/ and the desktop tokens
 scripts/                 build-core.sh, build-release.sh, signing and installer artwork
 packaging/homebrew/      the Homebrew cask's template; the tap is marcellosso/homebrew-tap
+assets/                  brand images for listings, e.g. the 400×400 logo
 docs/configuration.md    the Project file format (user-facing)
+server.json, glama.json  MCP directory listings, with the example .mcp.json and the introspection-only Dockerfile
 ```
 
 ## Vocabulary

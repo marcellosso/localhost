@@ -1,0 +1,2 @@
+# The Dockerfile downloads a release and copies nothing from the repository.
+*
