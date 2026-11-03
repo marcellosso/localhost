@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.marcellosso/localhost",
+  "title": "localhost app",
+  "description": "Start, stop and read logs of your local dev servers from Claude Code, Cursor and Codex.",
+  "websiteUrl": "https://www.getlocalhost.app/docs/mcp",
+  "repository": {
+    "url": "https://github.com/marcellosso/localhost",
+    "source": "github",
+    "subfolder": "packages/cli"
+  },
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@getlocalhost/cli",
+      "version": "0.2.0",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "packageArguments": [
+        { "type": "positional", "value": "mcp" },
+        { "type": "positional", "value": "serve" }
+      ]
+    }
+  ]
+}
