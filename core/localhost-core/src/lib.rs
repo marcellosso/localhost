@@ -23,6 +23,7 @@ mod library;
 mod listener;
 mod local_url;
 mod logs;
+pub mod machine;
 mod model;
 mod origin;
 mod output;
@@ -59,6 +60,7 @@ pub use library::{KeyClash, ProfileChanges, ProjectChanges, ProjectLibrary, Proj
 pub use listener::{Listener, ListenerKind, ListenerOwner, PortWarning, port_warnings};
 pub use local_url::LocalUrl;
 pub use logs::{LogBuffer, LogStore};
+pub use machine::{Machine, MachineProblem};
 pub use model::{
     EnvironmentProfile, ExecutionTarget, NewService, Project, Service, VariableInput, VariableLayer, VariableValue,
     Variables, service_label, suggested_project_key,

@@ -77,8 +77,12 @@ async fn serve(library: ProjectLibrary, read_only: bool) -> Result<(), String> {
     let storage_root = default_storage_root();
     let library = Arc::new(library);
     let logs = Arc::new(LogStore::new(&storage_root));
-    let targets =
-        Targets::open(library.clone(), &storage_root, ServiceManagerOptions::default(), launcher(&storage_root));
+    let targets = Targets::open(
+        library.clone(),
+        &storage_root,
+        ServiceManagerOptions::default(),
+        launcher(&storage_root, Client::Agent),
+    );
     // Now, so the first tool call doesn't wait for the core to start. If it
     // can't, each call that needs it says why.
     let _ = targets.connect(&ExecutionTarget::ThisMachine).await;
@@ -138,15 +142,16 @@ async fn serve(library: ProjectLibrary, read_only: bool) -> Result<(), String> {
 }
 
 /// This machine through the shared core, started as `localhost daemon` if
-/// it isn't running. A WSL distro's Projects are run by the Windows app only.
-fn launcher(storage_root: &Path) -> Launcher {
+/// it isn't running, connected as `client`. A WSL distro's Projects are run
+/// by the Windows app only.
+pub(crate) fn launcher(storage_root: &Path, client: Client) -> Launcher {
     let storage_root = storage_root.to_path_buf();
     Box::new(move |target| match target {
         ExecutionTarget::ThisMachine => {
             let executable = std::env::current_exe().unwrap_or_else(|_| "localhost".into());
             let mut daemon = std::process::Command::new(executable);
             daemon.arg("daemon").arg(&storage_root);
-            shared::link(&storage_root, Client::Agent, daemon)
+            shared::link(&storage_root, client, daemon)
         }
         ExecutionTarget::Wsl { distro } => {
             Link::Unavailable(format!("“{distro}” is reached only from the Windows app"))

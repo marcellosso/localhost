@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Id, Key, Listener, ProjectFileProblem};
+use crate::{Id, Key, Listener, MachineProblem, ProjectFileProblem};
 
 /// Every failure the core reports. Clients match on these cases; they are
 /// never flattened into strings inside the core.
@@ -119,6 +119,21 @@ pub enum LocalhostError {
         command: String,
         output: String,
     },
+
+    // Machines
+    /// Another Machine (by name) can't be reached over SSH, or the
+    /// connection to it was lost.
+    MachineUnavailable {
+        machine: String,
+        problem: MachineProblem,
+    },
+    /// The Port can't be forwarded from another Machine: SSH's reason.
+    ForwardFailed {
+        port: u16,
+        reason: String,
+    },
+    /// The other end runs an older localhost, which can't do this.
+    Unsupported,
 }
 
 impl LocalhostError {
@@ -193,6 +208,9 @@ impl LocalhostError {
                 format!("`{command}` failed: {output}. Try again, or set up the server by hand.")
             }
             CommandPathTaken(path) => format!("{path} already exists and isn’t localhost’s. Remove it first, or leave it."),
+            MachineUnavailable { machine, problem } => problem.message(machine),
+            ForwardFailed { port, reason } => format!("Port {port} couldn’t be forwarded: {reason}."),
+            Unsupported => "The other Machine runs an older localhost that can’t do this. Update localhost there.".into(),
             InvalidProjectFile { problem, field, line } => {
                 let line = line.map(|line| format!("Line {line}"));
                 let field = (!field.is_empty()).then(|| field.join(" › "));
