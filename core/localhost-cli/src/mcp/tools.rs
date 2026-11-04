@@ -714,6 +714,7 @@ fn started_by(origin: Origin) -> &'static str {
         Origin::MainWindow | Origin::MenuBar => "app",
         Origin::Cli => "cli",
         Origin::Agent => "agent",
+        Origin::Machine => "machine",
     }
 }
 

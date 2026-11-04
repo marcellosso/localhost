@@ -35,6 +35,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 pub use client::Remote;
+pub(crate) use server::forward_batches;
 pub use server::serve;
 
 use crate::{
@@ -42,7 +43,7 @@ use crate::{
 };
 
 /// Changes whenever a message changes shape; both ends must speak the same.
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// What a connection is, which decides what its disconnecting stops.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -56,6 +57,10 @@ pub enum Client {
     Agent,
     /// The `localhost` command.
     Cli,
+    /// The app of another Machine, through `localhost remote`. Not an app
+    /// here: it holds only the Runs it starts, so a laptop that sleeps or
+    /// quits changes nothing else this Machine keeps running.
+    Machine,
 }
 
 impl Client {
@@ -66,6 +71,7 @@ impl Client {
             Client::App => Origin::MainWindow,
             Client::Agent => Origin::Agent,
             Client::Cli => Origin::Cli,
+            Client::Machine => Origin::Machine,
         }
     }
 }
