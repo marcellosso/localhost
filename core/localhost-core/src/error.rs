@@ -121,6 +121,11 @@ pub enum LocalhostError {
     },
 
     // Machines
+    /// Not something `ssh` can connect to: empty, with spaces, or like an option.
+    InvalidMachineDestination(String),
+    /// Another Machine is already reached at this destination.
+    DuplicateMachine(String),
+    MachineNotFound(Id),
     /// Another Machine (by name) can't be reached over SSH, or the
     /// connection to it was lost.
     MachineUnavailable {
@@ -208,6 +213,11 @@ impl LocalhostError {
                 format!("`{command}` failed: {output}. Try again, or set up the server by hand.")
             }
             CommandPathTaken(path) => format!("{path} already exists and isn’t localhost’s. Remove it first, or leave it."),
+            InvalidMachineDestination(raw) => format!(
+                "“{raw}” isn’t something ssh can connect to. Use a Host from ~/.ssh/config, or user@host."
+            ),
+            DuplicateMachine(destination) => format!("{destination} is already one of your Machines."),
+            MachineNotFound(_) => "The Machine no longer exists.".into(),
             MachineUnavailable { machine, problem } => problem.message(machine),
             ForwardFailed { port, reason } => format!("Port {port} couldn’t be forwarded: {reason}."),
             Unsupported => "The other Machine runs an older localhost that can’t do this. Update localhost there.".into(),

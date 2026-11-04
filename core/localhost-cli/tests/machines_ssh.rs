@@ -254,3 +254,54 @@ async fn says_why_a_machine_cant_be_reached() {
     assert_eq!(problem(other.connect("oldbox").await), MachineProblem::TooOld(None));
     assert_eq!(problem(other.connect("barebox").await), MachineProblem::NotInstalled);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connects_again_after_the_connection_is_lost() {
+    use localhost_core::machine::{MachineState, Machines, MachinesEvent};
+    let Some(other) = OtherMachine::start() else { return };
+    let app_root = other.path().join("app-storage");
+    let machines = Machines::open(&app_root, &other.ssh()).unwrap();
+    let devbox = machines.add(None, "devbox").unwrap();
+    let (_, _, mut events) = machines.subscribe();
+    let connected = |event: &MachinesEvent| {
+        matches!(event, MachinesEvent::StateChanged { state: MachineState::Connected { .. }, .. })
+    };
+    machines.connect(devbox.id).unwrap();
+    until_event(&mut events, "connected", connected).await;
+    let (projects, _) = machines.connection(devbox.id).unwrap().projects().await.unwrap();
+    assert!(projects.is_empty());
+
+    // The network drops, or the laptop slept past the heartbeat.
+    machines.connection(devbox.id).unwrap().close();
+    let lost = |event: &MachinesEvent| {
+        matches!(
+            event,
+            MachinesEvent::StateChanged {
+                state: MachineState::Unavailable { problem: MachineProblem::Lost, is_retrying: true },
+                ..
+            }
+        )
+    };
+    until_event(&mut events, "lost", lost).await;
+    until_event(&mut events, "reconnected", connected).await;
+    assert!(machines.connection(devbox.id).is_ok());
+
+    machines.disconnect(devbox.id);
+    assert_eq!(machines.state(devbox.id), MachineState::NotConnected);
+    assert!(machines.connection(devbox.id).is_err());
+}
+
+async fn until_event(
+    events: &mut tokio::sync::mpsc::UnboundedReceiver<localhost_core::machine::MachinesEvent>,
+    what: &str,
+    condition: impl Fn(&localhost_core::machine::MachinesEvent) -> bool,
+) {
+    let wait = async {
+        while let Some(event) = events.recv().await {
+            if condition(&event) {
+                return;
+            }
+        }
+    };
+    tokio::time::timeout(PATIENCE, wait).await.unwrap_or_else(|_| panic!("never {what}"));
+}
