@@ -115,6 +115,36 @@ export const guides: Guide[] = [
     ],
   },
   {
+    slug: 'remote-dev-box',
+    title: 'Run dev servers on a remote dev box and open them from your laptop',
+    seoTitle: 'Run dev servers on a remote dev box over SSH',
+    description: 'Run dev servers on a dev box or home server and open them from your laptop: ssh -L port forwarding, Tailscale and ~/.ssh/config, then one window for both.',
+    summary: 'Forward the port with ssh -L, reach the box over Tailscale, then start and open its Services from your laptop.',
+    label: 'Dev servers on a dev box',
+    faq: [
+      {
+        question: 'How do I open a dev server running on another computer in my browser?',
+        answer: ['Forward its port over SSH: `ssh -L 5173:localhost:5173 devbox`, then open `http://localhost:5173` on your laptop. The forward lasts as long as that `ssh`. In localhost, Open in Browser makes the same forward for you, on the same port number.'],
+      },
+      {
+        question: 'Do I need Tailscale?',
+        answer: ['No. localhost uses whatever `ssh devbox` uses: a LAN, a VPN, a jump host with `ProxyJump`, or Tailscale. Tailscale is the easy way to reach a computer at home from anywhere, without opening a port on the router.'],
+      },
+      {
+        question: 'Does localhost open a port on the dev box?',
+        answer: ['No. It runs `localhost remote --stdio` over your SSH connection, and Forwards ride on that connection, bound to your laptop’s loopback only. Nothing new listens on either computer’s network.'],
+      },
+      {
+        question: 'What happens to the dev servers when I close my laptop?',
+        answer: ['The Services you started from the laptop stop on the dev box once the connection ends, about 45 seconds after the laptop goes quiet, unless localhost is open on the dev box. When the laptop is back, localhost connects again on its own, without starting anything.'],
+      },
+      {
+        question: 'Why does it say localhost isn’t installed on the dev box when it is?',
+        answer: ['A command run over SSH gets a non-interactive shell, which doesn’t read `~/.zshrc`. Put the folder holding `localhost` on the `PATH` in `~/.zshenv` (zsh) instead, and check with `ssh devbox localhost --version`.'],
+      },
+    ],
+  },
+  {
     slug: 'how-to-run-my-project',
     title: 'How do I run this project again?',
     seoTitle: 'Forgot how to run a project? Find its commands',
