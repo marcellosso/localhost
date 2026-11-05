@@ -78,6 +78,10 @@ jobs:
       # Windows runner: clippy doesn't link, so it needs no Windows toolchain.
       - name: Clippy for Windows
         run: cargo clippy -p localhost-core -p localhost-cli --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+      # `tests/machines_ssh.rs` reaches another Machine through a private
+      # sshd on loopback, and skips where there is none.
+      - name: Install sshd
+        run: sudo apt-get update && sudo apt-get install -y openssh-server
       - run: cargo test
 
   windows:
