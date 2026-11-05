@@ -34,6 +34,14 @@
   margin-top: 6px;
 }
 
+/* Three side by side don't fit a column: one above the other, the first on top. */
+.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: 220px;
+}
+
 .tip {
   margin: 4px 0 0;
   font-size: 12px;

@@ -168,6 +168,7 @@ function MainWindow({ view }: { view: CoreView }) {
                 icon={<FolderIcon size={40} />}
                 title="No Projects"
                 description="Add a project folder to get started."
+                isStacked
                 tip={
                   <KeyTip
                     before="Press"
