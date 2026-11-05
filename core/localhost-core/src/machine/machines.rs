@@ -57,6 +57,27 @@ pub enum MachineState {
     },
 }
 
+impl MachineState {
+    /// How it is, as the apps say it under its name: "Connected · localhost
+    /// 0.5.0", "Connecting…", or why it isn't and what to do next.
+    pub fn summary(&self, machine: &str) -> String {
+        match self {
+            MachineState::NotConnected => "Not connected".into(),
+            MachineState::Connecting => "Connecting…".into(),
+            MachineState::Connected { version } => format!("Connected · localhost {version}"),
+            MachineState::Unavailable { problem, is_retrying: true } => {
+                format!("{} Trying again…", problem.message(machine))
+            }
+            MachineState::Unavailable { problem, is_retrying: false } => problem.message(machine),
+        }
+    }
+
+    /// Whether it waits for the user to connect it again.
+    pub fn needs_user(&self) -> bool {
+        matches!(self, MachineState::NotConnected | MachineState::Unavailable { is_retrying: false, .. })
+    }
+}
+
 /// One Machine as an app shows it. Its Projects and statuses are those of
 /// its last connection, kept while it reconnects.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -833,6 +854,20 @@ mod tests {
         let reopened = Machines::open(root.path(), Path::new("ssh")).unwrap();
         assert_eq!(reopened.machines()[0].name, "me@devbox");
         assert!(matches!(machines.rename(Id::new(), "x"), Err(LocalhostError::MachineNotFound(_))));
+    }
+
+    #[test]
+    fn says_how_a_machine_is() {
+        let lost = MachineState::Unavailable { problem: MachineProblem::Lost, is_retrying: true };
+        assert_eq!(lost.summary("devbox"), "The connection to devbox was lost. Trying again…");
+        assert!(!lost.needs_user());
+        let untrusted = MachineState::Unavailable { problem: MachineProblem::HostKeyNotTrusted, is_retrying: false };
+        assert!(untrusted.needs_user());
+        assert_eq!(
+            MachineState::Connected { version: "0.5.0".into() }.summary("devbox"),
+            "Connected · localhost 0.5.0"
+        );
+        assert!(MachineState::NotConnected.needs_user());
     }
 
     #[test]

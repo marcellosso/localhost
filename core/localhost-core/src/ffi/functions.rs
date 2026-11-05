@@ -180,6 +180,18 @@ pub async fn scan_project(project: Project) -> Vec<ServiceSuggestion> {
 
 // MARK: Machines
 
+/// "Connected · localhost 0.5.0", "Connecting…", or why `machine` isn't.
+#[uniffi::export]
+pub fn machine_state_summary(state: &crate::machine::MachineState, machine: &str) -> String {
+    state.summary(machine)
+}
+
+/// Whether the Machine waits for the user to connect it again.
+#[uniffi::export]
+pub fn machine_state_needs_user(state: &crate::machine::MachineState) -> bool {
+    state.needs_user()
+}
+
 /// The hosts named in `~/.ssh/config`, to suggest as a Machine's destination.
 #[uniffi::export]
 pub async fn ssh_config_hosts() -> Vec<String> {
