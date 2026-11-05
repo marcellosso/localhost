@@ -745,6 +745,8 @@ mod tests {
         );
     }
 
+    // The fake `ssh` is a shell script.
+    #[cfg(unix)]
     #[tokio::test]
     async fn says_why_it_cant_connect_and_waits_when_waiting_wont_help() {
         let root = tempfile::tempdir().unwrap();
@@ -768,20 +770,18 @@ mod tests {
     }
 
     /// An `ssh` at `root`/ssh that writes `said` to standard error and fails.
+    #[cfg(unix)]
     fn failing_ssh(root: &Path, said: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
         let ssh = root.join("ssh");
         fs::write(&ssh, format!("#!/bin/sh\necho '{said}' >&2\nexit 255\n")).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&ssh, fs::Permissions::from_mode(0o755)).unwrap();
-            // A test forking on another thread may hold the file open for
-            // writing a moment longer, so it can't be run yet ("Text file busy").
-            for _ in 0..100 {
-                match std::process::Command::new(&ssh).output() {
-                    Err(error) if error.raw_os_error() == Some(26) => std::thread::sleep(Duration::from_millis(20)),
-                    _ => break,
-                }
+        fs::set_permissions(&ssh, fs::Permissions::from_mode(0o755)).unwrap();
+        // A test forking on another thread may hold the file open for
+        // writing a moment longer, so it can't be run yet ("Text file busy").
+        for _ in 0..100 {
+            match std::process::Command::new(&ssh).output() {
+                Err(error) if error.raw_os_error() == Some(26) => std::thread::sleep(Duration::from_millis(20)),
+                _ => break,
             }
         }
         ssh
