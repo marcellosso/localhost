@@ -37,6 +37,12 @@ export const faq: { question: string; answer: string[] }[] = [
     ],
   },
   {
+    question: 'Can I run my dev servers on a dev box or home server and open them from my laptop?',
+    answer: [
+      'Yes. Add it in Settings → Machines with the name you give `ssh` (a `Host` from `~/.ssh/config`, or `user@host:port`), and its Projects show in the sidebar below your laptop’s. Start, stop and read their logs from there; Open in Browser forwards the Port to the same port on your laptop through the SSH connection, so `http://localhost:5173` works as if it ran locally. Its Services, configuration and Secrets stay on it. It works over any network `ssh` reaches, such as Tailscale or a VPN, and adds no account or listening port. localhost has to be installed on both computers.',
+    ],
+  },
+  {
     question: 'Is it free and open source?',
     answer: ['Yes. localhost is free and open source under the MIT license. There is no account and no backend, and it works offline.'],
   },
