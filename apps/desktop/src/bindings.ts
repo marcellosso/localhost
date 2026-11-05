@@ -1098,6 +1098,12 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  */
 { kind: "coreUnavailable"; detail: string } | 
 /**
+ * This machine's shared core is another version's, which this one
+ * can't drive: kept alive by an older app or a coding agent's
+ * `localhost mcp`.
+ */
+{ kind: "incompatibleCore"; detail: { version: string } } | 
+/**
  * Something already listens on the port; `owner` is that Listener, if
  * localhost can see it (processes of other users can't be inspected).
  */
@@ -1268,6 +1274,11 @@ export type MachineProblem =
  * Its localhost has no `localhost remote` (the version it reported, if any).
  */
 { kind: "tooOld"; detail: string | null } | 
+/**
+ * localhost there started but couldn't serve this app, in its own
+ * words, e.g. its shared core is another version's.
+ */
+{ kind: "cantServe"; detail: string } | 
 /**
  * It was connected and the connection ended.
  */

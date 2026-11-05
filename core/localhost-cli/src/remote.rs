@@ -32,7 +32,11 @@ pub fn run(library: ProjectLibrary) -> Result<ExitCode, String> {
             crate::mcp::launcher(&storage_root, Client::Machine),
         );
         // Now, so the statuses the app subscribes to are this Machine's.
-        targets.connect(&ExecutionTarget::ThisMachine).await.map_err(|error| error.message())?;
+        // Said to the app too, which would otherwise see only that SSH ended.
+        if let Err(error) = targets.connect(&ExecutionTarget::ThisMachine).await {
+            relay::refuse(tokio::io::stdout(), &error.message()).await;
+            return Err(error.message());
+        }
         let mut signals = Signals::new().map_err(|error| error.to_string())?;
         tokio::select! {
             _ = relay::serve(tokio::io::stdin(), tokio::io::stdout(), library, targets, relay::SILENCE_TIMEOUT) => {}

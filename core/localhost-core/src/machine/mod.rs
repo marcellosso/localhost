@@ -49,6 +49,9 @@ pub enum MachineProblem {
     NotInstalled,
     /// Its localhost has no `localhost remote` (the version it reported, if any).
     TooOld(Option<String>),
+    /// localhost there started but couldn't serve this app, in its own
+    /// words, e.g. its shared core is another version's.
+    CantServe(String),
     /// It was connected and the connection ended.
     Lost,
     /// Anything else SSH said, e.g. a mistake in `~/.ssh/config`. Not
@@ -86,6 +89,7 @@ impl MachineProblem {
             TooOld(None) => {
                 format!("{machine} runs a localhost that can’t be viewed from another Machine. Update localhost there.")
             }
+            CantServe(reason) => format!("localhost on {machine} couldn’t start: {reason}"),
             Lost => format!("The connection to {machine} was lost."),
             Other(said) => format!("SSH couldn’t connect to {machine}: {said}"),
         }

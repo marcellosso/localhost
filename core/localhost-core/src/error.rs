@@ -60,6 +60,12 @@ pub enum LocalhostError {
     /// The shared core on this machine (`remote::shared`) can't be started
     /// or reached, or the connection to it was lost.
     CoreUnavailable(String),
+    /// This machine's shared core is another version's, which this one
+    /// can't drive: kept alive by an older app or a coding agent's
+    /// `localhost mcp`.
+    IncompatibleCore {
+        version: String,
+    },
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -184,6 +190,9 @@ impl LocalhostError {
             CoreUnavailable(reason) => {
                 format!("localhost’s background service isn’t running: {reason}. Quit localhost and open it again.")
             }
+            IncompatibleCore { version } => format!(
+                "localhost {version} is still running in the background, perhaps for a coding agent, and can’t work with this version. Quit it and any agent using `localhost mcp`, then try again."
+            ),
             PortConflict { port, owner: Some(owner) } => {
                 format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
             }

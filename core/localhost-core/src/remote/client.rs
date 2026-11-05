@@ -97,10 +97,15 @@ impl Remote {
             Some(_) => return Err(unavailable("it didn't say hello".into())),
         };
         if hello.protocol != PROTOCOL_VERSION {
-            return Err(unavailable(format!(
-                "localhostd {} speaks protocol {}, this app {PROTOCOL_VERSION}",
-                hello.version, hello.protocol
-            )));
+            // This machine's shared core says what to do about it; a WSL
+            // distro's `localhostd` is the app's to replace.
+            return Err(match unavailable(String::new()) {
+                LocalhostError::CoreUnavailable(_) => LocalhostError::IncompatibleCore { version: hello.version },
+                _ => unavailable(format!(
+                    "localhostd {} speaks protocol {}, this app {PROTOCOL_VERSION}",
+                    hello.version, hello.protocol
+                )),
+            });
         }
 
         let (outgoing, mut queue) = mpsc::unbounded_channel::<String>();

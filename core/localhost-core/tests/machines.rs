@@ -157,3 +157,22 @@ async fn ends_when_the_app_closes_the_connection() {
     connection.close();
     tokio::time::timeout(PATIENCE, other.relay).await.expect("the relay didn't end").unwrap();
 }
+
+/// localhost there starts but can't reach its own shared core: the app says
+/// so in that Machine's words, not as a failure of SSH.
+#[tokio::test]
+async fn says_why_the_other_machine_cant_serve() {
+    let (app, relay_end) = tokio::io::duplex(1 << 16);
+    let (relay_reader, relay_writer) = tokio::io::split(relay_end);
+    drop(relay_reader);
+    let reason = LocalhostError::IncompatibleCore { version: "0.4.0".into() }.message();
+    relay::refuse(relay_writer, &reason).await;
+    let (reader, writer) = tokio::io::split(app);
+    let result = MachineConnection::connect("devbox", reader, writer).await;
+    let Err(error) = result else { panic!("it connected") };
+    assert_eq!(
+        error,
+        LocalhostError::MachineUnavailable { machine: "devbox".into(), problem: MachineProblem::CantServe(reason) }
+    );
+    assert!(error.message().starts_with("localhost on devbox couldn’t start: localhost 0.4.0 is still running"));
+}

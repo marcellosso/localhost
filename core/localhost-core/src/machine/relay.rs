@@ -24,6 +24,16 @@ pub const SILENCE_TIMEOUT: Duration = Duration::from_secs(45);
 
 const ORIGIN: Origin = Origin::Machine;
 
+/// Says on `output`, instead of the hello, why this Machine can't serve the
+/// app (e.g. its shared core is another version's), in this Machine's words.
+pub async fn refuse<W: AsyncWrite + Unpin>(mut output: W, reason: &str) {
+    let mut line = serde_json::to_string(&MachineMessage::Refused { reason: reason.to_string() })
+        .expect("a message always encodes");
+    line.push('\n');
+    let _ = output.write_all(line.as_bytes()).await;
+    let _ = output.flush().await;
+}
+
 /// Answers the app on `input` and `output` until it closes or goes silent
 /// for `silence_timeout`. `targets` reaches this Machine's shared core as
 /// `Client::Machine`, so closing it lets the core stop what only this

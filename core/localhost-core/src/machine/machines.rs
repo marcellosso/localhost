@@ -226,7 +226,9 @@ impl Machines {
     /// and keeps it connected. Fails with why it can't be reached.
     pub async fn add(&self, name: Option<String>, destination: &str) -> Result<Machine, LocalhostError> {
         let machine = self.inner.state().new_machine(name, destination)?;
-        let (link, connection) = SshLink::connect(machine.clone(), &self.inner.ssh, &self.inner.control_folder).await?;
+        // Named by its destination while adding: that is what was tried.
+        let tried = Machine { name: machine.destination.clone(), ..machine.clone() };
+        let (link, connection) = SshLink::connect(tried, &self.inner.ssh, &self.inner.control_folder).await?;
         let mut state = self.inner.state();
         if let Err(error) = state.insert(&self.inner, machine.clone()) {
             link.end();
@@ -794,7 +796,8 @@ mod tests {
         let error = machines.add(Some("Dev".into()), "devbx").await.unwrap_err();
         assert_eq!(
             error,
-            LocalhostError::MachineUnavailable { machine: "Dev".into(), problem: MachineProblem::HostNotFound }
+            // Named by the host it tried, not the name it would have had.
+            LocalhostError::MachineUnavailable { machine: "devbx".into(), problem: MachineProblem::HostNotFound }
         );
         assert!(machines.machines().is_empty());
         assert!(Machines::open(root.path(), &ssh).unwrap().machines().is_empty());

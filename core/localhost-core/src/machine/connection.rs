@@ -63,6 +63,9 @@ impl MachineConnection {
             match lines.next_line().await {
                 Ok(Some(line)) => match serde_json::from_str::<MachineMessage>(&line) {
                     Ok(MachineMessage::Hello(hello)) => break hello,
+                    Ok(MachineMessage::Refused { reason }) => {
+                        return Err(unavailable(MachineProblem::CantServe(reason)));
+                    }
                     // A login banner or a profile's echo on standard output.
                     _ => continue,
                 },
@@ -264,7 +267,7 @@ impl MachineConnection {
         };
         let mut state = self.state();
         match message {
-            MachineMessage::Hello(_) | MachineMessage::Unknown => {}
+            MachineMessage::Hello(_) | MachineMessage::Refused { .. } | MachineMessage::Unknown => {}
             MachineMessage::Reply { id, result } => {
                 if let Some(pending) = state.pending.remove(&id) {
                     let _ = pending.send(result);

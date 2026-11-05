@@ -149,6 +149,7 @@ impl SshLink {
                 });
                 Ok((link, connection))
             }
+            Err(error @ LocalhostError::MachineUnavailable { problem: MachineProblem::CantServe(_), .. }) => Err(error),
             Err(_) => {
                 let code = child.wait().await.ok().and_then(|status| status.code());
                 let _ = stderr.await;

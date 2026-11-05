@@ -111,6 +111,11 @@ pub(crate) enum MachineRequest {
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum MachineMessage {
     Hello(MachineHello),
+    /// Instead of the hello: it can't serve, in its own words. An app that
+    /// doesn't know it sees the connection end.
+    Refused {
+        reason: String,
+    },
     Reply {
         id: u64,
         result: Result<serde_json::Value, LocalhostError>,
