@@ -240,3 +240,25 @@ private final class TemporaryRoot {
         try await targets.removeLogs(ofService: service.id)
     }
 }
+
+@Suite struct MachineTests {
+    /// What the layer adds; reaching a Machine over `ssh` is tested in core/.
+    @Test @MainActor func refusesADestinationSSHWouldMisreadAndSavesNothing() async throws {
+        let root = try TemporaryRoot()
+        let machines = try Machines(storageRoot: root.url)
+        let store = MachinesStore(machines: machines)
+        await #expect(throws: LocalhostError.InvalidMachineDestination("-oProxyCommand=evil")) {
+            try await machines.add(destination: "-oProxyCommand=evil")
+        }
+        #expect(machines.machines().isEmpty)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(store.machines.isEmpty)
+        #expect(throws: LocalhostError.self) { try machines.connect(UUID()) }
+    }
+
+    @Test func explainsWhyAMachineCantBeReached() {
+        #expect(MachineProblem.hostKeyNotTrusted.message(machine: "devbox").contains("ssh devbox"))
+        let error = LocalhostError.MachineUnavailable(machine: "devbox", problem: .notInstalled)
+        #expect(error.message.contains("isn’t installed on devbox"))
+    }
+}
