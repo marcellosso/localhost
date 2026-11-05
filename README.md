@@ -32,6 +32,7 @@ A **Project** is a folder. A **Service** is one long-running command in it: `pnp
 - **Keyboard first**: a command palette, a shortcut for every action, arrow keys across the window. Screen readers, light and dark, reduced motion.
 - **Coding agents included**: Claude Code, Cursor, Codex and other MCP clients start, stop and inspect your Services through `localhost mcp` instead of a hidden shell. The agent and the app share one background core, so what the agent starts shows in the app, with its logs. See [Coding agents (MCP)](#coding-agents-mcp).
 - **Updates that ask first**: a check at launch and every 6 hours, a notice in the sidebar, and Restart to Update stops your running Services only after asking. See [Updates](#updates).
+- **Your other computers too**: a dev box you reach with `ssh` is a **Machine**. Its Projects show below yours, and start, stop and open in your browser from here, while they run on it. See [Run Projects on another computer](#8-run-projects-on-another-computer).
 - **Local**: no account, no cloud, works offline. Configuration lives in localhost's own storage, never in your project folders.
 
 A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside a WSL 2 distro. All of them, the `localhost` command and the MCP server run on one Rust core.
@@ -159,9 +160,20 @@ Before starting a Service with a Port, localhost checks who holds it. If somethi
 
 The **Ports** view (**⌘0**) lists every process listening on a TCP port and whom it belongs to: one of your Services, a process running inside one of your Projects' folders, or nothing localhost knows (other apps and system services are folded below). Select one and press ⌘. to stop it; localhost asks first for anything it didn't start.
 
-### 7. Move a Project to another machine
+### 7. Copy a Project's configuration to another computer
 
-**Export Project…** saves a Project as a YAML Project file, and **Import Project…** reads one back, showing what it contains before adding anything; choose the folder if it is somewhere else on this machine. Secret values are never exported: the file lists Secret names, and the import shows which ones to fill in. The format is in [docs/configuration.md](docs/configuration.md).
+**Export Project…** saves a Project as a YAML Project file, and **Import Project…** reads one back, showing what it contains before adding anything; choose the folder if it is somewhere else on this computer. Secret values are never exported: the file lists Secret names, and the import shows which ones to fill in. The format is in [docs/configuration.md](docs/configuration.md).
+
+### 8. Run Projects on another computer
+
+A dev box or home server you reach with `ssh` can be a **Machine**: its Projects stay and run there, with its own configuration and Secrets, and this app shows and controls them.
+
+1. Check that `ssh devbox localhost --version` works from a terminal without asking anything (a key, in the SSH agent if it has a passphrase, and a host key you already trusted). It runs without your interactive profile: with zsh, put `localhost` on the `PATH` in `~/.zshenv`, not `~/.zshrc`.
+2. Open **Settings → Machines → Add Machine…**. In **SSH host**, type a `Host` from `~/.ssh/config` (the field lists them), or `user@host:port`. localhost connects first, and says why and what to do if it can't.
+3. The Machine's Projects show in the sidebar under its name, below this computer's: Start, Stop, Restart, logs. They are edited on the Machine.
+4. **Open in Browser** forwards the Service's Port to the same port here, through the SSH connection and on loopback only, then opens it.
+
+Any network `ssh` uses works: a LAN, a VPN, `ProxyJump`, Tailscale. Nothing new listens on either computer. A lost connection is made again on its own; Services you started from here stop on the Machine when the connection ends, unless localhost is open there. More in the [Machines docs](https://www.getlocalhost.app/docs/machines).
 
 ## Keyboard shortcuts
 
@@ -272,6 +284,7 @@ Inside that folder:
 - `projects/`: one JSON file per Project. A file that can't be read is renamed to `….unreadable` and reported at launch, never deleted.
 - `logs/`: each Run's output, the last 5 Runs per Service.
 - `runs/`: the Runs active right now, to find leftovers after a crash.
+- `machines.json`: the Machines you added, their names and SSH destinations; `machines/` holds their SSH connections' sockets while they are open.
 - `agent-backups/`: each coding agent's configuration file as it was before localhost first connected it.
 - `bin/`: the AppImage's `localhost` command, copied out for coding agents (Linux AppImage only).
 
@@ -392,6 +405,10 @@ Add the Project’s folder and localhost suggests Services from `package.json` s
 ### Can AI coding agents start my dev servers through localhost?
 
 Yes. `localhost mcp` is an MCP server for Claude Code, Cursor, Codex and other coding agents: they list your Projects, start and stop Services, and read their status, logs and ports, instead of running `pnpm dev` in a shell you can’t see. They can also add, edit and remove Projects and Services, checked as the app checks them: removing needs `confirm: true` and never touches a Project’s folder, and `localhost mcp --read-only` leaves those tools out. The agent and the app share one background core, so what the agent starts shows in the app, and the Services it started stop when it disconnects, unless the app is open.
+
+### Can I run my dev servers on a dev box or home server and open them from my laptop?
+
+Yes. Add it in Settings → Machines with the name you give `ssh` (a `Host` from `~/.ssh/config`, or `user@host:port`), and its Projects show in the sidebar below your laptop’s. Start, stop and read their logs from there; Open in Browser forwards the Port to the same port on your laptop through the SSH connection, so `http://localhost:5173` works as if it ran locally. Its Services, configuration and Secrets stay on it. It works over any network `ssh` reaches, such as Tailscale or a VPN, and adds no account or listening port. localhost has to be installed on both computers.
 
 ### Is it free and open source?
 
