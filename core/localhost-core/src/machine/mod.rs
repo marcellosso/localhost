@@ -51,7 +51,8 @@ pub enum MachineProblem {
     TooOld(Option<String>),
     /// It was connected and the connection ended.
     Lost,
-    /// Anything else SSH said.
+    /// Anything else SSH said, e.g. a mistake in `~/.ssh/config`. Not
+    /// tried again on its own.
     Other(String),
 }
 
@@ -107,6 +108,8 @@ impl MachineProblem {
             || lower.contains("timed out")
             || lower.contains("no route to host")
             || lower.contains("network is unreachable")
+            || lower.contains("connection reset")
+            || lower.contains("connection closed by")
         {
             MachineProblem::Unreachable(last_line.trim_start_matches("ssh: ").to_string())
         } else if code == Some(127)
@@ -165,7 +168,11 @@ mod tests {
         assert_eq!(problem("Unknown command `remote`.\nRun `localhost --help` for usage.", Some(2)), TooOld(None));
         assert_eq!(
             problem("kex_exchange_identification: read: Connection reset by peer", Some(255)),
-            Other("kex_exchange_identification: read: Connection reset by peer".into())
+            Unreachable("kex_exchange_identification: read: Connection reset by peer".into())
+        );
+        assert_eq!(
+            problem("/Users/me/.ssh/config line 4: Bad configuration option: hostnme", Some(255)),
+            Other("/Users/me/.ssh/config line 4: Bad configuration option: hostnme".into())
         );
         assert_eq!(problem("", Some(255)), Lost);
     }

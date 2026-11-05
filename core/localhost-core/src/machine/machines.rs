@@ -345,11 +345,10 @@ impl State {
 }
 
 /// Whether waiting could fix `problem`, so it is worth trying again unasked.
+/// What SSH says that localhost doesn't recognize is shown once instead: a
+/// mistake in `~/.ssh/config` stays one however often it is tried.
 fn is_passing(problem: &MachineProblem) -> bool {
-    matches!(
-        problem,
-        MachineProblem::Lost | MachineProblem::Unreachable(_) | MachineProblem::HostNotFound | MachineProblem::Other(_)
-    )
+    matches!(problem, MachineProblem::Lost | MachineProblem::Unreachable(_) | MachineProblem::HostNotFound)
 }
 
 /// Connects to `machine` until told to stop (the task is aborted), again
