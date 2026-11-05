@@ -22,7 +22,7 @@ mod ssh_config;
 use serde::{Deserialize, Serialize};
 
 pub use connection::MachineConnection;
-pub use machines::{MachineState, Machines, MachinesEvent};
+pub use machines::{MachineSnapshot, MachineState, Machines, MachinesEvent};
 pub use protocol::{MACHINE_PROTOCOL_VERSION, MachineHello};
 pub use ssh::{Forward, SshLink};
 pub use ssh_config::ssh_config_hosts;

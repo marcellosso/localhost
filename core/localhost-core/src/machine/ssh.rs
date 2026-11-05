@@ -182,7 +182,8 @@ impl SshLink {
         // on macOS could bind beside a Service listening on every address,
         // hiding it from this computer's browser.
         if !is_free(local_port) || crate::port_probe::is_accepting(local_port).await {
-            return Err(LocalhostError::PortConflict { port: local_port, owner: None });
+            let owner = tokio::task::spawn_blocking(move || crate::listener::holding(local_port)).await.ok().flatten();
+            return Err(LocalhostError::PortConflict { port: local_port, owner: owner.map(Box::new) });
         }
         self.control("forward", &format!("127.0.0.1:{local_port}:localhost:{port}"), port).await?;
         // Browsers may try `::1` first for `localhost`. Not every computer has it.

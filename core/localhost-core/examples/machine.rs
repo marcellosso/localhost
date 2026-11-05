@@ -8,7 +8,7 @@
 //! It lists the other Machine's Projects and Services and follows their
 //! changes. Type `start`, `stop`, `restart` or `open` and a
 //! `<project>/<service>` Key pair; `open` forwards the Service's Port and
-//! prints its URL. `quit` (or Ctrl-D) ends the connection and its Forwards.
+//! prints its URL, as Open in Browser does. `quit` (or Ctrl-D) ends the connection and its Forwards.
 //! The Machine list is kept in a temporary folder, never in localhost's own.
 
 use std::collections::HashMap;
@@ -34,31 +34,12 @@ async fn main() {
 async fn run(destination: &str) -> Result<(), LocalhostError> {
     let storage_root = std::env::temp_dir().join(format!("localhost-machine-example-{}", std::process::id()));
     let machines = Machines::open(&storage_root, Path::new("ssh"))?;
-    let machine = machines.add(None, destination)?;
-    let (_, _, mut machine_events) = machines.subscribe();
-    machines.connect(machine.id)?;
-    println!("Connecting to {}…", machine.name);
-    loop {
-        match machine_events.recv().await {
-            Some(MachinesEvent::StateChanged { state: MachineState::Connected { version }, .. }) => {
-                println!("Connected: localhost {version} there.");
-                break;
-            }
-            Some(MachinesEvent::StateChanged { state: MachineState::Unavailable { problem, is_retrying }, .. }) => {
-                println!("{}", problem.message(&machine.name));
-                if !is_retrying {
-                    return Ok(());
-                }
-            }
-            Some(_) => {}
-            None => return Ok(()),
-        }
-    }
-
-    let connection = machines.connection(machine.id)?;
-    let (mut projects, mut project_updates) = connection.projects().await?;
-    let (mut statuses, mut service_events) = connection.subscribe().await?;
-    print_projects(&projects, &statuses);
+    let (_, mut machine_events) = machines.subscribe();
+    println!("Connecting to {destination}…");
+    // Added only once it is reached; then kept connected.
+    let machine = machines.add(None, destination).await?;
+    let mut projects = Vec::new();
+    let mut statuses = HashMap::new();
     println!("\nstart|stop|restart|open <project>/<service>, or quit");
 
     let mut input = lines_typed();
@@ -73,28 +54,42 @@ async fn run(destination: &str) -> Result<(), LocalhostError> {
                     [] => continue,
                     _ => { println!("start|stop|restart|open <project>/<service>, or quit"); continue }
                 };
-                let Some((project, service)) = find(&projects, target) else {
+                let Some(service) = find(&projects, target) else {
                     println!("No Service {target} there.");
                     continue;
                 };
                 let result = match verb {
-                    "start" => connection.start(service, None).await.map(|_| ()),
-                    "stop" => connection.stop(service).await.map(|_| ()),
-                    "restart" => connection.restart(service).await.map(|_| ()),
-                    "open" => open(&machines, machine.id, &projects, &statuses, project, service).await,
+                    "start" => machines.start(machine.id, service, None).await.map(|_| ()),
+                    "stop" => machines.stop(machine.id, service).await.map(|_| ()),
+                    "restart" => machines.restart(machine.id, service).await.map(|_| ()),
+                    "open" => match machines.open_service(machine.id, service).await {
+                        Ok(Some(url)) => { println!("Open {url}"); Ok(()) }
+                        Ok(None) => { println!("{target} has nothing to open."); Ok(()) }
+                        Err(error) => Err(error),
+                    },
                     _ => { println!("start|stop|restart|open <project>/<service>, or quit"); continue }
                 };
                 if let Err(error) = result {
                     println!("{}", error.message());
                 }
             }
-            Some(updated) = project_updates.recv() => {
-                projects = updated;
-                println!("The Projects there changed.");
-                print_projects(&projects, &statuses);
-            }
-            Some(event) = service_events.recv() => {
-                if let ServiceEvent::ServiceStateChanged(status) = &event {
+            Some(event) = machine_events.recv() => match event {
+                MachinesEvent::StateChanged { state, .. } => match state {
+                    MachineState::Connected { version } => println!("Connected: localhost {version} there."),
+                    MachineState::Unavailable { problem, is_retrying } => {
+                        println!("{}{}", problem.message(&machine.name), if is_retrying { " Trying again…" } else { "" });
+                    }
+                    _ => {}
+                },
+                MachinesEvent::ProjectsChanged { projects: updated, .. } => {
+                    projects = updated;
+                    print_projects(&projects, &statuses);
+                }
+                MachinesEvent::StatusesChanged { statuses: updated, .. } => {
+                    statuses = updated.into_iter().map(|status| (status.service_id, status)).collect();
+                    print_projects(&projects, &statuses);
+                }
+                MachinesEvent::ServiceChanged { event: ServiceEvent::ServiceStateChanged(status), .. } => {
                     let run = status.run.as_ref();
                     println!(
                         "{} → {:?}{}{}",
@@ -106,25 +101,10 @@ async fn run(destination: &str) -> Result<(), LocalhostError> {
                     if let Some(failure) = run.and_then(|run| run.failure.as_ref()) {
                         println!("  {}", failure.message());
                     }
-                    statuses.insert(status.service_id, status.clone());
+                    statuses.insert(status.service_id, status);
                 }
-            }
-            Some(MachinesEvent::StateChanged { state, .. }) = machine_events.recv() => {
-                match state {
-                    MachineState::Unavailable { problem, is_retrying } => {
-                        println!("{}{}", problem.message(&machine.name), if is_retrying { " Trying again…" } else { "" });
-                    }
-                    MachineState::Connected { .. } => {
-                        // A new connection: its Projects and statuses afresh.
-                        println!("Connected again.");
-                        let connection = machines.connection(machine.id)?;
-                        (projects, project_updates) = connection.projects().await?;
-                        (statuses, service_events) = connection.subscribe().await?;
-                        print_projects(&projects, &statuses);
-                    }
-                    _ => {}
-                }
-            }
+                _ => {}
+            },
         }
     }
     machines.disconnect(machine.id);
@@ -147,38 +127,11 @@ fn lines_typed() -> mpsc::UnboundedReceiver<String> {
     receiver
 }
 
-/// Forwards the Service's Port, the same number here, and prints its URL.
-async fn open(
-    machines: &Machines,
-    machine_id: Id,
-    projects: &[Project],
-    statuses: &HashMap<Id, ServiceStatus>,
-    project_id: Id,
-    service_id: Id,
-) -> Result<(), LocalhostError> {
-    let service = projects
-        .iter()
-        .find(|project| project.id == project_id)
-        .and_then(|project| project.services.iter().find(|service| service.id == service_id))
-        .expect("found above");
-    let run = statuses.get(&service_id).and_then(|status| status.run.as_ref());
-    let Some(port) = run.and_then(|run| run.port).or(service.port) else {
-        println!("{} has no Port.", service.key);
-        return Ok(());
-    };
-    let forward = machines.forward(machine_id, port, port).await?;
-    println!("Forwarded {} there to {} here.", forward.port, forward.local_port);
-    if let Some(url) = service.url_to_open(run) {
-        println!("Open {url}");
-    }
-    Ok(())
-}
-
-fn find(projects: &[Project], target: &str) -> Option<(Id, Id)> {
+fn find(projects: &[Project], target: &str) -> Option<Id> {
     let (project_key, service_key) = target.split_once('/')?;
     let project = projects.iter().find(|project| project.key.to_string() == project_key)?;
     let service = project.services.iter().find(|service| service.key.to_string() == service_key)?;
-    Some((project.id, service.id))
+    Some(service.id)
 }
 
 fn name(projects: &[Project], service_id: Id) -> String {

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::Duration;
 
-use localhost_core::machine::SshLink;
+use localhost_core::machine::{MachineState, Machines, MachinesEvent, SshLink};
 use localhost_core::{
     Id, Key, LocalhostError, Machine, MachineProblem, MemorySecretStore, NewService, Origin, ProjectLibrary,
     ServiceState,
@@ -278,21 +278,83 @@ async fn says_why_a_machine_cant_be_reached() {
     assert_eq!(problem(other.connect("barebox").await), MachineProblem::NotInstalled);
 }
 
+/// What the apps do: add the Machine, show its Projects and statuses as
+/// they change, control a Service, and open it through a Forward.
+#[tokio::test(flavor = "multi_thread")]
+async fn shows_another_machine_as_the_apps_do() {
+    let Some(other) = OtherMachine::start() else { return };
+    let library = other.library();
+    let folder = other.path().join("site");
+    std::fs::create_dir_all(&folder).unwrap();
+    let project = library
+        .add_project("Site", Key::new("site").unwrap(), folder.to_str().unwrap(), vec![], Origin::Agent)
+        .unwrap();
+    let port = free_port();
+    let web = NewService {
+        port: Some(port.into()),
+        port_can_change: false,
+        ..NewService::new("Web", Key::new("web").unwrap(), "exec python3 -m http.server $PORT --bind 127.0.0.1")
+    };
+    let web = library.add_service(project.id, web, vec![], vec![], Origin::Agent).unwrap();
+
+    let machines = Machines::open(&other.path().join("app-storage"), &other.ssh()).unwrap();
+    let (snapshots, mut events) = machines.subscribe();
+    assert!(snapshots.is_empty());
+    let devbox = tokio::time::timeout(PATIENCE, machines.add(Some("Dev box".into()), "devbox"))
+        .await
+        .expect("ssh hung")
+        .unwrap();
+    until_event(&mut events, "showed its Projects", |event| {
+        matches!(event, MachinesEvent::ProjectsChanged { projects, .. } if projects.iter().any(|shown| shown.id == project.id))
+    })
+    .await;
+    until_event(&mut events, "connected", |event| {
+        matches!(event, MachinesEvent::StateChanged { state: MachineState::Connected { .. }, .. })
+    })
+    .await;
+
+    machines.start(devbox.id, web.id, None).await.unwrap();
+    until_event(&mut events, "ran", |event| {
+        matches!(
+            event,
+            MachinesEvent::ServiceChanged { event: localhost_core::ServiceEvent::ServiceStateChanged(status), .. }
+                if status.service_id == web.id && status.state == ServiceState::Running
+        )
+    })
+    .await;
+    let (snapshots, _) = machines.subscribe();
+    let shown = &snapshots[0];
+    assert_eq!((shown.machine.name.as_str(), shown.projects.len()), ("Dev box", 1));
+    let status = shown.statuses.iter().find(|status| status.service_id == web.id).unwrap();
+    assert_eq!((status.state, status.run.as_ref().unwrap().origin), (ServiceState::Running, Origin::Machine));
+
+    // Both ends are this computer, so the Service itself holds its port
+    // here: Open says who, rather than forwarding beside it.
+    match machines.open_service(devbox.id, web.id).await {
+        Err(LocalhostError::PortConflict { port: taken, owner: Some(owner) }) => {
+            assert_eq!(taken, port);
+            assert!(owner.ports.contains(&port), "{owner:?}");
+        }
+        other => panic!("opened beside the Service: {other:?}"),
+    }
+
+    assert_eq!(machines.stop(devbox.id, web.id).await.unwrap().state, ServiceState::Stopped);
+    machines.remove(devbox.id).unwrap();
+    assert!(machines.machines().is_empty());
+    assert!(machines.connection(devbox.id).is_err());
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn connects_again_after_the_connection_is_lost() {
-    use localhost_core::machine::{MachineState, Machines, MachinesEvent};
     let Some(other) = OtherMachine::start() else { return };
     let app_root = other.path().join("app-storage");
     let machines = Machines::open(&app_root, &other.ssh()).unwrap();
-    let devbox = machines.add(None, "devbox").unwrap();
-    let (_, _, mut events) = machines.subscribe();
+    let (_, mut events) = machines.subscribe();
     let connected = |event: &MachinesEvent| {
         matches!(event, MachinesEvent::StateChanged { state: MachineState::Connected { .. }, .. })
     };
-    machines.connect(devbox.id).unwrap();
+    let devbox = tokio::time::timeout(PATIENCE, machines.add(None, "devbox")).await.expect("ssh hung").unwrap();
     until_event(&mut events, "connected", connected).await;
-    let (projects, _) = machines.connection(devbox.id).unwrap().projects().await.unwrap();
-    assert!(projects.is_empty());
 
     // The network drops, or the laptop slept past the heartbeat.
     machines.connection(devbox.id).unwrap().close();
@@ -315,9 +377,9 @@ async fn connects_again_after_the_connection_is_lost() {
 }
 
 async fn until_event(
-    events: &mut tokio::sync::mpsc::UnboundedReceiver<localhost_core::machine::MachinesEvent>,
+    events: &mut tokio::sync::mpsc::UnboundedReceiver<MachinesEvent>,
     what: &str,
-    condition: impl Fn(&localhost_core::machine::MachinesEvent) -> bool,
+    condition: impl Fn(&MachinesEvent) -> bool,
 ) {
     let wait = async {
         while let Some(event) = events.recv().await {
