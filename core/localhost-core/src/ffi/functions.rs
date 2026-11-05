@@ -35,6 +35,12 @@ pub fn localhost_error_message(error: &LocalhostError) -> String {
     error.message()
 }
 
+/// Why `machine` can't be reached, and what to do next.
+#[uniffi::export]
+pub fn machine_problem_message(problem: &crate::MachineProblem, machine: &str) -> String {
+    problem.message(machine)
+}
+
 #[uniffi::export]
 pub fn project_file_problem_message(problem: &ProjectFileProblem) -> String {
     problem.message()
@@ -170,6 +176,14 @@ pub async fn scan_folder(path: String) -> Vec<ServiceSuggestion> {
 #[uniffi::export]
 pub async fn scan_project(project: Project) -> Vec<ServiceSuggestion> {
     blocking(move || ProjectScanner::default().scan_project(&project)).await
+}
+
+// MARK: Machines
+
+/// The hosts named in `~/.ssh/config`, to suggest as a Machine's destination.
+#[uniffi::export]
+pub async fn ssh_config_hosts() -> Vec<String> {
+    blocking(crate::machine::ssh_config_hosts).await
 }
 
 // MARK: Text

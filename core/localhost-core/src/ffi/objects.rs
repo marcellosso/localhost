@@ -9,11 +9,14 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::runtime::{blocking, on_runtime};
-use super::subscriptions::{FoundOrphansEvents, LibraryEvents, OutputLines, ServiceEvents, ServiceOutputLines};
+use super::subscriptions::{
+    FoundOrphansEvents, LibraryEvents, MachinesEvents, OutputLines, ServiceEvents, ServiceOutputLines,
+};
+use crate::machine::{Forward, MachineSnapshot, Machines};
 use crate::remote::{Client, shared};
 use crate::{
     AgentClient, AgentSetup, AgentStatus, CommandLineStatus, EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash,
-    Link, Listener, LocalhostError, LogStore, NewService, Origin, Orphan, OutputLine, ProfileChanges, Project,
+    Link, Listener, LocalhostError, LogStore, Machine, NewService, Origin, Orphan, OutputLine, ProfileChanges, Project,
     ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service, ServiceChanges, ServiceManager,
     ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore, Targets,
     UnreadableProjectFile, VariableInput, VariableLayer,
@@ -586,6 +589,149 @@ impl Targets {
     #[uniffi::method]
     pub async fn ffi_leave_orphans(self: Arc<Self>, orphans: Vec<Orphan>) -> Result<(), LocalhostError> {
         on_runtime(async move { self.leave_orphans(&ExecutionTarget::ThisMachine, &orphans).await }).await
+    }
+}
+
+// MARK: Machines
+
+#[derive(uniffi::Record)]
+pub struct MachinesSubscription {
+    pub machines: Vec<MachineSnapshot>,
+    pub events: Arc<MachinesEvents>,
+}
+
+/// The other Machines the app shows, reached with the system's `ssh`. One
+/// object for all of them: a Machine's controls and logs go through it by
+/// the Machine's id, so they survive its reconnections. Every change is made
+/// as `Origin::Machine` on the other Machine, which decides it.
+#[uniffi::export]
+impl Machines {
+    /// The Machines saved in `storage_root`.
+    #[uniffi::constructor]
+    pub fn ffi_open(storage_root: String) -> Result<Arc<Machines>, LocalhostError> {
+        Machines::open(Path::new(&storage_root), Path::new("ssh")).map(Arc::new)
+    }
+
+    #[uniffi::method]
+    pub fn ffi_machines(&self) -> Vec<Machine> {
+        self.machines()
+    }
+
+    #[uniffi::method]
+    pub fn ffi_subscribe(&self) -> MachinesSubscription {
+        let (machines, receiver) = self.subscribe();
+        MachinesSubscription { machines, events: MachinesEvents::new(receiver) }
+    }
+
+    /// Connects first, and remembers the Machine only once that works.
+    #[uniffi::method]
+    pub async fn ffi_add(
+        self: Arc<Self>,
+        name: Option<String>,
+        destination: String,
+    ) -> Result<Machine, LocalhostError> {
+        on_runtime(async move { self.add(name, &destination).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_rename(self: Arc<Self>, machine_id: Id, name: String) -> Result<Machine, LocalhostError> {
+        blocking(move || self.rename(machine_id, &name)).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_remove(self: Arc<Self>, machine_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.remove(machine_id) }).await
+    }
+
+    #[uniffi::method]
+    pub fn ffi_connect(&self, machine_id: Id) -> Result<(), LocalhostError> {
+        let _runtime = super::runtime::enter();
+        self.connect(machine_id)
+    }
+
+    #[uniffi::method]
+    pub fn ffi_reconnect(&self, machine_id: Id) -> Result<(), LocalhostError> {
+        let _runtime = super::runtime::enter();
+        self.reconnect(machine_id)
+    }
+
+    #[uniffi::method]
+    pub fn ffi_disconnect(&self, machine_id: Id) {
+        let _runtime = super::runtime::enter();
+        self.disconnect(machine_id)
+    }
+
+    /// The computer woke or its network changed: tries waiting connections now.
+    #[uniffi::method]
+    pub fn ffi_wake(&self) {
+        self.wake()
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_start(
+        self: Arc<Self>,
+        machine_id: Id,
+        service_id: Id,
+        on_port: Option<u16>,
+    ) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.start(machine_id, service_id, on_port).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop(self: Arc<Self>, machine_id: Id, service_id: Id) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.stop(machine_id, service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_restart(self: Arc<Self>, machine_id: Id, service_id: Id) -> Result<ServiceStatus, LocalhostError> {
+        on_runtime(async move { self.restart(machine_id, service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_start_all(self: Arc<Self>, machine_id: Id, project_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.start_all(machine_id, project_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_stop_all(self: Arc<Self>, machine_id: Id, project_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.stop_all(machine_id, project_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_subscribe_to_run(
+        self: Arc<Self>,
+        machine_id: Id,
+        run_id: Id,
+    ) -> Result<RunSubscription, LocalhostError> {
+        let (lines, receiver) = on_runtime(async move { self.subscribe_to_run(machine_id, run_id).await }).await?;
+        Ok(RunSubscription { lines, updates: OutputLines::new(receiver) })
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_subscribe_to_services(
+        self: Arc<Self>,
+        machine_id: Id,
+        service_ids: Vec<Id>,
+    ) -> Result<ServicesSubscription, LocalhostError> {
+        let service_ids = service_ids.into_iter().collect::<HashSet<Id>>();
+        let (lines, receiver) =
+            on_runtime(async move { self.subscribe_to_services(machine_id, service_ids).await }).await?;
+        Ok(ServicesSubscription { lines, updates: ServiceOutputLines::new(receiver) })
+    }
+
+    /// The URL to open for the Service, its Port forwarded here first.
+    #[uniffi::method]
+    pub async fn ffi_open_service(
+        self: Arc<Self>,
+        machine_id: Id,
+        service_id: Id,
+    ) -> Result<Option<String>, LocalhostError> {
+        on_runtime(async move { self.open_service(machine_id, service_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub fn ffi_forwards(&self, machine_id: Id) -> Vec<Forward> {
+        self.forwards(machine_id)
     }
 }
 

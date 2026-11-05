@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc, watch};
 
 use super::runtime::on_runtime;
+use crate::machine::MachinesEvent;
 use crate::{Orphan, OutputLine, ProjectLibraryEvent, ServiceEvent, ServiceOutputLine};
 
 macro_rules! subscription {
@@ -72,6 +73,12 @@ subscription!(
     /// The Orphans the shared core finds as the app connects to it.
     FoundOrphansEvents,
     Vec<Orphan>
+);
+subscription!(
+    /// Other Machines added, removed or renamed, their states, and what
+    /// each shows: its Projects and Service events.
+    MachinesEvents,
+    MachinesEvent
 );
 
 #[cfg(test)]
