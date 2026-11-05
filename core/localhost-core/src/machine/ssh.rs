@@ -101,7 +101,7 @@ impl SshLink {
             .args(options())
             .args(master_options())
             .arg("--")
-            .arg(&machine.destination)
+            .arg(ssh_destination(&machine.destination))
             .arg(REMOTE_COMMAND)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -230,7 +230,7 @@ impl SshLink {
             .arg(spec)
             .args(options())
             .arg("--")
-            .arg(&self.machine.destination)
+            .arg(ssh_destination(&self.machine.destination))
             .stdin(Stdio::null())
             .output()
             .await
@@ -250,6 +250,22 @@ impl Drop for SshLink {
     }
 }
 
+/// What `ssh` is given for a Machine's `destination`: `user@host:port`, as
+/// people write it, in the `ssh://` form `ssh` reads a port from; a `Host`
+/// of `~/.ssh/config` or `user@host` as it is.
+fn ssh_destination(destination: &str) -> String {
+    let Some((host, port)) = destination.rsplit_once(':') else { return destination.to_string() };
+    let is_port = !port.is_empty() && port.len() <= 5 && port.chars().all(|character| character.is_ascii_digit());
+    let address = host.rsplit_once('@').map_or(host, |(_, address)| address);
+    // An IPv6 address only with brackets: `[::1]:2222`.
+    let is_host =
+        !address.is_empty() && (!address.contains(':') || (address.starts_with('[') && address.ends_with(']')));
+    if destination.starts_with("ssh://") || !is_port || !is_host {
+        return destination.to_string();
+    }
+    format!("ssh://{destination}")
+}
+
 /// Whether nothing on this computer listens on `port` of IPv4's loopback.
 fn is_free(port: u16) -> bool {
     TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, port))).is_ok()
@@ -263,4 +279,21 @@ fn create_private_folder(folder: &Path) -> std::io::Result<()> {
         std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o700))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ssh_destination;
+
+    #[test]
+    fn gives_ssh_a_port_in_the_form_it_reads() {
+        assert_eq!(ssh_destination("devbox"), "devbox");
+        assert_eq!(ssh_destination("me@devbox"), "me@devbox");
+        assert_eq!(ssh_destination("me@devbox:2222"), "ssh://me@devbox:2222");
+        assert_eq!(ssh_destination("10.0.0.9:22"), "ssh://10.0.0.9:22");
+        assert_eq!(ssh_destination("me@[fd00::9]:2222"), "ssh://me@[fd00::9]:2222");
+        assert_eq!(ssh_destination("ssh://me@devbox:2222"), "ssh://me@devbox:2222");
+        assert_eq!(ssh_destination("fd00::9"), "fd00::9");
+        assert_eq!(ssh_destination("devbox:"), "devbox:");
+    }
 }
