@@ -66,10 +66,12 @@ The code, the UI and the docs use the same words. Use these, and avoid the alter
 | **Suggestion** | A Service proposed by scanning a folder, applied only once the user checks it. | detected service |
 | **Run** | One execution of a Service, launch until its whole process tree has ended. A Service has at most one active Run. | process, session, instance |
 | **Execution Target** | Where a Project's Services run: this machine, or a WSL distro. | host, runtime, environment, agent |
+| **Machine** | Another computer whose localhost this app shows and controls, reached over the system's `ssh`. Its Projects, Secrets and Runs stay on it. The UI says "Machine" and "Runs on". | host, server, remote, environment |
+| **Forward** | A Port of a Machine made reachable on this computer's loopback, through the SSH connection, so Open in Browser works. Same port number unless that one is taken here. | tunnel, proxy |
 | **Listener** | Any process listening on a TCP port, attributed to a Run, to a Project (its working directory is inside the folder), or to nobody. | port owner |
 | **Unmanaged Listener** | A Listener that belongs to no Run and no Project. localhost can show and stop it, never adopt it. | rogue, stray |
 | **Orphan** | A process tree left from a Run of a localhost session that ended unexpectedly. Never re-adopted as Running. | zombie, leftover |
-| **Origin** | Who asked for a change: main window, menu bar, CLI, or an agent through `localhost mcp`. | source, actor, caller |
+| **Origin** | Who asked for a change: main window, menu bar, CLI, an agent through `localhost mcp`, or another Machine's app through `localhost remote`. | source, actor, caller |
 | **Service State** | Exactly one of the six states below. | status (in the UI) |
 
 | State | Meaning |
@@ -131,6 +133,12 @@ These are product rules, not implementation details. A change that breaks one ne
 - Updates are offered, never installed unasked: a check at launch and every few hours (off in Settings), a notice, then Update Now and Restart to Update. Restarting to update stops every Service first, like quitting, after listing them, and retires the shared core so the new version starts its own. A `.deb` or `.rpm` only links to the release. Builds without the updater's public key never check.
 - Each active Run is recorded on disk (pid, process group, start time). At the next launch, survivors are offered as Orphans: Stop them (default) or Leave them.
 
+**Machines**
+- Add Machine connects first: a Machine is kept only once `ssh <destination> localhost remote --stdio` works, otherwise the typed `MachineProblem` says why and what to do next. The SSH host field suggests the `Host`s of `~/.ssh/config`, read only.
+- A lost connection is made again on its own, after 1 s growing to 30 s, or at once when the computer wakes; a problem waiting won't fix (a host key, a sign-in that needs a prompt, no or an old localhost there, anything SSH says that localhost doesn't recognize) is shown once and waits for Reconnect. Reconnecting never starts or stops a Service.
+- A Machine's Projects show below this computer's and act like them: Start, Stop, Restart, logs, Open in Browser. They are edited on the Machine. Open in Browser forwards the Port to the same port here first; if that port is taken here, it says so (`PortConflict`) rather than using another.
+- Quitting asks first when Services started from here on another Machine are active: that Machine stops them once the connection ends, unless localhost is open on it.
+
 **Detection**
 - Scanning only reads: no network, nothing written. It looks at the root, folders up to two levels deep (skipping dependency, build and hidden folders) and folders detectors declare (workspace packages, Cargo members).
 - Detectors (Node, Compose, Python, Cargo) are small and independent and return plain command lines. Every Suggestion is reviewed: likely ones checked, the rest folded away, each editable before anything is saved.
@@ -169,6 +177,7 @@ All state, process management, logs and persistence live in the core, which neve
 | `LogStore`, `LogBuffer` | Each Run's output: in-memory buffer and rotated file. |
 | `RunRegistry` | Records active Runs on disk, to find Orphans. |
 | `Targets`, `remote` | Where each Project runs, behind one interface: this machine through the shared core, a WSL distro through a `localhostd`. Merges every target's statuses and events. |
+| `machine` | Other Machines: `Machines` keeps the list (`machines.json`), keeps each connected over an `ssh` ControlMaster running `localhost remote --stdio` there, and mirrors its Projects and statuses for the apps; `relay` is that command's side. Its own versioned protocol, which only grows. |
 | `remote::shared` | The shared core: the `remote` protocol on a Unix socket in the storage root, or on Windows a named pipe named after it, started by its first client, one per storage root. Only the transport differs per platform. Decides which Runs a disconnecting client takes with it. |
 | `listener` | Finds Listeners (libproc, `/proc`, `GetExtendedTcpTable`, never `lsof`) and attributes them. |
 | `ProjectScanner` + detectors | Reads a folder and returns Suggestions. |
@@ -210,6 +219,7 @@ The hard-to-reverse choices, and why. Changing one is an issue and a discussion 
 - **Windows Runs in Job Objects, stopped with Ctrl-Break.** Windows has no process-group signals; a job holds the whole tree and dies with the core even on a crash. Ctrl-Break needs a shared console, so the core attaches once to a hidden one. A core an agent starts breaks away from the agent's job, which Node ends with the agent.
 - **WSL Projects run by a core inside the distro.** A Windows process sees nothing behind `wsl.exe`. The app copies its `localhostd` into the distro and drives it over stdio: no socket, port or firewall rule. Configuration and Secrets stay on Windows.
 - **Configuration stored by localhost, not in the Project folder.** Writing into users' repos is a surprising side effect. The Project file is the explicit bridge.
+- **Machines through the system's `ssh`, viewed, never merged.** The user already reaches their other computers with `ssh` (keys, agent, `~/.ssh/config`, `ProxyJump`, Tailscale), so localhost adds no sign-in, listener or port of its own: one `BatchMode` ControlMaster per Machine runs `localhost remote --stdio` there, and Forwards ride on it, bound to loopback. Host keys are checked as configured and never trusted on the user's behalf. Each Machine keeps its Configuration, Secrets and Runs; changes there are made as `Origin::Machine`, and that Machine's core holds only the Runs the connection started, stopping them when it ends unless an app is open there. Two computers often run different versions, so the Machine protocol is versioned on its own and only grows: unknown requests are answered `Unsupported`, unknown messages skipped.
 - **Pipes, not a PTY.** Keeping stderr distinct matters for failures and, later, for agents. The colour hints make up for the missing terminal.
 - **`$PORT`, and moves scoped to one Run.** It is the existing convention, needs no parser and works the same from any client. A moved port never rewrites the configuration.
 - **Run stats sampled on request.** Nothing is sampled unless a stats popover is open (every 1.5 s). The tree includes descendants that left the session. Memory is each platform's honest number rather than RSS, which counts forked workers once each.
