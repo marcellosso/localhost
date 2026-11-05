@@ -442,3 +442,6 @@ Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBU
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/marcellosso-localhost-snnlpq?v=79c3bbe7d907ac073570211d96f6debd)](https://m8ven.ai/mcp/marcellosso-localhost-snnlpq?s=readme)
