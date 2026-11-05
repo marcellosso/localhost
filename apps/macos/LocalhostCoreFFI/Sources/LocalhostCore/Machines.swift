@@ -118,6 +118,17 @@ extension MachineSnapshot: Identifiable {
     public var id: UUID { machine.id }
 }
 
+extension MachineState {
+    /// "Connected · localhost 0.5.0", "Connecting…", or why `machine` isn't
+    /// connected and what to do next.
+    public func summary(machine: String) -> String {
+        machineStateSummary(state: self, machine: machine)
+    }
+
+    /// Whether the Machine waits for the user to connect it again.
+    public var needsUser: Bool { machineStateNeedsUser(state: self) }
+}
+
 extension MachineProblem {
     /// Why `machine` can't be reached, and what to do next.
     public func message(machine: String) -> String {

@@ -101,21 +101,11 @@ extension AppModel {
 
     /// "Connected · localhost 0.5.0", "Connecting…", or why it isn't.
     func stateDescription(of shown: MachinesStore.Shown) -> String {
-        switch shown.state {
-        case .notConnected: "Not connected"
-        case .connecting: "Connecting…"
-        case .connected(let version): "Connected · localhost \(version)"
-        case .unavailable(let problem, let isRetrying):
-            problem.message(machine: shown.machine.name) + (isRetrying ? " Trying again…" : "")
-        }
+        shown.state.summary(machine: shown.machine.name)
     }
 
     /// Whether the Machine is waiting for the user to connect it again.
     func needsReconnect(_ shown: MachinesStore.Shown) -> Bool {
-        switch shown.state {
-        case .notConnected: true
-        case .unavailable(_, let isRetrying): !isRetrying
-        case .connecting, .connected: false
-        }
+        shown.state.needsUser
     }
 }
