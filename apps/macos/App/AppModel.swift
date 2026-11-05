@@ -884,7 +884,7 @@ final class AppModel {
             sidebarSelection = .ports
             return
         }
-        let project = savedSidebar.flatMap(UUID.init(uuidString:)).flatMap(project) ?? projects[0]
+        let project = savedSidebar.flatMap(UUID.init(uuidString:)).flatMap { self.project($0) } ?? projects[0]
         sidebarSelection = .project(project.id)
         let savedService = defaults.string(forKey: Self.serviceSelectionKey).flatMap(UUID.init(uuidString:))
         if let savedService, savedService == Self.allServicesID || project.services.contains(where: { $0.id == savedService }) {

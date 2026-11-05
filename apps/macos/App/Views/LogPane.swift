@@ -54,8 +54,9 @@ struct LogPane: View {
                 }
                 LogView(source: .run(status.run?.id), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: revealCount)
-                    // A new view for each place: its subscription is made where the log is.
-                    .id(place)
+                    // A new view for each place, and once a Machine reconnects: its
+                    // subscription is made where the log is, and ends with the connection.
+                    .id(LogIdentity(place: place, isReachable: model.isReachable(place)))
                     .overlay {
                         if status.run == nil {
                             VStack(spacing: 10) {
@@ -102,6 +103,12 @@ struct LogPane: View {
 
 /// Every Service of a Project in one stream, each line prefixed with its
 /// Service's Key in the Service's colour.
+/// What a log view is made anew for: where it is, and whether it is reachable.
+private struct LogIdentity: Hashable {
+    let place: AppModel.Place
+    let isReachable: Bool
+}
+
 struct CombinedLogPane: View {
     @Environment(AppModel.self) private var model
     let project: Project
@@ -121,7 +128,7 @@ struct CombinedLogPane: View {
             if let logs = model.logs(on: place) {
                 LogView(source: .services(Self.prefixes(of: project)), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: 0)
-                    .id(place)
+                    .id(LogIdentity(place: place, isReachable: model.isReachable(place)))
                     .overlay {
                         if !project.services.isEmpty, project.services.allSatisfy({ model.status(of: $0, on: place).run == nil }) {
                             VStack(spacing: 10) {
@@ -237,6 +244,12 @@ private struct RunTime: View {
     }
 }
 
+/// The Run a banner's excerpt follows, read again once its Machine reconnects.
+private struct LogTask: Hashable {
+    let runID: UUID
+    let isReachable: Bool
+}
+
 /// Why a Service Failed: what ended it and when, the error line from its
 /// output when the log below doesn't already show it all, and Start / Edit.
 private struct FailedBanner: View {
@@ -305,7 +318,7 @@ private struct FailedBanner: View {
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 4)
-        .task(id: run.id) {
+        .task(id: LogTask(runID: run.id, isReachable: model.isReachable(model.selectedPlace))) {
             // Lines may still arrive after the Service turned Failed.
             guard let (buffered, updates) = try? await logs.subscribe(toRun: run.id) else { return }
             var lines = buffered
