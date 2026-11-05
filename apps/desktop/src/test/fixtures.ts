@@ -1,4 +1,4 @@
-import type { Project, Run, Service, ServiceState, StatusView } from "../bindings";
+import type { MachineView, Project, Run, Service, ServiceState, StatusView } from "../bindings";
 
 let next = 0;
 const id = () => `00000000-0000-4000-8000-${String(++next).padStart(12, "0")}`;
@@ -38,6 +38,26 @@ export function run(serviceId: string, changes: Partial<Run> = {}): Run {
     portChange: null,
     isPortUnresponsive: false,
     detectedUrl: null,
+    ...changes,
+  };
+}
+
+/** Another Machine as the core sends it, connected unless `state` says otherwise. */
+export function machineView(
+  name: string,
+  projects: Project[] = [],
+  statuses: StatusView[] = [],
+  changes: Partial<MachineView> = {},
+): MachineView {
+  return {
+    machine: { id: id(), name, destination: name },
+    state: { kind: "connected", detail: { version: "0.5.0" } },
+    summary: "Connected · localhost 0.5.0",
+    isConnected: true,
+    needsUser: false,
+    projects,
+    statuses,
+    projectStates: [],
     ...changes,
   };
 }

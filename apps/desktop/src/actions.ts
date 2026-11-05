@@ -11,27 +11,31 @@ import {
 import { listenerKey } from "./listeners";
 import { currentUi, setProgress, setStoppingListener, showAlert, showSheet } from "./ui";
 
-// What the main window's buttons do. Failures become an alert; a start
-// blocked by a taken port becomes the question about it.
+// What the main window's buttons do, on this computer or, given its id,
+// another Machine. Failures become an alert; a start blocked by a taken
+// port here becomes the question about it. On another Machine, its row
+// says why it Failed.
 
-export async function start(serviceId: Id, port: number | null = null) {
-  askIfBlocked(await commands.startService(serviceId, port));
+export async function start(serviceId: Id, port: number | null = null, machineId: Id | null = null) {
+  if (machineId) report(await commands.machineStartService(machineId, serviceId));
+  else askIfBlocked(await commands.startService(serviceId, port));
 }
 
-export async function restart(serviceId: Id) {
-  askIfBlocked(await commands.restartService(serviceId));
+export async function restart(serviceId: Id, machineId: Id | null = null) {
+  if (machineId) report(await commands.machineRestartService(machineId, serviceId));
+  else askIfBlocked(await commands.restartService(serviceId));
 }
 
-export async function stop(serviceId: Id) {
-  report(await commands.stopService(serviceId));
+export async function stop(serviceId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineStopService(machineId, serviceId) : commands.stopService(serviceId)));
 }
 
-export async function startAll(projectId: Id) {
-  report(await commands.startAll(projectId));
+export async function startAll(projectId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineStartAll(machineId, projectId) : commands.startAll(projectId)));
 }
 
-export async function stopAll(projectId: Id) {
-  report(await commands.stopAll(projectId));
+export async function stopAll(projectId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineStopAll(machineId, projectId) : commands.stopAll(projectId)));
 }
 
 /** "Stop it and start": stops whatever holds the blocked start's port, then starts the Service. */
@@ -40,8 +44,9 @@ export async function stopHolderAndStart(blocked: BlockedStart) {
   askIfBlocked(await commands.stopHolderAndStart(blocked.serviceId, blocked.holder.listener));
 }
 
-export async function openUrl(serviceId: Id) {
-  report(await commands.openServiceUrl(serviceId));
+/** Open in Browser; another Machine's Port is forwarded to the same port here first. */
+export async function openUrl(serviceId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineOpenService(machineId, serviceId) : commands.openServiceUrl(serviceId)));
 }
 
 /** Opens the folder in the file manager, a terminal or the editor, asking for the editor first if none is set. */

@@ -16,6 +16,9 @@ const commands = vi.hoisted(() => ({
   restartService: vi.fn(),
   stopService: vi.fn(),
   startAll: vi.fn(),
+  machineStartService: vi.fn(),
+  machineRestartService: vi.fn(),
+  machineStopService: vi.fn(),
   fuzzyScores: vi.fn(),
   quitApp: vi.fn(),
 }));
@@ -30,11 +33,13 @@ const blog = project("Blog", 1);
 const view = viewFromSnapshot({ projects: [shop, blog], statuses: [status(web.id, "running")], projectStates: [] });
 const navigator = { selectPorts: vi.fn(), selectProject: vi.fn(), selectService: vi.fn() };
 
+const here = { machineId: null, isReachable: true };
+
 /** The window's keyboard over a sidebar and a Services list, like the app's columns. */
-function Window({ initial }: { initial: ServiceSelection }) {
+function Window({ initial, place = here }: { initial: ServiceSelection; place?: { machineId: string | null; isReachable: boolean } }) {
   const [selection, setSelection] = useState(initial);
   const { isPaletteOpen } = useUi();
-  useWindowShortcuts({ view, selected: shop, selection, setSelection, navigator });
+  useWindowShortcuts({ view, selected: shop, selection, setSelection, navigator, place, selectedView: view });
   const option = (row: ServiceSelection, name: string) => (
     <li role="option" aria-selected={JSON.stringify(row) === JSON.stringify(selection)} onClick={() => setSelection(row)}>
       {name}
@@ -81,6 +86,22 @@ describe("window shortcuts", () => {
     expect(commands.restartService).toHaveBeenCalledWith(web.id);
     press({ code: "Period", key: ".", ctrlKey: true });
     expect(commands.stopService).toHaveBeenCalledWith(web.id);
+  });
+
+  it("controls another Machine's Service there, only while it is connected", () => {
+    const { unmount } = render(
+      <Window initial={{ kind: "service", serviceId: web.id }} place={{ machineId: "devbox", isReachable: true }} />,
+    );
+    press({ code: "KeyR", key: "r", ctrlKey: true });
+    expect(commands.machineRestartService).toHaveBeenCalledWith("devbox", web.id);
+    expect(commands.restartService).not.toHaveBeenCalled();
+    press({ code: "Digit2", key: "™", ctrlKey: true, altKey: true });
+    expect(navigator.selectService).not.toHaveBeenCalled();
+    unmount();
+
+    render(<Window initial={{ kind: "service", serviceId: web.id }} place={{ machineId: "devbox", isReachable: false }} />);
+    press({ code: "Period", key: ".", ctrlKey: true });
+    expect(commands.machineStopService).not.toHaveBeenCalled();
   });
 
   it("selects Projects with Ctrl+1–9, Services with Ctrl+Alt+1–9, Ports with Ctrl+0", () => {

@@ -1,14 +1,16 @@
 import { useId, useState } from "react";
-import type { Project } from "../bindings";
+import { report, startAll, stopAll } from "../actions";
+import { commands, type Project } from "../bindings";
 import { type CoreView, serviceState } from "../core";
 import type { SidebarSelection } from "../selection";
 import { importProject } from "../editors";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
+import type { ShownMachine } from "../machines";
 import { isActive, projectServicesSummary } from "../status";
 import { showAlert, showSheet } from "../ui";
 import { useUpdate } from "../updates";
 import { ClearIcon, GearIcon, GlobeIcon, KeyboardIcon, PlusIcon, SearchIcon } from "./Icons";
-import { Menu, useContextMenu } from "./Menu";
+import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph } from "./StateGlyph";
@@ -17,31 +19,37 @@ import styles from "./Sidebar.module.css";
 
 type Props = {
   view: CoreView;
+  /** Other Machines, each shown below this computer's Projects. */
+  machines?: ShownMachine[];
   selection: SidebarSelection | null;
   onSelect: (selection: SidebarSelection) => void;
 };
 
 /**
- * The wordmark and project search, Ports and the Projects, a newer version
- * when there is one, and a footer with Settings and how many Services run.
+ * The wordmark and project search, Ports and the Projects, then each other
+ * Machine's, a newer version when there is one, and a footer with Settings
+ * and how many Services run.
  */
-export function Sidebar({ view, selection, onSelect }: Props) {
+export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const update = useUpdate();
   const query = search.trim().toLowerCase();
-  const projects = query
-    ? view.projects.filter((p) => p.name.toLowerCase().includes(query) || p.key.includes(query))
-    : view.projects;
+  const matching = (projects: Project[]) =>
+    query ? projects.filter((p) => p.name.toLowerCase().includes(query) || p.key.includes(query)) : projects;
+  const projects = matching(view.projects);
   const running = [...view.statuses.values()].filter((status) => isActive(status.state)).length;
   // Orca follows the selected row, as focus stays on the list.
   const listId = useId();
   const optionId = (key: string) => `${listId}-${key}`;
+  const machineKey = (machineId: string, projectId: string) => `${machineId}:${projectId}`;
   const selectedKey =
     selection?.kind === "ports"
       ? "ports"
       : selection?.kind === "project" && projects.some((project) => project.id === selection.projectId)
         ? selection.projectId
-        : null;
+        : selection?.kind === "machineProject"
+          ? machineKey(selection.machineId, selection.projectId)
+          : null;
 
   return (
     <nav className={styles.sidebar} aria-label="Sidebar" data-column="sidebar">
@@ -118,6 +126,27 @@ export function Sidebar({ view, selection, onSelect }: Props) {
             No projects match “{search.trim()}”.
           </li>
         )}
+        {machines.map((shown) => {
+          const machineId = shown.machine.id;
+          return [
+            <li key={`${machineId}:heading`} className={styles.heading} role="presentation">
+              {shown.machine.name}
+            </li>,
+            <MachineNote key={`${machineId}:note`} shown={shown} />,
+            ...matching(shown.view.projects).map((project) => (
+              <ProjectRow
+                key={machineKey(machineId, project.id)}
+                project={project}
+                view={shown.view}
+                id={optionId(machineKey(machineId, project.id))}
+                isSelected={selection?.kind === "machineProject" && selectedKey === machineKey(machineId, project.id)}
+                isDimmed={!shown.isConnected}
+                menuItems={() => machineProjectMenuItems(shown, project)}
+                onSelect={() => onSelect({ kind: "machineProject", machineId, projectId: project.id })}
+              />
+            )),
+          ];
+        })}
       </ul>
       <UpdateNotice update={update} />
       <footer className={styles.footer}>
@@ -148,19 +177,23 @@ export function Sidebar({ view, selection, onSelect }: Props) {
 type ProjectRowProps = {
   project: Project;
   view: CoreView;
-  index: number;
+  /** Its place among this computer's Projects, for its shortcut; none on another Machine. */
+  index?: number;
   id: string;
   isSelected: boolean;
   onSelect: () => void;
+  /** Its Machine isn't connected: what it shows is from before. */
+  isDimmed?: boolean;
+  menuItems?: () => MenuItem[];
 };
 
-function ProjectRow({ project, view, index, id, isSelected, onSelect }: ProjectRowProps) {
+function ProjectRow({ project, view, index, id, isSelected, onSelect, isDimmed = false, menuItems }: ProjectRowProps) {
   const state = view.projectStates.get(project.id) ?? null;
-  const context = useContextMenu(`${project.name} actions`, () => projectMenuItems(project));
+  const context = useContextMenu(`${project.name} actions`, menuItems ?? (() => projectMenuItems(project)));
   return (
     <li
       id={id}
-      className={`${styles.row} selectable`}
+      className={`${styles.row} selectable ${isDimmed ? styles.dimmed : ""}`}
       role="option"
       aria-selected={isSelected}
       aria-label={`${project.name}${project.isFavorite ? ", favourite" : ""}, ${projectServicesSummary(
@@ -177,8 +210,56 @@ function ProjectRow({ project, view, index, id, isSelected, onSelect }: ProjectR
           ★
         </span>
       )}
-      <ShortcutBadge kind="projects" index={index} />
+      {index !== undefined && <ShortcutBadge kind="projects" index={index} />}
       {context.menu}
     </li>
   );
+}
+
+/**
+ * How another Machine is, under its name, while that isn't plainly
+ * connected: connecting, why it can't be reached (with Reconnect when it
+ * waits for the user), or that it has no Projects.
+ */
+function MachineNote({ shown }: { shown: ShownMachine }) {
+  const isReconnecting = shown.state.kind === "connecting" && shown.view.projects.length > 0;
+  const text = shown.isConnected
+    ? shown.view.projects.length === 0
+      ? `No projects on ${shown.machine.name}.`
+      : null
+    : isReconnecting
+      ? null
+      : shown.summary;
+  if (!text) return null;
+  return (
+    <li className={`${styles.note} ${styles.machineNote} secondary`} role="presentation">
+      <span>{text}</span>
+      {shown.needsUser && (
+        <button
+          className="button compact"
+          aria-label={`Reconnect ${shown.machine.name}`}
+          onClick={() => void reconnect(shown.machine.id)}
+        >
+          Reconnect
+        </button>
+      )}
+    </li>
+  );
+}
+
+async function reconnect(machineId: string) {
+  report(await commands.reconnectMachine(machineId));
+}
+
+/** Another Machine's Project: Start All and Stop All; it is edited there. */
+function machineProjectMenuItems(shown: ShownMachine, project: Project): MenuItem[] {
+  const machineId = shown.machine.id;
+  const anyActive = project.services.some((service) => isActive(serviceState(shown.view, service.id)));
+  return [
+    ...(shown.isConnected && project.services.length > 0
+      ? [{ label: "Start All", onSelect: () => void startAll(project.id, machineId) }]
+      : []),
+    ...(shown.isConnected && anyActive ? [{ label: "Stop All", onSelect: () => void stopAll(project.id, machineId) }] : []),
+    { label: "Reconnect", onSelect: () => void reconnect(machineId) },
+  ];
 }

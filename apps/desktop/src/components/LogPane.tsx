@@ -17,13 +17,19 @@ import { type LogPrefix, LogView } from "./LogView";
 import { Menu } from "./Menu";
 import { ServiceDots } from "./ServiceDots";
 import { ServiceStatsButton } from "./Stats";
-import { serviceColor } from "./ServicesColumn";
+import { type Place, serviceColor, thisComputer } from "./ServicesColumn";
 import styles from "./LogPane.module.css";
 
 const FIND = shortcutLabel({ code: "KeyF" });
 
-/** The selected Service's latest Run, or every Service of the Project in one stream. */
-export function LogPane({ project, view, selection }: { project: Project; view: CoreView; selection: ServiceSelection }) {
+type Props = { project: Project; view: CoreView; selection: ServiceSelection; place?: Place };
+
+/**
+ * The selected Service's latest Run, or every Service of the Project in one
+ * stream, on this computer or another Machine.
+ */
+export function LogPane({ project, view, selection, place = thisComputer }: Props) {
+  const machineId = place.machineId;
   const settings = useSettings();
   const index = selection.kind === "service" ? project.services.findIndex((s) => s.id === selection.serviceId) : -1;
   const service = index >= 0 ? project.services[index] : undefined;
@@ -46,11 +52,15 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
     key = `services:${serviceIds.join(",")}:${clearCount}`;
     source = { kind: "services", serviceIds };
   }
-  const buffer = useLog(key, source);
+  // A Machine's stream opens again once it has reconnected.
+  const reach = machineId ? `${machineId}:${place.isReachable}` : "here";
+  const buffer = useLog(`${reach}:${key}`, source, machineId);
   const linePrefixes = service ? undefined : prefixes(project);
   const isAnyActive = project.services.some((s) => isActive(serviceStatus(view, s.id).state));
 
+  // Another Machine's buffers are cleared there.
   const clearLogs = async () => {
+    if (machineId) return;
     const result = await commands.clearLogs(serviceIds);
     if (result.status === "error") showAlert({ kind: "error", message: result.error.message });
     setClearCount((count) => count + 1);
@@ -86,13 +96,14 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
           className={styles.url}
           title={`Open ${status.urlToOpen}`}
           aria-label={`Open ${status.urlToOpen} in Browser`}
-          onClick={() => void openUrl(service.id)}
+          disabled={!place.isReachable}
+          onClick={() => void openUrl(service.id, machineId)}
         >
           <span>{status.urlToOpen.replace(/^http:\/\//, "")}</span>
           <ArrowUpRightIcon size={9} />
         </button>
       )}
-      {(status.state === "starting" || status.state === "running") && status.run && !status.run.endedAt && (
+      {!machineId && (status.state === "starting" || status.state === "running") && status.run && !status.run.endedAt && (
         <ServiceStatsButton service={service} index={index} />
       )}
     </>
@@ -114,7 +125,7 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
         onFilter={setFilter}
         filterField={filterField}
         onCopy={() => void copyLog(buffer, filter, linePrefixes)}
-        onClear={() => void clearLogs()}
+        onClear={machineId ? undefined : () => void clearLogs()}
       >
         {header}
       </LogHeader>
@@ -126,6 +137,7 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
             failureMessage={status.failureMessage}
             buffer={buffer}
             onHide={() => setHiddenBannerRunId(status.run!.id)}
+            place={place}
           />
         )}
         <div className={styles.log}>
@@ -139,9 +151,9 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
           {(service ? !status?.run : buffer.lines.length === 0) && (
             <div className={styles.empty}>
               <p className="secondary">No output yet.</p>
-              {service && status?.state === "stopped" && (
+              {service && status?.state === "stopped" && place.isReachable && (
                 <>
-                  <button className="button accent" title="Start" onClick={() => void start(service.id)}>
+                  <button className="button accent" title="Start" onClick={() => void start(service.id, null, machineId)}>
                     <PlayIcon size={11} />
                     Start {service.name}
                   </button>
@@ -151,7 +163,12 @@ export function LogPane({ project, view, selection }: { project: Project; view: 
               {!service && project.services.length > 0 && !isAnyActive && (
                 <>
                   <p className="secondary">Every service’s output shows here, each line marked with its service.</p>
-                  <button className="button accent" title="Start All" onClick={() => void startAll(project.id)}>
+                  <button
+                    className="button accent"
+                    title="Start All"
+                    disabled={!place.isReachable}
+                    onClick={() => void startAll(project.id, machineId)}
+                  >
                     <PlayIcon size={11} />
                     Start All
                   </button>
@@ -172,7 +189,8 @@ type HeaderProps = {
   onFilter: (filter: string) => void;
   filterField: React.RefObject<HTMLInputElement | null>;
   onCopy: () => void;
-  onClear: () => void;
+  /** None for a log that can't be cleared here: another Machine's. */
+  onClear?: () => void;
 };
 
 /** The bar above a log: what it shows, then the filter and a `⋯` menu. */
@@ -208,10 +226,7 @@ function LogHeader({ children, filter, onFilter, filterField, onCopy, onClear }:
       </label>
       <Menu
         label="More log actions"
-        items={[
-          { label: "Copy Log", onSelect: onCopy },
-          { label: "Clear Log", onSelect: onClear },
-        ]}
+        items={[{ label: "Copy Log", onSelect: onCopy }, ...(onClear ? [{ label: "Clear Log", onSelect: onClear }] : [])]}
       />
     </header>
   );

@@ -140,6 +140,14 @@ export const TerminalIcon = (props: Props) => (
   </Icon>
 );
 
+/** `desktopcomputer`: Settings › Machines. */
+export const DesktopIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.2}>
+    <rect x="1.8" y="2.5" width="12.4" height="8.5" rx="1.3" />
+    <path d="M6 14h4M8 11v3" />
+  </Icon>
+);
+
 /** `network`: no Listeners. */
 export const NetworkIcon = (props: Props) => (
   <Icon {...props} strokeWidth={1.1}>

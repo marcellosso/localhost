@@ -32,9 +32,9 @@ pub struct Snapshot {
 #[serde(rename_all = "camelCase")]
 pub struct StatusView {
     #[serde(flatten)]
-    status: ServiceStatus,
+    pub(crate) status: ServiceStatus,
     failure_message: Option<String>,
-    url_to_open: Option<String>,
+    pub(crate) url_to_open: Option<String>,
 }
 
 impl StatusView {
@@ -51,7 +51,7 @@ impl StatusView {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectState {
     project_id: Id,
-    state: Option<ServiceState>,
+    pub(crate) state: Option<ServiceState>,
 }
 
 /// A command's failure: the core's typed error, and its message for the user.
@@ -93,6 +93,10 @@ pub enum CoreEvent {
 pub struct Subscriptions(Mutex<Vec<JoinHandle<()>>>);
 
 impl Subscriptions {
+    pub fn push(&self, task: JoinHandle<()>) {
+        self.0.lock().unwrap().push(task);
+    }
+
     pub fn close_all(&self) {
         for task in self.0.lock().unwrap().drain(..) {
             task.abort();
@@ -107,13 +111,11 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
     let core = state.core()?;
     let (projects, mut library_events) = core.library.subscribe();
     let (statuses, mut service_events) = core.targets.subscribe();
-    let mut view = View { projects, statuses, states: HashMap::new() };
-    let project_states: Vec<ProjectState> = view.projects.iter().map(|project| view.project_state(project)).collect();
-    view.states = project_states.iter().map(|state| (state.project_id, state.state)).collect();
+    let mut view = View::new(projects, statuses);
     let snapshot = Snapshot {
         projects: view.projects.clone(),
-        statuses: view.statuses.values().map(|status| view.status_view(status)).collect(),
-        project_states,
+        statuses: view.status_views(),
+        project_states: view.project_states(),
     };
 
     let task = tauri::async_runtime::spawn(async move {
@@ -142,18 +144,37 @@ pub fn subscribe(state: tauri::State<'_, AppState>, events: Channel<CoreEvent>) 
             }
         }
     });
-    state.subscriptions.0.lock().unwrap().push(task);
+    state.subscriptions.push(task);
     Ok(snapshot)
 }
 
-/// One subscriber's copy of the state, for the derived Project states.
-struct View {
-    projects: Vec<Project>,
+/// One subscriber's copy of the state, for the derived Project states: of
+/// this computer's Projects, or another Machine's (`machines`).
+pub(crate) struct View {
+    pub(crate) projects: Vec<Project>,
     statuses: HashMap<Id, ServiceStatus>,
     states: HashMap<Id, Option<ServiceState>>,
 }
 
 impl View {
+    pub(crate) fn new(projects: Vec<Project>, statuses: HashMap<Id, ServiceStatus>) -> View {
+        let mut view = View { projects, statuses, states: HashMap::new() };
+        view.states = view.project_states().into_iter().map(|state| (state.project_id, state.state)).collect();
+        view
+    }
+
+    pub(crate) fn statuses(&self) -> &HashMap<Id, ServiceStatus> {
+        &self.statuses
+    }
+
+    pub(crate) fn status_views(&self) -> Vec<StatusView> {
+        self.statuses.values().map(|status| self.status_view(status)).collect()
+    }
+
+    pub(crate) fn project_states(&self) -> Vec<ProjectState> {
+        self.projects.iter().map(|project| self.project_state(project)).collect()
+    }
+
     /// Applies the event; returns the Project whose state may have changed.
     fn apply_library(&mut self, event: &ProjectLibraryEvent) -> Option<Id> {
         match event {
@@ -175,7 +196,7 @@ impl View {
         }
     }
 
-    fn status_view(&self, status: &ServiceStatus) -> StatusView {
+    pub(crate) fn status_view(&self, status: &ServiceStatus) -> StatusView {
         let service = self.projects.iter().find_map(|project| project.service(status.service_id));
         StatusView::new(status.clone(), service)
     }
@@ -191,13 +212,13 @@ impl View {
             .collect()
     }
 
-    fn apply_status(&mut self, status: &ServiceStatus) -> Option<Id> {
+    pub(crate) fn apply_status(&mut self, status: &ServiceStatus) -> Option<Id> {
         self.statuses.insert(status.service_id, status.clone());
         self.projects.iter().find(|project| project.service(status.service_id).is_some()).map(|project| project.id)
     }
 
     /// The Project's state if it differs from the last one sent.
-    fn refresh_state(&mut self, project_id: Id) -> Option<ProjectState> {
+    pub(crate) fn refresh_state(&mut self, project_id: Id) -> Option<ProjectState> {
         let project = self.projects.iter().find(|project| project.id == project_id)?;
         let state = self.project_state(project);
         (self.states.insert(project_id, state.state) != Some(state.state)).then_some(state)

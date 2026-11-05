@@ -15,14 +15,19 @@ import {
   trackBadgeModifiers,
 } from "./keyboard";
 import type { Navigator } from "./palette";
+import type { Place } from "./components/ServicesColumn";
 import type { ServiceSelection } from "./selection";
 import { isActive } from "./status";
 import { currentUi, setPaletteOpen, showAlert, showSheet } from "./ui";
 
 export type ShortcutContext = {
+  /** This computer's Projects, which Ctrl+1–9 select. */
   view: CoreView;
   /** The selected Project; none while Ports is shown. */
   selected: Project | undefined;
+  /** Where the selected Project is, and the view its statuses are in. */
+  place: Place;
+  selectedView: CoreView;
   selection: ServiceSelection;
   setSelection: (selection: ServiceSelection) => void;
   navigator: Navigator;
@@ -81,12 +86,16 @@ export function useWindowShortcuts(context: ShortcutContext) {
 }
 
 /** Runs the shortcut the event is, if any. */
-function runShortcut(event: KeyboardEvent, { view, selected, selection, setSelection, navigator }: ShortcutContext): boolean {
+function runShortcut(event: KeyboardEvent, context: ShortcutContext): boolean {
+  const { view, selected, selection, setSelection, navigator, place, selectedView } = context;
   const is = (shortcut: Parameters<typeof isShortcut>[1]) => isShortcut(event, shortcut);
   const service =
     selection.kind === "service" ? selected?.services.find((service) => service.id === selection.serviceId) : undefined;
-  const state = service ? serviceStatus(view, service.id).state : null;
+  const state = service ? serviceStatus(selectedView, service.id).state : null;
   const isLive = state === "starting" || state === "running";
+  const machineId = place.machineId;
+  // Another Machine's controls wait for it to be connected.
+  const canControl = place.isReachable;
 
   if (is(SHORTCUTS.palette)) setPaletteOpen(true);
   else if (is(SHORTCUTS.ports)) navigator.selectPorts();
@@ -94,17 +103,21 @@ function runShortcut(event: KeyboardEvent, { view, selected, selection, setSelec
   else if (is(SHORTCUTS.keyboardShortcuts)) showAlert({ kind: "keyboardShortcuts" });
   else if (is(SHORTCUTS.newProject)) showSheet({ kind: "addProject" });
   else if (is(SHORTCUTS.newService)) {
-    if (selected) showSheet({ kind: "addService", projectId: selected.id });
+    // Another Machine's Services are added there.
+    if (selected && !machineId) showSheet({ kind: "addService", projectId: selected.id });
   } else if (is(SHORTCUTS.startOrRestart)) {
-    if (service && state !== "stopping") void (isLive ? restart(service.id) : start(service.id));
+    if (service && canControl && state !== "stopping") {
+      void (isLive ? restart(service.id, machineId) : start(service.id, null, machineId));
+    }
   } else if (is(SHORTCUTS.stop)) {
-    if (service && isLive) void stop(service.id);
+    if (service && canControl && isLive) void stop(service.id, machineId);
   } else if (is(SHORTCUTS.openUrl)) {
-    if (service && isLive && serviceStatus(view, service.id).urlToOpen) void openUrl(service.id);
+    if (service && canControl && isLive && serviceStatus(selectedView, service.id).urlToOpen) void openUrl(service.id, machineId);
   } else if (is(SHORTCUTS.startAll)) {
-    if (selected && selected.services.length > 0) void startAll(selected.id);
+    if (selected && canControl && selected.services.length > 0) void startAll(selected.id, machineId);
   } else if (is(SHORTCUTS.stopAll)) {
-    if (selected?.services.some((service) => isActive(serviceStatus(view, service.id).state))) void stopAll(selected.id);
+    const anyActive = selected?.services.some((service) => isActive(serviceStatus(selectedView, service.id).state));
+    if (selected && canControl && anyActive) void stopAll(selected.id, machineId);
   } else if (is(SHORTCUTS.previousService) || is(SHORTCUTS.nextService)) {
     if (selected) setSelection(adjacentRow(selected, selection, is(SHORTCUTS.nextService) ? 1 : -1));
   } else {
@@ -113,7 +126,9 @@ function runShortcut(event: KeyboardEvent, { view, selected, selection, setSelec
     const index = Number(digit[1]) - 1;
     if (event.altKey) {
       const target = selected?.services[index];
-      if (selected && target) navigator.selectService(selected.id, target.id);
+      // The navigator selects this computer's Projects; another Machine's stays selected.
+      if (selected && target && machineId) setSelection({ kind: "service", serviceId: target.id });
+      else if (selected && target) navigator.selectService(selected.id, target.id);
     } else {
       const target = view.projects[index];
       if (target) navigator.selectProject(target.id);

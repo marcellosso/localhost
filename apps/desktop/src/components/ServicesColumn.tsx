@@ -1,6 +1,6 @@
 import { type CSSProperties, useId, useState } from "react";
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "../actions";
-import type { Folder, Project, Service, StatusView } from "../bindings";
+import type { Folder, Id, Project, Service, StatusView } from "../bindings";
 import { exportProject, requestRemoveService, setActiveProfile, setFavorite } from "../editors";
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
@@ -16,15 +16,35 @@ import { StateGlyph } from "./StateGlyph";
 import { ProjectStats } from "./Stats";
 import styles from "./ServicesColumn.module.css";
 
+/**
+ * Where a Project is: this computer (`machineId` null), or another Machine,
+ * whose Services are controlled while it is connected and edited there.
+ */
+export type Place = { machineId: Id | null; isReachable: boolean };
+
+export const thisComputer: Place = { machineId: null, isReachable: true };
+
 type Props = {
   project: Project;
   view: CoreView;
   selection: ServiceSelection;
   onSelect: (selection: ServiceSelection) => void;
+  place?: Place;
 };
 
 /** The selected Project's Services with their state and actions, the combined stream on top. */
-export function ServicesColumn({ project, view, selection, onSelect }: Props) {
+export function ServicesColumn({ project, view, selection, onSelect, place = thisComputer }: Props) {
+  if (project.services.length === 0 && place.machineId) {
+    return (
+      <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
+        <EmptyState
+          icon={<TerminalIcon size={40} />}
+          title="No Services"
+          description="Add services to this project on its machine."
+        />
+      </section>
+    );
+  }
   if (project.services.length === 0) {
     return (
       <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
@@ -92,41 +112,54 @@ export function ServicesColumn({ project, view, selection, onSelect }: Props) {
             id={optionId(service.id)}
             isSelected={selection.kind === "service" && selection.serviceId === service.id}
             onSelect={() => onSelect({ kind: "service", serviceId: service.id })}
+            place={place}
           />
         ))}
       </ul>
-      <button
-        className={`${styles.addService} secondary`}
-        onClick={() => showSheet({ kind: "addService", projectId: project.id })}
-      >
-        <PlusIcon size={11} />
-        <span className={styles.addServiceTitle}>Add Service</span>
-        <span className="keyHint">{shortcutLabel(SHORTCUTS.newService)}</span>
-      </button>
+      {!place.machineId && (
+        <button
+          className={`${styles.addService} secondary`}
+          onClick={() => showSheet({ kind: "addService", projectId: project.id })}
+        >
+          <PlusIcon size={11} />
+          <span className={styles.addServiceTitle}>Add Service</span>
+          <span className="keyHint">{shortcutLabel(SHORTCUTS.newService)}</span>
+        </button>
+      )}
     </section>
   );
 }
 
-/** The selected Project's toolbar actions: its Environment Profile once it has one, Start All, Stop All, and the rest in `⋯`. */
-export function ProjectActions({ project, view }: { project: Project; view: CoreView }) {
+/**
+ * The selected Project's toolbar actions: its Environment Profile once it
+ * has one, Start All, Stop All, and the rest in `⋯`. Another Machine's
+ * Projects have only Start All and Stop All: the rest is changed there.
+ */
+export function ProjectActions({ project, view, place = thisComputer }: { project: Project; view: CoreView; place?: Place }) {
   const anyActive = project.services.some((service) => isActive(serviceStatus(view, service.id).state));
   const [showsStats, setShowsStats] = useState(false);
   return (
     <>
-      {(project.profiles ?? []).length > 0 && <ProfileMenu project={project} />}
+      {(project.profiles ?? []).length > 0 && !place.machineId && <ProfileMenu project={project} />}
       <button
         className="button accent"
-        disabled={project.services.length === 0}
+        disabled={project.services.length === 0 || !place.isReachable}
         title={`Start every service except Manual ones (${shortcutLabel(SHORTCUTS.startAll)})`}
-        onClick={() => void startAll(project.id)}
+        onClick={() => void startAll(project.id, place.machineId)}
       >
         <PlayIcon size={11} />
         Start All
       </button>
-      <button className="button" disabled={!anyActive} title={`Stop All (${shortcutLabel(SHORTCUTS.stopAll)})`} onClick={() => void stopAll(project.id)}>
+      <button
+        className="button"
+        disabled={!anyActive || !place.isReachable}
+        title={`Stop All (${shortcutLabel(SHORTCUTS.stopAll)})`}
+        onClick={() => void stopAll(project.id, place.machineId)}
+      >
         <StopIcon size={11} />
         Stop All
       </button>
+      {!place.machineId && (
       <span className={styles.statsAnchor}>
         <Menu
           label={`More actions for ${project.name}`}
@@ -134,6 +167,7 @@ export function ProjectActions({ project, view }: { project: Project; view: Core
         />
         {showsStats && <ProjectStats project={project} view={view} onClose={() => setShowsStats(false)} />}
       </span>
+      )}
     </>
   );
 }
@@ -195,25 +229,32 @@ type RowProps = {
   id: string;
   isSelected: boolean;
   onSelect: () => void;
+  place: Place;
 };
 
 /** A Service: a rail in its colour, its state, name and Port, its command, and, while selected, its actions. */
-function ServiceRow({ project, service, status, index, id, isSelected, onSelect }: RowProps) {
+function ServiceRow({ project, service, status, index, id, isSelected, onSelect, place }: RowProps) {
   const state = status.state;
   // The active Run's port, which may have moved, else the Service's Port.
   const port = isActive(state) ? (status.run?.port ?? service.port) : service.port;
   const summary = rowSummary(project, service, status);
   const summaryClass = state === "failed" ? styles.failed : isWarning(status) ? styles.warning : "secondary";
-  const edit = () => showSheet({ kind: "editService", serviceId: service.id });
-  const context = useContextMenu(`${service.name} actions`, () => [
-    ...stateMenuItems(service, status),
-    "separator",
-    { label: "Edit Service…", onSelect: edit },
-    "separator",
-    ...folderMenuItems({ kind: "service", serviceId: service.id }),
-    "separator",
-    { label: "Remove Service…", isDestructive: true, onSelect: () => void requestRemoveService(service.id) },
-  ]);
+  const edit = () => {
+    if (!place.machineId) showSheet({ kind: "editService", serviceId: service.id });
+  };
+  const context = useContextMenu(`${service.name} actions`, () =>
+    place.machineId
+      ? stateMenuItems(service, status, place)
+      : [
+          ...stateMenuItems(service, status, place),
+          "separator",
+          { label: "Edit Service…", onSelect: edit },
+          "separator",
+          ...folderMenuItems({ kind: "service", serviceId: service.id }),
+          "separator",
+          { label: "Remove Service…", isDestructive: true, onSelect: () => void requestRemoveService(service.id) },
+        ],
+  );
   return (
     <li
       id={id}
@@ -235,7 +276,7 @@ function ServiceRow({ project, service, status, index, id, isSelected, onSelect 
         </span>
       </div>
       <div className={`${styles.command} mono secondary`}>{service.commandLine}</div>
-      {isSelected && <ServiceActions service={service} status={status} />}
+      {isSelected && <ServiceActions service={service} status={status} place={place} />}
       <ShortcutBadge kind="services" index={index} />
       {context.menu}
     </li>
@@ -243,7 +284,9 @@ function ServiceRow({ project, service, status, index, id, isSelected, onSelect 
 }
 
 /** Open (or Restart) and Stop while live, Start otherwise; the main one tinted. */
-function ServiceActions({ service, status }: { service: Service; status: StatusView }) {
+function ServiceActions({ service, status, place }: { service: Service; status: StatusView; place: Place }) {
+  const machineId = place.machineId;
+  const disabled = !place.isReachable;
   const act = (action: () => Promise<void>) => (event: React.MouseEvent) => {
     event.stopPropagation();
     void action();
@@ -257,7 +300,8 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
             className="button compact prominent"
             title={`Open ${url} (${shortcutLabel(SHORTCUTS.openUrl)})`}
             aria-label={`Open ${service.name} in Browser`}
-            onClick={act(() => openUrl(service.id))}
+            disabled={disabled}
+            onClick={act(() => openUrl(service.id, machineId))}
           >
             Open <ArrowUpRightIcon size={9} />
           </button>
@@ -266,7 +310,8 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
           className={`button compact ${url ? "" : "prominent"}`}
           title={`Restart (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
           aria-label={`Restart ${service.name}`}
-          onClick={act(() => restart(service.id))}
+          disabled={disabled}
+          onClick={act(() => restart(service.id, machineId))}
         >
           Restart
         </button>
@@ -274,7 +319,8 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
           className="button compact"
           title={`Stop (${shortcutLabel(SHORTCUTS.stop)})`}
           aria-label={`Stop ${service.name}`}
-          onClick={act(() => stop(service.id))}
+          disabled={disabled}
+          onClick={act(() => stop(service.id, machineId))}
         >
           Stop
         </button>
@@ -294,36 +340,41 @@ function ServiceActions({ service, status }: { service: Service; status: StatusV
         className="button compact prominent"
         title={`Start (${shortcutLabel(SHORTCUTS.startOrRestart)})`}
         aria-label={`Start ${service.name}`}
-        onClick={act(() => start(service.id))}
+        disabled={disabled}
+        onClick={act(() => start(service.id, null, machineId))}
       >
         Start
       </button>
-      <button
-        className="button compact"
-        title="Edit Service"
-        aria-label={`Edit ${service.name}…`}
-        onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id }))}
-      >
-        Edit…
-      </button>
+      {!machineId && (
+        <button
+          className="button compact"
+          title="Edit Service"
+          aria-label={`Edit ${service.name}…`}
+          onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id }))}
+        >
+          Edit…
+        </button>
+      )}
     </div>
   );
 }
 
 /** What a Service's context menu offers for its state, like its buttons. */
-function stateMenuItems(service: Service, status: StatusView): MenuItem[] {
+function stateMenuItems(service: Service, status: StatusView, place: Place): MenuItem[] {
+  const machineId = place.machineId;
+  if (!place.isReachable) return [];
   switch (status.state) {
     case "starting":
     case "running":
       return [
-        ...(status.urlToOpen ? [{ label: "Open in Browser", onSelect: () => void openUrl(service.id) }] : []),
-        { label: "Restart", onSelect: () => void restart(service.id) },
-        { label: "Stop", onSelect: () => void stop(service.id) },
+        ...(status.urlToOpen ? [{ label: "Open in Browser", onSelect: () => void openUrl(service.id, machineId) }] : []),
+        { label: "Restart", onSelect: () => void restart(service.id, machineId) },
+        { label: "Stop", onSelect: () => void stop(service.id, machineId) },
       ];
     case "stopping":
       return [];
     default:
-      return [{ label: "Start", onSelect: () => void start(service.id) }];
+      return [{ label: "Start", onSelect: () => void start(service.id, null, machineId) }];
   }
 }
 
