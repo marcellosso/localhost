@@ -51,6 +51,7 @@ pub enum MachineState {
     },
     /// Not connected, for this reason. `is_retrying`: another attempt comes
     /// on its own.
+    #[serde(rename_all = "camelCase")]
     Unavailable {
         problem: MachineProblem,
         is_retrying: bool,
@@ -93,34 +94,25 @@ pub struct MachineSnapshot {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+// Per variant, not `rename_all_fields`, which specta doesn't read.
+#[serde(tag = "kind", rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 // Not boxed: UniFFI carries no `Box`, and events go one at a time.
 #[allow(clippy::large_enum_variant)]
 pub enum MachinesEvent {
     /// The list changed: added, removed or renamed.
-    MachinesChanged {
-        machines: Vec<Machine>,
-    },
-    StateChanged {
-        machine_id: Id,
-        state: MachineState,
-    },
+    MachinesChanged { machines: Vec<Machine> },
+    #[serde(rename_all = "camelCase")]
+    StateChanged { machine_id: Id, state: MachineState },
     /// Its Projects, after it connected or they changed there.
-    ProjectsChanged {
-        machine_id: Id,
-        projects: Vec<Project>,
-    },
+    #[serde(rename_all = "camelCase")]
+    ProjectsChanged { machine_id: Id, projects: Vec<Project> },
     /// Every status there, read afresh after it connected.
-    StatusesChanged {
-        machine_id: Id,
-        statuses: Vec<ServiceStatus>,
-    },
-    ServiceChanged {
-        machine_id: Id,
-        event: ServiceEvent,
-    },
+    #[serde(rename_all = "camelCase")]
+    StatusesChanged { machine_id: Id, statuses: Vec<ServiceStatus> },
+    #[serde(rename_all = "camelCase")]
+    ServiceChanged { machine_id: Id, event: ServiceEvent },
 }
 
 #[derive(Serialize, Deserialize)]
