@@ -12,6 +12,7 @@ A **Project** is a folder. A **Service** is one long-running command in it: `pnp
 - **Set up in seconds**: point it at a folder and it suggests Services from `package.json` scripts, Compose files, Python apps and Cargo binaries. You review every suggestion; nothing is applied silently.
 - **Keyboard first**: a command palette, a shortcut for every action, arrow keys across the window. Screen readers, light and dark, reduced motion.
 - **Coding agents included**: Claude Code, Cursor, Codex and other MCP clients start, stop and inspect your Services through [`localhost mcp`](/docs/mcp) instead of a hidden shell. The agent and the app share one background core, so what the agent starts shows in the app, with its logs, and the reverse. See [localhost for AI coding agents](/agents).
+- **Your other computers too**: a dev box or home server you reach with `ssh` is a [Machine](/docs/machines). Its Projects show below yours, and you start, stop and open them from here; they run on it, with its Secrets.
 - **Local**: no account, no cloud, works offline. Configuration lives in localhost's own storage, never in your project folders. Checking for [updates](/docs/updates) is the only thing it asks the network for, and you can turn it off.
 
 A native SwiftUI app on macOS with a menu bar companion; one app for Linux and Windows with a tray icon. On Windows, Projects run on Windows itself or inside a WSL distro. The app updates itself, after asking, everywhere but the `.deb` and `.rpm` packages, which your package manager updates.
@@ -29,5 +30,7 @@ A native SwiftUI app on macOS with a menu bar companion; one app for Linux and W
 | **Secret** | A variable whose value lives in your system's secret store. |
 | **Run** | One execution of a Service, from launch until every process it started has ended. |
 | **Execution Target** | Where a Project's Services run: this machine, or a WSL distro. |
+| **Machine** | Another computer whose localhost this app shows and controls, over `ssh`. Its Projects, Secrets and Runs stay on it. |
+| **Forward** | A Machine's Port made reachable on this computer's loopback, through the SSH connection, so Open in Browser works. |
 
 Next: [install localhost](/docs/install), then [add your first Project](/docs/quick-start).
