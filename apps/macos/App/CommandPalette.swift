@@ -31,7 +31,8 @@ extension AppModel {
     /// Project. The rest (ids starting `other:`) are reachable by typing.
     func paletteItems() -> [PaletteItem] {
         var items: [PaletteItem] = []
-        let selected = selectedProject
+        // Another Machine's Projects are controlled from the main window for now.
+        let selected = selectedLocalProject
         if let service = selectedService, let selected {
             items += serviceActions(service, in: selected, isSelected: true)
         }

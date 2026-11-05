@@ -9,6 +9,7 @@ Inside that folder:
 - `projects/`: one JSON file per Project. A file that can't be read is renamed to `….unreadable` and reported at launch, never deleted.
 - `logs/`: each Run's output, the last 5 Runs per Service.
 - `runs/`: the Runs active right now, to find leftovers after a crash.
+- `machines.json`: the [Machines](/docs/machines) you added, their names and SSH destinations; `machines/` holds their SSH connections' sockets while they are open.
 - `agent-backups/`: each coding agent's configuration file as it was before localhost first connected it.
 - `bin/`: the AppImage's `localhost` command, copied out for coding agents (Linux AppImage only).
 

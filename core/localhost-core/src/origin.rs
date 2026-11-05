@@ -14,4 +14,6 @@ pub enum Origin {
     Cli,
     /// A coding agent, through `localhost mcp`.
     Agent,
+    /// The localhost app of another Machine, through `localhost remote`.
+    Machine,
 }

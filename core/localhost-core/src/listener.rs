@@ -206,6 +206,29 @@ pub(crate) fn scan() -> (Vec<platform::ListeningProcess>, HashMap<i32, String>) 
     (platform::scan_listeners(), platform::managed_jobs())
 }
 
+/// The process listening on `port` of this machine, as a Listener of no
+/// Run or Project, to say who holds a port localhost can't use. Blocking.
+pub(crate) fn holding(port: u16) -> Option<Listener> {
+    let (processes, jobs) = scan();
+    let process = processes.into_iter().find(|process| process.ports.contains(&port))?;
+    let launchd_label = jobs.get(&process.pid).or_else(|| jobs.get(&process.process_group_id)).cloned();
+    let owner = ListenerOwner::Unmanaged;
+    let kind = ListenerKind::of(process.executable_path.as_deref(), launchd_label.as_deref(), owner);
+    Some(Listener {
+        pid: process.pid,
+        process_group_id: process.process_group_id,
+        name: process.name,
+        command: process.command,
+        executable_path: process.executable_path,
+        ports: process.ports,
+        working_directory: process.working_directory,
+        owner,
+        launchd_label,
+        kind,
+        start_time: process.start_time,
+    })
+}
+
 /// Stops a Listener localhost didn't start: SIGINT, then SIGTERM, then SIGKILL.
 /// On Windows there is no graceful step (Ctrl-Break can't reach another
 /// console): the process and its descendants are terminated.

@@ -2,18 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { askAboutFoundOrphans, runLaunchChecks } from "./actions";
 import { commands, events, type Reveal } from "./bindings";
 import { Alerts } from "./components/Alerts";
-import { Announcer } from "./components/Announcer";
+import { Announcer, MachinesAnnouncer } from "./components/Announcer";
 import { CommandPalette } from "./components/CommandPalette";
 import { EmptyState, KeyTip } from "./components/EmptyState";
 import { Sheets } from "./components/Sheets";
 import { FolderIcon, LinesIcon } from "./components/Icons";
 import { LogPane } from "./components/LogPane";
 import { PortsView } from "./components/PortsView";
-import { ProjectActions, ServicesColumn } from "./components/ServicesColumn";
+import { type Place, ProjectActions, ServicesColumn, thisComputer } from "./components/ServicesColumn";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { importProject } from "./editors";
 import { SHORTCUTS, serviceShortcut, shortcutLabel } from "./keyboard";
+import { startMachines, useMachines } from "./machines";
 import { loadHome, tildePath } from "./paths";
 import { onPerfMeasurement, runPerfMeasurement } from "./perf";
 import { allServices, noService, type ServiceSelection, type SidebarSelection } from "./selection";
@@ -32,7 +33,7 @@ let started: Promise<void> | null = null;
  * A WSL distro's Orphans are asked about when it connects, which may be later.
  */
 function start(): Promise<void> {
-  started ??= Promise.all([loadSettings(), loadHome(), startCore(), startUpdates()]).then(async () => {
+  started ??= Promise.all([loadSettings(), loadHome(), startCore(), startMachines(), startUpdates()]).then(async () => {
     void events.orphansFound.listen(() => void askAboutFoundOrphans());
     await runLaunchChecks();
     await runPerfMeasurement();
@@ -67,9 +68,19 @@ function MainWindow({ view }: { view: CoreView }) {
   // Under a sheet, an alert or the palette, the window behind can't be reached, by screen readers either.
   const isBehindModal = isPaletteOpen || sheet !== null || alerts.length > 0;
 
+  const machines = useMachines();
   const isPorts = sidebarSelection?.kind === "ports";
   const selectedId = sidebarSelection?.kind === "project" ? sidebarSelection.projectId : null;
-  const selected = isPorts ? undefined : (view.projects.find((project) => project.id === selectedId) ?? view.projects[0]);
+  // A Project of another Machine, while it still has it.
+  const onMachine = sidebarSelection?.kind === "machineProject" ? sidebarSelection : null;
+  const machine = onMachine ? machines.find((shown) => shown.machine.id === onMachine.machineId) : undefined;
+  const machineProject = machine?.view.projects.find((project) => project.id === onMachine?.projectId);
+  const place: Place =
+    machine && machineProject ? { machineId: machine.machine.id, isReachable: machine.isConnected } : thisComputer;
+  const selectedView = machine && machineProject ? machine.view : view;
+  const selected = isPorts
+    ? undefined
+    : (machineProject ?? view.projects.find((project) => project.id === selectedId) ?? view.projects[0]);
   const select = (next: SidebarSelection) => {
     setSidebarSelection(next);
     setSelection(noService);
@@ -91,7 +102,7 @@ function MainWindow({ view }: { view: CoreView }) {
     }),
     [],
   );
-  useWindowShortcuts({ view, selected, selection, setSelection, navigator });
+  useWindowShortcuts({ view, selected, selection, setSelection, navigator, place, selectedView });
   useReveal(navigator);
   useEffect(() => onPerfMeasurement(() => setSelection(allServices)), []);
 
@@ -100,7 +111,16 @@ function MainWindow({ view }: { view: CoreView }) {
       <div className="contents" inert={isBehindModal}>
         <Sidebar
           view={view}
-          selection={isPorts ? sidebarSelection : selected ? { kind: "project", projectId: selected.id } : null}
+          machines={machines}
+          selection={
+            isPorts
+              ? sidebarSelection
+              : machine && machineProject
+                ? { kind: "machineProject", machineId: machine.machine.id, projectId: machineProject.id }
+                : selected
+                  ? { kind: "project", projectId: selected.id }
+                  : null
+          }
           onSelect={select}
         />
         {isPorts ? (
@@ -112,10 +132,17 @@ function MainWindow({ view }: { view: CoreView }) {
           <>
             <Toolbar
               title={selected.name}
-              subtitle={tildePath(selected.path)}
-              actions={<ProjectActions project={selected} view={view} />}
+              // A path on another Machine isn't one here.
+              subtitle={machine && place.machineId ? `${machine.machine.name} · ${selected.path}` : tildePath(selected.path)}
+              actions={<ProjectActions project={selected} view={selectedView} place={place} />}
             />
-            <ServicesColumn project={selected} view={view} selection={selection} onSelect={setSelection} />
+            <ServicesColumn
+              project={selected}
+              view={selectedView}
+              selection={selection}
+              onSelect={setSelection}
+              place={place}
+            />
             {selection.kind === "none" ? (
               <section className="emptyLog" data-column="detail">
                 <EmptyState
@@ -130,7 +157,7 @@ function MainWindow({ view }: { view: CoreView }) {
                 />
               </section>
             ) : (
-              <LogPane project={selected} view={view} selection={selection} />
+              <LogPane project={selected} view={selectedView} selection={selection} place={place} />
             )}
           </>
         ) : (
@@ -141,6 +168,7 @@ function MainWindow({ view }: { view: CoreView }) {
                 icon={<FolderIcon size={40} />}
                 title="No Projects"
                 description="Add a project folder to get started."
+                isStacked
                 tip={
                   <KeyTip
                     before="Press"
@@ -171,9 +199,13 @@ function MainWindow({ view }: { view: CoreView }) {
         )}
       </div>
       <Sheets view={view} onSelectProject={navigator.selectProject} onSelectService={navigator.selectService} />
-      {isPaletteOpen && <CommandPalette view={view} selected={selected} selection={selection} navigator={navigator} />}
+      {isPaletteOpen && (
+        // Another Machine's Projects are controlled from the window for now.
+        <CommandPalette view={view} selected={place.machineId ? undefined : selected} selection={selection} navigator={navigator} />
+      )}
       <Alerts view={view} />
-      <Announcer view={view} selectedProjectId={selected?.id ?? null} />
+      <Announcer view={view} selectedProjectId={place.machineId ? null : (selected?.id ?? null)} />
+      <MachinesAnnouncer machines={machines} selected={place.machineId ? { machineId: place.machineId, projectId: selected?.id ?? null } : null} />
     </div>
   );
 }

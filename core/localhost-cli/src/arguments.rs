@@ -50,6 +50,10 @@ pub enum Command {
     Daemon {
         storage_root: String,
     },
+    /// This Machine's Projects and Services, served over standard input and
+    /// output to the app of another Machine, which runs it over SSH: not for
+    /// people, so not in the usage.
+    Remote,
 }
 
 /// Reads the arguments after the program name. `Err` says what is wrong.
@@ -68,6 +72,7 @@ pub fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, S
         ("projects", []) => Ok(Command::Projects),
         ("mcp", []) => Ok(Command::Mcp { read_only: false }),
         ("mcp", [option]) if option == "--read-only" => Ok(Command::Mcp { read_only: true }),
+        ("remote", [option]) if option == "--stdio" => Ok(Command::Remote),
         ("daemon", [storage_root]) => Ok(Command::Daemon { storage_root: storage_root.clone() }),
         ("status", [project]) => Ok(Command::Status { project: project.clone() }),
         ("logs", [project]) => Ok(Command::Logs { project: project.clone(), service: None }),
@@ -81,6 +86,7 @@ pub fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, S
         ("up", _) => Err("Usage: localhost up <project> [service…]".into()),
         ("mcp", _) => Err("Usage: localhost mcp [--read-only]".into()),
         ("daemon", _) => Err("Usage: localhost daemon <storage root>".into()),
+        ("remote", _) => Err("Usage: localhost remote --stdio".into()),
         _ => Err(format!("Unknown command `{command}`.")),
     }
 }
@@ -110,6 +116,8 @@ mod tests {
         assert_eq!(parsed(&["mcp"]), Ok(Command::Mcp { read_only: false }));
         assert_eq!(parsed(&["mcp", "--read-only"]), Ok(Command::Mcp { read_only: true }));
         assert_eq!(parsed(&["daemon", "/tmp/root"]), Ok(Command::Daemon { storage_root: "/tmp/root".into() }));
+        assert_eq!(parsed(&["remote", "--stdio"]), Ok(Command::Remote));
+        assert!(parsed(&["remote"]).is_err());
         assert_eq!(parsed(&["--help"]), Ok(Command::Help));
         assert_eq!(parsed(&["-V"]), Ok(Command::Version));
     }

@@ -28,16 +28,25 @@ struct MainView: View {
                     } actions: {
                         if model.projects.isEmpty {
                             VStack(spacing: 12) {
-                                HStack(spacing: 8) {
+                                // Stacked at one width, the first action on top: three
+                                // side by side don't fit the column.
+                                VStack(spacing: 8) {
                                     if model.core != nil {
-                                        Button("Add Project…") { model.presentedSheet = .addProject }
-                                            .buttonStyle(AccentButtonStyle())
-                                        Button("Import Project…") { model.isChoosingImportFile = true }
-                                            .buttonStyle(PillButtonStyle())
-                                    }
-                                    Button("Connect Your Agents") { model.showConnectAgents() }
+                                        Button { model.presentedSheet = .addProject } label: {
+                                            Text("Add Project…").frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(AccentButtonStyle())
+                                        Button { model.isChoosingImportFile = true } label: {
+                                            Text("Import Project…").frame(maxWidth: .infinity)
+                                        }
                                         .buttonStyle(PillButtonStyle())
+                                    }
+                                    Button { model.showConnectAgents() } label: {
+                                        Text("Connect Your Agents").frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(PillButtonStyle())
                                 }
+                                .frame(width: 200)
                                 KeyTip(before: "Press", keys: "⌘/", after: "to see every keyboard shortcut.")
                             }
                         }

@@ -20,7 +20,7 @@ struct FolderActionCommands: View {
     let model: AppModel
 
     var body: some View {
-        let project = model.selectedProject
+        let project = model.selectedLocalProject
         Button("Reveal in Finder") { project.map { model.revealInFinder(AppModel.folder(of: $0)) } }
             .keyboardShortcut("f", modifiers: [.command, .option])
             .disabled(project == nil)

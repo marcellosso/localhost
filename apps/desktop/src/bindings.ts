@@ -457,11 +457,12 @@ async saveSettings(settings: Settings) : Promise<Result<null, CommandError>> {
 },
 /**
  * Streams `source` over `batches`: what is buffered first, then new
- * lines. Returns the id to close it with.
+ * lines; on another Machine (`machine_id`), through its connection.
+ * Returns the id to close it with.
  */
-async openLog(source: LogSource, batches: TAURI_CHANNEL<LogBatch>) : Promise<Result<number, CommandError>> {
+async openLog(source: LogSource, machineId: Id | null, batches: TAURI_CHANNEL<LogBatch>) : Promise<Result<number, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("open_log", { source, batches }) };
+    return { status: "ok", data: await TAURI_INVOKE("open_log", { source, machineId, batches }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -599,6 +600,118 @@ async addCommandToPath() : Promise<Result<CommandLineStatus, CommandError>> {
 async removeCommandFromPath() : Promise<Result<CommandLineStatus, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("remove_command_from_path") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The Machines as they are, then every change over `events` until the
+ * window goes away.
+ */
+async subscribeMachines(events: TAURI_CHANNEL<MachineEvent>) : Promise<Result<MachineView[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("subscribe_machines", { events }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Connects to the Machine `ssh` reaches as `destination`, and only once
+ * that works keeps it. Fails with why it can't be reached.
+ */
+async addMachine(destination: string, name: string | null) : Promise<Result<Machine, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_machine", { destination, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameMachine(machineId: Id, name: string) : Promise<Result<Machine, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_machine", { machineId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Disconnects and forgets the Machine. Nothing changes on it.
+ */
+async removeMachine(machineId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_machine", { machineId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Connects again now: at once if it was waiting, else anew.
+ */
+async reconnectMachine(machineId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reconnect_machine", { machineId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The hosts named in `~/.ssh/config`, to suggest as a destination. Only read.
+ */
+async sshHosts() : Promise<string[]> {
+    return await TAURI_INVOKE("ssh_hosts");
+},
+async machineStartService(machineId: Id, serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_start_service", { machineId, serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineStopService(machineId: Id, serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_stop_service", { machineId, serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineRestartService(machineId: Id, serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_restart_service", { machineId, serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineStartAll(machineId: Id, projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_start_all", { machineId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineStopAll(machineId: Id, projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_stop_all", { machineId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open in Browser: forwards the Service's Port to the same port here,
+ * then opens its URL. Fails with `PortConflict` when that port is taken here.
+ */
+async machineOpenService(machineId: Id, serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_open_service", { machineId, serviceId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -985,6 +1098,12 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
  */
 { kind: "coreUnavailable"; detail: string } | 
 /**
+ * This machine's shared core is another version's, which this one
+ * can't drive: kept alive by an older app or a coding agent's
+ * `localhost mcp`.
+ */
+{ kind: "incompatibleCore"; detail: { version: string } } | 
+/**
  * Something already listens on the port; `owner` is that Listener, if
  * localhost can see it (processes of other users can't be inspected).
  */
@@ -1035,7 +1154,28 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
 /**
  * An agent's own command (`claude mcp …`) failed: what it printed.
  */
-{ kind: "agentCommandFailed"; detail: { command: string; output: string } }
+{ kind: "agentCommandFailed"; detail: { command: string; output: string } } | 
+/**
+ * Not something `ssh` can connect to: empty, with spaces, or like an option.
+ */
+{ kind: "invalidMachineDestination"; detail: string } | 
+/**
+ * Another Machine is already reached at this destination.
+ */
+{ kind: "duplicateMachine"; detail: string } | { kind: "machineNotFound"; detail: Id } | 
+/**
+ * Another Machine (by name) can't be reached over SSH, or the
+ * connection to it was lost.
+ */
+{ kind: "machineUnavailable"; detail: { machine: string; problem: MachineProblem } } | 
+/**
+ * The Port can't be forwarded from another Machine: SSH's reason.
+ */
+{ kind: "forwardFailed"; detail: { port: number; reason: string } } | 
+/**
+ * The other end runs an older localhost, which can't do this.
+ */
+{ kind: "unsupported" }
 export type LogBatch = { lines: LogLine[]; 
 /**
  * Lines that arrived but were left out because the batch kept only its
@@ -1076,6 +1216,105 @@ export type LogSource =
  */
 { kind: "services"; serviceIds: Id[] }
 /**
+ * Another Machine, as this app remembers it.
+ */
+export type Machine = { id: Id; 
+/**
+ * What the app calls it: by default its destination.
+ */
+name: string; 
+/**
+ * What `ssh` connects to: a `Host` of `~/.ssh/config`, or `user@host`.
+ */
+destination: string }
+export type MachineEvent = 
+/**
+ * Every Machine afresh: one was added, removed or renamed, or its
+ * state, Projects or statuses changed as a whole.
+ */
+{ kind: "machines"; machines: MachineView[] } | 
+/**
+ * A Service's state changed there.
+ */
+{ kind: "status"; machineId: Id; status: StatusView } | 
+/**
+ * Sent after the status that changed it.
+ */
+{ kind: "projectState"; machineId: Id; projectState: ProjectState }
+/**
+ * Why another Machine can't be reached, as the app explains it.
+ */
+export type MachineProblem = 
+/**
+ * There is no `ssh` command on this computer.
+ */
+{ kind: "sshNotInstalled" } | 
+/**
+ * Its host key isn't in `known_hosts` yet. localhost never trusts one
+ * on the user's behalf.
+ */
+{ kind: "hostKeyNotTrusted" } | 
+/**
+ * Its host key differs from the one in `known_hosts`.
+ */
+{ kind: "hostKeyChanged" } | 
+/**
+ * SSH would have to ask for a password or passphrase, and can't.
+ */
+{ kind: "signInNeedsPrompt" } | { kind: "hostNotFound" } | 
+/**
+ * The network refused or timed out: SSH's words.
+ */
+{ kind: "unreachable"; detail: string } | 
+/**
+ * No `localhost` command there, or not on the `PATH` SSH gives.
+ */
+{ kind: "notInstalled" } | 
+/**
+ * Its localhost has no `localhost remote` (the version it reported, if any).
+ */
+{ kind: "tooOld"; detail: string | null } | 
+/**
+ * localhost there started but couldn't serve this app, in its own
+ * words, e.g. its shared core is another version's.
+ */
+{ kind: "cantServe"; detail: string } | 
+/**
+ * It was connected and the connection ended.
+ */
+{ kind: "lost" } | 
+/**
+ * Anything else SSH said, e.g. a mistake in `~/.ssh/config`. Not
+ * tried again on its own.
+ */
+{ kind: "other"; detail: string }
+/**
+ * Where the app is with one Machine.
+ */
+export type MachineState = { kind: "notConnected" } | { kind: "connecting" } | 
+/**
+ * Connected to the localhost of this version there.
+ */
+{ kind: "connected"; detail: { version: string } } | 
+/**
+ * Not connected, for this reason. `is_retrying`: another attempt comes
+ * on its own.
+ */
+{ kind: "unavailable"; detail: { problem: MachineProblem; isRetrying: boolean } }
+/**
+ * One Machine as the UI shows it. Its Projects and statuses are those of
+ * its last connection, kept while it reconnects.
+ */
+export type MachineView = { machine: Machine; state: MachineState; 
+/**
+ * How it is, in the core's words: "Connected · localhost 0.5.0", or why not.
+ */
+summary: string; isConnected: boolean; 
+/**
+ * It waits for the user to connect it again.
+ */
+needsUser: boolean; projects: Project[]; statuses: StatusView[]; projectStates: ProjectState[] }
+/**
  * Who or what requested a state-changing action.
  * 
  * Every mutation of the core takes an Origin so clients (and agents) can
@@ -1085,7 +1324,11 @@ export type Origin = "mainWindow" | "menuBar" | "cli" |
 /**
  * A coding agent, through `localhost mcp`.
  */
-"agent"
+"agent" | 
+/**
+ * The localhost app of another Machine, through `localhost remote`.
+ */
+"machine"
 /**
  * A target (this machine's shared core, a WSL distro) had Orphans as it
  * connected: the window asks about them.

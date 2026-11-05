@@ -15,6 +15,7 @@ mod launch;
 mod lifecycle;
 mod listeners;
 mod logs;
+mod machines;
 mod palette;
 mod perf;
 mod services;
@@ -29,6 +30,7 @@ pub use targets::DAEMON_ARGUMENT;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use localhost_core::machine::Machines;
 use localhost_core::{
     Launcher, LocalhostError, Origin, ProjectLibrary, SecretStore, ServiceManagerOptions, SystemSecretStore, Targets,
     default_storage_root,
@@ -69,6 +71,8 @@ impl Core {
 /// update on offer and the app's lifetime.
 pub struct AppState {
     core: Result<Core, LocalhostError>,
+    /// The other Machines, or why their list couldn't be read.
+    machines: Result<Machines, LocalhostError>,
     logs: logs::LogStreams,
     subscriptions: bridge::Subscriptions,
     lifecycle: lifecycle::Lifecycle,
@@ -165,6 +169,18 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             agents::command_line_status,
             agents::add_command_to_path,
             agents::remove_command_from_path,
+            machines::subscribe_machines,
+            machines::add_machine,
+            machines::rename_machine,
+            machines::remove_machine,
+            machines::reconnect_machine,
+            machines::ssh_hosts,
+            machines::machine_start_service,
+            machines::machine_stop_service,
+            machines::machine_restart_service,
+            machines::machine_start_all,
+            machines::machine_stop_all,
+            machines::machine_open_service,
         ])
         .events(collect_events![lifecycle::Reveal, launch::OrphansFound, updates::UpdateState])
 }
@@ -200,8 +216,15 @@ pub fn run() {
             if let Ok(core) = &core {
                 core.targets.set_automatic_port_move(settings.get().automatic_port_move);
             }
+            let machines = Machines::open(&storage_root(), Path::new("ssh"));
+            if let (Ok(machines), false) = (&machines, is_measuring) {
+                // Connecting spawns the tasks that keep each one connected.
+                let _runtime = tauri::async_runtime::handle().inner().enter();
+                machines::connect_all(machines);
+            }
             app.manage(AppState {
                 core,
+                machines,
                 logs: logs::LogStreams::default(),
                 subscriptions: bridge::Subscriptions::default(),
                 lifecycle: lifecycle::Lifecycle::default(),

@@ -1,10 +1,14 @@
 import LocalhostCore
 import SwiftUI
 
-/// A Project's Services with their state and Start / Stop / Restart.
+/// A Project's Services with their state and Start / Stop / Restart. Those
+/// of another Machine look and act the same, but are edited there.
 struct ProjectDetailView: View {
     @Environment(AppModel.self) private var model
     let project: Project
+
+    /// This view shows the selected Project, wherever it is.
+    private var place: AppModel.Place { model.selectedPlace }
 
     var body: some View {
         @Bindable var model = model
@@ -15,7 +19,7 @@ struct ProjectDetailView: View {
                     .tag(AppModel.allServicesID)
             }
             ForEach(Array(project.services.enumerated()), id: \.element.id) { index, service in
-                ServiceRow(service: service, status: model.status(of: service), color: Theme.serviceColor(at: index),
+                ServiceRow(service: service, status: model.status(of: service, on: place), color: Theme.serviceColor(at: index),
                            isSelected: model.selectedServiceID == service.id)
                     .shortcutBadge(index + 1, shownIn: .services)
                     .listRowSeparator(.hidden)
@@ -25,20 +29,28 @@ struct ProjectDetailView: View {
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: UUID.self) { ids in
-            if let id = ids.first, id != AppModel.allServicesID, let (_, service) = model.service(id) {
+            if let id = ids.first, id != AppModel.allServicesID, let (_, service) = model.service(id, on: place) {
                 serviceStateButtons(service)
-                Divider()
-                Button("Edit Service…") { model.presentedSheet = .editService(id) }
-                Divider()
-                if let folder = model.folder(ofService: id) { FolderActionButtons(folder: folder) }
-                Divider()
-                Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id) }
+                if place == .thisMac {
+                    Divider()
+                    Button("Edit Service…") { model.presentedSheet = .editService(id) }
+                    Divider()
+                    if let folder = model.folder(ofService: id) { FolderActionButtons(folder: folder) }
+                    Divider()
+                    Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id) }
+                }
             }
         } primaryAction: { ids in
-            if let id = ids.first, id != AppModel.allServicesID { model.presentedSheet = .editService(id) }
+            if place == .thisMac, let id = ids.first, id != AppModel.allServicesID { model.presentedSheet = .editService(id) }
         }
         .overlay {
-            if project.services.isEmpty {
+            if project.services.isEmpty, case .machine(let machineID) = place {
+                ContentUnavailableView {
+                    Label("No Services", systemImage: "terminal")
+                } description: {
+                    Text("Add services to this project on \(model.shownMachine(machineID)?.machine.name ?? "its machine").")
+                }
+            } else if project.services.isEmpty {
                 ContentUnavailableView {
                     Label("No Services", systemImage: "terminal")
                 } description: {
@@ -52,27 +64,36 @@ struct ProjectDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !project.services.isEmpty { addServiceRow }
+            if !project.services.isEmpty, place == .thisMac { addServiceRow }
         }
         .columnGlass()
         .navigationTitle(project.name)
-        .navigationSubtitle((project.path as NSString).abbreviatingWithTildeInPath)
+        .navigationSubtitle(subtitle)
+    }
+
+    /// The folder, and on another Machine its name: a path there isn't one here.
+    private var subtitle: String {
+        guard case .machine(let machineID) = place else { return (project.path as NSString).abbreviatingWithTildeInPath }
+        return "\(model.shownMachine(machineID)?.machine.name ?? "Machine") · \(project.path)"
     }
 
     @ViewBuilder
     private func serviceStateButtons(_ service: Service) -> some View {
-        switch model.status(of: service).state {
-        case .starting, .running:
-            if model.urlToOpen(service) != nil {
-                Button("Open in Browser") { model.openURL(of: service.id) }
+        Group {
+            switch model.status(of: service, on: place).state {
+            case .starting, .running:
+                if model.urlToOpen(service, on: place) != nil {
+                    Button("Open in Browser") { model.openURL(of: service.id, on: place) }
+                }
+                Button("Restart") { model.restart(service.id, on: place) }
+                Button("Stop") { model.stop(service.id, on: place) }
+            case .stopping:
+                EmptyView()
+            case .stopped, .exited, .failed:
+                Button("Start") { model.start(service.id, on: place) }
             }
-            Button("Restart") { model.restart(service.id) }
-            Button("Stop") { model.stop(service.id) }
-        case .stopping:
-            EmptyView()
-        case .stopped, .exited, .failed:
-            Button("Start") { model.start(service.id) }
         }
+        .disabled(!model.isReachable(place))
     }
 
     private var addServiceRow: some View {
@@ -101,19 +122,30 @@ struct ProjectToolbar: ToolbarContent {
     let model: AppModel
     let project: Project
 
+    private var place: AppModel.Place { model.selectedPlace }
+
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if !project.profiles.isEmpty {
+            // Another Machine's Profiles, configuration and folder are changed there.
+            if !project.profiles.isEmpty, place == .thisMac {
                 profileMenu
             }
-            Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id) }
+            Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id, on: place) }
                 .buttonStyle(AccentButtonStyle())
                 .help("Start every service except Manual ones (⇧⌘R)")
-                .disabled(project.services.isEmpty)
-            Button("Stop All", systemImage: "stop.fill") { model.stopAll(inProject: project.id) }
+                .disabled(project.services.isEmpty || !model.isReachable(place))
+            Button("Stop All", systemImage: "stop.fill") { model.stopAll(inProject: project.id, on: place) }
                 .buttonStyle(PillButtonStyle())
                 .help("Stop All (⇧⌘.)")
-                .disabled(!project.services.contains { model.status(of: $0).state.isActive })
+                .disabled(!project.services.contains { model.status(of: $0, on: place).state.isActive } || !model.isReachable(place))
+            if place == .thisMac {
+                moreMenu
+            }
+        }
+    }
+
+    private var moreMenu: some View {
+        Group {
             MoreMenu(help: "More actions for this project") {
                 Button("Stats…") { model.statsProjectID = project.id }
                     .disabled(!project.services.contains { model.status(of: $0).state.isActive })
@@ -168,10 +200,10 @@ struct AllServicesRow: View {
     let project: Project
 
     var body: some View {
-        let states = project.services.map { model.status(of: $0).state }
+        let states = project.services.map { model.status(of: $0, on: model.selectedPlace).state }
         let failed = states.filter { $0 == .failed }.count
         HStack(spacing: 9) {
-            ServiceDots(services: model.serviceDots(of: project))
+            ServiceDots(services: model.serviceDots(of: project, on: model.selectedPlace))
             Text("All services")
                 .fontWeight(.semibold)
                 .lineLimit(1)
@@ -273,7 +305,7 @@ struct ServiceRow: View {
 
     /// The status summary, naming the Dependencies a Starting Service waits for.
     private var summary: String {
-        let awaited = status.awaitedDependencies.compactMap { id in model.service(id)?.service.name }
+        let awaited = status.awaitedDependencies.compactMap { id in model.service(id, on: model.selectedPlace)?.service.name }
         if isManual { return "Manual" }
         if status.isRestartNeeded { return "\(status.summary) · restart to apply" }
         guard status.state == .starting, !awaited.isEmpty else { return status.summary }
@@ -303,19 +335,24 @@ struct ServiceAccessibilityActions: View {
     let status: ServiceStatus
 
     var body: some View {
-        switch status.state {
-        case .starting, .running:
-            if model.urlToOpen(service) != nil {
-                Button("Open in Browser") { model.openURL(of: service.id) }
+        let place = model.selectedPlace
+        if model.isReachable(place) {
+            switch status.state {
+            case .starting, .running:
+                if model.urlToOpen(service, on: place) != nil {
+                    Button("Open in Browser") { model.openURL(of: service.id, on: place) }
+                }
+                Button("Restart") { model.restart(service.id, on: place) }
+                Button("Stop") { model.stop(service.id, on: place) }
+            case .stopping:
+                EmptyView()
+            case .stopped, .exited, .failed:
+                Button("Start") { model.start(service.id, on: place) }
             }
-            Button("Restart") { model.restart(service.id) }
-            Button("Stop") { model.stop(service.id) }
-        case .stopping:
-            EmptyView()
-        case .stopped, .exited, .failed:
-            Button("Start") { model.start(service.id) }
         }
-        Button("Edit Service") { model.presentedSheet = .editService(service.id) }
+        if place == .thisMac {
+            Button("Edit Service") { model.presentedSheet = .editService(service.id) }
+        }
     }
 }
 
@@ -326,13 +363,15 @@ struct ServiceActions: View {
     let service: Service
     let status: ServiceStatus
 
+    private var place: AppModel.Place { model.selectedPlace }
+
     var body: some View {
         HStack(spacing: 6) {
             switch status.state {
             case .starting, .running:
-                let url = model.urlToOpen(service)
+                let url = model.urlToOpen(service, on: place)
                 if let url {
-                    Button { model.openURL(of: service.id) } label: {
+                    Button { model.openURL(of: service.id, on: place) } label: {
                         HStack(spacing: 3) {
                             Text("Open")
                             Image(systemName: "arrow.up.right").font(.system(size: 8.5, weight: .bold))
@@ -342,24 +381,27 @@ struct ServiceActions: View {
                     .help("Open \(url.absoluteString) (⇧⌘O)")
                     .accessibilityLabel("Open in Browser")
                 }
-                Button("Restart") { model.restart(service.id) }
+                Button("Restart") { model.restart(service.id, on: place) }
                     .buttonStyle(PillButtonStyle(isProminent: url == nil, isCompact: true))
                     .help("Restart (⌘R)")
-                Button("Stop") { model.stop(service.id) }
+                Button("Stop") { model.stop(service.id, on: place) }
                     .buttonStyle(PillButtonStyle(isCompact: true))
                     .help("Stop (⌘.)")
             case .stopping:
                 ProgressView().controlSize(.mini)
                 Text("Stopping…").font(.caption).foregroundStyle(.secondary)
             case .stopped, .exited, .failed:
-                Button("Start") { model.start(service.id) }
+                Button("Start") { model.start(service.id, on: place) }
                     .buttonStyle(PillButtonStyle(isProminent: true, isCompact: true))
                     .help("Start (⌘R)")
-                Button("Edit…") { model.presentedSheet = .editService(service.id) }
-                    .buttonStyle(PillButtonStyle(isCompact: true))
-                    .help("Edit Service")
+                if place == .thisMac {
+                    Button("Edit…") { model.presentedSheet = .editService(service.id) }
+                        .buttonStyle(PillButtonStyle(isCompact: true))
+                        .help("Edit Service")
+                }
             }
         }
+        .disabled(!model.isReachable(place))
         .frame(height: 22)
     }
 }

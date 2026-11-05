@@ -116,6 +116,48 @@ fn nothing_stops_while_an_app_is_connected_then_what_nobody_holds_does() {
 }
 
 #[test]
+fn another_machine_holds_only_what_it_started_and_keeps_nothing_else_alive() {
+    within_patience(async {
+        let setup = setup(PATIENCE).await;
+        let web = setup.service("web", vec![]);
+        let api = setup.service("api", vec![]);
+        let agent = setup.connect(Client::Agent).await;
+        let machine = setup.connect(Client::Machine).await;
+        let watcher = setup.connect(Client::Cli).await;
+
+        agent.start(web.id, None, Origin::Agent).await.unwrap();
+        machine.start(api.id, None, Origin::Machine).await.unwrap();
+        wait_for(&watcher, web.id, ServiceState::Running).await;
+        wait_for(&watcher, api.id, ServiceState::Running).await;
+
+        // Unlike an app, a viewing Machine keeps nobody else's Runs.
+        drop(agent);
+        wait_for(&watcher, web.id, ServiceState::Stopped).await;
+        assert_eq!(watcher.status(api.id).state, ServiceState::Running);
+
+        // A laptop that went away: what it started stops, as for any client.
+        drop(machine);
+        wait_for(&watcher, api.id, ServiceState::Stopped).await;
+    });
+}
+
+#[test]
+fn an_app_on_the_machine_keeps_what_another_machine_started() {
+    within_patience(async {
+        let setup = setup(PATIENCE).await;
+        let web = setup.service("web", vec![]);
+        let app = setup.connect(Client::App).await;
+        let machine = setup.connect(Client::Machine).await;
+
+        machine.start(web.id, None, Origin::Machine).await.unwrap();
+        wait_for(&app, web.id, ServiceState::Running).await;
+        drop(machine);
+        settle().await;
+        assert_eq!(app.status(web.id).state, ServiceState::Running);
+    });
+}
+
+#[test]
 fn a_client_keeps_what_it_started_and_its_dependencies() {
     within_patience(async {
         let setup = setup(PATIENCE).await;

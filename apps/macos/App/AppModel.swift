@@ -37,6 +37,15 @@ final class AppModel {
     enum SidebarItem: Hashable {
         case ports
         case project(UUID)
+        /// A Project of another Machine: identified by both, since each
+        /// Machine names its own Projects.
+        case machineProject(UUID, machine: UUID)
+    }
+
+    /// Where a Project and its Services are: this Mac, or another Machine.
+    enum Place: Hashable {
+        case thisMac
+        case machine(UUID)
     }
 
     /// A start that failed because its port is taken, waiting for the user
@@ -60,6 +69,11 @@ final class AppModel {
     let core: Core?
     /// Why the core could not start, e.g. an unreadable Project file.
     let startupError: LocalhostError?
+    /// The other Machines, kept connected while the app runs.
+    let machines: Machines?
+    let machineStore: MachinesStore?
+    /// Why the list of Machines couldn't be read.
+    let machinesError: LocalhostError?
 
     private(set) var projects: [Project] = []
     var sidebarSelection: SidebarItem? {
@@ -69,9 +83,20 @@ final class AppModel {
             saveSelection()
         }
     }
+    /// The selected Project's id, on this Mac or another Machine. Set, it
+    /// selects a Project of this Mac.
     var selectedProjectID: UUID? {
-        get { if case .project(let id) = sidebarSelection { id } else { nil } }
+        get {
+            switch sidebarSelection {
+            case .project(let id), .machineProject(let id, _): id
+            case .ports, nil: nil
+            }
+        }
         set { sidebarSelection = newValue.map(SidebarItem.project) }
+    }
+    /// Where the selected Project is.
+    var selectedPlace: Place {
+        if case .machineProject(_, let machineID) = sidebarSelection { .machine(machineID) } else { .thisMac }
     }
     var selectedServiceID: UUID? {
         didSet { if selectedServiceID != oldValue { saveSelection() } }
@@ -80,6 +105,11 @@ final class AppModel {
     var projectSearch = ""
     /// The Projects whose name or Key contains `projectSearch`.
     var filteredProjects: [Project] {
+        filtered(projects)
+    }
+
+    /// `projects` whose name or Key contains `projectSearch`.
+    func filtered(_ projects: [Project]) -> [Project] {
         let query = projectSearch.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return projects }
         return projects.filter {
@@ -181,16 +211,35 @@ final class AppModel {
             core = nil
             startupError = error
         }
+        do {
+            let machines = try Machines(storageRoot: root)
+            self.machines = machines
+            machineStore = MachinesStore(machines: machines)
+            machinesError = nil
+        } catch {
+            machines = nil
+            machineStore = nil
+            machinesError = error
+        }
         observeProjects()
+        connectToMachines()
         announceStates()
+        announceMachineStates()
         connectToSharedCore()
         updates.model = self
     }
 
     // MARK: Reading
 
+    /// The selected Project, on this Mac or another Machine.
     var selectedProject: Project? {
-        projects.first { $0.id == selectedProjectID }
+        guard let id = selectedProjectID else { return nil }
+        return project(id, on: selectedPlace)
+    }
+
+    /// The selected Project when it is on this Mac: what can be edited.
+    var selectedLocalProject: Project? {
+        selectedPlace == .thisMac ? selectedProject : nil
     }
 
     /// The `selectedServiceID` of the "All services" row, which shows every
@@ -205,24 +254,44 @@ final class AppModel {
         selectedProject?.services.first { $0.id == selectedServiceID }
     }
 
-    func project(_ id: UUID) -> Project? {
-        projects.first { $0.id == id }
-    }
-
-    func service(_ id: UUID) -> (project: Project, service: Service)? {
-        for project in projects {
-            if let service = project.services.first(where: { $0.id == id }) { return (project, service) }
+    func project(_ id: UUID, on place: Place = .thisMac) -> Project? {
+        switch place {
+        case .thisMac: projects.first { $0.id == id }
+        case .machine(let machineID): machineStore?.machine(machineID)?.project(id)
         }
-        return nil
     }
 
-    func status(of service: Service) -> ServiceStatus {
-        core?.statuses.status(of: service.id) ?? .neverRun(service.id)
+    func service(_ id: UUID, on place: Place = .thisMac) -> (project: Project, service: Service)? {
+        switch place {
+        case .thisMac:
+            for project in projects {
+                if let service = project.services.first(where: { $0.id == id }) { return (project, service) }
+            }
+            return nil
+        case .machine(let machineID):
+            return machineStore?.machine(machineID)?.service(id)
+        }
+    }
+
+    func status(of service: Service, on place: Place = .thisMac) -> ServiceStatus {
+        switch place {
+        case .thisMac: core?.statuses.status(of: service.id) ?? .neverRun(service.id)
+        case .machine(let machineID): machineStore?.machine(machineID)?.status(of: service.id) ?? .neverRun(service.id)
+        }
     }
 
     /// The most significant state among a Project's Services, or `nil` if it has none.
-    func aggregateState(of project: Project) -> ServiceState? {
-        .mostSignificant(of: project.services.map { status(of: $0).state })
+    func aggregateState(of project: Project, on place: Place = .thisMac) -> ServiceState? {
+        .mostSignificant(of: project.services.map { status(of: $0, on: place).state })
+    }
+
+    /// Whether its Services can be controlled now: this Mac always, another
+    /// Machine while connected.
+    func isReachable(_ place: Place) -> Bool {
+        switch place {
+        case .thisMac: core != nil
+        case .machine(let machineID): machineStore?.machine(machineID)?.isConnected ?? false
+        }
     }
 
     var activeServiceCount: Int {
@@ -250,8 +319,14 @@ final class AppModel {
 
     // MARK: Lifecycle
 
-    /// Starts the Service; if its port is taken, asks what to do (`blockedStart`).
-    func start(_ serviceID: UUID, onPort port: Int? = nil, origin: Origin = .mainWindow) {
+    /// Starts the Service; if its port is taken on this Mac, asks what to do
+    /// (`blockedStart`). On another Machine, its row says why it Failed.
+    func start(_ serviceID: UUID, onPort port: Int? = nil, on place: Place = .thisMac, origin: Origin = .mainWindow) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task { await report(origin: origin) { () throws(LocalhostError) in try await machines.start(serviceID, on: machineID, onPort: port) } }
+            return
+        }
         guard let services = core?.services else { return }
         Task {
             await report(origin: origin) { () throws(LocalhostError) in
@@ -261,12 +336,22 @@ final class AppModel {
         }
     }
 
-    func stop(_ serviceID: UUID, origin: Origin = .mainWindow) {
+    func stop(_ serviceID: UUID, on place: Place = .thisMac, origin: Origin = .mainWindow) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task { await report(origin: origin) { () throws(LocalhostError) in try await machines.stop(serviceID, on: machineID) } }
+            return
+        }
         guard let services = core?.services else { return }
         Task { await report(origin: origin) { () throws(LocalhostError) in try await services.stop(serviceID, origin: origin) } }
     }
 
-    func restart(_ serviceID: UUID, origin: Origin = .mainWindow) {
+    func restart(_ serviceID: UUID, on place: Place = .thisMac, origin: Origin = .mainWindow) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task { await report(origin: origin) { () throws(LocalhostError) in try await machines.restart(serviceID, on: machineID) } }
+            return
+        }
         guard let services = core?.services else { return }
         Task {
             await report(origin: origin) { () throws(LocalhostError) in
@@ -276,24 +361,54 @@ final class AppModel {
         }
     }
 
-    func startAll(inProject projectID: UUID, origin: Origin = .mainWindow) {
+    func startAll(inProject projectID: UUID, on place: Place = .thisMac, origin: Origin = .mainWindow) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task { await report(origin: origin) { () throws(LocalhostError) in try await machines.startAll(inProject: projectID, on: machineID) } }
+            return
+        }
         guard let services = core?.services else { return }
         Task { await report(origin: origin) { () throws(LocalhostError) in try await services.startAll(inProject: projectID, origin: origin) } }
     }
 
-    func stopAll(inProject projectID: UUID, origin: Origin = .mainWindow) {
+    func stopAll(inProject projectID: UUID, on place: Place = .thisMac, origin: Origin = .mainWindow) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task { await report(origin: origin) { () throws(LocalhostError) in try await machines.stopAll(inProject: projectID, on: machineID) } }
+            return
+        }
         guard let services = core?.services else { return }
         Task { await report(origin: origin) { () throws(LocalhostError) in try await services.stopAll(inProject: projectID, origin: origin) } }
     }
 
     /// The URL "Open" uses for a Service, or `nil` if there is none to open.
-    func urlToOpen(_ service: Service) -> URL? {
-        service.urlToOpen(for: status(of: service).run)
+    /// On another Machine, its Port is forwarded to the same port here.
+    func urlToOpen(_ service: Service, on place: Place = .thisMac) -> URL? {
+        service.urlToOpen(for: status(of: service, on: place).run)
     }
 
-    func openURL(of serviceID: UUID) {
+    func openURL(of serviceID: UUID, on place: Place = .thisMac) {
+        if case .machine(let machineID) = place {
+            guard let machines else { return }
+            Task {
+                await report { () throws(LocalhostError) in
+                    if let url = try await machines.openURL(ofService: serviceID, on: machineID) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            return
+        }
         guard let (_, service) = service(serviceID), let url = urlToOpen(service) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Where the selected Project's logs are read.
+    func logs(on place: Place) -> (any LogSource)? {
+        switch place {
+        case .thisMac: return core?.logs
+        case .machine(let machineID): return machines?.logs(on: machineID)
+        }
     }
 
     /// Shows Connect Your Agents, unless another sheet is open: replacing
@@ -326,8 +441,13 @@ final class AppModel {
         columnFocusRequest = ColumnFocusRequest(column: column)
     }
 
-    /// Whether a log is shown that ⌃L can clear.
+    /// Whether a log is shown that ⌃L can clear: another Machine's can't be.
     var canClearLogs: Bool {
+        selectedPlace == .thisMac && (selectedService != nil || isAllServicesSelected)
+    }
+
+    /// Whether a log is shown that ⌘F can filter.
+    var canFindInLog: Bool {
         selectedService != nil || isAllServicesSelected
     }
 
@@ -764,7 +884,7 @@ final class AppModel {
             sidebarSelection = .ports
             return
         }
-        let project = savedSidebar.flatMap(UUID.init(uuidString:)).flatMap(project) ?? projects[0]
+        let project = savedSidebar.flatMap(UUID.init(uuidString:)).flatMap { self.project($0) } ?? projects[0]
         sidebarSelection = .project(project.id)
         let savedService = defaults.string(forKey: Self.serviceSelectionKey).flatMap(UUID.init(uuidString:))
         if let savedService, savedService == Self.allServicesID || project.services.contains(where: { $0.id == savedService }) {
@@ -780,12 +900,13 @@ final class AppModel {
         switch sidebarSelection {
         case .ports: defaults.set("ports", forKey: Self.sidebarSelectionKey)
         case .project(let id): defaults.set(id.uuidString, forKey: Self.sidebarSelectionKey)
-        case nil: defaults.removeObject(forKey: Self.sidebarSelectionKey)
+        // Another Machine's Projects arrive only once it connects.
+        case .machineProject, nil: defaults.removeObject(forKey: Self.sidebarSelectionKey)
         }
         defaults.set(selectedServiceID?.uuidString, forKey: Self.serviceSelectionKey)
     }
 
-    private func report(origin: Origin = .mainWindow, _ action: () async throws(LocalhostError) -> Void) async {
+    func report(origin: Origin = .mainWindow, _ action: () async throws(LocalhostError) -> Void) async {
         do {
             try await action()
         } catch {

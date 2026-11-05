@@ -1,6 +1,6 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useReducer, useState } from "react";
-import { commands, type LogBatch, type LogSource } from "../bindings";
+import { commands, type Id, type LogBatch, type LogSource } from "../bindings";
 import { LogBuffer } from "./buffer";
 
 let received = 0;
@@ -13,9 +13,10 @@ export function linesReceived(): number {
 /**
  * The lines of `source`, live. The core sends batches at most once per frame;
  * React re-renders at most once per animation frame on top of that. `key`
- * names the source: a new key opens a new stream.
+ * names the source, with the Machine it is on (`machineId`, or this
+ * computer): a new key opens a new stream.
  */
-export function useLog(key: string, source: LogSource | null): LogBuffer {
+export function useLog(key: string, source: LogSource | null, machineId: Id | null = null): LogBuffer {
   const [buffer, setBuffer] = useState(() => new LogBuffer());
   // A counter, not the buffer's version: each stream's buffer counts from 0,
   // and setting the same number twice wouldn't re-render.
@@ -38,7 +39,7 @@ export function useLog(key: string, source: LogSource | null): LogBuffer {
         rerender();
       });
     };
-    void commands.openLog(source, batches).then((result) => {
+    void commands.openLog(source, machineId, batches).then((result) => {
       if (result.status !== "ok") return;
       if (isClosed) void commands.closeLog(result.data);
       else id = result.data;

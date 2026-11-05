@@ -471,7 +471,7 @@ impl Connection {
 /// Sends what `receiver` delivers in batches, at most one per
 /// `LOG_BATCH_INTERVAL`, until it ends (the last batch says so) or `send`
 /// returns false.
-async fn forward_batches<T>(mut receiver: mpsc::UnboundedReceiver<T>, send: impl Fn(Vec<T>, bool) -> bool) {
+pub(crate) async fn forward_batches<T>(mut receiver: mpsc::UnboundedReceiver<T>, send: impl Fn(Vec<T>, bool) -> bool) {
     loop {
         let Some(first) = receiver.recv().await else {
             send(Vec::new(), true);

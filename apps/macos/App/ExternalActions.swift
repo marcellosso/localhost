@@ -17,8 +17,9 @@ extension AppModel {
 
     /// The folder actions on the main window's selection use: the selected
     /// Service's working directory, else the selected Project's folder.
+    /// Another Machine's folders aren't on this Mac.
     var selectedFolder: URL? {
-        guard let project = selectedProject else { return nil }
+        guard let project = selectedLocalProject else { return nil }
         if let service = selectedService { return project.workingDirectoryURL(for: service) }
         return Self.folder(of: project)
     }

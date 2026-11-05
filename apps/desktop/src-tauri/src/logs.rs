@@ -96,18 +96,22 @@ pub struct LogStreams {
 }
 
 /// Streams `source` over `batches`: what is buffered first, then new
-/// lines. Returns the id to close it with.
+/// lines; on another Machine (`machine_id`), through its connection.
+/// Returns the id to close it with.
 #[tauri::command]
 #[specta::specta]
 pub async fn open_log(
     state: tauri::State<'_, AppState>,
     source: LogSource,
+    machine_id: Option<Id>,
     batches: Channel<LogBatch>,
 ) -> CommandResult<u32> {
-    let targets = &state.core()?.targets;
     let (buffered, receiver) = match &source {
         LogSource::Run { run_id } => {
-            let (lines, receiver) = targets.subscribe_to_run(*run_id).await?;
+            let (lines, receiver) = match machine_id {
+                Some(machine_id) => state.machines()?.subscribe_to_run(machine_id, *run_id).await?,
+                None => state.core()?.targets.subscribe_to_run(*run_id).await?,
+            };
             let lines: Vec<LogLine> = lines.iter().map(|line| LogLine::new(line, None)).collect();
             let (sender, combined) = mpsc::unbounded_channel();
             forward(receiver, sender, |line| LogLine::new(&line, None));
@@ -115,7 +119,10 @@ pub async fn open_log(
         }
         LogSource::Services { service_ids } => {
             let ids: HashSet<Id> = service_ids.iter().copied().collect();
-            let (lines, receiver) = targets.subscribe_to_services(ids).await?;
+            let (lines, receiver) = match machine_id {
+                Some(machine_id) => state.machines()?.subscribe_to_services(machine_id, ids).await?,
+                None => state.core()?.targets.subscribe_to_services(ids).await?,
+            };
             let lines = lines.iter().map(|line| LogLine::new(&line.line, Some(line.service_id))).collect();
             let (sender, combined) = mpsc::unbounded_channel();
             forward(receiver, sender, |line| LogLine::new(&line.line, Some(line.service_id)));

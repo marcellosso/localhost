@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { Id } from "../bindings";
+import type { Id, Project, ServiceState } from "../bindings";
 import type { CoreView } from "../core";
-import { type Announcement, currentStates, onAnnouncement, settledAnnouncements } from "../announce";
+import { type Announcement, announce, currentStates, onAnnouncement, settledAnnouncements } from "../announce";
+import type { ShownMachine } from "../machines";
 
 /** How long a message stays in its live region: long enough to be read, then out of the way. */
 const MESSAGE_LIFETIME = 10_000;
@@ -51,4 +52,37 @@ export function Announcer({ view, selectedProjectId }: { view: CoreView; selecte
       </div>
     </>
   );
+}
+
+/**
+ * Says when a Service of another Machine settles, through `Announcer`: with
+ * the Machine's name unless it is the selected one. What a Machine reads
+ * as it connects (its Projects afresh) is not announced.
+ */
+export function MachinesAnnouncer({
+  machines,
+  selected,
+}: {
+  machines: ShownMachine[];
+  selected: { machineId: Id; projectId: Id | null } | null;
+}) {
+  const seen = useRef(new Map<Id, { projects: Project[]; states: Map<Id, ServiceState> }>());
+
+  useEffect(() => {
+    for (const shown of machines) {
+      const id = shown.machine.id;
+      const last = seen.current.get(id);
+      if (!last || last.projects !== shown.view.projects) {
+        seen.current.set(id, { projects: shown.view.projects, states: currentStates(shown.view) });
+        continue;
+      }
+      const isSelected = selected?.machineId === id;
+      for (const { text, isUrgent } of settledAnnouncements(last.states, shown.view, isSelected ? selected.projectId : null)) {
+        announce(isSelected ? text : `${shown.machine.name}, ${text}`, isUrgent);
+      }
+    }
+    // Only new statuses are announced; the selection is read as they arrive.
+  }, [machines]);
+
+  return null;
 }

@@ -97,6 +97,19 @@
   font-size: 12px;
 }
 
+/* How another Machine is, and Reconnect when it waits for the user. */
+.machineNote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* Another Machine's Projects while it isn't connected: shown as they were. */
+.dimmed {
+  opacity: 0.6;
+}
+
 .row {
   position: relative;
   display: flex;

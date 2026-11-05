@@ -7,18 +7,20 @@ type Props = {
   description: string;
   /** Buttons under the description. */
   children?: ReactNode;
+  /** The buttons one above the other at one width, for more than two. */
+  isStacked?: boolean;
   /** A line under the buttons that teaches a shortcut, e.g. a `KeyTip`. */
   tip?: ReactNode;
 };
 
 /** A column with nothing to show: an icon, a title, a line and actions. */
-export function EmptyState({ icon, title, description, children, tip }: Props) {
+export function EmptyState({ icon, title, description, children, isStacked = false, tip }: Props) {
   return (
     <div className={styles.empty}>
       <span className={styles.icon}>{icon}</span>
       <h2 className={styles.title}>{title}</h2>
       <p className={styles.description}>{description}</p>
-      {children && <div className={styles.actions}>{children}</div>}
+      {children && <div className={`${styles.actions} ${isStacked ? styles.stacked : ""}`}>{children}</div>}
       {tip}
     </div>
   );

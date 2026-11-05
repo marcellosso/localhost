@@ -4,15 +4,17 @@ import { saveSettings, useSettings } from "../settings";
 import { checkForUpdates } from "../updates";
 import { CONNECT_AGENTS_SUBTITLE, CONNECT_AGENTS_TITLE, ConnectAgents } from "./ConnectAgents";
 import { Dialog, useModal } from "./Dialog";
-import { CircleHalfIcon, GearIcon, GlobeIcon, LinkIcon } from "./Icons";
+import { CircleHalfIcon, DesktopIcon, GearIcon, GlobeIcon, LinkIcon } from "./Icons";
+import { MachinesSettings } from "./MachinesSettings";
 import styles from "./SettingsDialog.module.css";
 
-type Section = "general" | "appearance" | "ports" | "agents";
+type Section = "general" | "appearance" | "ports" | "machines" | "agents";
 
 const sections: { id: Section; title: string; icon: ReactNode }[] = [
   { id: "general", title: "General", icon: <GearIcon size={13} /> },
   { id: "appearance", title: "Appearance", icon: <CircleHalfIcon size={13} /> },
   { id: "ports", title: "Ports", icon: <GlobeIcon size={13} /> },
+  { id: "machines", title: "Machines", icon: <DesktopIcon size={13} /> },
   { id: "agents", title: "Agents", icon: <LinkIcon size={13} /> },
 ];
 
@@ -61,6 +63,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           {section === "general" && <GeneralSettings />}
           {section === "appearance" && <AppearanceSettings />}
           {section === "ports" && <PortsSettings />}
+          {section === "machines" && <MachinesSettings />}
           {section === "agents" && (
             <>
               <SectionHeader title={CONNECT_AGENTS_TITLE} subtitle={CONNECT_AGENTS_SUBTITLE} />

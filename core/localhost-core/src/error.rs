@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Id, Key, Listener, ProjectFileProblem};
+use crate::{Id, Key, Listener, MachineProblem, ProjectFileProblem};
 
 /// Every failure the core reports. Clients match on these cases; they are
 /// never flattened into strings inside the core.
@@ -60,6 +60,12 @@ pub enum LocalhostError {
     /// The shared core on this machine (`remote::shared`) can't be started
     /// or reached, or the connection to it was lost.
     CoreUnavailable(String),
+    /// This machine's shared core is another version's, which this one
+    /// can't drive: kept alive by an older app or a coding agent's
+    /// `localhost mcp`.
+    IncompatibleCore {
+        version: String,
+    },
 
     // Ports and Listeners
     /// Something already listens on the port; `owner` is that Listener, if
@@ -119,6 +125,26 @@ pub enum LocalhostError {
         command: String,
         output: String,
     },
+
+    // Machines
+    /// Not something `ssh` can connect to: empty, with spaces, or like an option.
+    InvalidMachineDestination(String),
+    /// Another Machine is already reached at this destination.
+    DuplicateMachine(String),
+    MachineNotFound(Id),
+    /// Another Machine (by name) can't be reached over SSH, or the
+    /// connection to it was lost.
+    MachineUnavailable {
+        machine: String,
+        problem: MachineProblem,
+    },
+    /// The Port can't be forwarded from another Machine: SSH's reason.
+    ForwardFailed {
+        port: u16,
+        reason: String,
+    },
+    /// The other end runs an older localhost, which can't do this.
+    Unsupported,
 }
 
 impl LocalhostError {
@@ -164,6 +190,9 @@ impl LocalhostError {
             CoreUnavailable(reason) => {
                 format!("localhost’s background service isn’t running: {reason}. Quit localhost and open it again.")
             }
+            IncompatibleCore { version } => format!(
+                "localhost {version} is still running in the background, perhaps for a coding agent, and can’t work with this version. Quit it and any agent using `localhost mcp`, then try again."
+            ),
             PortConflict { port, owner: Some(owner) } => {
                 format!("Port {port} is in use by {} (PID {}).", owner.name, owner.pid)
             }
@@ -193,6 +222,14 @@ impl LocalhostError {
                 format!("`{command}` failed: {output}. Try again, or set up the server by hand.")
             }
             CommandPathTaken(path) => format!("{path} already exists and isn’t localhost’s. Remove it first, or leave it."),
+            InvalidMachineDestination(raw) => format!(
+                "“{raw}” isn’t something ssh can connect to. Use a Host from ~/.ssh/config, or user@host."
+            ),
+            DuplicateMachine(destination) => format!("{destination} is already one of your Machines."),
+            MachineNotFound(_) => "The Machine no longer exists.".into(),
+            MachineUnavailable { machine, problem } => problem.message(machine),
+            ForwardFailed { port, reason } => format!("Port {port} couldn’t be forwarded: {reason}."),
+            Unsupported => "The other Machine runs an older localhost that can’t do this. Update localhost there.".into(),
             InvalidProjectFile { problem, field, line } => {
                 let line = line.map(|line| format!("Line {line}"));
                 let field = (!field.is_empty()).then(|| field.join(" › "));

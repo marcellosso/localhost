@@ -144,15 +144,23 @@ pub fn quit(app: &AppHandle, origin: Origin) {
         let services = projects.iter().flat_map(|project| &project.services);
         services.filter(|service| core.targets.status(service.id).state.is_active()).count()
     });
+    let on_machines = state.machines().map_or(0, crate::machines::active_count);
+    let count = count + on_machines;
     if count == 0 {
         exit(app, origin);
         return;
     }
     let title =
         if count == 1 { "Stop 1 service and quit?".to_string() } else { format!("Stop {count} services and quit?") };
+    let message = if on_machines == 0 {
+        "Running services are stopped before localhost quits."
+    } else {
+        "Running services are stopped before localhost quits. Those started from here on other machines stop too, \
+         unless localhost is open on them."
+    };
     let mut dialog = app
         .dialog()
-        .message("Running services are stopped before localhost quits.")
+        .message(message)
         .title(title)
         .kind(MessageDialogKind::Warning)
         .buttons(MessageDialogButtons::OkCancelCustom("Stop and Quit".into(), "Cancel".into()));

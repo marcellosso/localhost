@@ -1,5 +1,6 @@
 import { start } from "../actions";
 import type { Run, Service } from "../bindings";
+import { type Place, thisComputer } from "./ServicesColumn";
 import type { LogBuffer } from "../log/buffer";
 import { failureExcerpt, failureTitle, runDuration } from "../status";
 import { ClearIcon } from "./Icons";
@@ -14,13 +15,14 @@ type Props = {
   buffer: LogBuffer;
   /** Puts the banner away for this Run. */
   onHide: () => void;
+  place?: Place;
 };
 
 /**
  * Why a Service Failed: what ended it and when, the error lines from its
  * output when the log below doesn't already show them all, and Start.
  */
-export function FailedBanner({ service, run, failureMessage, buffer, onHide }: Props) {
+export function FailedBanner({ service, run, failureMessage, buffer, onHide, place = thisComputer }: Props) {
   const excerpt = failureExcerpt(buffer.lines);
   const duration = runDuration(run);
   return (
@@ -30,7 +32,11 @@ export function FailedBanner({ service, run, failureMessage, buffer, onHide }: P
         <span className={styles.title}>{failureTitle(service, run, failureMessage)}</span>
         {duration && <span className={`${styles.duration} secondary`}>{duration}</span>}
         <span className={styles.spacer} />
-        <button className="button compact accent" onClick={() => void start(service.id)}>
+        <button
+          className="button compact accent"
+          disabled={!place.isReachable}
+          onClick={() => void start(service.id, null, place.machineId)}
+        >
           Start
         </button>
         <button className={styles.hide} aria-label="Hide" title="Hide" onClick={onHide}>

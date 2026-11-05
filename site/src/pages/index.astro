@@ -34,6 +34,7 @@ const structuredData = [
       'An MCP server (localhost mcp) for Claude Code, Cursor, Codex and other coding agents',
       'In-app updates that stop running Services only after asking',
       'Projects on Windows itself or in a WSL 2 distro',
+      'Projects of other computers (Machines) over the system’s ssh, opened in the browser through forwarded ports',
       'A command palette and a keyboard shortcut for every action',
     ],
     license: 'https://opensource.org/licenses/MIT',
@@ -62,8 +63,10 @@ const directory = [
   { id: 'ports', label: 'Ports', text: 'Who is on :3000' },
   { id: 'environment', label: 'Environment', text: 'Variables, Profiles, Secrets' },
   { id: 'agents', label: 'Coding agents', text: 'Claude Code, Cursor, Codex' },
+  { id: 'machines', label: 'Machines', text: 'Your dev box, over ssh' },
   { id: 'local', label: 'Local-first', text: 'No account, nothing silent' },
   { id: 'install', label: 'Install', text: 'macOS, Windows, Linux' },
+  { id: 'faq', label: 'Questions', text: 'Docker, pm2, platforms' },
 ];
 
 const commands = [
@@ -250,6 +253,29 @@ const problems = [
     </div>
   </section>
 
+  <section class="row" id="machines" aria-labelledby="machines-title">
+    <div class="container row-grid">
+      <div class="row-copy">
+        <h2 id="machines-title" class="engraved">Your dev box, in the same window.</h2>
+        <p class="lede">
+          Add a computer you reach with <code>ssh</code> as a Machine, and its Projects show below yours: start, stop, logs and Open in
+          Browser, which forwards the Port to the same one here. Over the SSH you already use, with your keys, <code>~/.ssh/config</code>
+          and Tailscale; nothing new listens on the network. Its Services, configuration and Secrets stay on it.
+        </p>
+        <a class="more" href={href('docs/machines')}>How Machines work</a>
+      </div>
+      <div class="panel inset machine-list" aria-hidden="true">
+        <div class="side-head">Projects</div>
+        <div class="side-row"><span class="glyph running"></span>Acme Shop<span class="side-meta">3 running</span></div>
+        <div class="side-row"><span class="glyph"></span>Docs site</div>
+        <div class="side-head">devbox</div>
+        <div class="side-row selected"><span class="glyph running"></span>Data Pipeline<span class="side-meta">2 running</span></div>
+        <div class="side-row"><span class="glyph"></span>ML Lab</div>
+        <div class="forward"><strong>Open in Browser</strong> forwards <code>:8888</code> on devbox to <code>localhost:8888</code> here.</div>
+      </div>
+    </div>
+  </section>
+
   <section class="row" id="local" aria-labelledby="local-title">
     <div class="container">
       <h2 id="local-title" class="engraved">Your machine, your rules.</h2>
@@ -299,7 +325,7 @@ const problems = [
     </div>
   </section>
 
-  <section class="row" aria-labelledby="faq-title">
+  <section class="row" id="faq" aria-labelledby="faq-title">
     <div class="container faq-grid">
       <h2 id="faq-title" class="engraved">Questions</h2>
       <div class="faq">
@@ -509,7 +535,7 @@ const problems = [
   }
   .card ul {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 0;
     padding: 0;
     list-style: none;
@@ -557,6 +583,11 @@ const problems = [
   .dir-text {
     font-size: 14px;
     color: #545c66;
+  }
+  @media (max-width: 1100px) {
+    .card ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   @media (max-width: 900px) {
     .card ul {
@@ -821,6 +852,61 @@ const problems = [
   }
   .transcript .g {
     color: #3fb950;
+  }
+
+  .machine-list {
+    padding: 12px;
+    font-size: 14px;
+  }
+  .side-head {
+    padding: 14px 10px 6px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .side-head:first-child {
+    padding-top: 4px;
+  }
+  .side-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 7px;
+  }
+  .side-row.selected {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .side-meta {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  /* State by shape: a dot with a halo for Running, a hollow ring for Stopped. */
+  .glyph {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid var(--state-stopped);
+  }
+  .glyph.running {
+    border-color: var(--state-running);
+    background: var(--state-running);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-running) 25%, transparent);
+  }
+  .forward {
+    margin-top: 12px;
+    padding: 12px 10px 4px;
+    border-top: 1px solid var(--separator);
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .forward strong {
+    color: var(--text);
   }
 
   .rules {

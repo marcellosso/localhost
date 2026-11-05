@@ -7,6 +7,7 @@ mod arguments;
 mod logs;
 mod mcp;
 mod projects;
+mod remote;
 mod resolve;
 mod signals;
 mod status;
@@ -58,6 +59,7 @@ fn run(command: Command, terminal: &Terminal) -> Result<ExitCode, String> {
         Command::Logs { project, service } => logs::run(&open()?, &project, service.as_deref(), terminal)?,
         Command::Up { project, services } => return up::run(open()?, &project, &services, terminal),
         Command::Mcp { read_only } => return mcp::run(open()?, read_only),
+        Command::Remote => return remote::run(open()?),
         Command::Daemon { storage_root } => localhost_core::remote::shared::run(storage_root.as_ref())?,
     }
     Ok(ExitCode::SUCCESS)
