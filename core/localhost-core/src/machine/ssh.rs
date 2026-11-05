@@ -68,7 +68,9 @@ pub struct Forward {
 pub struct SshLink {
     machine: Machine,
     ssh: PathBuf,
-    control_path: PathBuf,
+    control_folder: PathBuf,
+    /// The control socket's name, relative to `control_folder`.
+    control_name: String,
     child: Mutex<Option<Child>>,
     forwards: Mutex<HashSet<Forward>>,
 }
@@ -83,15 +85,19 @@ impl SshLink {
     ) -> Result<(Arc<SshLink>, MachineConnection), LocalhostError> {
         let unavailable = |problem| LocalhostError::MachineUnavailable { machine: machine.name.clone(), problem };
         create_private_folder(control_folder).map_err(|error| unavailable(MachineProblem::Other(error.to_string())))?;
-        let control_path = control_folder.join(machine.id.to_string().split('-').next().unwrap_or("machine"));
-        let _ = std::fs::remove_file(&control_path);
+        let control_name = machine.id.to_string().split('-').next().unwrap_or("machine").to_string();
+        let _ = std::fs::remove_file(control_folder.join(&control_name));
 
         let mut command = Command::new(ssh);
+        // The socket is named relative to the folder: a Unix socket's path
+        // is limited to about 104 bytes, and `ssh` adds 17 while making it,
+        // which a temporary or home folder can exceed (macOS's do).
         command
+            .current_dir(control_folder)
             .arg("-T")
             .arg("-M")
             .arg("-S")
-            .arg(&control_path)
+            .arg(&control_name)
             .args(options())
             .args(master_options())
             .arg("--")
@@ -127,7 +133,8 @@ impl SshLink {
                 let link = Arc::new(SshLink {
                     machine,
                     ssh: ssh.to_path_buf(),
-                    control_path,
+                    control_folder: control_folder.to_path_buf(),
+                    control_name,
                     child: Mutex::new(Some(child)),
                     forwards: Mutex::new(HashSet::new()),
                 });
@@ -207,14 +214,15 @@ impl SshLink {
             let _ = child.start_kill();
         }
         self.forwards.lock().unwrap().clear();
-        let _ = std::fs::remove_file(&self.control_path);
+        let _ = std::fs::remove_file(self.control_folder.join(&self.control_name));
     }
 
     /// Asks the master to `operation` (`forward`, `cancel`) the local forward `spec`.
     async fn control(&self, operation: &str, spec: &str, port: u16) -> Result<(), LocalhostError> {
         let output = Command::new(&self.ssh)
+            .current_dir(&self.control_folder)
             .arg("-S")
-            .arg(&self.control_path)
+            .arg(&self.control_name)
             .arg("-O")
             .arg(operation)
             .arg("-L")

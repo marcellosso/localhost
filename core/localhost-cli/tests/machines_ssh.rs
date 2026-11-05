@@ -1,7 +1,8 @@
 //! Reaching another Machine through the real `ssh`: a private `sshd` on a
 //! loopback port, run as this user with throwaway keys, whose sessions find
 //! this build's `localhost` first on the `PATH`. Nothing of the user's own
-//! SSH setup is read or written. Skipped where there is no `sshd`.
+//! SSH setup is read or written, nor their zsh files, which could change
+//! that `PATH`. Skipped where there is no `sshd`.
 #![cfg(target_os = "linux")]
 
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
@@ -74,7 +75,7 @@ impl OtherMachine {
             format!(
                 "Port {port}\nListenAddress 127.0.0.1\nHostKey {p}/host_key\nAuthorizedKeysFile {p}/authorized_keys\n\
                  PidFile {p}/sshd.pid\nUsePAM no\nStrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n\
-                 AcceptEnv LH_VARIANT\nSetEnv PATH={p}/bin:/usr/bin:/bin XDG_DATA_HOME={p}/data\n"
+                 AcceptEnv LH_VARIANT\nSetEnv PATH={p}/bin:/usr/bin:/bin XDG_DATA_HOME={p}/data ZDOTDIR={p}\n"
             ),
         )
         .unwrap();
@@ -244,6 +245,28 @@ async fn forwards_a_port_of_the_other_machine_to_this_one() {
 
     link.cancel_forward(forward).await;
     assert!(link.forwards().is_empty());
+    assert!(std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, local_port)).is_err());
+}
+
+/// A Unix socket's path is limited to about 104 bytes, and macOS's
+/// temporary and home folders can be long.
+#[tokio::test(flavor = "multi_thread")]
+async fn keeps_its_control_socket_in_a_folder_of_any_length() {
+    let Some(other) = OtherMachine::start() else { return };
+    let control =
+        other.path().join("a-folder-whose-path-is-longer-than-a-unix-socket-path-may-be").join("x".repeat(60));
+    assert!(control.as_os_str().len() > 120);
+    let ssh = other.ssh();
+    let link = SshLink::connect(other.machine("devbox"), &ssh, &control);
+    let (link, connection) = tokio::time::timeout(PATIENCE, link).await.expect("ssh hung").unwrap();
+    assert!(connection.is_connected());
+
+    let server = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let port = server.local_addr().unwrap().port();
+    let local_port = free_port();
+    let forward = link.forward_to(port, local_port).await.unwrap();
+    assert!(std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, local_port)).is_ok());
+    link.cancel_forward(forward).await;
     assert!(std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, local_port)).is_err());
 }
 
