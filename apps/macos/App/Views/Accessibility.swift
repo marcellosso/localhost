@@ -19,9 +19,9 @@ extension String {
 
 extension AppModel {
     /// A Project's Services for VoiceOver, e.g. "2 of 3 running, 1 failed".
-    func accessibilityState(of project: Project) -> String {
+    func accessibilityState(of project: Project, on place: Place = .thisMac) -> String {
         guard !project.services.isEmpty else { return "No services" }
-        let states = project.services.map { status(of: $0).state }
+        let states = project.services.map { status(of: $0, on: place).state }
         let failed = states.filter { $0 == .failed }.count
         return "\(states.filter(\.isActive).count) of \(states.count) running" + (failed > 0 ? ", \(failed) failed" : "")
     }

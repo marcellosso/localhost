@@ -55,14 +55,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let origin = model.quitOrigin
         model.quitOrigin = .mainWindow
-        let count = model.activeServiceCount
+        let count = model.activeServiceCount + model.activeMachineServiceCount
         guard count > 0 else { return .terminateNow }
 
         // Without a main window the app may be in the background (no Dock icon).
         NSApp.activate()
         let alert = NSAlert()
         alert.messageText = count == 1 ? "Stop 1 service and quit?" : "Stop \(count) services and quit?"
-        alert.informativeText = "Running services are stopped before localhost quits."
+        alert.informativeText = model.activeMachineServiceCount == 0
+            ? "Running services are stopped before localhost quits."
+            : "Running services are stopped before localhost quits. Those started from here on other machines stop too, unless localhost is open on them."
         alert.addButton(withTitle: "Stop and Quit")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
@@ -112,14 +114,14 @@ struct AppCommands: Commands {
                 .keyboardShortcut("n")
                 .disabled(model.core == nil)
             Button("New Service…") {
-                if let project = model.selectedProject { model.presentedSheet = .addService(projectID: project.id) }
+                if let project = model.selectedLocalProject { model.presentedSheet = .addService(projectID: project.id) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .disabled(model.selectedProject == nil)
+            .disabled(model.selectedLocalProject == nil)
             Button("Detect Services…") {
-                if let project = model.selectedProject { model.presentedSheet = .detectServices(projectID: project.id) }
+                if let project = model.selectedLocalProject { model.presentedSheet = .detectServices(projectID: project.id) }
             }
-            .disabled(model.selectedProject == nil)
+            .disabled(model.selectedLocalProject == nil)
             Divider()
             Button("Import Project…") {
                 openWindow(id: "main")
@@ -128,53 +130,59 @@ struct AppCommands: Commands {
             .disabled(model.core == nil)
             Button("Export Project…") {
                 openWindow(id: "main")
-                if let project = model.selectedProject { model.exportProject(project.id) }
+                if let project = model.selectedLocalProject { model.exportProject(project.id) }
             }
-            .disabled(model.selectedProject == nil)
+            .disabled(model.selectedLocalProject == nil)
         }
         CommandGroup(replacing: .textEditing) {
             Button("Find in Log") { model.findInLog() }
                 .keyboardShortcut("f")
-                .disabled(!model.canClearLogs)
+                .disabled(!model.canFindInLog)
             Button("Clear Log") { model.clearLogs() }
                 .keyboardShortcut("l", modifiers: .control)
                 .disabled(!model.canClearLogs)
         }
         CommandMenu("Service") {
-            let status = model.selectedService.map { model.status(of: $0) }
+            let place = model.selectedPlace
+            let status = model.selectedService.map { model.status(of: $0, on: place) }
             let isLive = status?.state == .starting || status?.state == .running
             Button(isLive ? "Restart" : "Start") {
                 guard let id = model.selectedServiceID else { return }
-                isLive ? model.restart(id) : model.start(id)
+                isLive ? model.restart(id, on: place) : model.start(id, on: place)
             }
             .keyboardShortcut("r")
-            .disabled(status == nil || status?.state == .stopping)
+            .disabled(status == nil || status?.state == .stopping || !model.isReachable(place))
             // In Ports, Stop applies to the selected Listener.
             let listener = model.sidebarSelection == .ports ? model.selectedListenerID.flatMap(model.listener) : nil
             Button(listener.map { "Stop \($0.name)" + (model.service(of: $0) == nil ? "…" : "") } ?? "Stop") {
-                if let listener { model.requestStop(listener) } else { model.selectedServiceID.map { model.stop($0) } }
+                if let listener { model.requestStop(listener) } else { model.selectedServiceID.map { model.stop($0, on: place) } }
             }
             .keyboardShortcut(".")
-            .disabled(listener.map { model.reasonNotStoppable($0) != nil } ?? !isLive)
+            .disabled(listener.map { model.reasonNotStoppable($0) != nil } ?? (!isLive || !model.isReachable(place)))
             Divider()
-            Button("Open URL") { model.selectedServiceID.map { model.openURL(of: $0) } }
+            Button("Open URL") { model.selectedServiceID.map { model.openURL(of: $0, on: place) } }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-                .disabled(!isLive || model.selectedService.flatMap(model.urlToOpen) == nil)
+                .disabled(!isLive || model.selectedService.flatMap { model.urlToOpen($0, on: place) } == nil || !model.isReachable(place))
             Divider()
-            Button("Edit Service…") { model.selectedService.map { model.presentedSheet = .editService($0.id) } }
-                .disabled(model.selectedService == nil)
-            Button("Remove Service…") { model.selectedService.map { model.pendingRemoval = .service($0.id) } }
-                .disabled(model.selectedService == nil)
+            // Another Machine's Services are edited there.
+            let localService = place == .thisMac ? model.selectedService : nil
+            Button("Edit Service…") { localService.map { model.presentedSheet = .editService($0.id) } }
+                .disabled(localService == nil)
+            Button("Remove Service…") { localService.map { model.pendingRemoval = .service($0.id) } }
+                .disabled(localService == nil)
         }
         CommandMenu("Project") {
-            let project = model.selectedProject
-            Button("Start All") { project.map { model.startAll(inProject: $0.id) } }
+            let place = model.selectedPlace
+            let shown = model.selectedProject
+            Button("Start All") { shown.map { model.startAll(inProject: $0.id, on: place) } }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(project?.services.isEmpty ?? true)
-            Button("Stop All") { project.map { model.stopAll(inProject: $0.id) } }
+                .disabled((shown?.services.isEmpty ?? true) || !model.isReachable(place))
+            Button("Stop All") { shown.map { model.stopAll(inProject: $0.id, on: place) } }
                 .keyboardShortcut(".", modifiers: [.command, .shift])
-                .disabled(!(project.map { $0.services.contains { model.status(of: $0).state.isActive } } ?? false))
+                .disabled(!(shown.map { $0.services.contains { model.status(of: $0, on: place).state.isActive } } ?? false)
+                    || !model.isReachable(place))
             Divider()
+            let project = model.selectedLocalProject
             Button("Edit Project…") { project.map { model.presentedSheet = .editProject($0.id) } }
                 .disabled(project == nil)
             Button("Edit Environment…") { project.map { model.presentedSheet = .projectEnvironment($0.id) } }

@@ -3,7 +3,8 @@ import LocalhostCore
 import Synchronization
 import SwiftUI
 
-/// The selected Service's output: its latest Run, live.
+/// The selected Service's output: its latest Run, live, on this Mac or
+/// another Machine.
 struct LogPane: View {
     @Environment(AppModel.self) private var model
     let service: Service
@@ -11,12 +12,14 @@ struct LogPane: View {
     @State private var dismissedBannerRunID: UUID?
     @State private var revealCount = 0
 
+    private var place: AppModel.Place { model.selectedPlace }
+
     var body: some View {
-        let status = model.status(of: service)
+        let status = model.status(of: service, on: place)
         VStack(spacing: 0) {
             LogHeader {
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(nsColor: model.color(of: service)))
+                    .fill(Color(nsColor: model.color(of: service, on: place)))
                     .frame(width: 8, height: 8)
                 Text(service.name).fontWeight(.semibold)
                     .lineLimit(1)
@@ -36,12 +39,13 @@ struct LogPane: View {
                     url(status)
                     Color.clear.frame(width: 0, height: 0)
                 }
-                if status.state == .starting || status.state == .running, status.run?.endedAt == nil {
+                // Stats are sampled on this Mac only.
+                if place == .thisMac, status.state == .starting || status.state == .running, status.run?.endedAt == nil {
                     ServiceStatsButton(service: service)
                 }
             }
 
-            if let logs = model.core?.logs {
+            if let logs = model.logs(on: place) {
                 if status.state == .failed, let run = status.run, run.id != dismissedBannerRunID {
                     FailedBanner(service: service, run: run, logs: logs) {
                         dismissedBannerRunID = run.id
@@ -50,13 +54,15 @@ struct LogPane: View {
                 }
                 LogView(source: .run(status.run?.id), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: revealCount)
+                    // A new view for each place: its subscription is made where the log is.
+                    .id(place)
                     .overlay {
                         if status.run == nil {
                             VStack(spacing: 10) {
                                 Text("No output yet.")
                                     .foregroundStyle(.secondary)
-                                if status.state == .stopped {
-                                    Button("Start \(service.name)", systemImage: "play.fill") { model.start(service.id) }
+                                if status.state == .stopped, model.isReachable(place) {
+                                    Button("Start \(service.name)", systemImage: "play.fill") { model.start(service.id, on: place) }
                                         .buttonStyle(AccentButtonStyle())
                                         .help("Start (⌘R)")
                                     KeyTip(before: "or press", keys: "⌘R")
@@ -76,8 +82,8 @@ struct LogPane: View {
 
     @ViewBuilder
     private func url(_ status: ServiceStatus) -> some View {
-        if status.state.isActive, let url = model.urlToOpen(service) {
-            Button { model.openURL(of: service.id) } label: {
+        if status.state.isActive, let url = model.urlToOpen(service, on: place) {
+            Button { model.openURL(of: service.id, on: place) } label: {
                 HStack(spacing: 2) {
                     Text(url.absoluteString.replacingOccurrences(of: "http://", with: ""))
                         .font(.callout.monospaced())
@@ -100,21 +106,24 @@ struct CombinedLogPane: View {
     @Environment(AppModel.self) private var model
     let project: Project
 
+    private var place: AppModel.Place { model.selectedPlace }
+
     var body: some View {
-        let running = project.services.filter { model.status(of: $0).state.isActive }.count
+        let running = project.services.filter { model.status(of: $0, on: place).state.isActive }.count
         VStack(spacing: 0) {
             LogHeader {
-                ServiceDots(services: model.serviceDots(of: project))
+                ServiceDots(services: model.serviceDots(of: project, on: place))
                 Text("All services").fontWeight(.semibold)
                 Text("\(running) of \(project.services.count) running")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if let logs = model.core?.logs {
+            if let logs = model.logs(on: place) {
                 LogView(source: .services(Self.prefixes(of: project)), logs: logs, filter: model.logFilter,
                         clearCount: model.logClearCount, revealCount: 0)
+                    .id(place)
                     .overlay {
-                        if !project.services.isEmpty, project.services.allSatisfy({ model.status(of: $0).run == nil }) {
+                        if !project.services.isEmpty, project.services.allSatisfy({ model.status(of: $0, on: place).run == nil }) {
                             VStack(spacing: 10) {
                                 Text("No output yet.")
                                     .foregroundStyle(.secondary)
@@ -122,9 +131,10 @@ struct CombinedLogPane: View {
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                     .multilineTextAlignment(.center)
-                                Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id) }
+                                Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id, on: place) }
                                     .buttonStyle(AccentButtonStyle())
                                     .help("Start All (⇧⌘R)")
+                                    .disabled(!model.isReachable(place))
                                 KeyTip(before: "or press", keys: "⇧⌘R")
                             }
                             .padding()
@@ -233,7 +243,7 @@ private struct FailedBanner: View {
     @Environment(AppModel.self) private var model
     let service: Service
     let run: Run
-    let logs: Targets
+    let logs: any LogSource
     let dismiss: () -> Void
     @State private var excerpt: [OutputLine] = []
 
@@ -257,11 +267,14 @@ private struct FailedBanner: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                Button("Start") { model.start(service.id) }
+                Button("Start") { model.start(service.id, on: model.selectedPlace) }
                     .buttonStyle(AccentButtonStyle(isCompact: true))
                     .help("Start (⌘R)")
-                Button("Edit Service…") { model.presentedSheet = .editService(service.id) }
-                    .buttonStyle(PillButtonStyle(isCompact: true))
+                    .disabled(!model.isReachable(model.selectedPlace))
+                if model.selectedPlace == .thisMac {
+                    Button("Edit Service…") { model.presentedSheet = .editService(service.id) }
+                        .buttonStyle(PillButtonStyle(isCompact: true))
+                }
                 Button("Hide", systemImage: "xmark") { dismiss() }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
@@ -355,7 +368,7 @@ struct LogView: NSViewRepresentable {
     }
 
     let source: Source
-    let logs: Targets
+    let logs: any LogSource
     @AppStorage(Preferences.logFontSizeKey) private var fontSize = Preferences.defaultLogFontSize
     /// Only lines containing this text are shown, with matches highlighted.
     let filter: String
@@ -396,7 +409,7 @@ final class LogViewController {
 
     let scrollView = NSScrollView()
     private let textView = LogTextView(frame: .zero)
-    private let logs: Targets
+    private let logs: any LogSource
     private var source: LogView.Source?
     private var clearCount = 0
     private var filter = ""
@@ -409,7 +422,7 @@ final class LogViewController {
     /// UTF-16 length of each displayed line, oldest first, for trimming.
     private var displayedLengths: [Int] = []
 
-    init(logs: Targets) {
+    init(logs: any LogSource) {
         self.logs = logs
         textView.isEditable = false
         textView.isSelectable = true

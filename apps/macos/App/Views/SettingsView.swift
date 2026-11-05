@@ -5,7 +5,7 @@ import SwiftUI
 /// the sidebar's glass and the selected section beside it.
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, ports, agents
+        case general, appearance, ports, machines, agents
 
         var id: Self { self }
 
@@ -14,6 +14,7 @@ struct SettingsView: View {
             case .general: "General"
             case .appearance: "Appearance"
             case .ports: "Ports"
+            case .machines: "Machines"
             case .agents: "Agents"
             }
         }
@@ -23,6 +24,7 @@ struct SettingsView: View {
             case .general: "gearshape"
             case .appearance: "circle.lefthalf.filled"
             case .ports: "network"
+            case .machines: "desktopcomputer"
             case .agents: "link"
             }
         }
@@ -40,6 +42,7 @@ struct SettingsView: View {
                     case .general: GeneralSettings()
                     case .appearance: AppearanceSettings()
                     case .ports: PortsSettings()
+                    case .machines: MachinesSettings()
                     case .agents: AgentsSettings()
                     }
                 }
@@ -95,7 +98,7 @@ private struct RailLabelStyle: LabelStyle {
 
 // MARK: Sections
 
-private struct SectionHeader: View {
+struct SectionHeader: View {
     let title: String
     let subtitle: String
 

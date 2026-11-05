@@ -133,9 +133,9 @@ struct MoreMenu<Content: View>: View {
 
 extension AppModel {
     /// Each Service's colour in its Project with whether it is active, for `ServiceDots`.
-    func serviceDots(of project: Project) -> [(color: NSColor, isActive: Bool)] {
+    func serviceDots(of project: Project, on place: Place = .thisMac) -> [(color: NSColor, isActive: Bool)] {
         project.services.enumerated().map { index, service in
-            (Theme.serviceColor(at: index), status(of: service).state.isActive)
+            (Theme.serviceColor(at: index), status(of: service, on: place).state.isActive)
         }
     }
 
@@ -146,8 +146,8 @@ extension AppModel {
     }
 
     /// The Service's colour: stable for its position in its Project.
-    func color(of service: Service) -> NSColor {
-        guard let (project, _) = self.service(service.id),
+    func color(of service: Service, on place: Place = .thisMac) -> NSColor {
+        guard let (project, _) = self.service(service.id, on: place),
               let index = project.services.firstIndex(where: { $0.id == service.id }) else { return Theme.serviceColor(at: 0) }
         return Theme.serviceColor(at: index)
     }
