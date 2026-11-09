@@ -87,6 +87,18 @@ private final class TemporaryRoot {
         #expect(AgentSetup(command: command, storageRoot: root.url).command == command)
         #expect(LocalhostError.CommandNotBundled("/x/localhost").message.contains("/x/localhost"))
     }
+
+    // A test build has no PostHog key: nothing is sent and no notice shows, but the choice is kept.
+    @Test func keepsTheTelemetryChoiceAndSendsNothing() throws {
+        let root = try TemporaryRoot()
+        let telemetry = Telemetry(storageRoot: root.url)
+        #expect(telemetry.isEnabled)
+        #expect(!telemetry.isNoticePending)
+        telemetry.recordAppOpen()
+        try telemetry.setEnabled(false)
+        #expect(!Telemetry(storageRoot: root.url).isEnabled)
+        #expect(Telemetry.privacyURL.absoluteString == "https://www.getlocalhost.app/privacy")
+    }
 }
 
 @Suite(.serialized) struct LibraryTests {
