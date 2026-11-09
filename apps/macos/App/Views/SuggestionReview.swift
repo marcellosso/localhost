@@ -17,6 +17,8 @@ struct SuggestionDraft: Identifiable {
     var portCanChange: Bool
     /// The drafts it starts after; only the checked ones are saved.
     var startsAfter: [UUID] = []
+    /// The Keys of the Project's Services it starts after.
+    var startsAfterServices: [String] = []
     /// The drafts merged into this one, to split it again.
     var mergedFrom: [SuggestionDraft] = []
 
@@ -44,7 +46,8 @@ struct SuggestionDraft: Identifiable {
     }
 
     /// The checked drafts as Services to add, each starting after the checked
-    /// drafts it picked, or a message saying what to fix.
+    /// drafts and the Project's Services it picked, or a message saying what
+    /// to fix.
     static func newServices(from drafts: [SuggestionDraft]) -> Result<[NewService], ReviewError> {
         let checked = drafts.filter(\.isChecked)
         let keys = Dictionary(uniqueKeysWithValues: checked.map { ($0.id, $0.key.trimmingCharacters(in: .whitespaces)) })
@@ -57,7 +60,7 @@ struct SuggestionDraft: Identifiable {
             }
             do {
                 var dependencyKeys: [Key] = []
-                for raw in draft.startsAfter.compactMap({ keys[$0] }) {
+                for raw in draft.startsAfterServices + draft.startsAfter.compactMap({ keys[$0] }) {
                     dependencyKeys.append(try Key(raw))
                 }
                 services.append(NewService(
@@ -89,6 +92,7 @@ extension [SuggestionDraft] {
         var draft = SuggestionDraft(mergedSuggestion)
         draft.isChecked = true
         draft.startsAfter = Self.unique(parts.flatMap(\.startsAfter)).filter { !ids.contains($0) }
+        draft.startsAfterServices = Self.uniqueKeys(parts.flatMap(\.startsAfterServices))
         draft.mergedFrom = parts
         var result = map { other in
             var other = other
@@ -149,6 +153,7 @@ extension [SuggestionDraft] {
             if partIDs.contains(other.id) {
                 other.isChecked = true
                 other.startsAfter = Self.unique(other.startsAfter + draft.startsAfter)
+                other.startsAfterServices = Self.uniqueKeys(other.startsAfterServices + draft.startsAfterServices)
             }
             return other
         }
@@ -173,6 +178,11 @@ extension [SuggestionDraft] {
         return ids.filter { seen.insert($0).inserted }
     }
 
+    private static func uniqueKeys(_ keys: [String]) -> [String] {
+        var seen: Set<String> = []
+        return keys.filter { seen.insert($0).inserted }
+    }
+
     /// `ids` with any of `removed` replaced by `added`, once each.
     private static func replacing(_ ids: [UUID], _ removed: [UUID], with added: [UUID]) -> [UUID] {
         guard ids.contains(where: removed.contains) else { return ids }
@@ -189,9 +199,9 @@ struct SuggestionReview: View {
     let isScanning: Bool
     /// The Project folder, for choosing working directories.
     let projectPath: String
-    /// The number of Services the Project already has, so new ones get the
-    /// colours they'll keep.
-    var existingServiceCount = 0
+    /// The Services the Project already has: new ones get the colours they'll
+    /// keep after them, and can start after them.
+    var existingServices: [Service] = []
     let emptyMessage: String
 
     @State private var expandedID: UUID?
@@ -316,7 +326,7 @@ struct SuggestionReview: View {
                     color: color(of: draft),
                     isExpanded: Binding { merging == nil && expandedID == draft.id } set: { expandedID = $0 ? draft.id : nil },
                     chooseFolder: { choosingFolderFor = draft.id },
-                    startsAfterOptions: startsAfterOptions(for: draft),
+                    startsAfterOptions: startsAfterOptions(for: $draft),
                     splitTitle: drafts.splitTitle(of: draft),
                     split: { split(draft) },
                     isPickedToMerge: merging.map { ids in Binding { ids.contains(draft.id) } set: { pick(draft.id, $0) } }
@@ -331,28 +341,50 @@ struct SuggestionReview: View {
         merging = ids
     }
 
-    private func startsAfterOptions(for draft: SuggestionDraft) -> [SuggestionRow.Option] {
-        drafts.filter { $0.isChecked && $0.id != draft.id }.map { other in
-            SuggestionRow.Option(draft: other, color: color(of: other), isCycle: drafts.startsAfter(other, draft))
+    /// What `draft` can start after: the Project's Services, then the other checked drafts.
+    private func startsAfterOptions(for draft: Binding<SuggestionDraft>) -> [SuggestionRow.Option] {
+        let current = draft.wrappedValue
+        let services = existingServices.enumerated().map { index, service in
+            let key = service.key.rawValue
+            return SuggestionRow.Option(
+                id: service.id.uuidString, name: service.name, key: key,
+                color: Theme.serviceColor(at: index), isCycle: false,
+                isOn: Binding { draft.wrappedValue.startsAfterServices.contains(key) } set: { isOn in
+                    if isOn { draft.wrappedValue.startsAfterServices.append(key) } else { draft.wrappedValue.startsAfterServices.removeAll { $0 == key } }
+                }
+            )
         }
+        let others = drafts.filter { $0.isChecked && $0.id != current.id }.map { other in
+            SuggestionRow.Option(
+                id: other.id.uuidString, name: other.name, key: other.key,
+                color: color(of: other), isCycle: drafts.startsAfter(other, current),
+                isOn: Binding { draft.wrappedValue.startsAfter.contains(other.id) } set: { isOn in
+                    if isOn { draft.wrappedValue.startsAfter.append(other.id) } else { draft.wrappedValue.startsAfter.removeAll { $0 == other.id } }
+                }
+            )
+        }
+        return services + others
     }
 
     /// A checked draft's colour is the one its Service will get; unchecked ones are grey.
     private func color(of draft: SuggestionDraft) -> NSColor {
         guard let index = drafts.filter(\.isChecked).firstIndex(where: { $0.id == draft.id }) else { return Theme.stopped }
-        return Theme.serviceColor(at: existingServiceCount + index)
+        return Theme.serviceColor(at: existingServices.count + index)
     }
 }
 
 /// One Suggestion: a checkbox, its name, Key, command and Port, and when
 /// opened, fields to edit it, what it starts after and where it was found.
 private struct SuggestionRow: View {
-    /// Another checked draft it can start after; a cycle when that one
-    /// already starts after it.
+    /// A Service of the Project or another checked draft it can start
+    /// after; a cycle when that one already starts after it.
     struct Option {
-        let draft: SuggestionDraft
+        let id: String
+        let name: String
+        let key: String
         let color: NSColor
         let isCycle: Bool
+        let isOn: Binding<Bool>
     }
 
     @Binding var draft: SuggestionDraft
@@ -448,7 +480,7 @@ private struct SuggestionRow: View {
 
     private var startsAfterNames: String {
         guard draft.isChecked else { return "" }
-        return startsAfterOptions.filter { draft.startsAfter.contains($0.draft.id) }.map(\.draft.name).joined(separator: ", ")
+        return startsAfterOptions.filter(\.isOn.wrappedValue).map(\.name).joined(separator: ", ")
     }
 
     private var editor: some View {
@@ -482,7 +514,7 @@ private struct SuggestionRow: View {
             if draft.isChecked, !startsAfterOptions.isEmpty {
                 Field(title: "Starts after", note: "waits until they’re running", hint: startsAfterHint) {
                     FlowLayout {
-                        ForEach(startsAfterOptions, id: \.draft.id) { option in
+                        ForEach(startsAfterOptions, id: \.id) { option in
                             dependencyChip(option)
                         }
                     }
@@ -511,16 +543,11 @@ private struct SuggestionRow: View {
     }
 
     private func dependencyChip(_ option: Option) -> some View {
-        let isOn = Binding {
-            draft.startsAfter.contains(option.draft.id)
-        } set: { isOn in
-            if isOn { draft.startsAfter.append(option.draft.id) } else { draft.startsAfter.removeAll { $0 == option.draft.id } }
-        }
-        let isBlocked = option.isCycle && !isOn.wrappedValue
-        return ChipToggle(title: option.draft.name, color: Color(nsColor: option.color), isOn: isOn)
+        let isBlocked = option.isCycle && !option.isOn.wrappedValue
+        return ChipToggle(title: option.name, color: Color(nsColor: option.color), isOn: option.isOn)
             .disabled(isBlocked)
             .opacity(isBlocked ? 0.4 : 1)
-            .help(isBlocked ? "\(option.draft.name) already starts after \(draft.name)." : option.draft.key)
+            .help(isBlocked ? "\(option.name) already starts after \(draft.name)." : option.key)
     }
 
     private var keyBinding: Binding<String> {
@@ -559,7 +586,7 @@ struct DetectServicesForm: View {
         ) {
             SuggestionReview(
                 drafts: $drafts, isScanning: isScanning, projectPath: project.path,
-                existingServiceCount: project.services.count,
+                existingServices: project.services,
                 emptyMessage: "Nothing new found. Services this project already runs aren’t suggested again."
             )
         }
