@@ -72,9 +72,13 @@ describe("editors", () => {
 
   it("saves Starts after as the Keys of the checked drafts only", () => {
     const [api, infra, docs] = suggestionDrafts([suggestion("API", true), suggestion("Infra", true), suggestion("Docs", false)]);
-    const edits = suggestionEdits([{ ...api, startsAfter: [infra.id, docs.id] }, { ...infra, key: "containers" }, docs]);
+    const edits = suggestionEdits([
+      { ...api, startsAfter: [infra.id, docs.id], startsAfterServices: ["db"] },
+      { ...infra, key: "containers" },
+      docs,
+    ]);
     expect(edits.map((edit) => [edit.key, edit.dependencyKeys])).toEqual([
-      ["api", ["containers"]],
+      ["api", ["db", "containers"]],
       ["containers", []],
     ]);
   });
@@ -96,7 +100,7 @@ describe("editors", () => {
       { ...suggestion("postgres", false), composeServices: ["postgres"] },
       { ...suggestion("temporal", false), composeServices: ["temporal"] },
     ]);
-    const before = [{ ...api, startsAfter: [postgres.id, temporal.id] }, postgres, temporal];
+    const before = [{ ...api, startsAfter: [postgres.id, temporal.id] }, { ...postgres, startsAfterServices: ["db"] }, temporal];
     const merged = { ...suggestion("Infra", true), commandLine: "docker compose up postgres temporal" };
     const after = mergingDrafts(before, [postgres.id, temporal.id], merged);
     expect(after.map((draft) => [draft.name, draft.isChecked])).toEqual([
@@ -104,6 +108,7 @@ describe("editors", () => {
       ["Infra", true],
     ]);
     expect(after[0].startsAfter).toEqual([after[1].id]);
+    expect(after[1].startsAfterServices).toEqual(["db"]);
 
     const split = splittingDraft(after, after[1].id);
     expect(split.map((draft) => [draft.name, draft.isChecked])).toEqual([

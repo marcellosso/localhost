@@ -84,6 +84,8 @@ export type SuggestionDraft = {
   portCanChange: boolean;
   /** The drafts it starts after; only the checked ones are saved. */
   startsAfter: number[];
+  /** The Keys of the Project's Services it starts after. */
+  startsAfterServices: string[];
   /** The drafts merged into this one, to split it again. */
   mergedFrom: SuggestionDraft[];
 };
@@ -101,6 +103,7 @@ function suggestionDraft(suggestion: ServiceSuggestion): SuggestionDraft {
     port: suggestion.port === null ? "" : String(suggestion.port),
     portCanChange: suggestion.portCanChange,
     startsAfter: [],
+    startsAfterServices: [],
     mergedFrom: [],
   };
 }
@@ -109,18 +112,18 @@ export function suggestionDrafts(suggestions: ServiceSuggestion[]): SuggestionDr
   return suggestions.map(suggestionDraft);
 }
 
-/** The checked drafts, to add, each starting after the checked drafts it picked. */
+/** The checked drafts, to add, each starting after the checked drafts and the Project's Services it picked. */
 export function suggestionEdits(drafts: SuggestionDraft[]): SuggestionEdit[] {
   const checked = drafts.filter((draft) => draft.isChecked);
   const keys = new Map(checked.map((draft) => [draft.id, draft.key]));
-  return checked.map(({ name, key, workingDirectory, commandLine, port, portCanChange, startsAfter }) => ({
+  return checked.map(({ name, key, workingDirectory, commandLine, port, portCanChange, startsAfter, startsAfterServices }) => ({
     name,
     key,
     workingDirectory,
     commandLine,
     port,
     portCanChange,
-    dependencyKeys: startsAfter.flatMap((id) => keys.get(id) ?? []),
+    dependencyKeys: [...startsAfterServices, ...startsAfter.flatMap((id) => keys.get(id) ?? [])],
   }));
 }
 
@@ -150,6 +153,7 @@ export function mergingDrafts(drafts: SuggestionDraft[], ids: number[], merged: 
     ...suggestionDraft({ ...merged, isRecommended: true }),
     isChecked: true,
     startsAfter: unique(parts.flatMap((part) => part.startsAfter)).filter((id) => !ids.includes(id)),
+    startsAfterServices: [...new Set(parts.flatMap((part) => part.startsAfterServices))],
     mergedFrom: parts,
   };
   const position = drafts.indexOf(parts[0]);
@@ -199,7 +203,12 @@ export function splittingDraft(drafts: SuggestionDraft[], id: number): Suggestio
     if (other.id === id) return { ...other, isChecked: false };
     const startsAfter = replacing(other.startsAfter, [id], partIds);
     return partIds.includes(other.id)
-      ? { ...other, isChecked: true, startsAfter: unique([...startsAfter, ...draft.startsAfter]) }
+      ? {
+          ...other,
+          isChecked: true,
+          startsAfter: unique([...startsAfter, ...draft.startsAfter]),
+          startsAfterServices: [...new Set([...other.startsAfterServices, ...draft.startsAfterServices])],
+        }
       : { ...other, startsAfter };
   });
 }
