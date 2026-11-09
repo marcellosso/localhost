@@ -82,7 +82,8 @@ extension NewService {
         port: Int? = nil,
         url: String? = nil,
         portCanChange: Bool = true,
-        isExcludedFromStartAll: Bool = false
+        isExcludedFromStartAll: Bool = false,
+        dependencyKeys: [Key] = []
     ) {
         self.init(
             name: name,
@@ -92,7 +93,8 @@ extension NewService {
             port: port.map(Int64.init),
             url: url,
             portCanChange: portCanChange,
-            isExcludedFromStartAll: isExcludedFromStartAll
+            isExcludedFromStartAll: isExcludedFromStartAll,
+            dependencyKeys: dependencyKeys
         )
     }
 
