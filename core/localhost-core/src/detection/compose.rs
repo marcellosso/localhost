@@ -1,10 +1,20 @@
+use super::grouping::compose_file;
 use super::{ScannedDirectory, ServiceDetector, ServiceSuggestion};
 use crate::yaml::{YamlLine, YamlLines, unquoted};
 
-/// Suggests one Service per Compose service, run in the foreground
-/// (`docker compose up <service>`) so Stop's SIGINT shuts it down cleanly.
-/// Its Port is the first published host port; it can't move, since the port
-/// is fixed in the Compose file.
+/// Suggests running a Compose file in the foreground, so Stop's SIGINT
+/// shuts it down cleanly.
+///
+/// Most Projects run their Compose file as one piece of infrastructure next
+/// to their own processes, so a file with several Compose services is
+/// suggested (checked) as one Service, `Infra`, running `docker compose up`.
+/// One Service per Compose service (`docker compose up <service>`) is also
+/// suggested, unchecked, for those who'd rather start them one by one. A file
+/// with one Compose service gets only that one, checked.
+///
+/// A Compose service's Port is its first published host port; it can't
+/// move, since the port is fixed in the Compose file. `Infra` keeps a Port
+/// only when exactly one of its Compose services publishes one.
 pub struct ComposeDetector;
 
 /// In the order Docker Compose picks them; only the first one present is used.
@@ -14,7 +24,7 @@ impl ServiceDetector for ComposeDetector {
     fn suggestions(&self, directory: &ScannedDirectory) -> Vec<ServiceSuggestion> {
         let Some(file_name) = FILE_NAMES.iter().find(|name| directory.contains(name)) else { return Vec::new() };
         let Some(text) = directory.read(file_name) else { return Vec::new() };
-        services(&text)
+        let each: Vec<ServiceSuggestion> = services(&text)
             .into_iter()
             .map(|service| {
                 let detail = match &service.image {
@@ -31,8 +41,16 @@ impl ServiceDetector for ComposeDetector {
                 );
                 suggestion.port = service.port;
                 suggestion.port_can_change = false;
+                suggestion.compose_services = vec![service.name];
                 suggestion
             })
+            .collect();
+        if each.len() < 2 {
+            return each;
+        }
+        let whole = compose_file(&each);
+        std::iter::once(whole)
+            .chain(each.into_iter().map(|suggestion| ServiceSuggestion { is_recommended: false, ..suggestion }))
             .collect()
     }
 }

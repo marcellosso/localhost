@@ -37,6 +37,9 @@ pub enum LocalhostError {
     ProjectNotFound(Id),
     ServiceNotFound(Id),
     ProfileNotFound(Id),
+    /// A Service being added starts after a Key that is neither in its
+    /// Project nor added with it.
+    DependencyNotFound(Key),
 
     // Launching a Run
     WorkingDirectoryMissing(String),
@@ -175,6 +178,9 @@ impl LocalhostError {
             ProjectNotFound(_) => "The project no longer exists.".into(),
             ServiceNotFound(_) => "The service no longer exists.".into(),
             ProfileNotFound(_) => "The environment profile no longer exists.".into(),
+            DependencyNotFound(key) => {
+                format!("It starts after “{key}”, but no service in this project has that key.")
+            }
             WorkingDirectoryMissing(path) => format!("The working directory {path} does not exist."),
             ShellNotFound(path) => format!("The shell {path} was not found."),
             LaunchFailed { errno } => format!("The command could not be launched: {}.", describe_errno(*errno)),

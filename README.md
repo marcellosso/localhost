@@ -89,7 +89,7 @@ Shortcuts are written for macOS; on Linux and Windows use Ctrl for ⌘ and Alt f
 Press **⌘N** (or the **+** in the sidebar) and choose your project's folder. localhost fills in a name and a **Key** (a short handle such as `my-saas`, used in logs and by the command line), then scans the folder and lists what it found:
 
 - **Node**: `package.json` scripts, run with your package manager (`pnpm run dev`, …). Known dev servers get their default port, passed as `$PORT`.
-- **Docker Compose**: one Service per Compose service, `docker compose up <service>` in the foreground.
+- **Docker Compose**: one `Infra` Service running the whole file (`docker compose up`, in the foreground), or one per Compose service (`docker compose up <service>`) if you'd rather. In the review you can also merge Suggestions into one Service and pick what each starts after.
 - **Python**: Django, FastAPI and Flask apps, with uv, Poetry, Pipenv or a virtualenv.
 - **Cargo**: `cargo run` for each binary.
 
@@ -392,7 +392,7 @@ A Project is a folder; a Service is one long-running command in it, such as `pnp
 
 ### Do I need Docker to use localhost?
 
-No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one per service in your Compose file, and if Docker isn’t running, the Service fails with that reason.
+No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one Service for your Compose file, or one per Compose service, and if Docker isn’t running, the Service fails with that reason.
 
 ### Is localhost a pm2 alternative?
 

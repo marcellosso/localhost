@@ -15,3 +15,12 @@ public struct ProjectScanner: Sendable {
         await scanProject(project: project)
     }
 }
+
+extension ServiceSuggestion {
+    /// Several reviewed Suggestions as one: Compose services of one folder
+    /// run together as `Infra`, anything else keeps the first one's command
+    /// line to edit. `nil` for none.
+    public static func merged(_ suggestions: [ServiceSuggestion]) -> ServiceSuggestion? {
+        mergeServiceSuggestions(suggestions: suggestions)
+    }
+}

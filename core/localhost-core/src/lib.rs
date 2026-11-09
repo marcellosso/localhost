@@ -51,7 +51,7 @@ pub use agents::{
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use detection::{
     CargoDetector, CommandSyntax, ComposeDetector, NodeDetector, ProjectScanner, PythonDetector, ScannedDirectory,
-    ServiceDetector, ServiceSuggestion,
+    ServiceDetector, ServiceSuggestion, merge_suggestions,
 };
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;

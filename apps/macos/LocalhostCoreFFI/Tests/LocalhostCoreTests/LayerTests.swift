@@ -31,6 +31,20 @@ private final class TemporaryRoot {
         #expect(Key(suggestedFrom: "!!!") == nil)
     }
 
+    @Test func mergesSuggestionsThroughTheCore() throws {
+        func compose(_ name: String) throws -> ServiceSuggestion {
+            ServiceSuggestion(
+                name: name, key: try Key(name), workingDirectory: ".", commandLine: "docker compose up \(name)",
+                corePort: nil, portCanChange: false, isRecommended: false, foundIn: "compose.yaml",
+                detail: "Compose service", composeServices: [name]
+            )
+        }
+        let merged = try #require(ServiceSuggestion.merged([compose("postgres"), compose("temporal")]))
+        #expect(merged.name == "Infra")
+        #expect(merged.commandLine == "docker compose up postgres temporal")
+        #expect(ServiceSuggestion.merged([]) == nil)
+    }
+
     @Test func errorsCarryTheCoresMessages() {
         #expect(LocalhostError.CommandNotFound.message == "Command not found.")
         #expect(LocalhostError.InvalidPort(70000).message.contains("70000"))

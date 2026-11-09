@@ -108,3 +108,32 @@
   text-overflow: ellipsis;
   user-select: text;
 }
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer .foundIn {
+  flex: 1;
+  min-width: 0;
+}
+
+.title .tertiary {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
+.mergeBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mergeHint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+}

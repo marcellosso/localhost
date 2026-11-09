@@ -8,6 +8,7 @@
 
 mod cargo;
 mod compose;
+mod grouping;
 mod manifest;
 mod node;
 mod python;
@@ -21,6 +22,7 @@ use serde::{Deserialize, Serialize};
 
 pub use cargo::CargoDetector;
 pub use compose::ComposeDetector;
+pub use grouping::merge_suggestions;
 pub use node::NodeDetector;
 pub use python::PythonDetector;
 pub use syntax::CommandSyntax;
@@ -55,6 +57,11 @@ pub struct ServiceSuggestion {
     pub found_in: String,
     /// What in that file it comes from, e.g. `"dev": vite`.
     pub detail: String,
+    /// The Compose services it runs, when it runs some of a Compose file
+    /// (`docker compose up …`); empty otherwise. The review step uses it to
+    /// offer one Service per Compose service instead of the whole file.
+    #[serde(default)]
+    pub compose_services: Vec<String>,
 }
 
 impl ServiceSuggestion {
@@ -77,6 +84,7 @@ impl ServiceSuggestion {
             is_recommended,
             found_in,
             detail: detail.into(),
+            compose_services: Vec::new(),
         }
     }
 }
@@ -92,6 +100,7 @@ impl From<ServiceSuggestion> for NewService {
             url: None,
             port_can_change: suggestion.port_can_change,
             is_excluded_from_start_all: false,
+            dependency_keys: Vec::new(),
         }
     }
 }
@@ -173,18 +182,15 @@ impl ProjectScanner {
     }
 
     /// Suggestions for an existing Project's folder, leaving out those its
-    /// Services already cover (same working directory and command line) and
-    /// avoiding the Keys they use.
+    /// Services already cover (see `grouping::is_covered_by`: the same
+    /// command line, or a `docker compose up` running those Compose
+    /// services) and avoiding the Keys they use. The Services themselves are
+    /// never changed: only what is new is offered.
     pub fn scan_project(&self, project: &Project) -> Vec<ServiceSuggestion> {
         let new: Vec<ServiceSuggestion> = self
             .suggestions_for_folder(&project.path)
             .into_iter()
-            .filter(|suggestion| {
-                !project.services.iter().any(|service| {
-                    service.working_directory == suggestion.working_directory
-                        && service.command_line == suggestion.command_line
-                })
-            })
+            .filter(|suggestion| !project.services.iter().any(|service| grouping::is_covered_by(suggestion, service)))
             .collect();
         let taken = project.services.iter().map(|service| service.key.to_string()).collect();
         making_keys_unique(new, taken)

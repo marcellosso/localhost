@@ -178,6 +178,12 @@ pub async fn scan_project(project: Project) -> Vec<ServiceSuggestion> {
     blocking(move || ProjectScanner::default().scan_project(&project)).await
 }
 
+/// Several reviewed Suggestions as one, `None` for none.
+#[uniffi::export]
+pub fn merge_service_suggestions(suggestions: Vec<ServiceSuggestion>) -> Option<ServiceSuggestion> {
+    crate::merge_suggestions(&suggestions)
+}
+
 // MARK: Machines
 
 /// "Connected · localhost 0.5.0", "Connecting…", or why `machine` isn't.
