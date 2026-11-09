@@ -13,8 +13,8 @@ export type Alert =
   | { kind: "unreadableFiles"; files: string[] }
   /** At launch: Services of an earlier session still running. */
   | { kind: "orphans"; orphans: string[] }
-  /** Settings; `forEditor` when Open in Editor needs one picked first, then retried. */
-  | { kind: "settings"; forEditor?: () => void }
+  /** Settings, on `section` if given; `forEditor` when Open in Editor needs one picked first, then retried. */
+  | { kind: "settings"; section?: SettingsSection; forEditor?: () => void }
   /** Every shortcut, grouped (Ctrl+/). */
   | { kind: "keyboardShortcuts" }
   /** Removing a Project or Service, which stops it first. */
@@ -24,6 +24,9 @@ export type Alert =
   | { kind: "importFailure"; fileName: string; message: string }
   /** Check for Updates found nothing newer than `version`. */
   | { kind: "upToDate"; version: string };
+
+/** The sections of Settings, in the rail's order. */
+export type SettingsSection = "general" | "appearance" | "ports" | "machines" | "agents";
 
 /** An editor over the main window, one at a time. */
 export type Sheet =

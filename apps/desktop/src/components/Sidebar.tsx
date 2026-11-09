@@ -14,6 +14,7 @@ import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph } from "./StateGlyph";
+import { TelemetryNotice } from "./TelemetryNotice";
 import { UpdateNotice } from "./UpdateNotice";
 import styles from "./Sidebar.module.css";
 
@@ -148,6 +149,7 @@ export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
           ];
         })}
       </ul>
+      <TelemetryNotice />
       <UpdateNotice update={update} />
       <footer className={styles.footer}>
         <div className={styles.footerButtons}>

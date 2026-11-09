@@ -235,7 +235,7 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
       return alert.forEditor ? (
         <ChooseEditorDialog onChosen={alert.forEditor} onClose={close} />
       ) : (
-        <SettingsDialog onClose={close} />
+        <SettingsDialog initialSection={alert.section} onClose={close} />
       );
 
     case "keyboardShortcuts":

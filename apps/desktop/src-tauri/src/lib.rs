@@ -21,6 +21,7 @@ mod perf;
 mod services;
 mod settings;
 mod targets;
+mod telemetry;
 mod tray;
 mod updates;
 mod wsl;
@@ -33,7 +34,7 @@ use std::sync::{Arc, Mutex};
 use localhost_core::machine::Machines;
 use localhost_core::{
     Launcher, LocalhostError, Origin, ProjectLibrary, SecretStore, ServiceManagerOptions, SystemSecretStore, Targets,
-    default_storage_root,
+    Telemetry, default_storage_root,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
@@ -79,6 +80,8 @@ pub struct AppState {
     launch: Mutex<launch::Launch>,
     settings: settings::SettingsStore,
     updates: updates::Updates,
+    /// Anonymous usage data: the user's choice, the first-open notice, the open events.
+    telemetry: Arc<Telemetry>,
     perf: Option<perf::PerfSettings>,
 }
 
@@ -162,6 +165,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             updates::put_off_update,
             updates::download_update,
             updates::install_update,
+            telemetry::telemetry_enabled,
+            telemetry::set_telemetry_enabled,
+            telemetry::telemetry_notice_pending,
+            telemetry::acknowledge_telemetry_notice,
             agents::take_connect_agents_offer,
             agents::agent_statuses,
             agents::connect_agent,
@@ -222,6 +229,11 @@ pub fn run() {
                 let _runtime = tauri::async_runtime::handle().inner().enter();
                 machines::connect_all(machines);
             }
+            let telemetry = Arc::new(Telemetry::open(&storage_root()));
+            if !is_measuring {
+                // Returns at once: the event goes out on a thread of its own, or not at all.
+                telemetry.record_app_open();
+            }
             app.manage(AppState {
                 core,
                 machines,
@@ -231,6 +243,7 @@ pub fn run() {
                 launch: launch::Launch::new(orphans),
                 settings,
                 updates: updates::Updates::default(),
+                telemetry,
                 perf,
             });
             if let Some(window) = app.get_webview_window(lifecycle::MAIN_WINDOW) {
