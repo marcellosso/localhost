@@ -18,7 +18,7 @@ use crate::{
     AgentClient, AgentSetup, AgentStatus, CommandLineStatus, EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash,
     Link, Listener, LocalhostError, LogStore, Machine, NewService, Origin, Orphan, OutputLine, ProfileChanges, Project,
     ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service, ServiceChanges, ServiceManager,
-    ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore, Targets,
+    ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore, Targets, Telemetry,
     UnreadableProjectFile, VariableInput, VariableLayer,
 };
 
@@ -843,5 +843,42 @@ impl AgentSetup {
     #[uniffi::method]
     pub async fn ffi_remove_command_from_path(self: Arc<Self>) -> Result<CommandLineStatus, LocalhostError> {
         blocking(move || self.remove_command_from_path()).await
+    }
+}
+
+// MARK: Telemetry
+
+#[uniffi::export]
+impl Telemetry {
+    /// The app's anonymous usage telemetry, its state kept in `storage_root`.
+    #[uniffi::constructor]
+    pub fn ffi_open(storage_root: String) -> Arc<Telemetry> {
+        Arc::new(Telemetry::open(Path::new(&storage_root)))
+    }
+
+    #[uniffi::method]
+    pub fn ffi_is_enabled(&self) -> bool {
+        self.is_enabled()
+    }
+
+    #[uniffi::method]
+    pub fn ffi_set_enabled(&self, enabled: bool) -> Result<(), LocalhostError> {
+        self.set_enabled(enabled)
+    }
+
+    #[uniffi::method]
+    pub fn ffi_is_notice_pending(&self) -> bool {
+        self.is_notice_pending()
+    }
+
+    #[uniffi::method]
+    pub fn ffi_acknowledge_notice(&self) {
+        self.acknowledge_notice()
+    }
+
+    /// Returns at once; the event is sent on a thread of its own.
+    #[uniffi::method]
+    pub fn ffi_record_app_open(self: Arc<Self>) {
+        self.record_app_open()
     }
 }
