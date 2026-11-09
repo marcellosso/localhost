@@ -82,10 +82,14 @@ export type SuggestionDraft = {
   commandLine: string;
   port: string;
   portCanChange: boolean;
+  /** The drafts it starts after; only the checked ones are saved. */
+  startsAfter: number[];
+  /** The drafts merged into this one, to split it again. */
+  mergedFrom: SuggestionDraft[];
 };
 
-export function suggestionDrafts(suggestions: ServiceSuggestion[]): SuggestionDraft[] {
-  return suggestions.map((suggestion) => ({
+function suggestionDraft(suggestion: ServiceSuggestion): SuggestionDraft {
+  return {
     id: draftId(),
     suggestion,
     isChecked: suggestion.isRecommended,
@@ -96,21 +100,133 @@ export function suggestionDrafts(suggestions: ServiceSuggestion[]): SuggestionDr
     commandLine: suggestion.commandLine,
     port: suggestion.port === null ? "" : String(suggestion.port),
     portCanChange: suggestion.portCanChange,
+    startsAfter: [],
+    mergedFrom: [],
+  };
+}
+
+export function suggestionDrafts(suggestions: ServiceSuggestion[]): SuggestionDraft[] {
+  return suggestions.map(suggestionDraft);
+}
+
+/** The checked drafts, to add, each starting after the checked drafts it picked. */
+export function suggestionEdits(drafts: SuggestionDraft[]): SuggestionEdit[] {
+  const checked = drafts.filter((draft) => draft.isChecked);
+  const keys = new Map(checked.map((draft) => [draft.id, draft.key]));
+  return checked.map(({ name, key, workingDirectory, commandLine, port, portCanChange, startsAfter }) => ({
+    name,
+    key,
+    workingDirectory,
+    commandLine,
+    port,
+    portCanChange,
+    dependencyKeys: startsAfter.flatMap((id) => keys.get(id) ?? []),
   }));
 }
 
-/** The checked drafts, to add. */
-export function suggestionEdits(drafts: SuggestionDraft[]): SuggestionEdit[] {
-  return drafts
-    .filter((draft) => draft.isChecked)
-    .map(({ name, key, workingDirectory, commandLine, port, portCanChange }) => ({
-      name,
-      key,
-      workingDirectory,
-      commandLine,
-      port,
-      portCanChange,
-    }));
+/** A draft as the Suggestion it now is, with the user's edits, to merge it. */
+export function editedSuggestion(draft: SuggestionDraft): ServiceSuggestion {
+  const port = /^\d+$/.test(draft.port.trim()) ? Number(draft.port.trim()) : null;
+  return {
+    ...draft.suggestion,
+    name: draft.name,
+    key: draft.key,
+    workingDirectory: draft.workingDirectory,
+    commandLine: draft.commandLine,
+    port,
+    portCanChange: draft.portCanChange,
+  };
+}
+
+/**
+ * Replaces the drafts `ids` with one, checked, for `merged` (the core's merge
+ * of them), where the first of them was. Drafts that started after any of
+ * them start after the merged one.
+ */
+export function mergingDrafts(drafts: SuggestionDraft[], ids: number[], merged: ServiceSuggestion): SuggestionDraft[] {
+  const parts = drafts.filter((draft) => ids.includes(draft.id));
+  if (parts.length === 0) return drafts;
+  const draft: SuggestionDraft = {
+    ...suggestionDraft({ ...merged, isRecommended: true }),
+    isChecked: true,
+    startsAfter: unique(parts.flatMap((part) => part.startsAfter)).filter((id) => !ids.includes(id)),
+    mergedFrom: parts,
+  };
+  const position = drafts.indexOf(parts[0]);
+  const rest = drafts.map((other) => ({ ...other, startsAfter: replacing(other.startsAfter, ids, [draft.id]) }));
+  return [...rest.slice(0, position), draft, ...rest.slice(position)].filter((other) => !ids.includes(other.id));
+}
+
+/** The drafts running one Compose service each that `draft` (running several) could split into. */
+export function containerDrafts(drafts: SuggestionDraft[], draft: SuggestionDraft): SuggestionDraft[] {
+  const services = draft.suggestion.composeServices ?? [];
+  if (services.length < 2) return [];
+  return drafts.filter((other) => {
+    const own = other.suggestion.composeServices ?? [];
+    return (
+      other.id !== draft.id &&
+      own.length === 1 &&
+      services.includes(own[0]) &&
+      other.suggestion.foundIn === draft.suggestion.foundIn &&
+      other.workingDirectory === draft.workingDirectory
+    );
+  });
+}
+
+/** Whether `draft` can be split again: merged here, or one running a whole Compose file found with its containers. */
+export function canSplit(drafts: SuggestionDraft[], draft: SuggestionDraft): boolean {
+  return draft.mergedFrom.length > 0 || containerDrafts(drafts, draft).length > 0;
+}
+
+/**
+ * Undoes a merge, or checks the one-per-container drafts instead of one
+ * running the whole Compose file (which they start after what it started
+ * after). Drafts that started after it start after all of them.
+ */
+export function splittingDraft(drafts: SuggestionDraft[], id: number): SuggestionDraft[] {
+  const draft = drafts.find((draft) => draft.id === id);
+  if (draft === undefined) return drafts;
+  if (draft.mergedFrom.length > 0) {
+    const parts = draft.mergedFrom.map((part) => ({ ...part, isChecked: true }));
+    const partIds = parts.map((part) => part.id);
+    return drafts.flatMap((other) =>
+      other.id === id ? parts : [{ ...other, startsAfter: replacing(other.startsAfter, [id], partIds) }],
+    );
+  }
+  const partIds = containerDrafts(drafts, draft).map((part) => part.id);
+  if (partIds.length === 0) return drafts;
+  return drafts.map((other) => {
+    if (other.id === id) return { ...other, isChecked: false };
+    const startsAfter = replacing(other.startsAfter, [id], partIds);
+    return partIds.includes(other.id)
+      ? { ...other, isChecked: true, startsAfter: unique([...startsAfter, ...draft.startsAfter]) }
+      : { ...other, startsAfter };
+  });
+}
+
+/** Whether `draft` starts after `other`, directly or through other checked drafts: then `other` can't start after it. */
+export function draftStartsAfter(drafts: SuggestionDraft[], draft: SuggestionDraft, other: SuggestionDraft): boolean {
+  const byId = new Map(drafts.filter((d) => d.isChecked).map((d) => [d.id, d]));
+  const seen = new Set<number>();
+  const visit = (current: SuggestionDraft): boolean =>
+    current.startsAfter.some((id) => {
+      if (id === other.id) return true;
+      const next = byId.get(id);
+      if (next === undefined || seen.has(id)) return false;
+      seen.add(id);
+      return visit(next);
+    });
+  return visit(draft);
+}
+
+function unique(ids: number[]): number[] {
+  return [...new Set(ids)];
+}
+
+/** `ids` with any of `removed` replaced by `added`, once each. */
+function replacing(ids: number[], removed: number[], added: number[]): number[] {
+  if (!ids.some((id) => removed.includes(id))) return ids;
+  return unique(ids.flatMap((id) => (removed.includes(id) ? added : [id])));
 }
 
 /** "./" for the Project's folder, else "./web". */

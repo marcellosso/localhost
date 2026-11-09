@@ -139,6 +139,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             editors::service_relations,
             editors::scan_folder,
             editors::scan_project,
+            editors::merge_suggestions,
             editors::save_environment,
             editors::set_active_profile,
             editors::secret_value,

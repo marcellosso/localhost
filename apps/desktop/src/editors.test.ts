@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ServiceSuggestion } from "./bindings";
-import { directoryLabel, suggestionDrafts, suggestionEdits, variableDrafts, variableEdits } from "./editors";
+import {
+  directoryLabel,
+  draftStartsAfter,
+  mergingDrafts,
+  splittingDraft,
+  suggestionDrafts,
+  suggestionEdits,
+  variableDrafts,
+  variableEdits,
+} from "./editors";
 
 function suggestion(name: string, isRecommended: boolean, port: number | null = null): ServiceSuggestion {
   return {
@@ -49,8 +58,72 @@ describe("editors", () => {
     expect([dev.isChecked, build.isChecked]).toEqual([true, false]);
     expect(dev.port).toBe("5173");
     expect(suggestionEdits([{ ...dev, name: "Web", key: "web" }, build])).toEqual([
-      { name: "Web", key: "web", workingDirectory: ".", commandLine: "pnpm dev", port: "5173", portCanChange: true },
+      {
+        name: "Web",
+        key: "web",
+        workingDirectory: ".",
+        commandLine: "pnpm dev",
+        port: "5173",
+        portCanChange: true,
+        dependencyKeys: [],
+      },
     ]);
+  });
+
+  it("saves Starts after as the Keys of the checked drafts only", () => {
+    const [api, infra, docs] = suggestionDrafts([suggestion("API", true), suggestion("Infra", true), suggestion("Docs", false)]);
+    const edits = suggestionEdits([{ ...api, startsAfter: [infra.id, docs.id] }, { ...infra, key: "containers" }, docs]);
+    expect(edits.map((edit) => [edit.key, edit.dependencyKeys])).toEqual([
+      ["api", ["containers"]],
+      ["containers", []],
+    ]);
+  });
+
+  it("says when a draft already starts after another, through others", () => {
+    const [web, api, infra] = suggestionDrafts([suggestion("Web", true), suggestion("API", true), suggestion("Infra", true)]);
+    const drafts = [
+      { ...web, startsAfter: [api.id] },
+      { ...api, startsAfter: [infra.id] },
+      infra,
+    ];
+    expect(draftStartsAfter(drafts, drafts[0], infra)).toBe(true);
+    expect(draftStartsAfter(drafts, infra, drafts[0])).toBe(false);
+  });
+
+  it("merges drafts into one where the first was, and splits it back", () => {
+    const [api, postgres, temporal] = suggestionDrafts([
+      suggestion("API", true),
+      { ...suggestion("postgres", false), composeServices: ["postgres"] },
+      { ...suggestion("temporal", false), composeServices: ["temporal"] },
+    ]);
+    const before = [{ ...api, startsAfter: [postgres.id, temporal.id] }, postgres, temporal];
+    const merged = { ...suggestion("Infra", true), commandLine: "docker compose up postgres temporal" };
+    const after = mergingDrafts(before, [postgres.id, temporal.id], merged);
+    expect(after.map((draft) => [draft.name, draft.isChecked])).toEqual([
+      ["API", true],
+      ["Infra", true],
+    ]);
+    expect(after[0].startsAfter).toEqual([after[1].id]);
+
+    const split = splittingDraft(after, after[1].id);
+    expect(split.map((draft) => [draft.name, draft.isChecked])).toEqual([
+      ["API", true],
+      ["postgres", true],
+      ["temporal", true],
+    ]);
+    expect(split[0].startsAfter).toEqual([postgres.id, temporal.id]);
+  });
+
+  it("splits a whole Compose file into the drafts for its containers", () => {
+    const [infra, postgres, temporal, api] = suggestionDrafts([
+      { ...suggestion("Infra", true), composeServices: ["postgres", "temporal"], foundIn: "compose.yaml" },
+      { ...suggestion("postgres", false), composeServices: ["postgres"], foundIn: "compose.yaml" },
+      { ...suggestion("temporal", false), composeServices: ["temporal"], foundIn: "compose.yaml" },
+      suggestion("API", true),
+    ]);
+    const split = splittingDraft([infra, postgres, temporal, { ...api, startsAfter: [infra.id] }], infra.id);
+    expect(split.map((draft) => draft.isChecked)).toEqual([false, true, true, true]);
+    expect(split[3].startsAfter).toEqual([postgres.id, temporal.id]);
   });
 
   it("shows working directories as relative paths", () => {

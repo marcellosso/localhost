@@ -72,6 +72,9 @@ pub struct SuggestionEdit {
     /// As typed; empty for none.
     port: String,
     port_can_change: bool,
+    /// The Keys, as typed, of the Services it starts after: others added
+    /// with it, or the Project's.
+    dependency_keys: Vec<String>,
 }
 
 /// The Service editor's fields.
@@ -299,6 +302,7 @@ pub fn add_service(state: tauri::State<'_, AppState>, project_id: Id, service: S
         url: Some(service.url),
         port_can_change: service.port_can_change,
         is_excluded_from_start_all: service.is_excluded_from_start_all,
+        dependency_keys: Vec::new(),
     };
     let library = &state.core()?.library;
     Ok(library.add_service(project_id, new, inputs(service.variables), service.dependencies, ORIGIN)?)
@@ -397,6 +401,13 @@ pub async fn scan_project(state: tauri::State<'_, AppState>, project_id: Id) -> 
     let core = state.core()?;
     let project = core.library.project(project_id)?;
     Ok(core.targets.scan_project(&project).await?)
+}
+
+/// Reviewed Suggestions merged into one, for the review's Merge.
+#[tauri::command]
+#[specta::specta]
+pub fn merge_suggestions(suggestions: Vec<ServiceSuggestion>) -> Option<ServiceSuggestion> {
+    localhost_core::merge_suggestions(&suggestions)
 }
 
 // MARK: Environment
@@ -653,6 +664,7 @@ fn new_services(edits: Vec<SuggestionEdit>) -> Result<Vec<NewService>, CommandEr
                 port: parse_port(&edit.port, Some(&edit.name))?,
                 working_directory: edit.working_directory,
                 port_can_change: edit.port_can_change,
+                dependency_keys: edit.dependency_keys.iter().map(|key| parse_key(key)).collect::<Result<_, _>>()?,
                 ..NewService::new(edit.name, parse_key(&edit.key)?, edit.command_line)
             })
         })
@@ -681,6 +693,7 @@ mod tests {
             command_line: "sleep 30".into(),
             port: port.into(),
             port_can_change: true,
+            dependency_keys: Vec::new(),
         }
     }
 
@@ -721,6 +734,17 @@ mod tests {
         assert_eq!(relations.cycles.len(), 1);
         assert_eq!(relations.cycles[0].service_id, worker);
         assert_eq!(relations.cycles[0].message, "api → worker → api would be a dependency cycle.");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn reviewed_suggestions_start_after_others_added_with_them() {
+        let (core, root) = core();
+        let path = root.to_string_lossy();
+        let api = SuggestionEdit { dependency_keys: vec![" infra ".into()], ..suggestion("API", "api", "") };
+        let services = new_services(vec![api, suggestion("Infra", "infra", "")]).unwrap();
+        let project = core.library.add_project("Shop", Key::new("shop").unwrap(), &path, services, ORIGIN).unwrap();
+        assert_eq!(project.services[0].dependencies, [project.services[1].id]);
         let _ = std::fs::remove_dir_all(root);
     }
 

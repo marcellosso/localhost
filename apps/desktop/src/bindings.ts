@@ -336,6 +336,12 @@ async scanProject(projectId: Id) : Promise<Result<ServiceSuggestion[], CommandEr
 }
 },
 /**
+ * Reviewed Suggestions merged into one, for the review's Merge.
+ */
+async mergeSuggestions(suggestions: ServiceSuggestion[]) : Promise<ServiceSuggestion | null> {
+    return await TAURI_INVOKE("merge_suggestions", { suggestions });
+},
+/**
  * Saves the Environment editor: the Project's variables, its Profiles
  * (added, edited, removed), then which one is active (an index into
  * `profiles`, or none).
@@ -1089,7 +1095,12 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
 /**
  * The Dependency would make a Service depend on itself, e.g. `[api, worker, api]`.
  */
-{ kind: "dependencyCycle"; detail: Key[] } | { kind: "projectNotFound"; detail: Id } | { kind: "serviceNotFound"; detail: Id } | { kind: "profileNotFound"; detail: Id } | { kind: "workingDirectoryMissing"; detail: string } | { kind: "shellNotFound"; detail: string } | { kind: "launchFailed"; detail: { errno: number } } | 
+{ kind: "dependencyCycle"; detail: Key[] } | { kind: "projectNotFound"; detail: Id } | { kind: "serviceNotFound"; detail: Id } | { kind: "profileNotFound"; detail: Id } | 
+/**
+ * A Service being added starts after a Key that is neither in its
+ * Project nor added with it.
+ */
+{ kind: "dependencyNotFound"; detail: Key } | { kind: "workingDirectoryMissing"; detail: string } | { kind: "shellNotFound"; detail: string } | { kind: "launchFailed"; detail: { errno: number } } | 
 /**
  * The shell exited with 127: the command was not found.
  */
@@ -1665,7 +1676,13 @@ foundIn: string;
 /**
  * What in that file it comes from, e.g. `"dev": vite`.
  */
-detail: string }
+detail: string; 
+/**
+ * The Compose services it runs, when it runs some of a Compose file
+ * (`docker compose up …`); empty otherwise. The review step uses it to
+ * offer one Service per Compose service instead of the whole file.
+ */
+composeServices?: string[] }
 export type Settings = { 
 /**
  * The command that opens a folder in the user's editor, e.g. `code`.
@@ -1719,7 +1736,12 @@ export type SuggestionEdit = { name: string; key: string; workingDirectory: stri
 /**
  * As typed; empty for none.
  */
-port: string; portCanChange: boolean }
+port: string; portCanChange: boolean; 
+/**
+ * The Keys, as typed, of the Services it starts after: others added
+ * with it, or the Project's.
+ */
+dependencyKeys: string[] }
 /**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.

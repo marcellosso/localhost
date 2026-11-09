@@ -95,7 +95,7 @@ describe("Sheets", () => {
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add Project" })));
     expect(commands.addProject).toHaveBeenCalledWith("My Other SaaS", "saas", folder, [
-      { name: "Dev", key: "dev", workingDirectory: ".", commandLine: "pnpm dev", port: "", portCanChange: true },
+      { name: "Dev", key: "dev", workingDirectory: ".", commandLine: "pnpm dev", port: "", portCanChange: true, dependencyKeys: [] },
     ]);
     expect(currentUi().sheet).toBeNull();
     expect(selected.project).toHaveBeenCalledWith("new");
