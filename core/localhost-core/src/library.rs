@@ -441,11 +441,14 @@ impl ProjectLibrary {
         let mut project =
             state.projects.get(&project_id).cloned().ok_or(LocalhostError::ProjectNotFound(project_id))?;
         ensure_service_key_is_free(&project, &service.key)?;
+        let dependency_keys = service.dependency_keys.clone();
         let mut service = make_service(service)?;
         let (variables, _) = self.apply(&variables, VariableLayer::Service(service.id), &Variables::default())?;
         service.set_variables(variables);
         let service_id = service.id;
         project.services.push(service);
+        let mut dependencies = dependencies;
+        dependencies.extend(dependency_ids(&dependency_keys, &project)?);
         set_dependencies(&dependencies, service_id, &mut project)?;
         self.commit(&mut state, &project)?;
         broadcast(&mut state, ProjectLibraryEvent::ProjectUpdated { project: project.clone(), origin });
@@ -762,12 +765,37 @@ fn make_service(new: NewService) -> Result<Service, LocalhostError> {
     })
 }
 
+/// Adds `services`, then their Dependencies, so a Service may start after
+/// another added with it, whatever their order.
 fn append(services: Vec<NewService>, project: &mut Project) -> Result<(), LocalhostError> {
+    let mut dependencies: Vec<(Id, Vec<Key>)> = Vec::new();
     for new in services {
         ensure_service_key_is_free(project, &new.key)?;
-        project.services.push(make_service(new)?);
+        let keys = new.dependency_keys.clone();
+        let service = make_service(new)?;
+        if !keys.is_empty() {
+            dependencies.push((service.id, keys));
+        }
+        project.services.push(service);
+    }
+    for (service_id, keys) in dependencies {
+        let ids = dependency_ids(&keys, project)?;
+        set_dependencies(&ids, service_id, project)?;
     }
     Ok(())
+}
+
+fn dependency_ids(keys: &[Key], project: &Project) -> Result<Vec<Id>, LocalhostError> {
+    keys.iter()
+        .map(|key| {
+            project
+                .services
+                .iter()
+                .find(|service| &service.key == key)
+                .map(|service| service.id)
+                .ok_or_else(|| LocalhostError::DependencyNotFound(key.clone()))
+        })
+        .collect()
 }
 
 /// Replaces the Dependencies of `service_id`, rejecting Services of other

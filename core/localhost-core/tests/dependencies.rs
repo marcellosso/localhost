@@ -44,6 +44,68 @@ impl Setup {
     }
 }
 
+// MARK: Adding
+
+fn starting_after(raw: &str, dependencies: &[&str]) -> NewService {
+    NewService {
+        dependency_keys: dependencies.iter().map(|raw| key(raw)).collect(),
+        ..NewService::new(raw, key(raw), "true")
+    }
+}
+
+#[test]
+fn services_added_together_can_start_after_each_other_whatever_their_order() {
+    let setup = Setup::new();
+    let database = setup.service("database", &[]);
+    let added = setup
+        .library
+        .add_services(
+            vec![starting_after("api", &["infra", "database"]), starting_after("infra", &[])],
+            setup.project.id,
+            Origin::MainWindow,
+        )
+        .unwrap();
+    assert_eq!(added[0].dependencies, [added[1].id, database.id]);
+
+    let project = setup
+        .library
+        .add_project(
+            "Shop",
+            key("shop"),
+            &some_project_path("shop"),
+            vec![starting_after("web", &["api"]), starting_after("api", &[])],
+            Origin::MainWindow,
+        )
+        .unwrap();
+    assert_eq!(project.services[0].dependencies, [project.services[1].id]);
+    let reloaded = setup.fixture.library().project(project.id).unwrap();
+    assert_eq!(reloaded.services[0].dependencies, [project.services[1].id]);
+}
+
+#[test]
+fn adding_rejects_unknown_dependency_keys_and_cycles_and_saves_nothing() {
+    let setup = Setup::new();
+    let unknown =
+        setup.library.add_services(vec![starting_after("api", &["infra"])], setup.project.id, Origin::MainWindow);
+    assert_eq!(unknown, Err(LocalhostError::DependencyNotFound(key("infra"))));
+    let cycle = setup.library.add_services(
+        vec![starting_after("api", &["worker"]), starting_after("worker", &["api"])],
+        setup.project.id,
+        Origin::MainWindow,
+    );
+    assert!(matches!(cycle, Err(LocalhostError::DependencyCycle(_))));
+    assert!(setup.current().services.is_empty());
+
+    let single = setup.library.add_service(
+        setup.project.id,
+        starting_after("web", &["nope"]),
+        vec![],
+        vec![],
+        Origin::MainWindow,
+    );
+    assert_eq!(single, Err(LocalhostError::DependencyNotFound(key("nope"))));
+}
+
 // MARK: Editing
 
 #[test]

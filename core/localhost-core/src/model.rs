@@ -213,7 +213,7 @@ impl Service {
 }
 
 /// A Service to add together with others in one save, e.g. a reviewed
-/// Suggestion. It has no variables or Dependencies yet.
+/// Suggestion. It has no variables yet.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct NewService {
@@ -226,6 +226,10 @@ pub struct NewService {
     pub url: Option<String>,
     pub port_can_change: bool,
     pub is_excluded_from_start_all: bool,
+    /// The Keys of the Services it starts after: others added in the same
+    /// save, or ones the Project already has. Keys, since Services added
+    /// together have no ids yet; they are saved as ids like any Dependency.
+    pub dependency_keys: Vec<Key>,
 }
 
 impl NewService {
@@ -240,6 +244,7 @@ impl NewService {
             url: None,
             port_can_change: true,
             is_excluded_from_start_all: false,
+            dependency_keys: Vec::new(),
         }
     }
 }

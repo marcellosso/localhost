@@ -250,6 +250,7 @@ impl Tools {
             url: url(arguments)?.flatten(),
             port_can_change: optional_bool(arguments, "port_can_change")?.unwrap_or(true),
             is_excluded_from_start_all: !optional_bool(arguments, "in_start_all")?.unwrap_or(true),
+            dependency_keys: Vec::new(),
         };
         let variables = variables(arguments, &Variables::default())?.unwrap_or_default();
         let dependencies = dependencies(&project, arguments)?.unwrap_or_default();

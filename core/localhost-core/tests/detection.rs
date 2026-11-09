@@ -5,7 +5,7 @@
 mod common;
 
 use common::{Fixture, key};
-use localhost_core::{CommandSyntax, NewService, Origin, ProjectScanner, ServiceSuggestion};
+use localhost_core::{CommandSyntax, NewService, Origin, ProjectScanner, ServiceSuggestion, merge_suggestions};
 
 /// Writes `files` (relative path → contents) into a fresh Project folder and scans it.
 fn scan(files: &[(&str, &str)]) -> (tempfile::TempDir, Vec<ServiceSuggestion>) {
@@ -94,6 +94,50 @@ fn rescanning_a_project_hides_what_its_services_cover_and_avoids_their_keys() {
     let found = ProjectScanner::default().with_syntax(CommandSyntax::Posix).scan_project(&project);
     assert_eq!(field(&found, |s| s.command_line.clone()), ["npm run dev -- --port $PORT", "npm run build"]);
     assert_eq!(field(&found, |s| s.key.to_string()), ["web-2", "web-build"]);
+}
+
+const BACKEND_COMPOSE: &str = "services:\n  postgres:\n    image: postgres\n  temporal:\n    image: temporal\n  elasticmq:\n    image: elasticmq\n";
+
+fn rescan(services: Vec<NewService>) -> (Vec<ServiceSuggestion>, localhost_core::Project, localhost_core::Project) {
+    let (root, _) = scan(&[("compose.yaml", BACKEND_COMPOSE)]);
+    let fixture = Fixture::new();
+    let library = fixture.library();
+    let project = library
+        .add_project("Backend", key("backend"), root.path().to_str().unwrap(), services, Origin::MainWindow)
+        .unwrap();
+    let found = ProjectScanner::default().with_syntax(CommandSyntax::Posix).scan_project(&project);
+    let after = library.project(project.id).unwrap();
+    (found, project, after)
+}
+
+#[test]
+fn a_service_running_the_whole_compose_file_covers_every_compose_suggestion() {
+    let mut infra = NewService::new("Containers", key("containers"), "docker compose up");
+    infra.port = Some(5432);
+    let (found, before, after) = rescan(vec![infra]);
+    assert!(found.is_empty(), "{found:?}");
+    assert_eq!(before, after, "scanning never changes the Project");
+}
+
+#[test]
+fn a_service_running_some_compose_services_covers_them_and_the_whole_file() {
+    let (found, ..) = rescan(vec![NewService::new("DB", key("db"), "docker compose up postgres temporal")]);
+    assert_eq!(field(&found, |s| s.command_line.clone()), ["docker compose up elasticmq"]);
+    assert!(!found[0].is_recommended);
+
+    let (found, ..) = rescan(vec![NewService::new("Web", key("web"), "docker compose up postgres && echo")]);
+    assert_eq!(found[0].command_line, "docker compose up", "a command line it can't read covers nothing");
+    assert!(found[0].is_recommended);
+    assert_eq!(found.len(), 4);
+}
+
+#[test]
+fn a_compose_service_elsewhere_in_the_project_covers_nothing_here() {
+    let mut elsewhere = NewService::new("Infra", key("infra"), "docker compose up");
+    elsewhere.working_directory = "infra".into();
+    let (found, ..) = rescan(vec![elsewhere]);
+    assert_eq!(found.len(), 4);
+    assert_eq!(found[0].key.as_str(), "infra-2");
 }
 
 // MARK: Node
@@ -309,12 +353,88 @@ volumes:
   data: {}"#,
     )]);
 
-    assert_eq!(field(&found, |s| s.key.to_string()), ["postgres", "redis", "mail", "api", "worker"]);
-    assert_eq!(field(&found, |s| s.port), [Some(5432), Some(6379), Some(8025), Some(8000), None]);
-    assert_eq!(found[0].command_line, "docker compose up postgres");
-    assert_eq!(found[0].working_directory, ".");
-    assert_eq!(found[0].detail, "Compose service · postgres:16");
-    assert!(found.iter().all(|s| s.is_recommended && !s.port_can_change && s.found_in == "compose.yaml"));
+    let each = &found[1..];
+    assert_eq!(field(each, |s| s.key.to_string()), ["postgres", "redis", "mail", "api", "worker"]);
+    assert_eq!(field(each, |s| s.port), [Some(5432), Some(6379), Some(8025), Some(8000), None]);
+    assert_eq!(each[0].command_line, "docker compose up postgres");
+    assert_eq!(each[0].working_directory, ".");
+    assert_eq!(each[0].detail, "Compose service · postgres:16");
+    assert_eq!(each[0].compose_services, ["postgres"]);
+    assert!(found.iter().all(|s| !s.port_can_change && s.found_in == "compose.yaml"));
+}
+
+#[test]
+fn a_compose_file_with_several_services_is_suggested_as_one_infra_service() {
+    let found = suggestions(&[
+        (
+            "compose.yaml",
+            "services:\n  postgres:\n    image: postgres\n    ports: [\"5432:5432\"]\n  temporal:\n    image: temporalio/auto-setup\n  elasticmq:\n    image: softwaremill/elasticmq\n",
+        ),
+        ("backend/compose.yaml", "services:\n  a:\n    image: a\n  b:\n    image: b\n"),
+    ]);
+
+    let checked: Vec<&ServiceSuggestion> = found.iter().filter(|s| s.is_recommended).collect();
+    assert_eq!(field(&found, |s| s.key.to_string())[..4], ["infra", "postgres", "temporal", "elasticmq"]);
+    let infra = checked[0];
+    assert_eq!((infra.name.as_str(), infra.command_line.as_str()), ("Infra", "docker compose up"));
+    assert_eq!(infra.compose_services, ["postgres", "temporal", "elasticmq"]);
+    assert_eq!(infra.detail, "Compose file · 3 services");
+    // Only postgres publishes a port, so Infra is up once postgres is.
+    assert_eq!((infra.port, infra.port_can_change), (Some(5432), false));
+
+    let backend = checked[1];
+    assert_eq!((backend.name.as_str(), backend.key.as_str()), ("Infra (backend)", "infra-backend"));
+    assert_eq!((backend.working_directory.as_str(), backend.port), ("backend", None));
+    assert_eq!(checked.len(), 2, "one Service per Compose service is folded away");
+}
+
+fn suggestion(name: &str, command_line: &str, port: Option<u16>) -> ServiceSuggestion {
+    let mut found = suggestions(&[("package.json", &scripts(&[("dev", "vite")]))]).remove(0);
+    found.name = name.into();
+    found.command_line = command_line.into();
+    found.port = port;
+    found.port_can_change = true;
+    found.found_in = "compose.yaml".into();
+    found
+}
+
+#[test]
+fn merging_compose_suggestions_runs_their_compose_services_together() {
+    let postgres = suggestion("postgres", "docker compose up postgres", Some(5432));
+    let temporal = suggestion("temporal", "docker compose up temporal", Some(7233));
+    let ui = suggestion("temporal-ui", "docker compose up temporal-ui", None);
+
+    let merged = merge_suggestions(&[postgres.clone(), temporal.clone(), ui.clone(), postgres.clone()]).unwrap();
+    assert_eq!((merged.name.as_str(), merged.key.as_str()), ("Infra", "infra"));
+    assert_eq!(merged.command_line, "docker compose up postgres temporal temporal-ui");
+    assert_eq!(merged.compose_services, ["postgres", "temporal", "temporal-ui"]);
+    assert_eq!(merged.found_in, "compose.yaml");
+    assert!(merged.is_recommended);
+    // Two of them have a Port: no single one says when all are up.
+    assert_eq!(merged.port, None);
+
+    let one_port = merge_suggestions(&[ui.clone(), postgres.clone()]).unwrap();
+    assert_eq!(one_port.port, Some(5432));
+
+    let mut whole = suggestion("Infra", "docker compose up", None);
+    whole.compose_services = vec!["postgres".into(), "temporal".into()];
+    assert_eq!(merge_suggestions(&[whole, ui]).unwrap().command_line, "docker compose up");
+    assert_eq!(merge_suggestions(&[]), None);
+    assert_eq!(merge_suggestions(std::slice::from_ref(&postgres)), Some(postgres));
+}
+
+#[test]
+fn merging_other_suggestions_keeps_the_first_command_line_to_edit() {
+    let api = suggestion("api", "uv run uvicorn app.main:app --port $PORT", Some(8000));
+    let worker = suggestion("worker", "uv run worker", None);
+    let mut elsewhere = suggestion("db", "docker compose up db", None);
+    elsewhere.working_directory = "infra".into();
+
+    let merged = merge_suggestions(&[api.clone(), worker, elsewhere]).unwrap();
+    assert_eq!((merged.name.as_str(), merged.command_line.as_str()), ("api", api.command_line.as_str()));
+    assert_eq!(merged.detail, "Merged · api, worker, db");
+    assert_eq!((merged.port, merged.port_can_change), (Some(8000), true));
+    assert!(merged.compose_services.is_empty());
 }
 
 #[test]
