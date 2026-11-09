@@ -13,6 +13,8 @@ serde_json = "1.0.154"
 serde_path_to_error = "0.1.20"
 tokio = { version = "1.53.2", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "net", "io-util", "process", "signal"] }
 unicode-normalization = "0.1.25"
+# The apps' anonymous telemetry only, behind the `telemetry` feature.
+ureq = { version = "3.5.1", default-features = false, features = ["rustls"], optional = true }
 url = "2.5.8"
 uuid = { version = "1.28.0", features = ["v4", "serde"] }
 uniffi = { version = "0.32.2", optional = true }
@@ -24,6 +26,9 @@ specta = { version = "=2.0.0-rc.22", features = ["derive", "uuid"], optional = t
 ffi = ["dep:uniffi"]
 # TypeScript types for the Tauri app, through tauri-specta.
 specta = ["dep:specta"]
+# Lets `Telemetry` send. Only the apps turn it on: the `localhost` command
+# and `localhostd` never link an HTTP client, so they can't send anything.
+telemetry = ["dep:ureq"]
 
 [dev-dependencies]
 tempfile = "3.27.0"

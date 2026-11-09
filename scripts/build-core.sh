@@ -44,6 +44,8 @@ sources_hash() {
         shasum scripts/build-core.sh
         # The version the bundled command reports (scripts/build-release.sh).
         echo "${LOCALHOST_VERSION:-}"
+        # The app's PostHog project, built into release builds' telemetry.
+        echo "${LOCALHOST_POSTHOG_KEY:-} ${LOCALHOST_POSTHOG_HOST:-}"
     ) | shasum | cut -d' ' -f1
 }
 

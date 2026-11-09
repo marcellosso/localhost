@@ -106,6 +106,18 @@
   color: var(--text-secondary);
 }
 
+.inlineLink {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
 .caption {
   margin: 0 0 9px;
   font-size: 11px;

@@ -13,6 +13,7 @@ const entries: { path: string; files: string[] }[] = [
   { path: '/guides', files: ['src/pages/guides/index.astro', 'src/lib/guides.ts'] },
   ...guides.map((guide) => ({ path: `/guides/${guide.slug}`, files: [`src/content/guides/${guide.slug}.md`] })),
   { path: '/changelog', files: ['src/pages/changelog.astro', 'src/content/changelog'] },
+  { path: '/privacy', files: ['src/pages/privacy.astro'] },
   ...pages.map((page) => ({
     path: page.slug ? `/docs/${page.slug}` : '/docs',
     files: [page.collection === 'reference' ? `../docs/${page.id}.md` : `src/content/docs/${page.id}.md`],

@@ -171,6 +171,33 @@ final class AppModel {
     let updates = UpdateController()
     /// Coding agents connected to `localhost mcp`, and `localhost` in terminals.
     let agents = AgentsModel(storageRoot: AppModel.storageRoot)
+    /// Anonymous usage data: what is sent is decided, and the choice kept, by the core.
+    @ObservationIgnored let telemetry = Telemetry(storageRoot: AppModel.storageRoot)
+    /// Whether the sidebar says, once, what is sent and how to turn it off.
+    private(set) var isTelemetryNoticePending = false
+
+    /// What the app sends when it opens, worded once for the notice and Settings.
+    static let telemetrySummary = "When localhost opens it sends a random id, its version, your OS and architecture, and how it was installed. Never your projects, commands, paths or logs."
+
+    /// Settings › General's "Share anonymous usage data".
+    var isTelemetryEnabled: Bool {
+        get {
+            access(keyPath: \.isTelemetryEnabled)
+            return telemetry.isEnabled
+        }
+        set {
+            var failure: LocalhostError?
+            withMutation(keyPath: \.isTelemetryEnabled) {
+                do throws(LocalhostError) {
+                    try telemetry.setEnabled(newValue)
+                } catch {
+                    failure = error
+                }
+            }
+            actionError = failure
+            isTelemetryNoticePending = false
+        }
+    }
 
     /// Whether a Service may move to a free port when its Port is taken.
     var isAutomaticPortMoveEnabled: Bool {
@@ -227,6 +254,9 @@ final class AppModel {
         announceMachineStates()
         connectToSharedCore()
         updates.model = self
+        isTelemetryNoticePending = telemetry.isNoticePending
+        // Returns at once: the event goes out on a thread of its own, or not at all.
+        telemetry.recordAppOpen()
     }
 
     // MARK: Reading
@@ -729,6 +759,12 @@ final class AppModel {
         }
         await checkForOrphans()
         offerConnectAgentsOnce()
+    }
+
+    /// The telemetry notice was read: it never shows again.
+    func acknowledgeTelemetryNotice() {
+        isTelemetryNoticePending = false
+        telemetry.acknowledgeNotice()
     }
 
     static let hasOfferedAgentsKey = "hasOfferedConnectAgents"

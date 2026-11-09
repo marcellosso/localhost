@@ -40,6 +40,7 @@ mod secrets;
 mod service_manager;
 mod storage;
 mod targets;
+mod telemetry;
 mod validate;
 mod yaml;
 
@@ -82,6 +83,7 @@ pub use service_manager::{
 };
 pub use storage::UnreadableProjectFile;
 pub use targets::{Connecting, FoundOrphans, Launcher, Link, Targets};
+pub use telemetry::{InstallChannel, PRIVACY_URL, Telemetry, TelemetryEvent};
 pub use validate::existing_project_folder;
 
 /// How serde writes a `SystemTime`, for the TypeScript types: specta's own

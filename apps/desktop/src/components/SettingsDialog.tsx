@@ -1,6 +1,8 @@
-import { type ReactNode, useId, useRef, useState } from "react";
-import type { Appearance } from "../bindings";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type Appearance, commands } from "../bindings";
 import { saveSettings, useSettings } from "../settings";
+import { PRIVACY_URL, TELEMETRY_SUMMARY } from "../telemetry";
+import { type SettingsSection, showAlert } from "../ui";
 import { checkForUpdates } from "../updates";
 import { CONNECT_AGENTS_SUBTITLE, CONNECT_AGENTS_TITLE, ConnectAgents } from "./ConnectAgents";
 import { Dialog, useModal } from "./Dialog";
@@ -8,9 +10,7 @@ import { CircleHalfIcon, DesktopIcon, GearIcon, GlobeIcon, LinkIcon } from "./Ic
 import { MachinesSettings } from "./MachinesSettings";
 import styles from "./SettingsDialog.module.css";
 
-type Section = "general" | "appearance" | "ports" | "machines" | "agents";
-
-const sections: { id: Section; title: string; icon: ReactNode }[] = [
+const sections: { id: SettingsSection; title: string; icon: ReactNode }[] = [
   { id: "general", title: "General", icon: <GearIcon size={13} /> },
   { id: "appearance", title: "Appearance", icon: <CircleHalfIcon size={13} /> },
   { id: "ports", title: "Ports", icon: <GlobeIcon size={13} /> },
@@ -25,8 +25,14 @@ const LOG_FONT_SIZES = [10, 11, 12, 13, 14, 16];
  * Settings: a rail of sections and the selected one beside it. Changes
  * apply at once.
  */
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const [section, setSection] = useState<Section>("appearance");
+export function SettingsDialog({
+  initialSection = "appearance",
+  onClose,
+}: {
+  initialSection?: SettingsSection;
+  onClose: () => void;
+}) {
+  const [section, setSection] = useState<SettingsSection>(initialSection);
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   // Starts on the current section; Tab stays inside, Escape closes.
@@ -89,7 +95,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle: string })
 }
 
 /** A setting: its name and a line of explanation, the control on the right. */
-function SettingsRow({ title, detail, children }: { title: string; detail?: string; children: ReactNode }) {
+function SettingsRow({ title, detail, children }: { title: string; detail?: ReactNode; children: ReactNode }) {
   return (
     <div className={styles.row}>
       <div className={styles.rowText}>
@@ -141,7 +147,45 @@ function GeneralSettings() {
           Check Now
         </button>
       </SettingsRow>
+      <UsageDataRow />
     </>
+  );
+}
+
+/** The anonymous usage data the core sends at each open; the choice is kept by the core. */
+function UsageDataRow() {
+  const [isEnabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    let isCurrent = true;
+    void commands.telemetryEnabled().then((enabled) => isCurrent && setEnabled(enabled));
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+  const change = async (enabled: boolean) => {
+    setEnabled(enabled);
+    const result = await commands.setTelemetryEnabled(enabled);
+    if (result.status === "error") {
+      setEnabled(!enabled);
+      showAlert({ kind: "error", message: result.error.message });
+    }
+  };
+  return (
+    <SettingsRow
+      title="Share anonymous usage data"
+      detail={
+        <>
+          {TELEMETRY_SUMMARY}{" "}
+          <button className={styles.inlineLink} onClick={() => void commands.openUrl(PRIVACY_URL)}>
+            Privacy
+          </button>
+        </>
+      }
+    >
+      {isEnabled !== null && (
+        <Switch label="Share anonymous usage data" isOn={isEnabled} onChange={(enabled) => void change(enabled)} />
+      )}
+    </SettingsRow>
   );
 }
 

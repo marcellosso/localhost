@@ -549,6 +549,29 @@ async installUpdate() : Promise<void> {
     await TAURI_INVOKE("install_update");
 },
 /**
+ * Whether the user lets localhost send anonymous usage data (Settings › General).
+ */
+async telemetryEnabled() : Promise<boolean> {
+    return await TAURI_INVOKE("telemetry_enabled");
+},
+async setTelemetryEnabled(enabled: boolean) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_telemetry_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether the sidebar should say, once, what is sent and how to turn it off.
+ */
+async telemetryNoticePending() : Promise<boolean> {
+    return await TAURI_INVOKE("telemetry_notice_pending");
+},
+async acknowledgeTelemetryNotice() : Promise<void> {
+    await TAURI_INVOKE("acknowledge_telemetry_notice");
+},
+/**
  * Whether Connect your agents should open by itself at this launch: once,
  * the first time localhost runs with it.
  */

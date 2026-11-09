@@ -1,0 +1,160 @@
+---
+import Base from '../layouts/Base.astro';
+import { href, name, repository } from '../lib/site';
+
+const description =
+  'What the localhost website and app collect: anonymous page views and download clicks on the site, two anonymous open events from the app, and how to turn them off.';
+const url = (path: string) => new URL(path, Astro.site).toString();
+const structuredData = [
+  {
+    '@type': 'WebPage',
+    name: 'localhost privacy',
+    description,
+    url: url(href('privacy')),
+    isPartOf: { '@type': 'WebSite', name, url: url('/') },
+  },
+];
+---
+
+<Base title="Privacy" {description} type="article" {structuredData}>
+  <div class="container page">
+    <header>
+      <p class="plate-label">Privacy</p>
+      <h1 class="engraved">What localhost collects</h1>
+      <p class="lede">
+        Very little, and nothing about your projects. Both the website and the app send anonymous usage events to
+        <a href="https://posthog.com">PostHog</a>, so we can tell whether people who download localhost keep using it.
+      </p>
+    </header>
+
+    <section>
+      <h2 class="engraved">The app</h2>
+      <div class="body">
+        <p>
+          When the app opens, it sends one event: <code>app_first_open</code> the first time, <code>app_opened</code> after
+          that. Each carries only:
+        </p>
+        <ul>
+          <li>a random id made on your computer the first time, not tied to you, your account or your machine;</li>
+          <li>the app’s version, your operating system (macOS, Windows or Linux) and architecture;</li>
+          <li>how it was installed: Homebrew, DMG, the Windows installer, <code>.deb</code>, <code>.rpm</code>, AppImage or a source build.</li>
+        </ul>
+        <p>
+          Never your projects, services, commands, paths, logs, environment variables, Secrets, host name or user name. No
+          person profiles, no location lookup, no session recording. The <code>localhost</code> command and the MCP server
+          send nothing.
+        </p>
+        <p>The app says this once, the first time it opens. It is on by default; to turn it off, any of these works:</p>
+        <ul>
+          <li>Settings › General › <strong>Share anonymous usage data</strong>;</li>
+          <li>set <code>DO_NOT_TRACK=1</code> in the environment the app starts with;</li>
+          <li>set <code>LOCALHOST_TELEMETRY=0</code> (or <code>false</code>, <code>off</code>).</li>
+        </ul>
+        <p>Development builds, test runs and builds in CI send nothing at all.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="engraved">The website</h2>
+      <div class="body">
+        <p>
+          This site counts page views and a few named clicks, such as Download buttons, copied install commands and links
+          to GitHub. It doesn’t record sessions or any other clicks. PostHog keeps an anonymous id in your browser’s storage
+          to tell one visit from the next, and makes no person profile from it.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="engraved">The rest</h2>
+      <div class="body">
+        <p>
+          The site and the app use separate PostHog projects, and an id from one is never linked to the other. The tokens
+          built into both can only send events, not read them. Nothing is sold or shared with anyone else.
+        </p>
+        <p>
+          localhost is open source: the code that sends these events is
+          <a href={`${repository}/blob/main/core/localhost-core/src/telemetry.rs`}>in the repository</a>, and the full list is
+          in <a href={`${repository}/blob/main/docs/analytics.md`}>docs/analytics.md</a>. Questions go to
+          <a href={`${repository}/issues`}>GitHub Issues</a>.
+        </p>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .page {
+    max-width: 960px;
+    padding-top: 72px;
+    padding-bottom: 96px;
+  }
+  header {
+    margin-bottom: 56px;
+  }
+  h1 {
+    margin-top: 12px;
+    font-size: clamp(48px, 6vw, 80px);
+  }
+  .lede {
+    margin-top: 20px;
+    max-width: 68ch;
+  }
+  .lede a,
+  .body a {
+    color: var(--accent-text);
+    text-underline-offset: 3px;
+  }
+  section {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 40px;
+    padding: 40px 0;
+    border-top: 1px solid var(--separator);
+  }
+  h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: clamp(24px, 2.4vw, 28px);
+    line-height: 1.1;
+  }
+  .body {
+    min-width: 0;
+    max-width: 68ch;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .body p {
+    margin: 0 0 16px;
+  }
+  .body ul {
+    margin: 0 0 16px;
+    padding-left: 20px;
+  }
+  .body li {
+    margin-bottom: 8px;
+  }
+  .body li::marker {
+    color: var(--text-tertiary);
+  }
+  .body strong {
+    color: var(--text);
+  }
+  .body code {
+    font-size: 0.88em;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--fill);
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 720px) {
+    .page {
+      padding-top: 48px;
+    }
+    section {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+      padding: 32px 0;
+    }
+  }
+</style>

@@ -14,7 +14,8 @@ export function startAnalytics() {
     defaults: '2026-08-30',
     capture_pageview: 'history_change',
     capture_pageleave: true,
-    autocapture: true,
+    // Only the clicks declared with `data-track` below: nothing else on a page is recorded.
+    autocapture: false,
     disable_session_recording: true,
     person_profiles: 'identified_only',
   });

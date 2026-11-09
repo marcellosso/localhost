@@ -157,6 +157,8 @@ jobs:
           SIGNING_IDENTITY: ${{ steps.identity.outputs.identity || '-' }}
           DEVELOPER_ID: ${{ steps.signing.outputs.mode == 'developer-id' && '1' || '' }}
           FEED_URL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/appcast.xml
+          # Where the app's anonymous usage events go (docs/analytics.md); empty is PostHog US.
+          LOCALHOST_POSTHOG_HOST: ${{ vars.LOCALHOST_POSTHOG_HOST }}
         run: |
           dmg=$(scripts/build-release.sh "${{ needs.version.outputs.version }}" "$GITHUB_RUN_NUMBER" | tail -1)
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
@@ -275,6 +277,7 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
           LOCALHOST_VERSION: ${{ needs.version.outputs.version }}
+          LOCALHOST_POSTHOG_HOST: ${{ vars.LOCALHOST_POSTHOG_HOST }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
@@ -439,6 +442,7 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
           LOCALHOST_VERSION: ${{ needs.version.outputs.version }}
+          LOCALHOST_POSTHOG_HOST: ${{ vars.LOCALHOST_POSTHOG_HOST }}
           THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

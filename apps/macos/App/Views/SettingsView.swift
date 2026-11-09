@@ -1,4 +1,5 @@
 import AppKit
+import LocalhostCore
 import SwiftUI
 
 /// The Settings window (⌘, or the sidebar's gear): a rail of sections in
@@ -30,7 +31,10 @@ struct SettingsView: View {
         }
     }
 
-    @SceneStorage("settings.section") private var section = Section.appearance
+    /// The section shown; the telemetry notice opens General.
+    static let sectionKey = "settingsSection"
+
+    @AppStorage(SettingsView.sectionKey) private var section = Section.appearance
 
     var body: some View {
         HStack(spacing: 0) {
@@ -118,6 +122,8 @@ struct SectionHeader: View {
 struct SettingsRow<Control: View>: View {
     let title: String
     var detail: String?
+    /// A page that says more, linked under the detail.
+    var link: (title: String, url: URL)?
     @ViewBuilder let control: Control
 
     var body: some View {
@@ -129,6 +135,13 @@ struct SettingsRow<Control: View>: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if let link {
+                    Link(link.title, destination: link.url)
+                        .font(.caption)
+                        .foregroundStyle(Theme.accentText)
+                        .pointerStyle(.link)
+                        .help(link.url.absoluteString)
                 }
             }
             Spacer(minLength: 0)
@@ -171,6 +184,15 @@ private struct GeneralSettings: View {
             SettingsRow(title: "Check for updates now") {
                 Button("Check Now") { model.updates.checkForUpdates() }
                     .buttonStyle(PillButtonStyle())
+            }
+            @Bindable var telemetryModel = model
+            SettingsRow(title: "Share anonymous usage data",
+                        detail: AppModel.telemetrySummary,
+                        link: (title: "Privacy", url: Telemetry.privacyURL)) {
+                Toggle("Share anonymous usage data", isOn: $telemetryModel.isTelemetryEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Theme.accent)
             }
         }
     }

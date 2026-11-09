@@ -249,3 +249,11 @@ pub fn agent_client_name(client: AgentClient) -> String {
 pub fn update_confirmation(services: u64, agents: u64) -> Option<crate::UpdateConfirmation> {
     crate::UpdateConfirmation::new(services as usize, agents as usize)
 }
+
+// MARK: Telemetry
+
+/// The page that says what localhost collects and how to turn it off.
+#[uniffi::export]
+pub fn privacy_url() -> String {
+    crate::PRIVACY_URL.to_string()
+}
