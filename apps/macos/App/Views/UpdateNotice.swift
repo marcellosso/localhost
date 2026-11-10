@@ -20,7 +20,7 @@ struct UpdateNotice: View {
                         Text(problem)
                             .font(.caption)
                             .foregroundStyle(Color(nsColor: Theme.failed))
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrapsInSidebarNotice()
                     }
                     HStack(spacing: 6) {
                         notesButton
