@@ -152,3 +152,15 @@ extension AppModel {
         return Theme.serviceColor(at: index)
     }
 }
+
+extension View {
+    /// Text at the foot of the sidebar, shown whole at any width the sidebar
+    /// can take. Measured for the window's minimum size at zero width, text
+    /// fixed to its height wraps a character a line and makes that minimum
+    /// taller than the screen; this measures it at the narrowest sidebar
+    /// (180 points, less the notice's padding) instead.
+    func wrapsInSidebarNotice() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+            .frame(minWidth: 140, alignment: .leading)
+    }
+}

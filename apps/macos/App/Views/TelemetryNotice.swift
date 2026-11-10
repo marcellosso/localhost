@@ -17,7 +17,7 @@ struct TelemetryNotice: View {
                 Text("\(AppModel.telemetrySummary) Turn it off in Settings › General, or set \(Text("DO_NOT_TRACK=1").monospaced()).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrapsInSidebarNotice()
                 HStack(spacing: 6) {
                     Link("Privacy", destination: Telemetry.privacyURL)
                         .font(.caption)
