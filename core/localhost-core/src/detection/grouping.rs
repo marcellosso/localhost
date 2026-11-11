@@ -124,6 +124,7 @@ fn grouped(
         found_in,
         detail,
         compose_services,
+        python_environment: parts.iter().find_map(|part| part.python_environment.clone()),
     }
 }
 
@@ -141,7 +142,9 @@ fn union(lists: impl IntoIterator<Item = Vec<String>>) -> Vec<String> {
 /// Whether `service` already does what `suggestion` proposes, so scanning
 /// the Project again doesn't offer it. In the same working directory:
 ///
-/// - the same command line;
+/// - the same command line, or the same with its program spelled from the
+///   suggestion's virtual environment (`.venv/bin/flask …` for `flask …`),
+///   as Services saved before `python_environment` existed have it;
 /// - a `docker compose up` that runs the whole file covers every Compose
 ///   suggestion, and `docker compose up a b` covers those for `a` and `b`;
 /// - any `docker compose up` covers the suggestion to run the whole file:
@@ -153,6 +156,12 @@ pub(crate) fn is_covered_by(suggestion: &ServiceSuggestion, service: &Service) -
     }
     if service.command_line == suggestion.command_line {
         return true;
+    }
+    if let Some(environment) = &suggestion.python_environment {
+        let spelled = [format!("{environment}/bin/"), format!("{}\\Scripts\\", environment.replace('/', "\\"))];
+        if spelled.iter().any(|prefix| service.command_line == format!("{prefix}{}", suggestion.command_line)) {
+            return true;
+        }
     }
     match (compose_up(&service.command_line), compose_up(&suggestion.command_line)) {
         (Some(ComposeUp::All), Some(_)) | (Some(_), Some(ComposeUp::All)) => true,

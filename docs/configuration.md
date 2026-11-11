@@ -27,8 +27,9 @@ services:
     port_can_change: false
   api:
     name: API
-    command: uv run fastapi dev --port $PORT
+    command: uvicorn app.main:app --reload --port $PORT
     cwd: api
+    python_environment: virtualenv
     port: 8000
     depends_on:
       - database
@@ -39,6 +40,7 @@ services:
   web:
     name: Web
     command: pnpm dev
+    run_before: nvm use
     cwd: web
     port: 3000
     url: http://localhost:3000/admin
@@ -77,8 +79,10 @@ Each entry under `services` is keyed by the Service's Key (same rules as the Pro
 | Field | Required | Default | Value |
 |---|---|---|---|
 | `command` | yes | | The command line, run as `$SHELL -l -c "<command>"` in the working directory (`cmd.exe /s /c "<command>"` for a Project on Windows itself). |
+| `run_before` | no | none | A command line run first, in the same shell as `command`, so what it sets applies to it: `nvm use`, `source ./env.sh`, `direnv export bash`. If it fails, `command` doesn't run, the Service is Failed and its log says “Run before failed”. See [Run before](#run-before). |
 | `name` | no | the Key | The display name. |
 | `cwd` | no | `.` | The working directory, relative to the Project's `path` (`web`, `packages/api`, `../shared`). `.` is the Project folder. Absolute paths and `~` aren't allowed. |
+| `python_environment` | no | none | A Python virtual environment the Service runs in, relative to `cwd` (`.venv`, `virtualenv`, `../.venv`) or absolute. See [Python environment](#python-environment). |
 | `port` | no | none | The Service's Port, 1–65535. The command gets the actual port as `$PORT` (`%PORT%` in cmd), and the Service counts as Running once it accepts connections. |
 | `url` | no | none | An `http` or `https` URL for Open in Browser. Its port is replaced by the actual port of the Run. Without one, Open in Browser uses `http://localhost:<port>`. |
 | `port_can_change` | no | `true` | `false`: never start this Service on another port when its Port is taken. |
@@ -100,6 +104,18 @@ On every layer (Project, Service, Profile):
 - A name can't be both a variable and a Secret on the same layer.
 
 When a Service starts, its environment is built from (later ones win): the login shell's environment, the Project's variables, the Service's, then the active Profile's. `PORT` is set when the Service has a Port.
+
+### Python environment
+
+With `python_environment`, a Service runs as if its virtual environment were activated: when it starts, the environment's `bin` folder (`Scripts` on Windows) goes first on `PATH` and `VIRTUAL_ENV` is set to it, so the command can say `uvicorn app.main:app` rather than `virtualenv/bin/uvicorn app.main:app`. Neither variable is added to the Service's own variables, and the command line isn't changed. If the folder isn't there, the Service starts without it and its log says so.
+
+Adding a Service, or scanning a folder for Suggestions, fills it in when the command starts a Python program (`python`, `python3`, `py`, `pip`, `uvicorn`, `gunicorn`, `hypercorn`, `daphne`, `granian`, `flask`, `fastapi`, `django-admin`, `celery`, `dramatiq`, `rq`, `streamlit`, `jupyter`, `pytest`, `waitress-serve`, or a `.py` script) and a virtual environment named `.venv`, `venv` or `virtualenv` is in its working directory or a folder above it, up to the Project's. The nearest one wins. A folder counts when it has a Python in its `bin` (`Scripts\python.exe` on Windows), or a `pyvenv.cfg` beside that folder; a `.env` file never does. It isn't filled in for commands that already pick their environment: `uv run`, `poetry run`, `pipenv run`, or a program given by its path into the environment (`.venv/bin/uvicorn`). Scanning a Project again never changes its Services.
+
+### Run before
+
+`run_before` and `command` run in one shell, one after the other, so variables, `cd` and `source` from Run before apply to the command, as when you type both in a terminal. Writing them together in `command` (`source virtualenv/bin/activate && uvicorn …`) still works too. A Run before that fails, or ends the shell with `exit`, stops the Service there: it is Failed with Run before's exit code (`1` on Windows), and the log shows its output followed by “Run before failed with exit code 3, so the command didn’t run”. Run before's time counts as the Service starting: one with a Port is Running once the Port opens, one without after 1.5 s alive, Run before included.
+
+Run before is written for the login shell: `sh` syntax for zsh, bash and other `sh`-like shells, fish's own for fish, and cmd's for a Project on Windows itself.
 
 ## The YAML localhost reads
 
@@ -134,3 +150,5 @@ Nothing is ever overwritten without choosing Replace.
 ## Versions
 
 `localhost: 1` is the only format version so far. A file with a newer version than your localhost knows is refused with a message saying so; update localhost to import it.
+
+Fields added to version 1 later, such as `python_environment` and `run_before`, are only written when set. A file that has them is refused by an older localhost, which doesn't know them (unknown fields are errors); update localhost there, or remove the fields.

@@ -83,6 +83,11 @@ pub(crate) fn command_line(raw: &str) -> Result<String, LocalhostError> {
     Ok(command_line.to_string())
 }
 
+/// Trimmed text; blank means none.
+pub(crate) fn optional_text(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim).filter(|text| !text.is_empty()).map(str::to_string)
+}
+
 pub(crate) fn port(port: Option<i64>) -> Result<Option<u16>, LocalhostError> {
     match port {
         None => Ok(None),

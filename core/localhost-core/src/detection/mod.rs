@@ -12,6 +12,7 @@ mod grouping;
 mod manifest;
 mod node;
 mod python;
+mod python_environment;
 mod syntax;
 
 use std::collections::{BTreeSet, HashSet};
@@ -25,6 +26,7 @@ pub use compose::ComposeDetector;
 pub use grouping::merge_suggestions;
 pub use node::NodeDetector;
 pub use python::PythonDetector;
+pub use python_environment::{ENVIRONMENT_FOLDER_NAMES, detect_python_environment, runs_in_python_environment};
 pub use syntax::CommandSyntax;
 
 use crate::paths::{expand_tilde, standardize};
@@ -62,6 +64,11 @@ pub struct ServiceSuggestion {
     /// offer one Service per Compose service instead of the whole file.
     #[serde(default)]
     pub compose_services: Vec<String>,
+    /// The virtual environment its command runs in, relative to its working
+    /// directory (e.g. `.venv`), found while scanning; the review shows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub python_environment: Option<String>,
 }
 
 impl ServiceSuggestion {
@@ -85,6 +92,7 @@ impl ServiceSuggestion {
             found_in,
             detail: detail.into(),
             compose_services: Vec::new(),
+            python_environment: None,
         }
     }
 }
@@ -101,6 +109,8 @@ impl From<ServiceSuggestion> for NewService {
             port_can_change: suggestion.port_can_change,
             is_excluded_from_start_all: false,
             dependency_keys: Vec::new(),
+            python_environment: suggestion.python_environment,
+            run_before: None,
         }
     }
 }
@@ -128,11 +138,12 @@ pub trait ServiceDetector: Send + Sync {
 }
 
 /// Folders that hold dependencies, build output or tooling, never Services.
-const IGNORED_FOLDER_NAMES: [&str; 14] = [
+const IGNORED_FOLDER_NAMES: [&str; 15] = [
     "node_modules",
     "bower_components",
     "vendor",
     "venv",
+    "virtualenv",
     "env",
     "__pycache__",
     "site-packages",

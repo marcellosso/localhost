@@ -497,14 +497,128 @@ fn a_poetry_django_project_runs_manage_py_runserver() {
 }
 
 #[test]
-fn a_flask_app_with_a_virtual_environment_uses_its_tools() {
+fn a_flask_app_with_a_virtual_environment_runs_its_tools_plainly_in_it() {
     let found = suggestions(&[
         ("requirements.txt", "flask\n"),
         (".venv/bin/python", ""),
         ("app.py", "from flask import Flask\napp = Flask(__name__)\n"),
     ]);
-    assert_eq!(found[0].command_line, ".venv/bin/flask --app app:app run --debug --port $PORT");
+    assert_eq!(found[0].command_line, "flask --app app:app run --debug --port $PORT");
+    assert_eq!(found[0].python_environment.as_deref(), Some(".venv"));
     assert_eq!(found[0].port, Some(5000));
+    assert_eq!(NewService::from(found[0].clone()).python_environment.as_deref(), Some(".venv"));
+}
+
+#[test]
+fn a_fastapi_app_with_a_folder_named_virtualenv_runs_uvicorn_in_it() {
+    let found = suggestions(&[
+        ("requirements.txt", "fastapi\nuvicorn\n"),
+        ("virtualenv/pyvenv.cfg", "home = /usr/bin\n"),
+        ("virtualenv/bin/activate", ""),
+        ("src/api/main.py", "from fastapi import FastAPI\napp = FastAPI()\n"),
+    ]);
+    assert_eq!(found.len(), 1, "nothing is looked for inside the virtualenv: {found:?}");
+    assert_eq!(found[0].command_line, "uvicorn api.main:app --reload --app-dir src --port $PORT");
+    assert_eq!(found[0].python_environment.as_deref(), Some("virtualenv"));
+}
+
+#[test]
+fn a_django_project_in_a_virtual_environment_runs_python() {
+    let found = suggestions(&[("manage.py", ""), ("venv/bin/python", "")]);
+    assert_eq!(found[0].command_line, "python manage.py runserver $PORT");
+    assert_eq!(found[0].python_environment.as_deref(), Some("venv"));
+}
+
+#[test]
+fn the_nearest_virtual_environment_is_used_up_to_the_project_root() {
+    let flask = "from flask import Flask\napp = Flask(__name__)\n";
+    let found = suggestions(&[
+        (".venv/bin/python", ""),
+        ("apps/api/requirements.txt", "flask\n"),
+        ("apps/api/app.py", flask),
+        ("apps/admin/requirements.txt", "flask\n"),
+        ("apps/admin/app.py", flask),
+        ("apps/admin/virtualenv/bin/python", ""),
+    ]);
+    let environments: Vec<(&str, Option<&str>)> =
+        found.iter().map(|s| (s.working_directory.as_str(), s.python_environment.as_deref())).collect();
+    assert_eq!(environments, [("apps/admin", Some("virtualenv")), ("apps/api", Some("../../.venv"))]);
+}
+
+#[test]
+fn only_a_real_virtual_environment_counts() {
+    let flask = [("requirements.txt", "flask\n"), ("app.py", "from flask import Flask\napp = Flask(__name__)\n")];
+    for not_one in [
+        (".env", "DATABASE_URL=postgres://localhost/db\n"),
+        (".venv/README.md", "empty"),
+        ("venv/pyvenv.cfg", "no programs folder beside it"),
+        ("env/bin/python", ""),
+    ] {
+        let found = suggestions(&[flask[0], flask[1], not_one]);
+        assert_eq!(found[0].command_line, "python3 -m flask --app app:app run --debug --port $PORT", "{not_one:?}");
+        assert_eq!(found[0].python_environment, None, "{not_one:?}");
+    }
+}
+
+#[test]
+fn uv_poetry_and_pipenv_keep_their_run_without_a_virtual_environment() {
+    for (lockfile, prefix) in [("uv.lock", "uv run"), ("poetry.lock", "poetry run"), ("Pipfile", "pipenv run")] {
+        let found = suggestions(&[(lockfile, ""), ("manage.py", ""), (".venv/bin/python", "")]);
+        assert_eq!(found[0].command_line, format!("{prefix} python manage.py runserver $PORT"));
+        assert_eq!(found[0].python_environment, None, "{lockfile}");
+    }
+}
+
+#[test]
+fn a_new_service_gets_the_virtual_environment_its_python_command_runs_in() {
+    use localhost_core::detect_python_environment;
+    let root = tempfile::tempdir().unwrap();
+    for path in ["virtualenv/bin/python", "api/main.py", ".env"] {
+        let path = root.path().join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "").unwrap();
+    }
+    let project = root.path().to_str().unwrap();
+    let detect = |working_directory, command_line| {
+        detect_python_environment(project, working_directory, command_line, CommandSyntax::Posix)
+    };
+    assert_eq!(detect(".", "uvicorn api.main:app --reload").as_deref(), Some("virtualenv"));
+    assert_eq!(detect("api", "python -m api").as_deref(), Some("../virtualenv"));
+    assert_eq!(detect(".", "virtualenv/bin/uvicorn api.main:app"), None, "already runs from it");
+    assert_eq!(detect(".", "source virtualenv/bin/activate && uvicorn api.main:app"), None);
+    assert_eq!(detect(".", "uv run uvicorn api.main:app"), None);
+    assert_eq!(detect(".", "pnpm dev"), None);
+    assert_eq!(detect("../elsewhere", "uvicorn app:app"), None);
+    assert_eq!(
+        detect_python_environment(project, ".", "py -m uvicorn app:app", CommandSyntax::Cmd),
+        None,
+        "a Linux virtualenv can't run on Windows"
+    );
+}
+
+#[test]
+fn scanning_a_project_again_leaves_its_services_as_they_are() {
+    let fixture = Fixture::new();
+    let folder = tempfile::tempdir().unwrap();
+    for (path, contents) in [
+        ("requirements.txt", "flask\n"),
+        (".venv/bin/python", ""),
+        ("app.py", "from flask import Flask\napp = Flask(__name__)\n"),
+    ] {
+        let path = folder.path().join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
+    let old = NewService::new("Web", key("web"), ".venv/bin/flask --app app:app run --debug --port $PORT");
+    let library = fixture.library();
+    let project = library
+        .add_project("Shop", key("shop"), folder.path().to_str().unwrap(), vec![old], Origin::MainWindow)
+        .unwrap();
+    let found = ProjectScanner::default().with_syntax(CommandSyntax::Posix).scan_project(&project);
+    assert!(found.is_empty(), "the Service already runs it from .venv: {found:?}");
+    let service = &library.project(project.id).unwrap().services[0];
+    assert_eq!(service.command_line, ".venv/bin/flask --app app:app run --debug --port $PORT");
+    assert_eq!(service.python_environment, None);
 }
 
 #[test]
@@ -536,15 +650,19 @@ fn on_windows_scripts_get_percent_port_and_double_quotes() {
 }
 
 #[test]
-fn on_windows_a_virtual_environment_runs_from_scripts() {
+fn on_windows_a_virtual_environment_needs_scripts() {
     let flask = [("requirements.txt", "flask\n"), ("app.py", "from flask import Flask\napp = Flask(__name__)\n")];
     let found = windows_suggestions(&[flask[0], flask[1], (".venv/Scripts/python.exe", "")]);
-    assert_eq!(found[0].command_line, r".venv\Scripts\flask --app app:app run --debug --port %PORT%");
+    assert_eq!(found[0].command_line, "flask --app app:app run --debug --port %PORT%");
+    assert_eq!(found[0].python_environment.as_deref(), Some(".venv"));
+    let found = windows_suggestions(&[("manage.py", ""), ("virtualenv/Scripts/python.exe", "")]);
+    assert_eq!(found[0].command_line, "py manage.py runserver %PORT%");
     let found = windows_suggestions(&[flask[0], flask[1], (".venv/bin/python", "")]);
     assert_eq!(
         found[0].command_line, "py -m flask --app app:app run --debug --port %PORT%",
         "a WSL venv can't run here"
     );
+    assert_eq!(found[0].python_environment, None);
 }
 
 #[test]

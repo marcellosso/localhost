@@ -178,6 +178,20 @@ pub async fn scan_project(project: Project) -> Vec<ServiceSuggestion> {
     blocking(move || ProjectScanner::default().scan_project(&project)).await
 }
 
+/// The virtual environment a new Service would run in, for its editor to
+/// fill in (see `detect_python_environment`); `None` if it has none.
+#[uniffi::export]
+pub async fn detect_python_environment(
+    project_path: String,
+    working_directory: String,
+    command_line: String,
+) -> Option<String> {
+    blocking(move || {
+        crate::detect_python_environment(&project_path, &working_directory, &command_line, crate::CommandSyntax::HERE)
+    })
+    .await
+}
+
 /// Several reviewed Suggestions as one, `None` for none.
 #[uniffi::export]
 pub fn merge_service_suggestions(suggestions: Vec<ServiceSuggestion>) -> Option<ServiceSuggestion> {

@@ -50,8 +50,9 @@ pub use agents::{
 };
 pub use ansi::{Ansi, AnsiColor, Span, StyledLine, TextStyle};
 pub use detection::{
-    CargoDetector, CommandSyntax, ComposeDetector, NodeDetector, ProjectScanner, PythonDetector, ScannedDirectory,
-    ServiceDetector, ServiceSuggestion, merge_suggestions,
+    CargoDetector, CommandSyntax, ComposeDetector, ENVIRONMENT_FOLDER_NAMES, NodeDetector, ProjectScanner,
+    PythonDetector, ScannedDirectory, ServiceDetector, ServiceSuggestion, detect_python_environment, merge_suggestions,
+    runs_in_python_environment,
 };
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;

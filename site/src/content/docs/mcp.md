@@ -138,8 +138,8 @@ Projects and Services are named by their **Key**, as `list_projects` and `list_s
 | `create_project` | Adds a Project: a `name` and the absolute `path` of an existing folder, optionally a `key`, `favorite` and plain variables (`env`). |
 | `update_project` | Changes the given fields of a Project: `name`, `key`, `path`, `favorite`, `env`. |
 | `delete_project` | Removes a Project from localhost, after stopping its running Services; deletes their logs. Needs `confirm: true`. |
-| `create_service` | Adds a Service: `name` and `command_line`, optionally `key`, `working_directory`, `port`, `url`, `port_can_change`, `in_start_all`, `dependencies` (Keys) and `env`. |
-| `update_service` | Changes the given fields of a Service; `port` or `url` set to `null` removes them. |
+| `create_service` | Adds a Service: `name` and `command_line`, optionally `key`, `working_directory`, `run_before`, `python_environment`, `port`, `url`, `port_can_change`, `in_start_all`, `dependencies` (Keys) and `env`. Without `python_environment`, a Python command gets the virtual environment found beside it (`null` for none). |
+| `update_service` | Changes the given fields of a Service; `port`, `url`, `run_before` or `python_environment` set to `null` removes them. |
 | `delete_service` | Removes a Service, stopping it first if it runs, and drops it from other Services' Dependencies. Needs `confirm: true`. |
 
 Results are JSON. The tools that add or edit return the Project or Service as saved, with its Key and `id`; those that remove return what they removed. Failures name what went wrong with a `kind` (`portConflict`, `commandNotFound`, `notFound`, …) and a message saying what to do next.

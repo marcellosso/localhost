@@ -203,6 +203,49 @@ extension View {
     }
 }
 
+/// A Service's Python virtual environment, relative to its working
+/// directory: a path to type, Turn Off to clear it, or Use to take the one
+/// the core found.
+struct PythonEnvironmentField: View {
+    @Binding var path: String
+    /// The virtual environment found for the command, if any.
+    let detected: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            BoxedTextField(label: "Python environment", text: $path, prompt: detected ?? ".venv", isMonospaced: true)
+            if !path.trimmingCharacters(in: .whitespaces).isEmpty {
+                Button("Turn Off") { path = "" }
+                    .buttonStyle(PillButtonStyle(isCompact: true))
+                    .accessibilityLabel("Turn Off Python Environment")
+            } else if let detected {
+                Button { path = detected } label: {
+                    Text("Use ") + Text(detected).monospaced()
+                }
+                .buttonStyle(PillButtonStyle(isCompact: true))
+                .accessibilityLabel("Use \(detected)")
+            }
+        }
+    }
+}
+
+/// “Using detected .venv”: says, where it shows, that localhost found the
+/// virtual environment and uses it.
+struct DetectedEnvironment: View {
+    let path: String
+
+    var body: some View {
+        Label {
+            Text("Using detected ") + Text(path).monospaced()
+        } icon: {
+            Image(systemName: "checkmark").imageScale(.small)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// The command as a terminal line: its working directory (click to choose),
 /// a `$`, then the command line.
 struct CommandField: View {

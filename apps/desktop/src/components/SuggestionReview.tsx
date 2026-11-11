@@ -1,5 +1,17 @@
-import { type CSSProperties, type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
-import { commands, type Project, type ProjectFolder, type Service } from "../bindings";
+import {
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  commands,
+  type Project,
+  type ProjectFolder,
+  type Service,
+} from "../bindings";
 import {
   canSplit,
   directoryLabel,
@@ -18,6 +30,7 @@ import {
   ChipList,
   ChipToggle,
   CommandField,
+  DetectedEnvironment,
   Field,
   FieldHint,
   FieldRow,
@@ -52,7 +65,14 @@ type Props = {
  * can be checked, unchecked, and opened to edit it, choose what it starts
  * after, or split it; several can be merged into one. Nothing is saved here.
  */
-export function SuggestionReview({ drafts, setDrafts, isScanning, project, existingServices = [], emptyMessage }: Props) {
+export function SuggestionReview({
+  drafts,
+  setDrafts,
+  isScanning,
+  project,
+  existingServices = [],
+  emptyMessage,
+}: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isShowingOthers, setIsShowingOthers] = useState(false);
   /** The drafts picked to merge, while picking them. */
@@ -61,12 +81,18 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
   const likely = drafts.filter((draft) => draft.suggestion.isRecommended);
   const others = drafts.filter((draft) => !draft.suggestion.isRecommended);
   const update = (id: number, change: Partial<SuggestionDraft>) =>
-    setDrafts((drafts) => drafts.map((draft) => (draft.id === id ? { ...draft, ...change } : draft)));
+    setDrafts((drafts) =>
+      drafts.map((draft) =>
+        draft.id === id ? { ...draft, ...change } : draft,
+      ),
+    );
 
   /** A checked draft's colour is the one its Service will get; unchecked ones are grey. */
   const color = (draft: SuggestionDraft) => {
     const index = checked.indexOf(draft);
-    return index < 0 ? "var(--state-stopped)" : serviceColor(existingServices.length + index);
+    return index < 0
+      ? "var(--state-stopped)"
+      : serviceColor(existingServices.length + index);
   };
 
   /** What `draft` can start after: the Project's Services, then the other checked drafts. */
@@ -99,7 +125,9 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
         isCycle: draftStartsAfter(drafts, other, draft),
         onChange: (isOn: boolean) =>
           update(draft.id, {
-            startsAfter: isOn ? [...draft.startsAfter, other.id] : draft.startsAfter.filter((id) => id !== other.id),
+            startsAfter: isOn
+              ? [...draft.startsAfter, other.id]
+              : draft.startsAfter.filter((id) => id !== other.id),
           }),
       })),
   ];
@@ -130,16 +158,28 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
           color={color(draft)}
           project={project}
           isExpanded={merging === null && expandedId === draft.id}
-          onToggleExpanded={() => setExpandedId(expandedId === draft.id ? null : draft.id)}
+          onToggleExpanded={() =>
+            setExpandedId(expandedId === draft.id ? null : draft.id)
+          }
           onChange={(change) => update(draft.id, change)}
           startsAfter={startsAfterOptions(draft)}
           splitTitle={
-            canSplit(drafts, draft) ? (draft.mergedFrom.length > 0 ? "Undo merge" : "One Service per container") : null
+            canSplit(drafts, draft)
+              ? draft.mergedFrom.length > 0
+                ? "Undo merge"
+                : "One Service per container"
+              : null
           }
           onSplit={() => split(draft)}
           isPickedToMerge={merging === null ? null : merging.includes(draft.id)}
           onPickToMerge={(isPicked) =>
-            setMerging((ids) => (ids === null ? ids : isPicked ? [...ids, draft.id] : ids.filter((id) => id !== draft.id)))
+            setMerging((ids) =>
+              ids === null
+                ? ids
+                : isPicked
+                  ? [...ids, draft.id]
+                  : ids.filter((id) => id !== draft.id),
+            )
           }
         />
       ))}
@@ -154,13 +194,18 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
         : checked.length === 0
           ? "none selected"
           : `${checked.length} selected · edit before adding`;
-  const showsOthers = isShowingOthers || likely.length === 0 || merging !== null;
-  const hasContainers = others.some((draft) => (draft.suggestion.composeServices ?? []).length === 1);
+  const showsOthers =
+    isShowingOthers || likely.length === 0 || merging !== null;
+  const hasContainers = others.some(
+    (draft) => (draft.suggestion.composeServices ?? []).length === 1,
+  );
   return (
     <Field title="Services" note={note}>
       {() =>
         isScanning ? (
-          <Working>Looking for package.json, Compose, Python and Cargo files…</Working>
+          <Working>
+            Looking for package.json, Compose, Python and Cargo files…
+          </Working>
         ) : drafts.length === 0 ? (
           <FieldHint>{emptyMessage}</FieldHint>
         ) : (
@@ -175,10 +220,16 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
                   disabled={likely.length === 0 || merging !== null}
                   onClick={() => setIsShowingOthers(!isShowingOthers)}
                 >
-                  <ChevronIcon size={9} className={showsOthers ? styles.open : undefined} />
+                  <ChevronIcon
+                    size={9}
+                    className={showsOthers ? styles.open : undefined}
+                  />
                   {others.length} more found
                   <span className={styles.tertiary}>
-                    · {hasContainers ? "one per container, build steps, other scripts" : "build steps, other scripts"}
+                    ·{" "}
+                    {hasContainers
+                      ? "one per container, build steps, other scripts"
+                      : "build steps, other scripts"}
                   </span>
                 </button>
                 {showsOthers && card(others)}
@@ -188,15 +239,27 @@ export function SuggestionReview({ drafts, setDrafts, isScanning, project, exist
               <div className={styles.mergeBar}>
                 {merging === null ? (
                   <>
-                    <button type="button" className="button" onClick={() => setMerging([])}>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => setMerging([])}
+                    >
                       Merge…
                     </button>
-                    <span className={`${styles.mergeHint} secondary`}>Run several as one Service, e.g. a Compose file</span>
+                    <span className={`${styles.mergeHint} secondary`}>
+                      Run several as one Service, e.g. a Compose file
+                    </span>
                   </>
                 ) : (
                   <>
-                    <span className={`${styles.mergeHint} secondary`}>Pick the ones to run as one Service.</span>
-                    <button type="button" className="button" onClick={() => setMerging(null)}>
+                    <span className={`${styles.mergeHint} secondary`}>
+                      Pick the ones to run as one Service.
+                    </span>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => setMerging(null)}
+                    >
                       Cancel
                     </button>
                     <button
@@ -248,7 +311,16 @@ type RowProps = {
 
 /** One Suggestion: a checkbox, its name, Key, command and Port, and when opened, fields to edit it and where it was found. */
 function SuggestionRow(props: RowProps) {
-  const { draft, color, project, isExpanded, onToggleExpanded, onChange, startsAfter, isPickedToMerge } = props;
+  const {
+    draft,
+    color,
+    project,
+    isExpanded,
+    onToggleExpanded,
+    onChange,
+    startsAfter,
+    isPickedToMerge,
+  } = props;
   const port = /^\d+$/.test(draft.port.trim()) ? draft.port.trim() : null;
   const latestName = useRef(draft.name);
   const setName = (name: string) => {
@@ -264,35 +336,54 @@ function SuggestionRow(props: RowProps) {
     const workingDirectory = await commands.chooseWorkingDirectory(project);
     if (workingDirectory !== null) onChange({ workingDirectory });
   };
-  const after = draft.isChecked ? startsAfter.filter((other) => other.isOn) : [];
+  const after = draft.isChecked
+    ? startsAfter.filter((other) => other.isOn)
+    : [];
   const isMerging = isPickedToMerge !== null;
   return (
     <div
       className={`${styles.row} ${cardRow} ${(isMerging ? isPickedToMerge : draft.isChecked) ? "" : styles.unchecked}`}
       style={{ "--service": color } as CSSProperties}
     >
-      <div className={styles.summary} title={`From ${draft.suggestion.foundIn} · ${draft.suggestion.detail}`}>
+      <div
+        className={styles.summary}
+        title={`From ${draft.suggestion.foundIn} · ${draft.suggestion.detail}`}
+      >
         <input
           type="checkbox"
           className={styles.checkbox}
           checked={isMerging ? isPickedToMerge : draft.isChecked}
           aria-label={isMerging ? `Merge ${draft.name}` : `Add ${draft.name}`}
           onChange={(event) =>
-            isMerging ? props.onPickToMerge(event.target.checked) : onChange({ isChecked: event.target.checked })
+            isMerging
+              ? props.onPickToMerge(event.target.checked)
+              : onChange({ isChecked: event.target.checked })
           }
         />
         <span className={styles.swatch} aria-hidden="true" />
-        <div className={styles.text} onClick={isMerging ? () => props.onPickToMerge(!isPickedToMerge) : onToggleExpanded}>
+        <div
+          className={styles.text}
+          onClick={
+            isMerging
+              ? () => props.onPickToMerge(!isPickedToMerge)
+              : onToggleExpanded
+          }
+        >
           <div className={styles.title}>
             <span className={styles.name}>{draft.name}</span>
             <span className="mono secondary">{draft.key}</span>
             {after.length > 0 && (
-              <span className={styles.tertiary}>after {after.map((other) => other.name).join(", ")}</span>
+              <span className={styles.tertiary}>
+                after {after.map((other) => other.name).join(", ")}
+              </span>
             )}
           </div>
           <div className={`${styles.commandLine} mono secondary`}>
             {directoryLabel(draft.workingDirectory)} $ {draft.commandLine}
           </div>
+          {draft.pythonEnvironment && (
+            <DetectedEnvironment path={draft.pythonEnvironment} />
+          )}
         </div>
         {port && <span className="portPill">:{port}</span>}
         {!isMerging && (
@@ -303,7 +394,10 @@ function SuggestionRow(props: RowProps) {
             aria-label={isExpanded ? "Close Editor" : `Edit ${draft.name}`}
             onClick={onToggleExpanded}
           >
-            <ChevronIcon size={9} className={isExpanded ? styles.up : styles.down} />
+            <ChevronIcon
+              size={9}
+              className={isExpanded ? styles.up : styles.down}
+            />
           </button>
         )}
       </div>
@@ -311,7 +405,15 @@ function SuggestionRow(props: RowProps) {
         <div className={styles.editor}>
           <FieldRow>
             <Field title="Name">
-              {(id) => <TextField id={id} value={draft.name} onChange={setName} placeholder="Web" autoFocus />}
+              {(id) => (
+                <TextField
+                  id={id}
+                  value={draft.name}
+                  onChange={setName}
+                  placeholder="Web"
+                  autoFocus
+                />
+              )}
             </Field>
             <Field title="Key" width={140}>
               {(id) => (
@@ -326,7 +428,13 @@ function SuggestionRow(props: RowProps) {
             </Field>
             <Field title="Port" width={80}>
               {(id) => (
-                <TextField id={id} value={draft.port} onChange={(value) => onChange({ port: value })} placeholder="—" isMonospaced />
+                <TextField
+                  id={id}
+                  value={draft.port}
+                  onChange={(value) => onChange({ port: value })}
+                  placeholder="—"
+                  isMonospaced
+                />
               )}
             </Field>
           </FieldRow>
@@ -341,6 +449,20 @@ function SuggestionRow(props: RowProps) {
               />
             )}
           </Field>
+          {draft.suggestion.pythonEnvironment && (
+            <SwitchRow
+              title="Use its Python environment"
+              detail={`${draft.suggestion.pythonEnvironment} goes first on PATH when it starts, as activate does.`}
+              isOn={draft.pythonEnvironment !== ""}
+              onChange={(isOn) =>
+                onChange({
+                  pythonEnvironment: isOn
+                    ? (draft.suggestion.pythonEnvironment ?? "")
+                    : "",
+                })
+              }
+            />
+          )}
           {draft.port.trim() !== "" && (
             <SwitchRow
               title="Port can change"
@@ -372,7 +494,11 @@ function SuggestionRow(props: RowProps) {
                       color={other.color}
                       isOn={other.isOn}
                       isDisabled={other.isCycle && !other.isOn}
-                      help={other.isCycle ? `${other.name} already starts after ${draft.name}.` : other.key}
+                      help={
+                        other.isCycle
+                          ? `${other.name} already starts after ${draft.name}.`
+                          : other.key
+                      }
                       onChange={other.onChange}
                     />
                   ))}
@@ -382,8 +508,8 @@ function SuggestionRow(props: RowProps) {
           )}
           <div className={styles.footer}>
             <p className={`${styles.foundIn} secondary`}>
-              Found in <span className="mono">{draft.suggestion.foundIn}</span> ·{" "}
-              <span className="mono">{draft.suggestion.detail}</span>
+              Found in <span className="mono">{draft.suggestion.foundIn}</span>{" "}
+              · <span className="mono">{draft.suggestion.detail}</span>
             </p>
             {props.splitTitle && (
               <button type="button" className="button" onClick={props.onSplit}>
@@ -398,7 +524,13 @@ function SuggestionRow(props: RowProps) {
 }
 
 /** Scans an existing Project's folder again and adds the Services the user picks from what it finds. */
-export function DetectServicesForm({ project, onAdded }: { project: Project; onAdded: (serviceId: string) => void }) {
+export function DetectServicesForm({
+  project,
+  onAdded,
+}: {
+  project: Project;
+  onAdded: (serviceId: string) => void;
+}) {
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
   const [isScanning, setIsScanning] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -420,7 +552,10 @@ export function DetectServicesForm({ project, onAdded }: { project: Project; onA
   const count = drafts.filter((draft) => draft.isChecked).length;
   const save = async () => {
     setIsSaving(true);
-    const result = await commands.addServices(project.id, suggestionEdits(drafts));
+    const result = await commands.addServices(
+      project.id,
+      suggestionEdits(drafts),
+    );
     setIsSaving(false);
     if (result.status === "error") return setError(result.error.message);
     closeSheet();
@@ -432,12 +567,17 @@ export function DetectServicesForm({ project, onAdded }: { project: Project; onA
       title="Detect Services"
       subtitle={
         <>
-          in <strong>{project.name}</strong> · <span className="mono">{tildePath(project.path)}</span>
+          in <strong>{project.name}</strong> ·{" "}
+          <span className="mono">{tildePath(project.path)}</span>
         </>
       }
       hint={count === 0 ? null : "↩ to add"}
       error={error}
-      primaryTitle={count === 0 ? "Add Services" : `Add ${count} Service${count === 1 ? "" : "s"}`}
+      primaryTitle={
+        count === 0
+          ? "Add Services"
+          : `Add ${count} Service${count === 1 ? "" : "s"}`
+      }
       isPrimaryDisabled={count === 0 || isSaving}
       width={640}
       onCancel={closeSheet}

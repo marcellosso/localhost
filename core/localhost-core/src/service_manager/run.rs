@@ -216,6 +216,8 @@ mod tests {
             port,
             url: url.map(String::from),
             port_can_change: true,
+            python_environment: None,
+            run_before: None,
         }
     }
 

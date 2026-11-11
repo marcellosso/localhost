@@ -31,7 +31,7 @@ use crate::local_url::LocalUrl;
 use crate::logs::LogStore;
 use crate::output::{OutputChannel, OutputLine};
 use crate::platform::{self, ProcessStartTime};
-use crate::process::{LaunchConfiguration, ProcessTree, ProcessTreeExit, StopPolicy, Termination};
+use crate::process::{LaunchConfiguration, ProcessTree, ProcessTreeExit, RUN_BEFORE_FAILED, StopPolicy, Termination};
 use crate::run_registry::RunRegistry;
 use crate::run_stats::{self, RunStats};
 use crate::{Id, Key, LocalhostError, Origin, Project, ProjectLibrary, ProjectLibraryEvent, RunEnvironment, Service};
@@ -790,6 +790,7 @@ impl Inner {
         self.wait_for_active_run_to_end(service_id).await;
 
         let mut run = Run::new(service_id, origin);
+        let mut launch_notes: Vec<String> = Vec::new();
         let launched: Result<ProcessTree, LocalhostError> = async {
             let (project, service) = self.library.service(service_id)?;
             let variables = self.library.resolved_variables(service_id)?;
@@ -801,11 +802,22 @@ impl Inner {
             }
             let environment =
                 RunEnvironment::merged(&RunEnvironment::base(&self.options.base_environment), &variables, run.port);
-            let configuration = LaunchConfiguration::new(
-                service.command_line.clone(),
-                project.working_directory(&service),
-                environment,
-            );
+            let working_directory = project.working_directory(&service);
+            let mut configuration =
+                LaunchConfiguration::new(service.command_line.clone(), working_directory.clone(), environment);
+            if let Some(run_before) = &service.run_before {
+                launch_notes.push(format!("Run before: {run_before}"));
+                configuration = configuration.running_first(run_before);
+            }
+            if let Some(python_environment) = &service.python_environment {
+                let resolved = resolved_python_environment(python_environment, &working_directory);
+                if resolved.is_dir() {
+                    configuration = configuration.using_python_environment(&resolved);
+                } else {
+                    launch_notes
+                        .push(format!("No Python environment at {}: running without it", resolved.to_string_lossy()));
+                }
+            }
             ProcessTree::launch(&configuration, self.options.stop_policy)
         }
         .await;
@@ -829,7 +841,12 @@ impl Inner {
         }
         self.logs.begin_run(run.id, service_id);
         if let (Some(port), Some(change)) = (run.port, &run.port_change) {
-            self.logs.append(&[OutputLine::new(OutputChannel::Localhost, log_note_for_port(port, change))], run.id);
+            launch_notes.insert(0, log_note_for_port(port, change));
+        }
+        if !launch_notes.is_empty() {
+            let notes: Vec<OutputLine> =
+                launch_notes.into_iter().map(|note| OutputLine::new(OutputChannel::Localhost, note)).collect();
+            self.logs.append(&notes, run.id);
         }
         self.lock_and(|_, state| {
             broadcast(state, ServiceEvent::RunStarted(run.clone()));
@@ -879,7 +896,12 @@ impl Inner {
     /// explain a failure (`diagnosis`), then how it ended.
     async fn follow_output(self: Arc<Self>, service_id: Id, run_id: Id, tree: ProcessTree) {
         let (mut has_detected_url, mut has_diagnosed_failure) = (false, false);
-        while let Some(lines) = tree.next_output().await {
+        while let Some(mut lines) = tree.next_output().await {
+            for line in &mut lines {
+                if let Some(note) = run_before_failure_note(line) {
+                    *line = OutputLine::new(OutputChannel::Localhost, note);
+                }
+            }
             self.logs.append(&lines, run_id);
             for line in lines.iter().filter(|line| line.channel != OutputChannel::Localhost) {
                 if !has_detected_url
@@ -1201,7 +1223,30 @@ fn launch_fingerprint(service: &Service, project: &Project, variables: &BTreeMap
     project.working_directory(service).hash(&mut hasher);
     variables.hash(&mut hasher);
     service.port.hash(&mut hasher);
+    service.python_environment.hash(&mut hasher);
+    service.run_before.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Where a Service's `python_environment` is: as written if absolute (or
+/// starting with `~`), else inside its working directory.
+fn resolved_python_environment(python_environment: &str, working_directory: &std::path::Path) -> std::path::PathBuf {
+    let expanded = crate::paths::expand_tilde(python_environment);
+    crate::paths::standardize(&working_directory.join(expanded))
+}
+
+/// The note that replaces the line the shell prints when a Run before
+/// fails (see `LaunchConfiguration::running_first`).
+fn run_before_failure_note(line: &OutputLine) -> Option<String> {
+    if line.channel != OutputChannel::Stderr {
+        return None;
+    }
+    let code = line.text.trim().strip_prefix(RUN_BEFORE_FAILED)?.trim();
+    Some(match code {
+        "" => "Run before failed, so the command didn’t run".to_string(),
+        "0" => "Run before ended the shell, so the command didn’t run".to_string(),
+        code => format!("Run before failed with exit code {code}, so the command didn’t run"),
+    })
 }
 
 /// What localhost writes into a Run's log when it starts on another port.

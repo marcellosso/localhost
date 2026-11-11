@@ -562,14 +562,14 @@ final class AppModel {
     func addService(
         to projectID: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?, portCanChange: Bool
+        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?
     ) async throws(LocalhostError) -> Service {
         guard let library = core?.library else { throw .ProjectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, variables: variables, dependencies: dependencies,
             isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, portCanChange: portCanChange,
-            origin: .mainWindow
+            pythonEnvironment: pythonEnvironment, runBefore: runBefore, origin: .mainWindow
         )
         projects = library.projects()
         selectedServiceID = service.id
@@ -605,14 +605,15 @@ final class AppModel {
     func editService(
         _ id: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?, portCanChange: Bool
+        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?
     ) async throws(LocalhostError) {
         guard let library = core?.library else { throw .ServiceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
             commandLine: commandLine, variables: variables, dependencies: dependencies,
             isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url),
-            portCanChange: portCanChange, origin: .mainWindow
+            portCanChange: portCanChange, pythonEnvironment: .some(pythonEnvironment), runBefore: .some(runBefore),
+            origin: .mainWindow
         )
     }
 

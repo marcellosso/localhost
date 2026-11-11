@@ -751,6 +751,41 @@ fn changes_are_checked_as_the_apps_editors_check_them() {
 }
 
 #[test]
+fn a_new_python_service_gets_the_virtual_environment_beside_it_and_run_before_is_kept() {
+    let home = Home::new();
+    let project = home.project("Acme", "acme");
+    let folder = std::path::PathBuf::from(&project.path);
+    let programs = if cfg!(windows) { "Scripts" } else { "bin" };
+    std::fs::create_dir_all(folder.join("virtualenv").join(programs)).unwrap();
+    std::fs::write(folder.join("virtualenv").join("pyvenv.cfg"), "home = /usr/bin\n").unwrap();
+    let mut agent = home.mcp();
+
+    let added = agent.call(
+        "create_service",
+        json!({ "project": "acme", "name": "API", "command_line": "uvicorn app:app", "run_before": "nvm use" }),
+    );
+    assert_eq!(added["service"]["pythonEnvironment"], "virtualenv", "{added:#}");
+    assert_eq!(added["service"]["runBefore"], "nvm use");
+    let off = agent.call(
+        "create_service",
+        json!({ "project": "acme", "name": "Worker", "command_line": "celery -A app worker", "python_environment": null }),
+    );
+    assert_eq!(off["service"]["pythonEnvironment"], Value::Null);
+    let web = agent.call("create_service", json!({ "project": "acme", "name": "Web", "command_line": "pnpm dev" }));
+    assert_eq!(web["service"]["pythonEnvironment"], Value::Null, "not a Python command");
+
+    let edited = agent.call(
+        "update_service",
+        json!({ "project": "acme", "service": "api", "python_environment": ".venv", "run_before": null }),
+    );
+    assert_eq!(edited["service"]["pythonEnvironment"], ".venv");
+    assert_eq!(edited["service"]["runBefore"], Value::Null);
+    let api = &home.library().projects()[0].services[0];
+    assert_eq!((api.python_environment.as_deref(), api.run_before.as_deref()), (Some(".venv"), None));
+    agent.disconnect();
+}
+
+#[test]
 fn read_only_offers_only_the_tools_that_read_and_run() {
     let home = Home::new();
     home.project("Acme", "acme");

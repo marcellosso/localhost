@@ -342,6 +342,18 @@ async mergeSuggestions(suggestions: ServiceSuggestion[]) : Promise<ServiceSugges
     return await TAURI_INVOKE("merge_suggestions", { suggestions });
 },
 /**
+ * The virtual environment a new Service of the Project would run in, for
+ * the Service editor to fill in. A distro's folders aren't read from here.
+ */
+async detectPythonEnvironment(projectId: Id, workingDirectory: string, commandLine: string) : Promise<Result<string | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("detect_python_environment", { projectId, workingDirectory, commandLine }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Saves the Environment editor: the Project's variables, its Profiles
  * (added, edited, removed), then which one is active (an index into
  * `profiles`, or none).
@@ -1592,7 +1604,20 @@ url?: string | null;
  * Whether a Run may use another port when the Port is taken. Off for
  * commands that ignore `$PORT`.
  */
-portCanChange?: boolean }
+portCanChange?: boolean; 
+/**
+ * A Python virtual environment (`.venv`, `virtualenv`) the Run uses, as
+ * written: relative to the working directory, or absolute. Its programs
+ * folder goes first on `PATH` and it is `VIRTUAL_ENV`, as `activate`
+ * would do; the command line stays as it is.
+ */
+pythonEnvironment?: string | null; 
+/**
+ * A command line run first, in the same shell, so what it sets (`nvm
+ * use`, `source env.sh`) applies to the command. If it fails, the
+ * command doesn't run and the Run is Failed.
+ */
+runBefore?: string | null }
 /**
  * The Service editor's fields.
  */
@@ -1604,7 +1629,15 @@ port: string;
 /**
  * Empty for none.
  */
-url: string; portCanChange: boolean; variables: VariableEdit[]; dependencies: Id[]; isExcludedFromStartAll: boolean }
+url: string; portCanChange: boolean; variables: VariableEdit[]; dependencies: Id[]; isExcludedFromStartAll: boolean; 
+/**
+ * Relative to the working directory; empty for none.
+ */
+pythonEnvironment: string; 
+/**
+ * Empty for none.
+ */
+runBefore: string }
 /**
  * What a Service's editor needs to know about the others of its Project.
  */
@@ -1682,7 +1715,12 @@ detail: string;
  * (`docker compose up …`); empty otherwise. The review step uses it to
  * offer one Service per Compose service instead of the whole file.
  */
-composeServices?: string[] }
+composeServices?: string[]; 
+/**
+ * The virtual environment its command runs in, relative to its working
+ * directory (e.g. `.venv`), found while scanning; the review shows it.
+ */
+pythonEnvironment?: string | null }
 export type Settings = { 
 /**
  * The command that opens a folder in the user's editor, e.g. `code`.
@@ -1741,7 +1779,11 @@ port: string; portCanChange: boolean;
  * The Keys, as typed, of the Services it starts after: others added
  * with it, or the Project's.
  */
-dependencyKeys: string[] }
+dependencyKeys: string[]; 
+/**
+ * The virtual environment scanning found; empty for none.
+ */
+pythonEnvironment?: string }
 /**
  * How serde writes a `SystemTime`, for the TypeScript types: specta's own
  * description of it doesn't match.
