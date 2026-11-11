@@ -15,7 +15,7 @@ export const faq: { question: string; answer: string[] }[] = [
   {
     question: 'Do I need Docker to use localhost?',
     answer: [
-      'No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one per service in your Compose file, and if Docker isn’t running, the Service fails with that reason.',
+      'No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one `Infra` Service running the whole file (`docker compose up`), with each Compose service on its own under “N more found” if you’d rather; in the review you can merge them and pick what each starts after. If Docker isn’t running, the Service fails with that reason.',
     ],
   },
   {

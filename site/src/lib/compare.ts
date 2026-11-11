@@ -92,7 +92,7 @@ export const alternatives: Alternative[] = [
     ],
     localhost: [
       'Commands that run natively with your own toolchain, through your login shell, without a container.',
-      'It runs Compose too: it suggests one Service per Compose service, run as `docker compose up <service>`. Use both together.',
+      'It runs Compose too: it suggests one `Infra` Service for the whole file (`docker compose up`), with each Compose service on its own under “N more found”; merge them as you like and make your app start after them. Use both together.',
     ],
     summary: { wins: 'Containerized, reproducible stacks', localhost: 'Native commands next to your Compose services' },
   },

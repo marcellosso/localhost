@@ -90,7 +90,7 @@ Press **⌘N** (or the **+** in the sidebar) and choose your project's folder. l
 
 - **Node**: `package.json` scripts, run with your package manager (`pnpm run dev`, …). Known dev servers get their default port, passed as `$PORT`.
 - **Docker Compose**: one `Infra` Service running the whole file (`docker compose up`, in the foreground), or one per Compose service (`docker compose up <service>`) if you'd rather. In the review you can also merge Suggestions into one Service and pick what each starts after.
-- **Python**: Django, FastAPI and Flask apps, with uv, Poetry, Pipenv or a virtualenv.
+- **Python**: Django, FastAPI and Flask apps, with uv, Poetry, Pipenv or a virtualenv. A `.venv`, `venv` or `virtualenv` is detected for Python commands and used as the Service's Python environment; `uv run`, `poetry run` and `pipenv run` commands are left as they are.
 - **Cargo**: `cargo run` for each binary.
 
 The likely Services are checked; the rest are folded under “N more found”. Click a row to edit it before adding, then click **Add Project**.
@@ -105,6 +105,8 @@ A Service has:
 
 - a **command**: one command line, run in your login shell (`$SHELL -l -c "…"`), so your `PATH`, version managers and profile apply. Pipes, `&&` and `$VARIABLES` work as in a terminal. On Windows itself it runs in `cmd.exe`;
 - a **working directory** inside the Project (the Project folder by default);
+- an optional **Run before**: a command line run first, in the same shell as the command, so what it sets applies (`nvm use`, `source ./env.sh`). If it fails, or ends the shell with `exit`, the command doesn't run: the Service is Failed and its log shows the output, then “Run before failed…”. Writing both in the command with `&&` still works;
+- an optional **Python environment**: a virtualenv the Service runs in. When it starts, the environment's `bin` folder (`Scripts` on Windows) goes first on `PATH` and `VIRTUAL_ENV` is set, so the command can stay `uvicorn app.main:app`. The command line isn't rewritten, and neither variable is added to the Service's own variables. If the folder is missing, the Service starts without it and the log says so. For a Python command, localhost fills it in with the nearest `.venv`, `venv` or `virtualenv` in the working directory or a folder above it, up to the Project's, and says so in the editor: “Using detected .venv”. It doesn't for commands that already pick their environment (`uv run`, `poetry run`, `pipenv run`, `.venv/bin/uvicorn`), and scanning again never changes existing Services;
 - an optional **Port**. The command gets the actual port as `$PORT` (`%PORT%` in cmd), e.g. `next dev -p $PORT`, and the Service counts as Running once that port accepts connections. Without a Port it counts as Running after about 1.5 seconds;
 - an optional **URL** for Open in Browser (⇧⌘O). Its port follows the actual port;
 - **Starts after**: its Dependencies. Starting the Service starts them first and waits until they are Running, or have Exited for one-off steps such as migrations;
@@ -392,7 +394,7 @@ A Project is a folder; a Service is one long-running command in it, such as `pnp
 
 ### Do I need Docker to use localhost?
 
-No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one Service for your Compose file, or one per Compose service, and if Docker isn’t running, the Service fails with that reason.
+No. localhost runs your own commands, such as `npm run dev`, `uv run fastapi dev` or `cargo run`, natively in your login shell, with your `PATH` and version managers. No Docker or containers are required. If you use Docker Compose, a Compose service can be one of your Services (`docker compose up postgres`): localhost suggests one `Infra` Service running the whole file (`docker compose up`), with each Compose service on its own under “N more found” if you’d rather; in the review you can merge them and pick what each starts after. If Docker isn’t running, the Service fails with that reason.
 
 ### Is localhost a pm2 alternative?
 
