@@ -60,7 +60,8 @@ pub struct ProjectChanges {
 }
 
 /// The fields of a Service to change; `None` leaves a field as it is. For
-/// `port` and `url`, `Some(None)` removes the value.
+/// `port`, `url`, `python_environment` and `run_before`, `Some(None)`
+/// removes the value.
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceChanges {
@@ -74,6 +75,10 @@ pub struct ServiceChanges {
     pub port: Option<Option<i64>>,
     pub url: Option<Option<String>>,
     pub port_can_change: Option<bool>,
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub python_environment: Option<Option<String>>,
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub run_before: Option<Option<String>>,
 }
 
 /// The fields of an Environment Profile to change; `None` leaves a field as it is.
@@ -383,6 +388,8 @@ impl ProjectLibrary {
                 port: imported.port,
                 url: imported.url.clone(),
                 port_can_change: imported.port_can_change,
+                python_environment: imported.python_environment.clone(),
+                run_before: imported.run_before.clone(),
             })
             .collect();
         let ids_by_key: HashMap<Key, Id> =
@@ -510,6 +517,12 @@ impl ProjectLibrary {
         }
         if let Some(port_can_change) = changes.port_can_change {
             service.port_can_change = port_can_change;
+        }
+        if let Some(python_environment) = changes.python_environment {
+            service.python_environment = validate::optional_text(python_environment.as_deref());
+        }
+        if let Some(run_before) = changes.run_before {
+            service.run_before = validate::optional_text(run_before.as_deref());
         }
         project.services[index] = service;
         if let Some(dependencies) = changes.dependencies {
@@ -762,6 +775,8 @@ fn make_service(new: NewService) -> Result<Service, LocalhostError> {
         port: validate::port(new.port)?,
         url: validate::url(new.url.as_deref())?,
         port_can_change: new.port_can_change,
+        python_environment: validate::optional_text(new.python_environment.as_deref()),
+        run_before: validate::optional_text(new.run_before.as_deref()),
     })
 }
 

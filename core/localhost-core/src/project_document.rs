@@ -45,6 +45,8 @@ pub struct DocumentService {
     pub url: Option<String>,
     pub port_can_change: bool,
     pub is_excluded_from_start_all: bool,
+    pub python_environment: Option<String>,
+    pub run_before: Option<String>,
     /// The Keys of the Services of the same file it needs, in order.
     pub dependencies: Vec<Key>,
     pub variables: Variables,
@@ -79,6 +81,8 @@ impl From<&Project> for ProjectDocument {
                     url: service.url.clone(),
                     port_can_change: service.port_can_change,
                     is_excluded_from_start_all: service.is_excluded_from_start_all,
+                    python_environment: service.python_environment.clone(),
+                    run_before: service.run_before.clone(),
                     dependencies: service
                         .dependencies
                         .iter()
@@ -175,7 +179,13 @@ impl ProjectDocument {
                 lines.push(format!("  {}:", write_scalar(service.key.as_str())));
                 lines.push(format!("    name: {}", write_scalar(&service.name)));
                 lines.push(format!("    command: {}", write_scalar(&service.command_line)));
+                if let Some(run_before) = &service.run_before {
+                    lines.push(format!("    run_before: {}", write_scalar(run_before)));
+                }
                 lines.push(format!("    cwd: {}", write_scalar(&service.working_directory)));
+                if let Some(python_environment) = &service.python_environment {
+                    lines.push(format!("    python_environment: {}", write_scalar(python_environment)));
+                }
                 if let Some(port) = service.port {
                     lines.push(format!("    port: {port}"));
                 }
@@ -333,6 +343,10 @@ fn read_service(entry: &YamlEntry) -> Result<(DocumentService, Vec<DependencyIte
         url: fields.optional("url", |raw| Ok(validate::url(Some(raw))?))?.flatten(),
         port_can_change: fields.boolean("port_can_change")?.unwrap_or(true),
         is_excluded_from_start_all: !fields.boolean("start_all")?.unwrap_or(true),
+        python_environment: fields
+            .optional("python_environment", |raw| Ok(validate::optional_text(Some(raw))))?
+            .flatten(),
+        run_before: fields.optional("run_before", |raw| Ok(validate::optional_text(Some(raw))))?.flatten(),
         dependencies: Vec::new(),
         variables: read_variables(&mut fields)?,
     };
@@ -361,6 +375,8 @@ fn resolve_dependencies(lists: &[Vec<DependencyItem>], services: &mut [DocumentS
             port: None,
             url: None,
             port_can_change: true,
+            python_environment: None,
+            run_before: None,
         })
         .collect();
     for (index, list) in lists.iter().enumerate() {

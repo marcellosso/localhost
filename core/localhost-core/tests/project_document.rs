@@ -50,6 +50,12 @@ fn make_full_project(library: &ProjectLibrary) -> Project {
             Origin::MainWindow,
         )
         .unwrap();
+    let mut worker = NewService::new("Jobs", key("jobs"), "celery -A app worker");
+    worker.working_directory = "api".into();
+    worker.python_environment = Some("../virtualenv".into());
+    worker.run_before = Some("source ./env.sh\nexport QUEUE=default".into());
+    worker.is_excluded_from_start_all = true;
+    library.add_service(project.id, worker, vec![], vec![], Origin::MainWindow).unwrap();
     let mut web = NewService::new("Web", key("web"), "pnpm dev");
     web.working_directory = "web".into();
     web.is_excluded_from_start_all = true;
@@ -107,6 +113,13 @@ services:
       DATABASE_URL: postgres://localhost:5432/app
     secrets:
       - STRIPE_KEY
+  jobs:
+    name: Jobs
+    command: celery -A app worker
+    run_before: \"source ./env.sh\\nexport QUEUE=default\"
+    cwd: api
+    python_environment: ../virtualenv
+    start_all: false
   web:
     name: Web
     command: pnpm dev
@@ -157,7 +170,10 @@ fn export_import_export_gives_the_same_file_and_the_same_project_but_for_identit
             service.dependencies.iter().filter_map(|id| imported.service(*id)).map(|s| s.key.as_str()).collect()
         })
         .collect();
-    assert_eq!(dependency_keys, [vec![], vec!["database"], vec!["api"]]);
+    assert_eq!(dependency_keys, [vec![], vec!["database"], vec![], vec!["api"]]);
+    let jobs = &imported.services[2];
+    assert_eq!(jobs.python_environment.as_deref(), Some("../virtualenv"));
+    assert_eq!(jobs.run_before.as_deref(), Some("source ./env.sh\nexport QUEUE=default"));
 }
 
 // MARK: Reading
@@ -174,10 +190,12 @@ path: ~/Code/my-saas
 services:
   web:
     command: pnpm dev   # the Vite app
+    run_before: nvm use
     cwd: ./web/
     port: "3000"
   api:
-    command: 'uv run fastapi dev'
+    command: 'uvicorn app:app'
+    python_environment: virtualenv
     cwd: ./api
     port: 8000
     depends_on: [database, database]
@@ -197,6 +215,9 @@ services:
     assert_eq!(services.iter().map(|service| service.name.as_str()).collect::<Vec<_>>(), ["web", "api", "database"]);
     assert_eq!(services[0].working_directory, "web");
     assert_eq!(services[0].port, Some(3000));
+    assert_eq!(services[0].run_before.as_deref(), Some("nvm use"));
+    assert_eq!(services[0].python_environment, None);
+    assert_eq!(services[1].python_environment.as_deref(), Some("virtualenv"));
     assert_eq!(services[1].dependencies, [key("database")]);
     assert_eq!(
         services[1].variables.values,
@@ -382,7 +403,7 @@ fn replace_keeps_the_projects_identity_matching_services_and_profiles_and_their_
     assert!(replaced.is_favorite);
     assert_eq!(replaced.name, "My SaaS (shared)");
     let keys: Vec<&str> = replaced.services.iter().map(|service| service.key.as_str()).collect();
-    assert_eq!(keys, ["database", "api", "worker"]);
+    assert_eq!(keys, ["database", "api", "jobs", "worker"]);
     assert_eq!(replaced.services[1].id, api.id);
     let profile_ids = |project: &Project| project.profiles.iter().map(|profile| profile.id).collect::<Vec<_>>();
     assert_eq!(profile_ids(&replaced), profile_ids(&existing));

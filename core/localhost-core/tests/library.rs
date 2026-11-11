@@ -751,3 +751,28 @@ fn a_dropped_subscriber_is_forgotten() {
     library.add_project("Two", key("two"), "/tmp/two", vec![], Origin::MainWindow).unwrap();
     assert!(matches!(events.try_recv(), Ok(ProjectLibraryEvent::ProjectAdded { .. })));
 }
+
+#[test]
+fn a_services_python_environment_and_run_before_are_trimmed_and_cleared_when_blank() {
+    let fixture = Fixture::new();
+    let library = fixture.library();
+    let project =
+        library.add_project("App", key("app"), &common::some_project_path("app"), vec![], Origin::MainWindow).unwrap();
+    let mut api = NewService::new("API", key("api"), "uvicorn app:app");
+    api.python_environment = Some("  virtualenv ".into());
+    api.run_before = Some("   ".into());
+    let api = library.add_service(project.id, api, vec![], vec![], Origin::MainWindow).unwrap();
+    assert_eq!((api.python_environment.as_deref(), api.run_before.as_deref()), (Some("virtualenv"), None));
+
+    let edit = |changes: ServiceChanges| library.edit_service(api.id, changes, Origin::MainWindow).unwrap();
+    let edited = edit(ServiceChanges { run_before: Some(Some(" nvm use \n".into())), ..Default::default() });
+    assert_eq!(edited.run_before.as_deref(), Some("nvm use"));
+    assert_eq!(edited.python_environment.as_deref(), Some("virtualenv"), "left out: kept");
+    let edited = edit(ServiceChanges {
+        python_environment: Some(None),
+        run_before: Some(Some(String::new())),
+        ..Default::default()
+    });
+    assert_eq!((edited.python_environment, edited.run_before), (None, None));
+    assert_eq!(fixture.library().project(project.id).unwrap().services[0].python_environment, None);
+}

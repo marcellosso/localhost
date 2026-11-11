@@ -107,6 +107,8 @@ impl Project {
                 port,
                 url: None,
                 port_can_change: true,
+                python_environment: None,
+                run_before: None,
             })
             .collect();
         project
@@ -186,6 +188,19 @@ pub struct Service {
     /// commands that ignore `$PORT`.
     #[serde(default = "default_true")]
     pub port_can_change: bool,
+    /// A Python virtual environment (`.venv`, `virtualenv`) the Run uses, as
+    /// written: relative to the working directory, or absolute. Its programs
+    /// folder goes first on `PATH` and it is `VIRTUAL_ENV`, as `activate`
+    /// would do; the command line stays as it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub python_environment: Option<String>,
+    /// A command line run first, in the same shell, so what it sets (`nvm
+    /// use`, `source env.sh`) applies to the command. If it fails, the
+    /// command doesn't run and the Run is Failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub run_before: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -230,6 +245,10 @@ pub struct NewService {
     /// save, or ones the Project already has. Keys, since Services added
     /// together have no ids yet; they are saved as ids like any Dependency.
     pub dependency_keys: Vec<Key>,
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub python_environment: Option<String>,
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub run_before: Option<String>,
 }
 
 impl NewService {
@@ -245,6 +264,8 @@ impl NewService {
             port_can_change: true,
             is_excluded_from_start_all: false,
             dependency_keys: Vec::new(),
+            python_environment: None,
+            run_before: None,
         }
     }
 }
@@ -380,6 +401,7 @@ mod tests {
         assert!(!service.is_excluded_from_start_all);
         assert!(service.port_can_change);
         assert_eq!(service.port, None);
+        assert_eq!((service.python_environment, service.run_before), (None, None));
     }
 
     #[test]

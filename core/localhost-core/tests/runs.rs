@@ -343,3 +343,132 @@ async fn the_current_sessions_own_runs_are_not_orphans() {
     assert!(registry.orphans().is_empty());
     manager.stop(service.id, Origin::MainWindow).await.unwrap();
 }
+
+// MARK: Python environment and Run before
+
+/// A virtual environment in the Project folder with one program, `tool`,
+/// that prints `from-venv`.
+#[cfg(unix)]
+fn virtual_environment(s: &Services, name: &str) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let folder = s.project_folder().join(name);
+    std::fs::create_dir_all(folder.join("bin")).unwrap();
+    std::fs::write(folder.join("pyvenv.cfg"), "home = /usr/bin\n").unwrap();
+    let tool = folder.join("bin/tool");
+    std::fs::write(&tool, "#!/bin/sh\necho from-venv\n").unwrap();
+    std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).unwrap();
+    folder
+}
+
+/// Adds the Service, starts it and returns its Run's lines once it has ended.
+async fn lines_of_run(s: &Services, service: NewService) -> Vec<OutputLine> {
+    let service = s.add(service, vec![], vec![]);
+    let status = s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
+    let run_id = status.run.unwrap().id;
+    let (_, mut updates) = s.logs.subscribe_to_run(run_id);
+    tokio::time::timeout(PATIENCE, async { while updates.recv().await.is_some() {} }).await.unwrap();
+    s.logs.lines(run_id)
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn a_python_environment_goes_first_on_path_and_is_virtual_env() {
+    let s = Services::new();
+    let folder = virtual_environment(&s, "virtualenv");
+    let mut web = NewService::new(
+        "Web",
+        key("web"),
+        "echo \"$(tool) VIRTUAL_ENV=$VIRTUAL_ENV FIRST=${PATH%%:*}\" > env.txt; exec sleep 1000",
+    );
+    web.python_environment = Some("virtualenv".into());
+    let service = s.add(web, vec![], vec![]);
+
+    let expected = format!("from-venv VIRTUAL_ENV={0} FIRST={0}/bin", folder.display());
+    assert_eq!(run_output(&s, &service).await, expected);
+    let saved = &s.library.project(s.project.id).unwrap().services[0];
+    assert!(!saved.environment.contains_key("PATH") && !saved.environment.contains_key("VIRTUAL_ENV"));
+    s.manager.stop(service.id, Origin::MainWindow).await.unwrap();
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn a_python_environment_stays_first_after_the_login_profile_and_run_before_runs_in_it() {
+    let s = Services::new();
+    virtual_environment(&s, ".venv");
+    // What macOS's `path_helper` or pyenv's shims do to `PATH` in a login profile.
+    let home = s.project_folder().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(".profile"), "PATH=/usr/bin:/bin\nexport PATH\n").unwrap();
+    let mut web = NewService::new("Web", key("web"), "echo \"$(tool) $BEFORE\" > env.txt; exec sleep 1000");
+    web.python_environment = Some(".venv".into());
+    web.run_before = Some("BEFORE=$(tool)".into());
+    let home = VariableInput::plain("HOME", home.to_str().unwrap());
+    let service = s.add(web, vec![home], vec![]);
+
+    assert_eq!(run_output(&s, &service).await, "from-venv from-venv");
+    s.manager.stop(service.id, Origin::MainWindow).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_missing_python_environment_is_noted_and_the_command_runs_without_it() {
+    let s = Services::new();
+    let mut web = NewService::new("Web", key("web"), "echo ran");
+    web.python_environment = Some(".venv".into());
+    let lines = lines_of_run(&s, web).await;
+
+    assert_eq!(on(&lines, OutputChannel::Stdout), ["ran"]);
+    let notes = on(&lines, OutputChannel::Localhost);
+    assert!(notes[0].starts_with("No Python environment at ") && notes[0].ends_with(".venv: running without it"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn run_before_runs_first_in_the_same_shell() {
+    let s = Services::new();
+    let mut web = NewService::new("Web", key("web"), "echo \"$GREETING from $(basename \"$PWD\")\"");
+    std::fs::create_dir_all(s.project_folder().join("sub")).unwrap();
+    web.run_before = Some("GREETING=hello\ncd sub # a comment".into());
+    let lines = lines_of_run(&s, web).await;
+
+    assert_eq!(on(&lines, OutputChannel::Stdout), ["hello from sub"]);
+    assert_eq!(
+        on(&lines, OutputChannel::Localhost),
+        ["Run before: GREETING=hello\ncd sub # a comment", "Exited with code 0"]
+    );
+    assert_eq!(ended_status(&s).await.state, ServiceState::Exited);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn when_run_before_fails_the_command_doesnt_run_and_the_log_says_so() {
+    let s = Services::new();
+    let mut web = NewService::new("Web", key("web"), "echo should-not-run; exec sleep 1000");
+    web.run_before = Some("echo 'nvm: version not installed' >&2; exit 3".into());
+    let lines = lines_of_run(&s, web).await;
+    let status = ended_status(&s).await;
+
+    assert_eq!(status.state, ServiceState::Failed);
+    assert_eq!(status.run.unwrap().termination, Some(Termination::Exited { code: 3 }));
+    assert!(on(&lines, OutputChannel::Stdout).is_empty());
+    assert_eq!(on(&lines, OutputChannel::Stderr), ["nvm: version not installed"]);
+    assert_eq!(
+        on(&lines, OutputChannel::Localhost)[1..],
+        ["Run before failed with exit code 3, so the command didn’t run", "Exited with code 3"]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn changing_run_before_or_the_python_environment_marks_a_running_service() {
+    let s = Services::new();
+    let service = printing_service(&s, &[], vec![], None);
+    let (_, mut events) = s.manager.subscribe();
+    run_output(&s, &service).await;
+    let edit = |changes: ServiceChanges| s.library.edit_service(service.id, changes, Origin::MainWindow).unwrap();
+
+    edit(ServiceChanges { run_before: Some(Some("nvm use".into())), ..Default::default() });
+    next_status(&mut events, &service, |status| status.is_restart_needed).await;
+    edit(ServiceChanges { run_before: Some(None), ..Default::default() });
+    next_status(&mut events, &service, |status| !status.is_restart_needed).await;
+    edit(ServiceChanges { python_environment: Some(Some(".venv".into())), ..Default::default() });
+    next_status(&mut events, &service, |status| status.is_restart_needed).await;
+
+    s.manager.stop(service.id, Origin::MainWindow).await.unwrap();
+}

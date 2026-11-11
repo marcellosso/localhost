@@ -11,8 +11,8 @@
 //! every Secret a layer has is kept as it is.
 
 use localhost_core::{
-    Id, Key, NewService, Origin, Project, ProjectChanges, Service, ServiceChanges, VariableInput, Variables,
-    existing_project_folder, suggested_project_key,
+    CommandSyntax, Id, Key, NewService, Origin, Project, ProjectChanges, Service, ServiceChanges, VariableInput,
+    Variables, detect_python_environment, existing_project_folder, suggested_project_key,
 };
 use serde_json::{Map, Value, json};
 
@@ -47,6 +47,8 @@ pub fn definitions() -> Vec<Value> {
             "port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535, "description": "The TCP port it listens on: it is running once the port accepts connections, and its command gets it as $PORT. Leave out for none." },
             "url": { "type": ["string", "null"], "description": "Where to open it, e.g. \"http://localhost:3000/admin\". Leave out to use http://localhost:<port>." },
             "port_can_change": { "type": "boolean", "description": "Whether a Run may move to the next free port when the Port is taken. Turn off for commands that ignore $PORT. Default true." },
+            "run_before": { "type": ["string", "null"], "description": "A command run first in the same shell, e.g. \"nvm use\" or \"source env.sh\", so what it sets applies to command_line. If it fails, the command doesn't run and the Service fails. Leave out for none." },
+            "python_environment": { "type": ["string", "null"], "description": "A Python virtual environment to run in, relative to working_directory, e.g. \".venv\" or \"virtualenv\": its bin folder goes first on PATH and VIRTUAL_ENV is set, so command_line can say \"uvicorn app:app\". Leave out to use the one found next to a Python command (uvicorn, flask, python, …), if any; null for none." },
             "in_start_all": { "type": "boolean", "description": "Whether start_project starts it. Default true." },
             "dependencies": { "type": "array", "items": { "type": "string" }, "description": "Keys of Services of the same Project that must be running (or have exited) before it starts." },
             "env": env,
@@ -56,6 +58,12 @@ pub fn definitions() -> Vec<Value> {
             fields["key"]["description"] = "A new Key: lowercase letters, digits and single hyphens.".into();
             fields["port"]["description"] = "A new Port, or null for none.".into();
             fields["url"]["description"] = "A new URL, or null for none.".into();
+            fields["run_before"]["description"] =
+                "A new command run first in the same shell, or null for none. If it fails, the command doesn't run."
+                    .into();
+            fields["python_environment"]["description"] =
+                "A new Python virtual environment, relative to working_directory (e.g. \".venv\"), or null for none."
+                    .into();
             fields["dependencies"]["description"] =
                 "Replaces its Dependencies: Keys of Services of the same Project; [] for none.".into();
         }
@@ -241,16 +249,30 @@ impl Tools {
             Some(key) => Key::new(key)?,
             None => project.suggested_service_key(name, None),
         };
+        let working_directory = optional_string(arguments, "working_directory")?.unwrap_or(".").to_string();
+        let command_line = required_string(arguments, "command_line")?.to_string();
+        // Left out, a new Service runs in the virtual environment found next
+        // to it, as one added in the app would. A distro's folders aren't
+        // read from here.
+        let python_environment = match optional_text(arguments, "python_environment")? {
+            Some(python_environment) => python_environment,
+            None if project.execution_target.is_this_machine() => {
+                detect_python_environment(&project.path, &working_directory, &command_line, CommandSyntax::HERE)
+            }
+            None => None,
+        };
         let new = NewService {
             name: name.to_string(),
             key,
-            working_directory: optional_string(arguments, "working_directory")?.unwrap_or(".").to_string(),
-            command_line: required_string(arguments, "command_line")?.to_string(),
+            working_directory,
+            command_line,
             port: port(arguments)?.flatten(),
             url: url(arguments)?.flatten(),
             port_can_change: optional_bool(arguments, "port_can_change")?.unwrap_or(true),
             is_excluded_from_start_all: !optional_bool(arguments, "in_start_all")?.unwrap_or(true),
             dependency_keys: Vec::new(),
+            python_environment,
+            run_before: optional_text(arguments, "run_before")?.flatten(),
         };
         let variables = variables(arguments, &Variables::default())?.unwrap_or_default();
         let dependencies = dependencies(&project, arguments)?.unwrap_or_default();
@@ -273,6 +295,8 @@ impl Tools {
             port: port(arguments)?,
             url: url(arguments)?,
             port_can_change: optional_bool(arguments, "port_can_change")?,
+            python_environment: optional_text(arguments, "python_environment")?,
+            run_before: optional_text(arguments, "run_before")?,
         };
         let service = self.library.edit_service(service.id, changes, Origin::Agent)?;
         let project = self.library.project(project.id)?;
@@ -362,6 +386,16 @@ fn url(arguments: &Map<String, Value>) -> Result<Option<Option<String>>, ToolErr
     }
 }
 
+/// `None` if left out, `Some(None)` for null (none).
+fn optional_text(arguments: &Map<String, Value>, name: &str) -> Result<Option<Option<String>>, ToolError> {
+    match arguments.get(name) {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(None)),
+        Some(Value::String(text)) => Ok(Some(Some(text.clone()))),
+        Some(_) => Err(ToolError::invalid(format!("`{name}` must be a string, or null for none."))),
+    }
+}
+
 /// The layer's variables from `env`: its plain values, and every Secret
 /// `current` has, kept. `None` if `env` is left out.
 fn variables(arguments: &Map<String, Value>, current: &Variables) -> Result<Option<Vec<VariableInput>>, ToolError> {
@@ -427,7 +461,9 @@ fn service_value(project: &Project, service: &Service) -> Value {
         "key": service.key,
         "name": service.name,
         "commandLine": service.command_line,
+        "runBefore": service.run_before,
         "workingDirectory": service.working_directory,
+        "pythonEnvironment": service.python_environment,
         "port": service.port,
         "url": service.url,
         "portCanChange": service.port_can_change,
