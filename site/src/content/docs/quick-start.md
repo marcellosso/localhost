@@ -5,11 +5,11 @@ Shortcuts are written for macOS; on Linux and Windows use Ctrl for ⌘ and Alt f
 Press **⌘N** (or the **+** in the sidebar) and choose your project's folder. localhost fills in a name and a **Key** (a short handle such as `my-saas`, used in logs and by the command line), then scans the folder and lists what it found:
 
 - **Node**: `package.json` scripts, run with your package manager (`pnpm run dev`, …). Known dev servers get their default port, passed as `$PORT`.
-- **Docker Compose**: one Service per Compose service, `docker compose up <service>` in the foreground.
-- **Python**: Django, FastAPI and Flask apps, with uv, Poetry, Pipenv or a virtualenv.
+- **Docker Compose**: one `Infra` Service running the whole file (`docker compose up`, in the foreground), or one per Compose service (`docker compose up <service>`) if you'd rather. In the review you can also merge Suggestions into one Service and pick what each starts after.
+- **Python**: Django, FastAPI and Flask apps, with uv, Poetry, Pipenv or a virtualenv. A `.venv`, `venv` or `virtualenv` is detected for Python commands and used as the Service's Python environment; `uv run`, `poetry run` and `pipenv run` commands are left as they are.
 - **Cargo**: `cargo run` for each binary.
 
-The likely Services are checked; the rest are folded under “N more found”. Click a row to edit it before adding, then click **Add Project**.
+The likely Services are checked, such as `Infra` for a Compose file with two or more services; the rest, such as each Compose service on its own, are folded under “N more found”. Select several and click **Merge…** to make them one Service, or set what a Suggestion **Starts after**. Click a row to edit it before adding, then click **Add Project**.
 
 Nothing found, or a command it doesn't know? Add the Project anyway and add Services yourself with **⇧⌘N**. **Detect Services…** scans again later.
 
