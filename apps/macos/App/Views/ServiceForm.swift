@@ -3,8 +3,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Adds or edits a Service: name, key, working directory relative to the
-/// Project, command line, Port and URL, environment variables, Dependencies
-/// and whether Start All includes it.
+/// Project, command line, Run before, Python environment, Port and URL,
+/// environment variables, Dependencies and whether Start All includes it.
+///
+/// A new Service takes the virtual environment the core finds for its
+/// command until the user edits that field; an existing one only offers it.
 struct ServiceForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +19,10 @@ struct ServiceForm: View {
     @State private var isKeyEdited = false
     @State private var workingDirectory = "."
     @State private var commandLine = ""
+    @State private var runBefore = ""
+    @State private var pythonEnvironment = ""
+    @State private var isPythonEnvironmentEdited = false
+    @State private var detectedEnvironment: String?
     @State private var port = ""
     @State private var url = ""
     @State private var portCanChange = true
@@ -54,6 +61,34 @@ struct ServiceForm: View {
             }
             Field(title: "Command", note: "runs in your login shell") {
                 CommandField(workingDirectory: $workingDirectory, commandLine: $commandLine) { isChoosingFolder = true }
+            }
+            Field(
+                title: "Run before",
+                note: "optional · same shell, first",
+                hint: "Runs before the command, in the same shell, e.g. “nvm use”. If it fails, the service doesn’t start."
+            ) {
+                BoxedTextField(label: "Run before", text: $runBefore, prompt: "nvm use", isMonospaced: true)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Field(title: "Python environment", note: "virtualenv") {
+                    PythonEnvironmentField(path: pythonEnvironmentBinding, detected: detectedEnvironment)
+                }
+                if isUsingDetectedEnvironment, let detectedEnvironment {
+                    DetectedEnvironment(path: detectedEnvironment)
+                }
+                if let pythonEnvironmentHint {
+                    FieldHint(pythonEnvironmentHint)
+                }
+            }
+            .task(id: DetectionInput(workingDirectory: workingDirectory, commandLine: commandLine)) {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                let detected = await ProjectScanner().pythonEnvironment(
+                    projectPath: project.path, workingDirectory: workingDirectory, commandLine: commandLine
+                )
+                guard !Task.isCancelled else { return }
+                detectedEnvironment = detected
+                if !isPythonEnvironmentEdited { pythonEnvironment = detected ?? "" }
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 12) {
@@ -100,6 +135,9 @@ struct ServiceForm: View {
             isKeyEdited = true
             workingDirectory = editing.workingDirectory
             commandLine = editing.commandLine
+            runBefore = editing.runBefore ?? ""
+            pythonEnvironment = editing.pythonEnvironment ?? ""
+            isPythonEnvironmentEdited = true
             port = editing.port.map(String.init) ?? ""
             url = editing.url ?? ""
             portCanChange = editing.portCanChange
@@ -107,6 +145,34 @@ struct ServiceForm: View {
             dependencies = editing.dependencies
             isExcludedFromStartAll = editing.isExcludedFromStartAll
         }
+    }
+
+    /// What the virtual environment is detected from.
+    private struct DetectionInput: Equatable {
+        let workingDirectory: String
+        let commandLine: String
+    }
+
+    private var pythonEnvironmentBinding: Binding<String> {
+        Binding { pythonEnvironment } set: { newValue in
+            pythonEnvironment = newValue
+            isPythonEnvironmentEdited = true
+        }
+    }
+
+    private var isUsingDetectedEnvironment: Bool {
+        let trimmed = pythonEnvironment.trimmingCharacters(in: .whitespaces)
+        return !trimmed.isEmpty && trimmed == detectedEnvironment
+    }
+
+    private var pythonEnvironmentHint: String? {
+        let trimmed = pythonEnvironment.trimmingCharacters(in: .whitespaces)
+        if isUsingDetectedEnvironment { return nil }
+        if !trimmed.isEmpty {
+            return "Its bin folder goes first on PATH and VIRTUAL_ENV is set, as activate does. Relative to the working directory."
+        }
+        if let detectedEnvironment { return "Off. \(detectedEnvironment) was found next to this Python command." }
+        return "Optional. A virtual environment such as .venv, relative to the working directory."
     }
 
     /// The Service's colour; a new one gets the next colour in the Project.
@@ -188,14 +254,14 @@ struct ServiceForm: View {
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
-                    portCanChange: portCanChange
+                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
-                    portCanChange: portCanChange
+                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore
                 )
             }
             dismiss()

@@ -15,6 +15,8 @@ struct SuggestionDraft: Identifiable {
     var commandLine: String
     var port: String
     var portCanChange: Bool
+    /// The virtual environment scanning found, while the user keeps it; empty for none.
+    var pythonEnvironment: String
     /// The drafts it starts after; only the checked ones are saved.
     var startsAfter: [UUID] = []
     /// The Keys of the Project's Services it starts after.
@@ -31,6 +33,7 @@ struct SuggestionDraft: Identifiable {
         commandLine = suggestion.commandLine
         port = suggestion.port.map(String.init) ?? ""
         portCanChange = suggestion.portCanChange
+        pythonEnvironment = suggestion.pythonEnvironment ?? ""
     }
 
     /// The draft as the Suggestion it now is, with the user's edits, to merge it.
@@ -42,6 +45,7 @@ struct SuggestionDraft: Identifiable {
         edited.commandLine = commandLine
         edited.corePort = UInt16(port.trimmingCharacters(in: .whitespaces))
         edited.portCanChange = portCanChange
+        edited.pythonEnvironment = pythonEnvironment.isEmpty ? nil : pythonEnvironment
         return edited
     }
 
@@ -66,7 +70,8 @@ struct SuggestionDraft: Identifiable {
                 services.append(NewService(
                     name: draft.name, key: try Key(draft.key.trimmingCharacters(in: .whitespaces)),
                     workingDirectory: draft.workingDirectory, commandLine: draft.commandLine,
-                    port: port, portCanChange: draft.portCanChange, dependencyKeys: dependencyKeys
+                    port: port, portCanChange: draft.portCanChange, dependencyKeys: dependencyKeys,
+                    pythonEnvironment: draft.pythonEnvironment.isEmpty ? nil : draft.pythonEnvironment
                 ))
             } catch {
                 return .failure(ReviewError(message: error.message))
@@ -434,6 +439,9 @@ private struct SuggestionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if !draft.pythonEnvironment.isEmpty {
+                        DetectedEnvironment(path: draft.pythonEnvironment)
+                    }
                 }
                 Spacer(minLength: 8)
                 if let port = Int(draft.port) {
@@ -503,6 +511,11 @@ private struct SuggestionRow: View {
             }
             Field(title: "Command") {
                 CommandField(workingDirectory: $draft.workingDirectory, commandLine: $draft.commandLine, chooseDirectory: chooseFolder)
+            }
+            if let found = draft.suggestion.pythonEnvironment {
+                SwitchRow(title: "Use its Python environment",
+                          detail: "\(found) goes first on PATH when it starts, as activate does.",
+                          isOn: Binding { !draft.pythonEnvironment.isEmpty } set: { draft.pythonEnvironment = $0 ? found : "" })
             }
             if !draft.port.isEmpty {
                 SwitchRow(title: "Port can change",

@@ -165,6 +165,30 @@ private final class TemporaryRoot {
         #expect(ServiceState.mostSignificant(of: [.running, .failed]) == .failed)
         #expect(ServiceState.mostSignificant(of: []) == nil)
     }
+
+    @Test func setsAndClearsRunBeforeAndThePythonEnvironmentItFinds() async throws {
+        let root = try TemporaryRoot()
+        let folder = root.url.appending(path: "api")
+        try FileManager.default.createDirectory(at: folder.appending(path: "virtualenv/bin"), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: folder.appending(path: "virtualenv/bin/python").path, contents: Data())
+
+        let scanner = ProjectScanner()
+        let found = await scanner.pythonEnvironment(projectPath: folder.path, workingDirectory: ".", commandLine: "uvicorn app:app")
+        #expect(found == "virtualenv")
+        #expect(await scanner.pythonEnvironment(projectPath: folder.path, workingDirectory: ".", commandLine: "pnpm dev") == nil)
+
+        let library = try ProjectLibrary(storageRoot: root.url)
+        let project = try await library.addProject(name: "API", key: Key("api"), path: folder.path, origin: .mainWindow)
+        let service = try await library.addService(
+            toProject: project.id, name: "API", key: Key("api"), commandLine: "uvicorn app:app",
+            pythonEnvironment: found, runBefore: "source env.sh", origin: .mainWindow
+        )
+        #expect(service.pythonEnvironment == "virtualenv")
+        #expect(service.runBefore == "source env.sh")
+        let edited = try await library.editService(id: service.id, pythonEnvironment: .some(nil), origin: .mainWindow)
+        #expect(edited.pythonEnvironment == nil)
+        #expect(edited.runBefore == "source env.sh", "left out: kept")
+    }
 }
 
 @Suite(.serialized) struct RunTests {

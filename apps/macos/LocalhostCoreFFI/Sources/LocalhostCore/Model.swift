@@ -83,7 +83,9 @@ extension NewService {
         url: String? = nil,
         portCanChange: Bool = true,
         isExcludedFromStartAll: Bool = false,
-        dependencyKeys: [Key] = []
+        dependencyKeys: [Key] = [],
+        pythonEnvironment: String? = nil,
+        runBefore: String? = nil
     ) {
         self.init(
             name: name,
@@ -94,7 +96,9 @@ extension NewService {
             url: url,
             portCanChange: portCanChange,
             isExcludedFromStartAll: isExcludedFromStartAll,
-            dependencyKeys: dependencyKeys
+            dependencyKeys: dependencyKeys,
+            pythonEnvironment: pythonEnvironment,
+            runBefore: runBefore
         )
     }
 
@@ -106,7 +110,8 @@ extension NewService {
             workingDirectory: suggestion.workingDirectory,
             commandLine: suggestion.commandLine,
             port: suggestion.port,
-            portCanChange: suggestion.portCanChange
+            portCanChange: suggestion.portCanChange,
+            pythonEnvironment: suggestion.pythonEnvironment
         )
     }
 }

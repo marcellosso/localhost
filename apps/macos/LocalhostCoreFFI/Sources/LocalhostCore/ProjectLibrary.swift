@@ -119,6 +119,8 @@ extension ProjectLibrary {
         port: Int? = nil,
         url: String? = nil,
         portCanChange: Bool = true,
+        pythonEnvironment: String? = nil,
+        runBefore: String? = nil,
         origin: Origin
     ) async throws(LocalhostError) -> Service {
         let service = NewService(
@@ -129,7 +131,9 @@ extension ProjectLibrary {
             port: port,
             url: url,
             portCanChange: portCanChange,
-            isExcludedFromStartAll: isExcludedFromStartAll
+            isExcludedFromStartAll: isExcludedFromStartAll,
+            pythonEnvironment: pythonEnvironment,
+            runBefore: runBefore
         )
         return try await core {
             try await ffiAddService(
@@ -151,7 +155,8 @@ extension ProjectLibrary {
         try await core { try await ffiAddServices(services: services, projectId: projectID, origin: origin) }
     }
 
-    /// Changes what is given; `port: .some(nil)` clears the port.
+    /// Changes what is given; `port: .some(nil)` clears the port, and the
+    /// same for `url`, `pythonEnvironment` and `runBefore`.
     @discardableResult
     public func editService(
         id: UUID,
@@ -165,6 +170,8 @@ extension ProjectLibrary {
         port: Int?? = nil,
         url: String?? = nil,
         portCanChange: Bool? = nil,
+        pythonEnvironment: String?? = nil,
+        runBefore: String?? = nil,
         origin: Origin
     ) async throws(LocalhostError) -> Service {
         let changes = ServiceChanges(
@@ -177,7 +184,9 @@ extension ProjectLibrary {
             isExcludedFromStartAll: isExcludedFromStartAll,
             port: port.map { $0.map(Int64.init) },
             url: url,
-            portCanChange: portCanChange
+            portCanChange: portCanChange,
+            pythonEnvironment: pythonEnvironment,
+            runBefore: runBefore
         )
         return try await core { try await ffiEditService(id: id, changes: changes, origin: origin) }
     }

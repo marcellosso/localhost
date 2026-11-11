@@ -14,6 +14,21 @@ public struct ProjectScanner: Sendable {
     public func scan(_ project: Project) async -> [ServiceSuggestion] {
         await scanProject(project: project)
     }
+
+    /// The virtual environment a new Service of the Project at `projectPath`
+    /// would run in (`.venv`, `../virtualenv`), when its command starts a
+    /// Python program; `nil` otherwise.
+    public func pythonEnvironment(
+        projectPath: String,
+        workingDirectory: String,
+        commandLine: String
+    ) async -> String? {
+        await detectPythonEnvironment(
+            projectPath: projectPath,
+            workingDirectory: workingDirectory,
+            commandLine: commandLine
+        )
+    }
 }
 
 extension ServiceSuggestion {
