@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImportPreview, Project, ServiceSuggestion } from "../bindings";
 import { viewFromSnapshot } from "../core";
@@ -16,6 +22,8 @@ const commands = vi.hoisted(() => ({
   keyFromName: vi.fn(),
   addProject: vi.fn(),
   editService: vi.fn(),
+  addService: vi.fn(),
+  detectPythonEnvironment: vi.fn(),
   serviceRelations: vi.fn(),
   commandLineUsesPort: vi.fn(),
   secretValue: vi.fn(),
@@ -29,13 +37,31 @@ vi.mock("../bindings", () => ({ commands }));
 const ok = <T,>(data: T) => ({ status: "ok", data }) as const;
 
 const api = service("API", 4000);
-const worker = { ...service("Worker"), dependencies: [api.id], secretNames: ["TOKEN"], environment: { MODE: "dev" } };
-const shop: Project = { ...project("Shop", 0, [api, worker]), path: "/home/me/shop" };
-const view = viewFromSnapshot({ projects: [shop], statuses: [], projectStates: [] });
+const worker = {
+  ...service("Worker"),
+  dependencies: [api.id],
+  secretNames: ["TOKEN"],
+  environment: { MODE: "dev" },
+};
+const shop: Project = {
+  ...project("Shop", 0, [api, worker]),
+  path: "/home/me/shop",
+};
+const view = viewFromSnapshot({
+  projects: [shop],
+  statuses: [],
+  projectStates: [],
+});
 
 function renderSheets() {
   const selected = { project: vi.fn(), service: vi.fn() };
-  render(<Sheets view={view} onSelectProject={selected.project} onSelectService={selected.service} />);
+  render(
+    <Sheets
+      view={view}
+      onSelectProject={selected.project}
+      onSelectService={selected.service}
+    />,
+  );
   return selected;
 }
 
@@ -59,26 +85,42 @@ function suggestion(name: string, isRecommended: boolean): ServiceSuggestion {
 
 describe("Sheets", () => {
   beforeEach(() => {
-    Object.values(commands).forEach((command) => command.mockResolvedValue(ok(null)));
-    commands.suggestedProjectKey.mockImplementation(async (name: string) => ok(name.toLowerCase().replace(/ /g, "-")));
-    commands.serviceRelations.mockResolvedValue(ok({ cycles: [], dependents: [] }));
+    Object.values(commands).forEach((command) =>
+      command.mockResolvedValue(ok(null)),
+    );
+    commands.suggestedProjectKey.mockImplementation(async (name: string) =>
+      ok(name.toLowerCase().replace(/ /g, "-")),
+    );
+    commands.serviceRelations.mockResolvedValue(
+      ok({ cycles: [], dependents: [] }),
+    );
     commands.commandLineUsesPort.mockResolvedValue(true);
     commands.wslDistros.mockResolvedValue([]);
   });
   afterEach(() => act(resetUi));
 
   it("adds a Project from a chosen folder with the Suggestions left checked", async () => {
-    const folder = { target: { kind: "thisMachine" }, path: "/home/me/my-saas" } as const;
+    const folder = {
+      target: { kind: "thisMachine" },
+      path: "/home/me/my-saas",
+    } as const;
     commands.chooseFolder.mockResolvedValue(folder);
-    commands.scanFolder.mockResolvedValue(ok([suggestion("Dev", true), suggestion("Build", false)]));
+    commands.scanFolder.mockResolvedValue(
+      ok([suggestion("Dev", true), suggestion("Build", false)]),
+    );
     const added = { ...shop, id: "new" };
     commands.addProject.mockResolvedValue(ok(added));
     const selected = renderSheets();
     act(() => showSheet({ kind: "addProject" }));
 
     expect(screen.queryByLabelText("Runs in")).toBeNull();
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
-    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "thisMachine" }, null);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Folder" })),
+    );
+    expect(commands.chooseFolder).toHaveBeenCalledWith(
+      { kind: "thisMachine" },
+      null,
+    );
     expect(commands.scanFolder).toHaveBeenCalledWith(folder);
     expect(field("Name").value).toBe("my-saas");
     await waitFor(() => expect(field("Key").value).toBe("my-saas"));
@@ -93,53 +135,104 @@ describe("Sheets", () => {
     await act(async () => {});
     expect(field("Key").value).toBe("saas");
 
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add Project" })));
-    expect(commands.addProject).toHaveBeenCalledWith("My Other SaaS", "saas", folder, [
-      { name: "Dev", key: "dev", workingDirectory: ".", commandLine: "pnpm dev", port: "", portCanChange: true, dependencyKeys: [] },
-    ]);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Add Project" })),
+    );
+    expect(commands.addProject).toHaveBeenCalledWith(
+      "My Other SaaS",
+      "saas",
+      folder,
+      [
+        {
+          name: "Dev",
+          key: "dev",
+          workingDirectory: ".",
+          commandLine: "pnpm dev",
+          port: "",
+          portCanChange: true,
+          pythonEnvironment: "",
+          dependencyKeys: [],
+        },
+      ],
+    );
     expect(currentUi().sheet).toBeNull();
     expect(selected.project).toHaveBeenCalledWith("new");
   });
 
   it("adds a Project on this computer, or where its folder is", async () => {
     commands.wslDistros.mockResolvedValue(["Ubuntu", "Debian"]);
-    const inDebian = { target: { kind: "wsl", distro: "Debian" }, path: "/home/me/shop" } as const;
+    const inDebian = {
+      target: { kind: "wsl", distro: "Debian" },
+      path: "/home/me/shop",
+    } as const;
     commands.chooseFolder.mockResolvedValue(inDebian);
     commands.scanFolder.mockResolvedValue(ok([]));
     commands.addProject.mockResolvedValue(ok({ ...shop, id: "new" }));
     renderSheets();
     act(() => showSheet({ kind: "addProject" }));
 
-    const runsIn = (await screen.findByLabelText("Runs in")) as HTMLSelectElement;
+    const runsIn = (await screen.findByLabelText(
+      "Runs in",
+    )) as HTMLSelectElement;
     await waitFor(() => expect(runsIn.options).toHaveLength(3));
-    expect([...runsIn.options].map((option) => option.textContent)).toEqual(["This computer", "Ubuntu (WSL)", "Debian (WSL)"]);
+    expect([...runsIn.options].map((option) => option.textContent)).toEqual([
+      "This computer",
+      "Ubuntu (WSL)",
+      "Debian (WSL)",
+    ]);
     expect(runsIn.selectedOptions[0].textContent).toBe("This computer");
 
     // Picked inside a distro's folders: the Project runs there.
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
-    expect(commands.chooseFolder).toHaveBeenCalledWith({ kind: "thisMachine" }, null);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Folder" })),
+    );
+    expect(commands.chooseFolder).toHaveBeenCalledWith(
+      { kind: "thisMachine" },
+      null,
+    );
     expect(runsIn.selectedOptions[0].textContent).toBe("Debian (WSL)");
-    expect(screen.getByRole("button", { name: "Folder" }).textContent).toContain("Debian/home/me/shop");
+    expect(
+      screen.getByRole("button", { name: "Folder" }).textContent,
+    ).toContain("Debian/home/me/shop");
     expect(commands.scanFolder).toHaveBeenCalledWith(inDebian);
 
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add Project" })));
-    expect(commands.addProject).toHaveBeenCalledWith("shop", "shop", inDebian, []);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Add Project" })),
+    );
+    expect(commands.addProject).toHaveBeenCalledWith(
+      "shop",
+      "shop",
+      inDebian,
+      [],
+    );
 
     // Another target: the folder is chosen again.
     act(() => showSheet({ kind: "addProject" }));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
-    fireEvent.change(await screen.findByLabelText("Runs in"), { target: { value: "wsl:Ubuntu" } });
-    expect(screen.getByRole("button", { name: "Folder" }).textContent).toContain("Choose a folder…");
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Folder" })),
+    );
+    fireEvent.change(await screen.findByLabelText("Runs in"), {
+      target: { value: "wsl:Ubuntu" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Folder" }).textContent,
+    ).toContain("Choose a folder…");
   });
 
   it("keeps the sheet open with the core's message when saving fails", async () => {
-    const message = "“My App” is not a valid key. Use lowercase letters, digits and single hyphens, e.g. my-app.";
-    commands.editService.mockResolvedValue({ status: "error", error: { error: { kind: "invalidKey", detail: "My App" }, message } });
+    const message =
+      "“My App” is not a valid key. Use lowercase letters, digits and single hyphens, e.g. my-app.";
+    commands.editService.mockResolvedValue({
+      status: "error",
+      error: { error: { kind: "invalidKey", detail: "My App" }, message },
+    });
     renderSheets();
     act(() => showSheet({ kind: "editService", serviceId: api.id }));
 
     fireEvent.change(field("Key"), { target: { value: "My App" } });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Save" })),
+    );
     expect(screen.getByRole("alert").textContent).toBe(message);
     expect(currentUi().sheet).not.toBeNull();
   });
@@ -153,7 +246,9 @@ describe("Sheets", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^API/ }));
     fireEvent.change(field("Port"), { target: { value: "8080" } });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Save" })),
+    );
     expect(commands.editService).toHaveBeenCalledWith(worker.id, {
       name: "Worker",
       key: "worker",
@@ -164,11 +259,67 @@ describe("Sheets", () => {
       portCanChange: true,
       variables: [
         { name: "MODE", value: { kind: "plain", value: "dev" } },
-        { name: "TOKEN", value: { kind: "storedSecret", previousName: "TOKEN" } },
+        {
+          name: "TOKEN",
+          value: { kind: "storedSecret", previousName: "TOKEN" },
+        },
       ],
       dependencies: [],
       isExcludedFromStartAll: false,
+      pythonEnvironment: "",
+      runBefore: "",
     });
+  });
+
+  it("gives a new Service the virtual environment found for its command, says so, and turns it off", async () => {
+    commands.detectPythonEnvironment.mockImplementation(
+      async (_project: string, _directory: string, commandLine: string) =>
+        ok(commandLine.startsWith("uvicorn") ? "virtualenv" : null),
+    );
+    commands.addService.mockResolvedValue(ok({ ...api, id: "new" }));
+    commands.suggestedServiceKey.mockImplementation(
+      async (_project: string, name: string) => ok(name.toLowerCase()),
+    );
+    renderSheets();
+    act(() => showSheet({ kind: "addService", projectId: shop.id }));
+
+    fireEvent.change(field("Name"), { target: { value: "Gateway" } });
+    await waitFor(() => expect(field("Key").value).toBe("gateway"));
+    fireEvent.change(field("Command line"), {
+      target: { value: "uvicorn app.main:app --reload" },
+    });
+    await waitFor(() =>
+      expect(field("Python environment").value).toBe("virtualenv"),
+    );
+    expect(
+      screen.getByText("Using detected", { exact: false }).textContent,
+    ).toBe("Using detected virtualenv");
+    fireEvent.change(field("Run before"), {
+      target: { value: "source env.sh" },
+    });
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Add Service" })),
+    );
+    expect(commands.addService).toHaveBeenCalledWith(
+      shop.id,
+      expect.objectContaining({
+        commandLine: "uvicorn app.main:app --reload",
+        pythonEnvironment: "virtualenv",
+        runBefore: "source env.sh",
+      }),
+    );
+
+    act(() => showSheet({ kind: "addService", projectId: shop.id }));
+    fireEvent.change(field("Command line"), {
+      target: { value: "uvicorn app:app" },
+    });
+    await waitFor(() =>
+      expect(field("Python environment").value).toBe("virtualenv"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Turn Off" }));
+    expect(field("Python environment").value).toBe("");
+    expect(screen.queryByText("Using detected", { exact: false })).toBeNull();
+    expect(screen.getByRole("button", { name: "Use virtualenv" })).toBeTruthy();
   });
 
   it("reveals a stored Secret from its layer", async () => {
@@ -176,24 +327,45 @@ describe("Sheets", () => {
     renderSheets();
     act(() => showSheet({ kind: "editService", serviceId: worker.id }));
 
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Reveal the value of TOKEN" })));
-    expect(commands.secretValue).toHaveBeenCalledWith("TOKEN", { kind: "service", id: worker.id });
+    await act(async () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "Reveal the value of TOKEN" }),
+      ),
+    );
+    expect(commands.secretValue).toHaveBeenCalledWith("TOKEN", {
+      kind: "service",
+      id: worker.id,
+    });
     expect(field("Value of TOKEN").value).toBe("s3cret");
     expect(field("Value of TOKEN").type).toBe("text");
   });
 
   it("doesn't offer a Dependency that would be a cycle, and says why", async () => {
     commands.serviceRelations.mockResolvedValue(
-      ok({ cycles: [{ serviceId: worker.id, message: "api → worker → api would be a dependency cycle." }], dependents: ["Worker"] }),
+      ok({
+        cycles: [
+          {
+            serviceId: worker.id,
+            message: "api → worker → api would be a dependency cycle.",
+          },
+        ],
+        dependents: ["Worker"],
+      }),
     );
     renderSheets();
     act(() => showSheet({ kind: "editService", serviceId: api.id }));
 
     const chip = await screen.findByRole("button", { name: "Worker" });
-    await waitFor(() => expect((chip as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() =>
+      expect((chip as HTMLButtonElement).disabled).toBe(true),
+    );
     expect(chip.title).toBe("api → worker → api would be a dependency cycle.");
     fireEvent.click(screen.getByRole("switch", { name: "Manual" }));
-    expect(screen.getByText("Start All skips this service, but still starts it for “Worker”, which depends on it.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Start All skips this service, but still starts it for “Worker”, which depends on it.",
+      ),
+    ).toBeTruthy();
   });
 
   it("saves the Environment: a new Profile, made active", async () => {
@@ -202,7 +374,9 @@ describe("Sheets", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add Profile" }));
     fireEvent.click(screen.getByRole("button", { name: "Development" }));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Save" })),
+    );
     expect(commands.saveEnvironment).toHaveBeenCalledWith(
       shop.id,
       [],
@@ -218,35 +392,78 @@ describe("Sheets", () => {
       key: "shop",
       folder: { target: { kind: "thisMachine" }, path: "/elsewhere/shop" },
       folderExists: false,
-      services: [{ name: "API", key: "api", workingDirectory: ".", commandLine: "run API", port: 4000, isExcludedFromStartAll: false, dependencies: [] }],
+      services: [
+        {
+          name: "API",
+          key: "api",
+          workingDirectory: ".",
+          commandLine: "run API",
+          port: 4000,
+          isExcludedFromStartAll: false,
+          dependencies: [],
+        },
+      ],
       environment: "1 project variable",
       secrets: [{ name: "TOKEN", owner: "project" }],
-      clash: { projectName: "Shop", freeKey: "shop-2", removed: ["Worker (running, stopped first)"] },
+      clash: {
+        projectName: "Shop",
+        freeKey: "shop-2",
+        removed: ["Worker (running, stopped first)"],
+      },
     };
-    const folder = { target: { kind: "thisMachine" }, path: "/home/me/shop" } as const;
+    const folder = {
+      target: { kind: "thisMachine" },
+      path: "/home/me/shop",
+    } as const;
     commands.chooseFolder.mockResolvedValue(folder);
     commands.importProject.mockResolvedValue(ok(shop));
     const selected = renderSheets();
-    act(() => showSheet({ kind: "importProject", file: "/tmp/shop.yaml", preview }));
+    act(() =>
+      showSheet({ kind: "importProject", file: "/tmp/shop.yaml", preview }),
+    );
 
-    const importButton = screen.getByRole("button", { name: "Import" }) as HTMLButtonElement;
+    const importButton = screen.getByRole("button", {
+      name: "Import",
+    }) as HTMLButtonElement;
     expect(importButton.disabled).toBe(true);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Folder" })));
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Folder" })),
+    );
     fireEvent.click(screen.getByLabelText(/Replace “Shop”/));
-    expect(screen.getByText("Removes Worker (running, stopped first), which the file doesn’t have.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Removes Worker (running, stopped first), which the file doesn’t have.",
+      ),
+    ).toBeTruthy();
 
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Replace" })));
-    expect(commands.importProject).toHaveBeenCalledWith("/tmp/shop.yaml", folder, "replace");
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Replace" })),
+    );
+    expect(commands.importProject).toHaveBeenCalledWith(
+      "/tmp/shop.yaml",
+      folder,
+      "replace",
+    );
     expect(selected.project).toHaveBeenCalledWith(shop.id);
   });
 
   it("asks before removing a Service, naming those that depend on it", async () => {
     render(<Alerts view={view} />);
-    act(() => showAlert({ kind: "removeService", serviceId: api.id, dependents: ["Worker"] }));
+    act(() =>
+      showAlert({
+        kind: "removeService",
+        serviceId: api.id,
+        dependents: ["Worker"],
+      }),
+    );
 
     const dialog = screen.getByRole("alertdialog", { name: "Remove “API”?" });
-    expect(dialog.textContent).toContain("“Worker” will no longer depend on it.");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })));
+    expect(dialog.textContent).toContain(
+      "“Worker” will no longer depend on it.",
+    );
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Remove" })),
+    );
     expect(commands.removeService).toHaveBeenCalledWith(api.id);
   });
 });

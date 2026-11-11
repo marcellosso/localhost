@@ -3,6 +3,7 @@ import type { ServiceSuggestion } from "./bindings";
 import {
   directoryLabel,
   draftStartsAfter,
+  editedSuggestion,
   mergingDrafts,
   splittingDraft,
   suggestionDrafts,
@@ -11,7 +12,11 @@ import {
   variableEdits,
 } from "./editors";
 
-function suggestion(name: string, isRecommended: boolean, port: number | null = null): ServiceSuggestion {
+function suggestion(
+  name: string,
+  isRecommended: boolean,
+  port: number | null = null,
+): ServiceSuggestion {
   return {
     name,
     key: name.toLowerCase(),
@@ -27,8 +32,18 @@ function suggestion(name: string, isRecommended: boolean, port: number | null = 
 
 describe("editors", () => {
   it("lists plain variables by name, then Secrets without their values", () => {
-    const drafts = variableDrafts({ values: { MODE: "dev", API: "http://localhost" }, secretNames: ["TOKEN"] });
-    expect(drafts.map(({ name, value, isSecret, isValueKnown }) => [name, value, isSecret, isValueKnown])).toEqual([
+    const drafts = variableDrafts({
+      values: { MODE: "dev", API: "http://localhost" },
+      secretNames: ["TOKEN"],
+    });
+    expect(
+      drafts.map(({ name, value, isSecret, isValueKnown }) => [
+        name,
+        value,
+        isSecret,
+        isValueKnown,
+      ]),
+    ).toEqual([
       ["API", "http://localhost", false, true],
       ["MODE", "dev", false, true],
       ["TOKEN", "", true, false],
@@ -36,7 +51,10 @@ describe("editors", () => {
   });
 
   it("keeps a stored Secret's value unless it was typed or revealed, and drops empty rows", () => {
-    const [mode, token, renamed, typed] = variableDrafts({ values: { MODE: "dev" }, secretNames: ["A", "B", "C"] });
+    const [mode, token, renamed, typed] = variableDrafts({
+      values: { MODE: "dev" },
+      secretNames: ["A", "B", "C"],
+    });
     const empty = { ...mode, id: -1, name: "", value: "" };
     const edits = variableEdits([
       mode,
@@ -54,10 +72,15 @@ describe("editors", () => {
   });
 
   it("checks the likely Suggestions and adds only the checked ones, as edited", () => {
-    const [dev, build] = suggestionDrafts([suggestion("Dev", true, 5173), suggestion("Build", false)]);
+    const [dev, build] = suggestionDrafts([
+      suggestion("Dev", true, 5173),
+      suggestion("Build", false),
+    ]);
     expect([dev.isChecked, build.isChecked]).toEqual([true, false]);
     expect(dev.port).toBe("5173");
-    expect(suggestionEdits([{ ...dev, name: "Web", key: "web" }, build])).toEqual([
+    expect(
+      suggestionEdits([{ ...dev, name: "Web", key: "web" }, build]),
+    ).toEqual([
       {
         name: "Web",
         key: "web",
@@ -65,13 +88,31 @@ describe("editors", () => {
         commandLine: "pnpm dev",
         port: "5173",
         portCanChange: true,
+        pythonEnvironment: "",
         dependencyKeys: [],
       },
     ]);
   });
 
+  it("keeps the virtual environment scanning found, unless turned off", () => {
+    const [api] = suggestionDrafts([
+      { ...suggestion("API", true), pythonEnvironment: ".venv" },
+    ]);
+    expect(suggestionEdits([api])[0].pythonEnvironment).toBe(".venv");
+    expect(
+      suggestionEdits([{ ...api, pythonEnvironment: "" }])[0].pythonEnvironment,
+    ).toBe("");
+    expect(
+      editedSuggestion({ ...api, pythonEnvironment: "" }).pythonEnvironment,
+    ).toBeNull();
+  });
+
   it("saves Starts after as the Keys of the checked drafts only", () => {
-    const [api, infra, docs] = suggestionDrafts([suggestion("API", true), suggestion("Infra", true), suggestion("Docs", false)]);
+    const [api, infra, docs] = suggestionDrafts([
+      suggestion("API", true),
+      suggestion("Infra", true),
+      suggestion("Docs", false),
+    ]);
     const edits = suggestionEdits([
       { ...api, startsAfter: [infra.id, docs.id], startsAfterServices: ["db"] },
       { ...infra, key: "containers" },
@@ -84,7 +125,11 @@ describe("editors", () => {
   });
 
   it("says when a draft already starts after another, through others", () => {
-    const [web, api, infra] = suggestionDrafts([suggestion("Web", true), suggestion("API", true), suggestion("Infra", true)]);
+    const [web, api, infra] = suggestionDrafts([
+      suggestion("Web", true),
+      suggestion("API", true),
+      suggestion("Infra", true),
+    ]);
     const drafts = [
       { ...web, startsAfter: [api.id] },
       { ...api, startsAfter: [infra.id] },
@@ -100,8 +145,15 @@ describe("editors", () => {
       { ...suggestion("postgres", false), composeServices: ["postgres"] },
       { ...suggestion("temporal", false), composeServices: ["temporal"] },
     ]);
-    const before = [{ ...api, startsAfter: [postgres.id, temporal.id] }, { ...postgres, startsAfterServices: ["db"] }, temporal];
-    const merged = { ...suggestion("Infra", true), commandLine: "docker compose up postgres temporal" };
+    const before = [
+      { ...api, startsAfter: [postgres.id, temporal.id] },
+      { ...postgres, startsAfterServices: ["db"] },
+      temporal,
+    ];
+    const merged = {
+      ...suggestion("Infra", true),
+      commandLine: "docker compose up postgres temporal",
+    };
     const after = mergingDrafts(before, [postgres.id, temporal.id], merged);
     expect(after.map((draft) => [draft.name, draft.isChecked])).toEqual([
       ["API", true],
@@ -121,13 +173,33 @@ describe("editors", () => {
 
   it("splits a whole Compose file into the drafts for its containers", () => {
     const [infra, postgres, temporal, api] = suggestionDrafts([
-      { ...suggestion("Infra", true), composeServices: ["postgres", "temporal"], foundIn: "compose.yaml" },
-      { ...suggestion("postgres", false), composeServices: ["postgres"], foundIn: "compose.yaml" },
-      { ...suggestion("temporal", false), composeServices: ["temporal"], foundIn: "compose.yaml" },
+      {
+        ...suggestion("Infra", true),
+        composeServices: ["postgres", "temporal"],
+        foundIn: "compose.yaml",
+      },
+      {
+        ...suggestion("postgres", false),
+        composeServices: ["postgres"],
+        foundIn: "compose.yaml",
+      },
+      {
+        ...suggestion("temporal", false),
+        composeServices: ["temporal"],
+        foundIn: "compose.yaml",
+      },
       suggestion("API", true),
     ]);
-    const split = splittingDraft([infra, postgres, temporal, { ...api, startsAfter: [infra.id] }], infra.id);
-    expect(split.map((draft) => draft.isChecked)).toEqual([false, true, true, true]);
+    const split = splittingDraft(
+      [infra, postgres, temporal, { ...api, startsAfter: [infra.id] }],
+      infra.id,
+    );
+    expect(split.map((draft) => draft.isChecked)).toEqual([
+      false,
+      true,
+      true,
+      true,
+    ]);
     expect(split[3].startsAfter).toEqual([postgres.id, temporal.id]);
   });
 

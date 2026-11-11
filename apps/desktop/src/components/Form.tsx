@@ -1,4 +1,11 @@
-import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { ExecutionTarget } from "../bindings";
 import { tildePath } from "../paths";
 import { distroOf, isSameTarget, targetId, thisMachine } from "../targets";
@@ -32,7 +39,17 @@ type SheetProps = {
  * footer with a hint or the error, Cancel and the primary action.
  */
 export function FormSheet(props: SheetProps) {
-  const { icon, tint, title, subtitle, hint, error, primaryTitle, isPrimaryDisabled, width = 560 } = props;
+  const {
+    icon,
+    tint,
+    title,
+    subtitle,
+    hint,
+    error,
+    primaryTitle,
+    isPrimaryDisabled,
+    width = 560,
+  } = props;
   const panel = useRef<HTMLFormElement>(null);
   const titleId = useId();
   const onKeyDown = useModal(panel, props.onCancel);
@@ -45,7 +62,12 @@ export function FormSheet(props: SheetProps) {
       <form
         ref={panel}
         className={styles.sheet}
-        style={{ width: `min(${width}px, calc(100vw - 48px))`, "--tint": tint ?? "var(--accent)" } as CSSProperties}
+        style={
+          {
+            width: `min(${width}px, calc(100vw - 48px))`,
+            "--tint": tint ?? "var(--accent)",
+          } as CSSProperties
+        }
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -71,7 +93,11 @@ export function FormSheet(props: SheetProps) {
           <button type="button" className="button" onClick={props.onCancel}>
             Cancel
           </button>
-          <button type="submit" className="button accent" disabled={isPrimaryDisabled}>
+          <button
+            type="submit"
+            className="button accent"
+            disabled={isPrimaryDisabled}
+          >
             {primaryTitle}
           </button>
         </footer>
@@ -95,7 +121,10 @@ type FieldProps = {
 export function Field({ title, note, hint, width, children }: FieldProps) {
   const id = useId();
   return (
-    <div className={styles.field} style={width ? { flex: `0 0 ${width}px` } : undefined}>
+    <div
+      className={styles.field}
+      style={width ? { flex: `0 0 ${width}px` } : undefined}
+    >
       <FieldLabel title={title} note={note} htmlFor={id} />
       {children(id)}
       {hint && <FieldHint>{hint}</FieldHint>}
@@ -103,7 +132,15 @@ export function Field({ title, note, hint, width, children }: FieldProps) {
   );
 }
 
-export function FieldLabel({ title, note, htmlFor }: { title: string; note?: string | null; htmlFor?: string }) {
+export function FieldLabel({
+  title,
+  note,
+  htmlFor,
+}: {
+  title: string;
+  note?: string | null;
+  htmlFor?: string;
+}) {
   return (
     <div className={styles.label}>
       <label htmlFor={htmlFor}>{title}</label>
@@ -137,7 +174,15 @@ type TextFieldProps = {
 };
 
 /** A text field in a rounded box that shows the accent ring while focused. */
-export function TextField({ id, value, onChange, placeholder, isMonospaced, label, autoFocus }: TextFieldProps) {
+export function TextField({
+  id,
+  value,
+  onChange,
+  placeholder,
+  isMonospaced,
+  label,
+  autoFocus,
+}: TextFieldProps) {
   return (
     <input
       id={id}
@@ -154,18 +199,30 @@ export function TextField({ id, value, onChange, placeholder, isMonospaced, labe
 }
 
 /** A folder's path in a field box; choosing opens the folder picker. */
-type FolderProps = { id?: string; path: string; target?: ExecutionTarget; onChoose: () => void };
+type FolderProps = {
+  id?: string;
+  path: string;
+  target?: ExecutionTarget;
+  onChoose: () => void;
+};
 
 /** A Project's folder, after its distro's name when it runs in WSL. */
 export function FolderField({ id, path, target, onChoose }: FolderProps) {
   const distro = distroOf(target);
   return (
-    <button type="button" id={id} className={`${styles.box} ${styles.folder}`} onClick={onChoose}>
+    <button
+      type="button"
+      id={id}
+      className={`${styles.box} ${styles.folder}`}
+      onClick={onChoose}
+    >
       <FolderIcon size={14} className="secondary" />
       {path && distro && <span className={styles.distro}>{distro}</span>}
       <span className={`${styles.folderPath} mono ${path ? "" : "secondary"}`}>
         {/* Truncated at the start, so the folder's name shows; `ltr` keeps the path's own order. */}
-        <span dir="ltr">{!path ? "Choose a folder…" : distro ? path : tildePath(path)}</span>
+        <span dir="ltr">
+          {!path ? "Choose a folder…" : distro ? path : tildePath(path)}
+        </span>
       </span>
       <span className={`${styles.choose} secondary`}>Choose…</span>
     </button>
@@ -185,16 +242,26 @@ type TargetProps = {
  * which can move to this computer.
  */
 export function TargetField({ id, target, distros, onChange }: TargetProps) {
-  const options: ExecutionTarget[] = [thisMachine, ...distros.map((distro) => ({ kind: "wsl" as const, distro }))];
+  const options: ExecutionTarget[] = [
+    thisMachine,
+    ...distros.map((distro) => ({ kind: "wsl" as const, distro })),
+  ];
   // A distro that is no longer installed stays shown while it is the Project's.
-  if (!options.some((option) => isSameTarget(option, target))) options.push(target);
-  const label = (option: ExecutionTarget) => (option.kind === "wsl" ? `${option.distro} (WSL)` : "This computer");
+  if (!options.some((option) => isSameTarget(option, target)))
+    options.push(target);
+  const label = (option: ExecutionTarget) =>
+    option.kind === "wsl" ? `${option.distro} (WSL)` : "This computer";
   return (
     <select
       id={id}
       className={`${styles.box} ${styles.select}`}
       value={targetId(target)}
-      onChange={(event) => onChange(options.find((option) => targetId(option) === event.target.value) ?? target)}
+      onChange={(event) =>
+        onChange(
+          options.find((option) => targetId(option) === event.target.value) ??
+            target,
+        )
+      }
     >
       {options.map((option) => (
         <option key={targetId(option)} value={targetId(option)}>
@@ -214,7 +281,13 @@ type CommandProps = {
 };
 
 /** The command as a terminal line: its working directory (click to choose), a `$`, then the command line. */
-export function CommandField({ id, workingDirectory, commandLine, onCommandLineChange, onChooseDirectory }: CommandProps) {
+export function CommandField({
+  id,
+  workingDirectory,
+  commandLine,
+  onCommandLineChange,
+  onChooseDirectory,
+}: CommandProps) {
   const isRoot = workingDirectory === "" || workingDirectory === ".";
   return (
     <div className={`${styles.box} ${styles.command}`}>
@@ -248,6 +321,69 @@ export function CommandField({ id, workingDirectory, commandLine, onCommandLineC
   );
 }
 
+type PythonEnvironmentProps = {
+  id?: string;
+  value: string;
+  /** The virtual environment the core found for the command, if any. */
+  detected: string | null;
+  onChange: (value: string) => void;
+};
+
+/**
+ * A Service's Python virtual environment, relative to its working directory:
+ * a path to type, Turn Off to clear it, or Use to take the one found.
+ */
+export function PythonEnvironmentField({
+  id,
+  value,
+  detected,
+  onChange,
+}: PythonEnvironmentProps) {
+  const isSet = value.trim() !== "";
+  return (
+    <div className={styles.inline}>
+      <TextField
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={detected ?? ".venv"}
+        isMonospaced
+      />
+      {isSet ? (
+        <button
+          type="button"
+          className="button compact"
+          onClick={() => onChange("")}
+        >
+          Turn Off
+        </button>
+      ) : (
+        detected !== null && (
+          <button
+            type="button"
+            className="button compact"
+            onClick={() => onChange(detected)}
+          >
+            Use <span className="mono">{detected}</span>
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+/** “Using detected .venv”: says, where it shows, that localhost found the virtual environment and uses it. */
+export function DetectedEnvironment({ path }: { path: string }) {
+  return (
+    <p className={`${styles.detected} secondary`}>
+      <CheckIcon size={10} aria-hidden="true" />
+      <span>
+        Using detected <span className="mono">{path}</span>
+      </span>
+    </p>
+  );
+}
+
 /** A group of rows on a quiet card, e.g. the variables table. */
 export function FormCard({ children }: { children: ReactNode }) {
   return <div className={styles.card}>{children}</div>;
@@ -266,7 +402,14 @@ type ChipProps = {
 };
 
 /** A toggle drawn as a chip in a colour, e.g. a Dependency in its Service's colour. */
-export function ChipToggle({ title, color, isOn, onChange, isDisabled, help }: ChipProps) {
+export function ChipToggle({
+  title,
+  color,
+  isOn,
+  onChange,
+  isDisabled,
+  help,
+}: ChipProps) {
   return (
     <button
       type="button"
@@ -285,7 +428,13 @@ export function ChipToggle({ title, color, isOn, onChange, isDisabled, help }: C
 }
 
 /** Chips that wrap. */
-export function ChipList({ label, children }: { label: string; children: ReactNode }) {
+export function ChipList({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div className={styles.chips} role="group" aria-label={label}>
       {children}
@@ -294,13 +443,20 @@ export function ChipList({ label, children }: { label: string; children: ReactNo
 }
 
 /** A setting with a switch on the right. */
-export function SwitchRow(props: { title: string; detail?: string; isOn: boolean; onChange: (isOn: boolean) => void }) {
+export function SwitchRow(props: {
+  title: string;
+  detail?: string;
+  isOn: boolean;
+  onChange: (isOn: boolean) => void;
+}) {
   const detailId = useId();
   return (
     <div className={styles.switchRow}>
       <div className={styles.switchText}>
         <span className={styles.switchTitle}>{props.title}</span>
-        {props.detail && <FieldHint>{<span id={detailId}>{props.detail}</span>}</FieldHint>}
+        {props.detail && (
+          <FieldHint>{<span id={detailId}>{props.detail}</span>}</FieldHint>
+        )}
       </div>
       <button
         type="button"
@@ -331,7 +487,11 @@ export function Working({ children }: { children: ReactNode }) {
  * A Key field that follows the name, as the core suggests it, until the user
  * edits it. `suggest` returns `null` when it can't suggest one.
  */
-export function useFollowingKey(initial: string, isInitiallyEdited: boolean, suggest: (name: string) => Promise<string | null>) {
+export function useFollowingKey(
+  initial: string,
+  isInitiallyEdited: boolean,
+  suggest: (name: string) => Promise<string | null>,
+) {
   const [key, setKey] = useState(initial);
   const isEdited = useRef(isInitiallyEdited);
   const latest = useRef(0);
@@ -342,7 +502,12 @@ export function useFollowingKey(initial: string, isInitiallyEdited: boolean, sug
       if (isEdited.current) return;
       const request = ++latest.current;
       void suggest(name).then((suggested) => {
-        if (suggested !== null && request === latest.current && !isEdited.current) setKey(suggested);
+        if (
+          suggested !== null &&
+          request === latest.current &&
+          !isEdited.current
+        )
+          setKey(suggested);
       });
     },
     edit(key: string) {

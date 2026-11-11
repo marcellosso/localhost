@@ -140,6 +140,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             editors::scan_folder,
             editors::scan_project,
             editors::merge_suggestions,
+            editors::detect_python_environment,
             editors::save_environment,
             editors::set_active_profile,
             editors::secret_value,

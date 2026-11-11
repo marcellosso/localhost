@@ -75,6 +75,9 @@ pub struct SuggestionEdit {
     /// The Keys, as typed, of the Services it starts after: others added
     /// with it, or the Project's.
     dependency_keys: Vec<String>,
+    /// The virtual environment scanning found; empty for none.
+    #[serde(default)]
+    python_environment: String,
 }
 
 /// The Service editor's fields.
@@ -93,6 +96,10 @@ pub struct ServiceEdit {
     variables: Vec<VariableEdit>,
     dependencies: Vec<Id>,
     is_excluded_from_start_all: bool,
+    /// Relative to the working directory; empty for none.
+    python_environment: String,
+    /// Empty for none.
+    run_before: String,
 }
 
 /// One Environment Profile as edited; `profile_id` is `None` for a new one.
@@ -303,6 +310,8 @@ pub fn add_service(state: tauri::State<'_, AppState>, project_id: Id, service: S
         port_can_change: service.port_can_change,
         is_excluded_from_start_all: service.is_excluded_from_start_all,
         dependency_keys: Vec::new(),
+        python_environment: Some(service.python_environment),
+        run_before: Some(service.run_before),
     };
     let library = &state.core()?.library;
     Ok(library.add_service(project_id, new, inputs(service.variables), service.dependencies, ORIGIN)?)
@@ -322,6 +331,8 @@ pub fn edit_service(state: tauri::State<'_, AppState>, service_id: Id, service: 
         port: Some(parse_port(&service.port, None)?),
         url: Some(Some(service.url)),
         port_can_change: Some(service.port_can_change),
+        python_environment: Some(Some(service.python_environment)),
+        run_before: Some(Some(service.run_before)),
     };
     state.core()?.library.edit_service(service_id, changes, ORIGIN)?;
     Ok(())
@@ -401,6 +412,32 @@ pub async fn scan_project(state: tauri::State<'_, AppState>, project_id: Id) -> 
     let core = state.core()?;
     let project = core.library.project(project_id)?;
     Ok(core.targets.scan_project(&project).await?)
+}
+
+/// The virtual environment a new Service of the Project would run in, for
+/// the Service editor to fill in. A distro's folders aren't read from here.
+#[tauri::command]
+#[specta::specta]
+pub async fn detect_python_environment(
+    state: tauri::State<'_, AppState>,
+    project_id: Id,
+    working_directory: String,
+    command_line: String,
+) -> CommandResult<Option<String>> {
+    let project = state.core()?.library.project(project_id)?;
+    if !project.execution_target.is_this_machine() {
+        return Ok(None);
+    }
+    let detected = tauri::async_runtime::spawn_blocking(move || {
+        localhost_core::detect_python_environment(
+            &project.path,
+            &working_directory,
+            &command_line,
+            localhost_core::CommandSyntax::HERE,
+        )
+    })
+    .await;
+    Ok(detected.ok().flatten())
 }
 
 /// Reviewed Suggestions merged into one, for the review's Merge.
@@ -665,6 +702,7 @@ fn new_services(edits: Vec<SuggestionEdit>) -> Result<Vec<NewService>, CommandEr
                 working_directory: edit.working_directory,
                 port_can_change: edit.port_can_change,
                 dependency_keys: edit.dependency_keys.iter().map(|key| parse_key(key)).collect::<Result<_, _>>()?,
+                python_environment: Some(edit.python_environment),
                 ..NewService::new(edit.name, parse_key(&edit.key)?, edit.command_line)
             })
         })
@@ -694,6 +732,7 @@ mod tests {
             port: port.into(),
             port_can_change: true,
             dependency_keys: Vec::new(),
+            python_environment: String::new(),
         }
     }
 

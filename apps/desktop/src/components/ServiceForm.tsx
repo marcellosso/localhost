@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { commands, type Project, type Service, type ServiceRelations } from "../bindings";
-import { serviceVariables, type VariableDraft, variableDrafts, variableEdits } from "../editors";
+import {
+  commands,
+  type Project,
+  type Service,
+  type ServiceRelations,
+} from "../bindings";
+import {
+  serviceVariables,
+  type VariableDraft,
+  variableDrafts,
+  variableEdits,
+} from "../editors";
 import { tildePath } from "../paths";
 import { formatList } from "../status";
 import { portVariable, projectFolder } from "../targets";
@@ -9,11 +19,13 @@ import {
   ChipList,
   ChipToggle,
   CommandField,
+  DetectedEnvironment,
   Field,
   FieldGroup,
   FieldHint,
   FieldRow,
   FormSheet,
+  PythonEnvironmentField,
   SwitchRow,
   TextField,
   useFollowingKey,
@@ -31,24 +43,60 @@ type Props = {
 
 /**
  * Adds or edits a Service: name, Key, working directory relative to the
- * Project, command line, Port and URL, environment variables, Dependencies
- * and whether Start All includes it.
+ * Project, command line, Run before, Python environment, Port and URL,
+ * environment variables, Dependencies and whether Start All includes it.
+ *
+ * A new Service takes the virtual environment the core finds for its
+ * command until the user edits that field; an existing one only offers it.
  */
 export function ServiceForm({ project, editing, onAdded }: Props) {
   const [name, setName] = useState(editing?.name ?? "");
-  const key = useFollowingKey(editing?.key ?? "", editing !== undefined, async (name) => {
-    const result = await commands.suggestedServiceKey(project.id, name, editing?.id ?? null);
-    return result.status === "ok" ? result.data : null;
-  });
-  const [workingDirectory, setWorkingDirectory] = useState(editing?.workingDirectory ?? ".");
+  const key = useFollowingKey(
+    editing?.key ?? "",
+    editing !== undefined,
+    async (name) => {
+      const result = await commands.suggestedServiceKey(
+        project.id,
+        name,
+        editing?.id ?? null,
+      );
+      return result.status === "ok" ? result.data : null;
+    },
+  );
+  const [workingDirectory, setWorkingDirectory] = useState(
+    editing?.workingDirectory ?? ".",
+  );
   const [commandLine, setCommandLine] = useState(editing?.commandLine ?? "");
-  const [port, setPort] = useState(editing?.port != null ? String(editing.port) : "");
+  const [runBefore, setRunBefore] = useState(editing?.runBefore ?? "");
+  const [pythonEnvironment, setPythonEnvironment] = useState(
+    editing?.pythonEnvironment ?? "",
+  );
+  const [isPythonEnvironmentEdited, setIsPythonEnvironmentEdited] = useState(
+    editing !== undefined,
+  );
+  const [detectedEnvironment, setDetectedEnvironment] = useState<string | null>(
+    null,
+  );
+  const [port, setPort] = useState(
+    editing?.port != null ? String(editing.port) : "",
+  );
   const [url, setUrl] = useState(editing?.url ?? "");
-  const [portCanChange, setPortCanChange] = useState(editing?.portCanChange ?? true);
-  const [variables, setVariables] = useState<VariableDraft[]>(() => (editing ? variableDrafts(serviceVariables(editing)) : []));
-  const [dependencies, setDependencies] = useState<string[]>(editing?.dependencies ?? []);
-  const [isManual, setIsManual] = useState(editing?.isExcludedFromStartAll ?? false);
-  const [relations, setRelations] = useState<ServiceRelations>({ cycles: [], dependents: [] });
+  const [portCanChange, setPortCanChange] = useState(
+    editing?.portCanChange ?? true,
+  );
+  const [variables, setVariables] = useState<VariableDraft[]>(() =>
+    editing ? variableDrafts(serviceVariables(editing)) : [],
+  );
+  const [dependencies, setDependencies] = useState<string[]>(
+    editing?.dependencies ?? [],
+  );
+  const [isManual, setIsManual] = useState(
+    editing?.isExcludedFromStartAll ?? false,
+  );
+  const [relations, setRelations] = useState<ServiceRelations>({
+    cycles: [],
+    dependents: [],
+  });
   const [usesPort, setUsesPort] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,21 +110,62 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
 
   useEffect(() => {
     let isCurrent = true;
-    void commands.commandLineUsesPort(commandLine).then((uses) => isCurrent && setUsesPort(uses));
+    void commands
+      .commandLineUsesPort(commandLine)
+      .then((uses) => isCurrent && setUsesPort(uses));
     return () => {
       isCurrent = false;
     };
   }, [commandLine]);
 
-  const index = editing ? project.services.findIndex((service) => service.id === editing.id) : project.services.length;
-  const others = project.services.filter((service) => service.id !== editing?.id);
+  useEffect(() => {
+    let isCurrent = true;
+    const timer = window.setTimeout(() => {
+      void commands
+        .detectPythonEnvironment(project.id, workingDirectory, commandLine)
+        .then((result) => {
+          if (!isCurrent) return;
+          const detected = result.status === "ok" ? result.data : null;
+          setDetectedEnvironment(detected);
+          if (!isPythonEnvironmentEdited) setPythonEnvironment(detected ?? "");
+        });
+    }, 250);
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [project.id, workingDirectory, commandLine, isPythonEnvironmentEdited]);
+
+  const changePythonEnvironment = (value: string) => {
+    setIsPythonEnvironmentEdited(true);
+    setPythonEnvironment(value);
+  };
+
+  const pythonEnvironmentHint = (() => {
+    const trimmed = pythonEnvironment.trim();
+    if (trimmed && trimmed === detectedEnvironment) return null;
+    if (trimmed)
+      return "Its bin folder goes first on PATH and VIRTUAL_ENV is set, as activate does. Relative to the working directory.";
+    if (detectedEnvironment)
+      return `Off. ${detectedEnvironment} was found next to this Python command.`;
+    return "Optional. A virtual environment such as .venv, relative to the working directory.";
+  })();
+
+  const index = editing
+    ? project.services.findIndex((service) => service.id === editing.id)
+    : project.services.length;
+  const others = project.services.filter(
+    (service) => service.id !== editing?.id,
+  );
   const trimmedPort = port.trim();
 
   const portFooter = (() => {
-    if (!trimmedPort) return "Optional. With a port, the service counts as running once the port accepts connections.";
+    if (!trimmedPort)
+      return "Optional. With a port, the service counts as running once the port accepts connections.";
     const variable = portVariable(projectFolder(project).target);
     let footer = `The command gets the port as ${variable}, e.g. “next dev -p ${variable}”. It counts as running once the port accepts connections.`;
-    if (variables.some((variable) => variable.name === "PORT")) footer += " The PORT variable below is replaced by this port.";
+    if (variables.some((variable) => variable.name === "PORT"))
+      footer += " The PORT variable below is replaced by this port.";
     if (portCanChange && !usesPort) {
       footer += ` The command doesn’t mention ${variable}: if it ignores PORT, turn off “Port can change”.`;
     }
@@ -97,7 +186,9 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
   };
 
   const chooseDirectory = async () => {
-    const chosen = await commands.chooseWorkingDirectory(projectFolder(project));
+    const chosen = await commands.chooseWorkingDirectory(
+      projectFolder(project),
+    );
     if (chosen !== null) setWorkingDirectory(chosen);
   };
 
@@ -115,6 +206,8 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
       variables: variableEdits(variables),
       dependencies,
       isExcludedFromStartAll: isManual,
+      pythonEnvironment,
+      runBefore,
     };
     if (editing) {
       const result = await commands.editService(editing.id, service);
@@ -138,23 +231,42 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
       title={editing ? `Edit ${editing.name}` : "New Service"}
       subtitle={
         <>
-          in <strong>{project.name}</strong> · <span className="mono">{tildePath(project.path)}</span>
+          in <strong>{project.name}</strong> ·{" "}
+          <span className="mono">{tildePath(project.path)}</span>
         </>
       }
       hint={`↩ to ${editing ? "save" : "add"}`}
       error={error}
       primaryTitle={editing ? "Save" : "Add Service"}
-      isPrimaryDisabled={!name.trim() || !key.key.trim() || !commandLine.trim() || isSaving}
+      isPrimaryDisabled={
+        !name.trim() || !key.key.trim() || !commandLine.trim() || isSaving
+      }
       width={580}
       onCancel={closeSheet}
       onSubmit={() => void save()}
     >
       <FieldRow>
         <Field title="Name">
-          {(id) => <TextField id={id} value={name} onChange={changeName} placeholder="Web" autoFocus />}
+          {(id) => (
+            <TextField
+              id={id}
+              value={name}
+              onChange={changeName}
+              placeholder="Web"
+              autoFocus
+            />
+          )}
         </Field>
         <Field title="Key" note="in logs & CLI" width={160}>
-          {(id) => <TextField id={id} value={key.key} onChange={key.edit} placeholder="web" isMonospaced />}
+          {(id) => (
+            <TextField
+              id={id}
+              value={key.key}
+              onChange={key.edit}
+              placeholder="web"
+              isMonospaced
+            />
+          )}
         </Field>
       </FieldRow>
       <Field title="Command" note="runs in your login shell">
@@ -168,10 +280,52 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
           />
         )}
       </Field>
+      <Field
+        title="Run before"
+        note="optional · same shell, first"
+        hint="Runs before the command, in the same shell, e.g. “nvm use”. If it fails, the service doesn’t start."
+      >
+        {(id) => (
+          <TextField
+            id={id}
+            value={runBefore}
+            onChange={setRunBefore}
+            placeholder="nvm use"
+            isMonospaced
+          />
+        )}
+      </Field>
+      <FieldGroup>
+        <Field title="Python environment" note="virtualenv">
+          {(id) => (
+            <PythonEnvironmentField
+              id={id}
+              value={pythonEnvironment}
+              detected={detectedEnvironment}
+              onChange={changePythonEnvironment}
+            />
+          )}
+        </Field>
+        {pythonEnvironment.trim() !== "" &&
+          pythonEnvironment.trim() === detectedEnvironment && (
+            <DetectedEnvironment path={detectedEnvironment} />
+          )}
+        {pythonEnvironmentHint && (
+          <FieldHint>{pythonEnvironmentHint}</FieldHint>
+        )}
+      </FieldGroup>
       <FieldGroup>
         <FieldRow>
           <Field title="Port" width={120}>
-            {(id) => <TextField id={id} value={port} onChange={setPort} placeholder="3000" isMonospaced />}
+            {(id) => (
+              <TextField
+                id={id}
+                value={port}
+                onChange={setPort}
+                placeholder="3000"
+                isMonospaced
+              />
+            )}
           </Field>
           <Field title="URL" note="optional">
             {(id) => (
@@ -195,7 +349,10 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
           />
         )}
       </FieldGroup>
-      <Field title="Environment" note="overrides the project’s · applies on next start">
+      <Field
+        title="Environment"
+        note="overrides the project’s · applies on next start"
+      >
         {() => (
           <VariableEditor
             variables={variables}
@@ -209,12 +366,18 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
         <Field
           title="Starts after"
           note="waits until they’re running"
-          hint={hasCycleHint ? "Services that already depend on this one can’t be chosen: that would be a cycle." : null}
+          hint={
+            hasCycleHint
+              ? "Services that already depend on this one can’t be chosen: that would be a cycle."
+              : null
+          }
         >
           {() => (
             <ChipList label="Starts after">
               {others.map((other) => {
-                const cycle = relations.cycles.find((cycle) => cycle.serviceId === other.id);
+                const cycle = relations.cycles.find(
+                  (cycle) => cycle.serviceId === other.id,
+                );
                 const isOn = dependencies.includes(other.id);
                 return (
                   <ChipToggle
@@ -225,7 +388,11 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
                     isDisabled={cycle !== undefined}
                     help={cycle?.message ?? other.key}
                     onChange={(isOn) =>
-                      setDependencies(isOn ? [...dependencies, other.id] : dependencies.filter((id) => id !== other.id))
+                      setDependencies(
+                        isOn
+                          ? [...dependencies, other.id]
+                          : dependencies.filter((id) => id !== other.id),
+                      )
                     }
                   />
                 );
@@ -234,7 +401,12 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
           )}
         </Field>
       )}
-      <SwitchRow title="Manual" detail={manualFooter} isOn={isManual} onChange={setIsManual} />
+      <SwitchRow
+        title="Manual"
+        detail={manualFooter}
+        isOn={isManual}
+        onChange={setIsManual}
+      />
     </FormSheet>
   );
 }
