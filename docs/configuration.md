@@ -113,7 +113,7 @@ Adding a Service, or scanning a folder for Suggestions, fills it in when the com
 
 ### Run before
 
-`run_before` and `command` run in one shell, one after the other, so variables, `cd` and `source` from Run before apply to the command, as when you type both in a terminal. Writing them together in `command` (`source virtualenv/bin/activate && uvicorn …`) still works too. A Run before that fails, or ends the shell with `exit`, stops the Service there: it is Failed with Run before's exit code (`1` on Windows), and the log shows its output followed by “Run before failed with exit code 3, so the command didn’t run”. While Run before runs, the Service is Starting as usual.
+`run_before` and `command` run in one shell, one after the other, so variables, `cd` and `source` from Run before apply to the command, as when you type both in a terminal. Writing them together in `command` (`source virtualenv/bin/activate && uvicorn …`) still works too. A Run before that fails, or ends the shell with `exit`, stops the Service there: it is Failed with Run before's exit code (`1` on Windows), and the log shows its output followed by “Run before failed with exit code 3, so the command didn’t run”. Run before's time counts as the Service starting: one with a Port is Running once the Port opens, one without after 1.5 s alive, Run before included.
 
 Run before is written for the login shell: `sh` syntax for zsh, bash and other `sh`-like shells, fish's own for fish, and cmd's for a Project on Windows itself.
 
