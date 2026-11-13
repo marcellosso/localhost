@@ -119,7 +119,7 @@ These are product rules, not implementation details. A change that breaks one ne
 - Removing a Service or Project stops it first and deletes its logs. The Project's folder is never touched.
 
 **Coding agents**
-- Each app bundles the `localhost` command of its own version. Connect your agents (Settings, the command palette, the first-run empty state) adds a `localhost` MCP server running it, and the localhost-mcp skill, to Claude Code, Cursor and Codex, only at the locations each agent documents.
+- Each app bundles the `localhost` command of its own version. Connect your agents (Settings, the command palette, the empty state, the Get started checklist) adds a `localhost` MCP server running it, and the localhost-mcp skill, to Claude Code, Cursor and Codex, only at the locations each agent documents.
 - Claude Code's servers change through its `claude mcp` command when it is installed, else by editing `~/.claude.json`. `npx @getlocalhost/cli mcp install` (`packages/cli/`) writes the same entries from a terminal, under the same rules, and Claude Desktop's too; its JSON and TOML editors mirror the core's, so change them together. Cursor reads Claude Code's and Codex's skill folders, so it gets its own copy only when neither has one.
 - An update asks before disconnecting connected agents, as it asks before stopping Services; then their `localhost mcp` ends.
 - Nothing is written until the user clicks, after seeing the file and the entry. Only localhost's own entries change, the rest of the file byte for byte; each file is backed up before localhost first edits it; Disconnect removes only localhost's entries. A file localhost can't parse is reported, never rewritten.
@@ -131,6 +131,7 @@ These are product rules, not implementation details. A change that breaks one ne
 - Closing the window keeps the app and its Services running; the menu bar or tray shows them. Quitting asks first when anything is active, then stops everything in parallel, whoever started it.
 - The apps and `localhost mcp` drive one shared core, so they see the same Runs, on Windows too. When a client disconnects, the core stops the Runs nobody needs any more: none while an app is connected, else those no remaining client started (with their Dependencies). It exits once no client has been connected for 10 s.
 - Updates are offered, never installed unasked: a check at launch and every few hours (off in Settings), a notice, then Update Now and Restart to Update. Restarting to update stops every Service first, like quitting, after listing them, and retires the shared core so the new version starts its own. A `.deb` or `.rpm` only links to the release. Builds without the updater's public key never check.
+- The first launch of someone new shows a short welcome (Project, Service, Port) ending in Add Project…, then a Get started checklist in the sidebar ticked from real state, until complete or closed. Both are kept in the app's settings, shown once, and never to someone who opened localhost before or already has Projects. Nothing else opens by itself at launch.
 - Each active Run is recorded on disk (pid, process group, start time). At the next launch, survivors are offered as Orphans: Stop them (default) or Leave them.
 
 **Machines**
