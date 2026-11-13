@@ -3,7 +3,7 @@
 localhost keeps each Project's configuration in its own storage, never in your project folder. To move a Project to another machine, keep it in a dotfiles repo or share it with a teammate, export it as a **Project file**: one YAML file per Project.
 
 - **Export Project…** (macOS: File menu; Linux and Windows: the Project's `⋯` menu) writes the selected Project to a file you choose.
-- **Import Project…** (macOS: File menu; Linux and Windows: the `+` menu in the sidebar) reads one, validates it, and shows what it contains before anything is added.
+- **Import Project…** (the `+` menu in the sidebar, and on macOS the File menu) reads one, validates it, and shows what it contains before anything is added.
 
 You can also write a Project file by hand and import it.
 

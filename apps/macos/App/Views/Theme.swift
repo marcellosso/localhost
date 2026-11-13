@@ -54,6 +54,8 @@ enum Theme {
     /// The sidebar with translucency off, and the Settings rail's tint.
     static let sidebarSolid = dynamic(light: 0xEDECF0, dark: 0x232329)
     static let sidebarTint = dynamic(light: 0xF6F5F8, dark: 0x202026, lightAlpha: 0.55, darkAlpha: 0.48)
+    /// A card raised off a surface, e.g. the welcome's pictures.
+    static let raised = dynamic(light: 0xFFFFFF, dark: 0x2A2A30)
 
     /// Nonisolated: AppKit resolves dynamic colours off the main thread too,
     /// e.g. while SwiftUI renders an animation asynchronously.

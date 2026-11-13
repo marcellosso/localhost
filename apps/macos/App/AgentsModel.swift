@@ -42,6 +42,17 @@ final class AgentsModel {
         commandLine = await setup.commandLine()
     }
 
+    /// Reads the agents only, without the slower `PATH` check: whether any
+    /// is connected, for Get started.
+    func refreshAgents() async {
+        agents = await setup.statuses()
+    }
+
+    /// Whether any agent's configuration has localhost's server.
+    var hasConnectedAgent: Bool {
+        agents.contains(where: \.hasLocalhost)
+    }
+
     func connect(_ client: AgentClient) async {
         await change(client) { () throws(LocalhostError) in try await self.setup.connect(client) }
     }

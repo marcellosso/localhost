@@ -45,6 +45,7 @@ struct ProjectSidebar: View {
         .safeAreaInset(edge: .top, spacing: 0) { SidebarHeader() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
+                GetStartedView()
                 TelemetryNotice()
                 UpdateNotice()
                 SidebarFooter()
@@ -146,7 +147,7 @@ private struct MachineStateRow: View {
     }
 }
 
-/// The `localhost:` wordmark, then project search with Add Project beside it.
+/// The `localhost:` wordmark, then project search with the Add Project menu beside it.
 private struct SidebarHeader: View {
     @Environment(AppModel.self) private var model
     @FocusState private var isSearchFocused: Bool
@@ -189,11 +190,20 @@ private struct SidebarHeader: View {
                 .padding(.horizontal, 8)
                 .frame(height: 28)
                 .background(Color.primary.opacity(isSearchFocused ? 0.09 : 0.06), in: .rect(cornerRadius: 7))
-                Button("Add Project", systemImage: "plus") { model.presentedSheet = .addProject }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(SquareIconButtonStyle())
-                    .help("Add Project (⌘N)")
-                    .disabled(model.core == nil)
+                // A new Project from a folder, or one from a Project file.
+                Menu {
+                    Button("New Project…") { model.presentedSheet = .addProject }
+                    Button("Import Project…") { model.isChoosingImportFile = true }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .buttonStyle(SquareIconButtonStyle())
+                .fixedSize()
+                .accessibilityLabel("Add Project")
+                .help("Add Project")
+                .disabled(model.core == nil)
             }
         }
         .padding(.horizontal, 10)

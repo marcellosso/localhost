@@ -9,18 +9,29 @@ type Props = {
   children?: ReactNode;
   /** The buttons one above the other at one width, for more than two. */
   isStacked?: boolean;
+  /** Quieter actions under the buttons, as links. */
+  links?: { label: string; onClick: () => void }[];
   /** A line under the buttons that teaches a shortcut, e.g. a `KeyTip`. */
   tip?: ReactNode;
 };
 
 /** A column with nothing to show: an icon, a title, a line and actions. */
-export function EmptyState({ icon, title, description, children, isStacked = false, tip }: Props) {
+export function EmptyState({ icon, title, description, children, isStacked = false, links, tip }: Props) {
   return (
     <div className={styles.empty}>
       <span className={styles.icon}>{icon}</span>
       <h2 className={styles.title}>{title}</h2>
       <p className={styles.description}>{description}</p>
       {children && <div className={`${styles.actions} ${isStacked ? styles.stacked : ""}`}>{children}</div>}
+      {links && (
+        <div className={styles.links}>
+          {links.map((link) => (
+            <button key={link.label} className={styles.link} onClick={link.onClick}>
+              {link.label}
+            </button>
+          ))}
+        </div>
+      )}
       {tip}
     </div>
   );

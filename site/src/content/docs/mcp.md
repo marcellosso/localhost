@@ -4,7 +4,7 @@ It is a [Model Context Protocol](https://modelcontextprotocol.io) server on stan
 
 ## Connect from the app
 
-The app comes with the `localhost` command and connects your agents for you, no terminal needed. It opens **Connect your agents** by itself the first time it starts; after that, open **Settings → Agents**, or **Connect Agents…** in the command palette (also **Connect Your Agents** before you have any Projects), and click **Connect** next to Claude Code, Cursor or Codex. **What changes** shows exactly what localhost writes before you click:
+The app comes with the `localhost` command and connects your agents for you, no terminal needed. Open **Settings → Agents**, **Connect Agents…** in the command palette, **Connect your agents** in the **Get started** checklist after your first Project (or **Connect Your Agents…** before you have any), and click **Connect** next to Claude Code, Cursor or Codex. **What changes** shows exactly what localhost writes before you click:
 
 | Agent | MCP server added to | Skill installed in |
 |---|---|---|

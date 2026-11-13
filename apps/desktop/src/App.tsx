@@ -18,6 +18,7 @@ import { startMachines, useMachines } from "./machines";
 import { loadHome, tildePath } from "./paths";
 import { onPerfMeasurement, runPerfMeasurement } from "./perf";
 import { allServices, noService, type ServiceSelection, type SidebarSelection } from "./selection";
+import { PROJECT_CONCEPT } from "./onboarding";
 import { loadSettings } from "./settings";
 import type { CoreView } from "./core";
 import type { Navigator } from "./palette";
@@ -174,9 +175,12 @@ function MainWindow({ view }: { view: CoreView }) {
             <section className="emptyColumn" data-column="list">
               <EmptyState
                 icon={<FolderIcon size={40} />}
-                title="No Projects"
-                description="Add a project folder to get started."
-                isStacked
+                title="Add Your First Project"
+                description={PROJECT_CONCEPT}
+                links={[
+                  { label: "Import Project…", onClick: () => void importProject() },
+                  { label: "Connect Your Agents…", onClick: () => showSheet({ kind: "connectAgents" }) },
+                ]}
                 tip={
                   <KeyTip
                     before="Press"
@@ -187,12 +191,6 @@ function MainWindow({ view }: { view: CoreView }) {
               >
                 <button className="button accent" onClick={() => showSheet({ kind: "addProject" })}>
                   Add Project…
-                </button>
-                <button className="button" onClick={() => void importProject()}>
-                  Import Project…
-                </button>
-                <button className="button" onClick={() => showSheet({ kind: "connectAgents" })}>
-                  Connect Your Agents
                 </button>
               </EmptyState>
             </section>

@@ -9,6 +9,7 @@ import type { ShownMachine } from "../machines";
 import { isActive, projectServicesSummary } from "../status";
 import { showAlert, showSheet } from "../ui";
 import { useUpdate } from "../updates";
+import { GetStarted } from "./GetStarted";
 import { ClearIcon, GearIcon, GlobeIcon, KeyboardIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
@@ -149,6 +150,11 @@ export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
           ];
         })}
       </ul>
+      <GetStarted
+        view={view}
+        selectedProjectId={selection?.kind === "project" ? selection.projectId : null}
+        onSelectProject={(projectId) => onSelect({ kind: "project", projectId })}
+      />
       <TelemetryNotice />
       <UpdateNotice update={update} />
       <footer className={styles.footer}>

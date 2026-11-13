@@ -1,8 +1,12 @@
 Shortcuts are written for macOS; on Linux and Windows use Ctrl for ⌘ and Alt for ⌥ (see [Keyboard shortcuts](/docs/keyboard)).
 
+The first time you open localhost, a short welcome explains the three words that matter: a **Project** is a folder, a **Service** is a long-running command in it (`pnpm dev`, `docker compose up`), and its **Port** is how localhost knows it is Running. It ends in **Add Project…**, which is step 1 below; **Skip** or **Not Now** closes it, and it doesn't come back. If you used localhost before, you won't see it.
+
+Once you have a Project, a **Get started** checklist at the foot of the sidebar ticks off adding a Project, adding a Service and starting your first one, plus connecting your coding agents if you want to. Click an open item to go there. It disappears once everything is ticked, or close it with **×**.
+
 ## 1. Add a Project
 
-Press **⌘N** (or the **+** in the sidebar) and choose your project's folder. localhost fills in a name and a **Key** (a short handle such as `my-saas`, used in logs and by the command line), then scans the folder and lists what it found:
+Click **Add Project…** (or press **⌘N**, or choose **New Project…** from the **+** in the sidebar) and choose your project's folder. localhost fills in a name and a **Key** (a short handle such as `my-saas`, used in logs and by the command line), then scans the folder and lists what it found:
 
 - **Node**: `package.json` scripts, run with your package manager (`pnpm run dev`, …). Known dev servers get their default port, passed as `$PORT`.
 - **Docker Compose**: one `Infra` Service running the whole file (`docker compose up`, in the foreground), or one per Compose service (`docker compose up <service>`) if you'd rather. In the review you can also merge Suggestions into one Service and pick what each starts after.
@@ -33,4 +37,4 @@ Closing the window doesn't stop anything: your Services keep running, and the me
 
 ## 5. Let your coding agent run it too
 
-Connect Claude Code, Cursor, Codex or another MCP client to `localhost mcp`, from **Settings → Agents** or with `npx @getlocalhost/cli mcp install` in a terminal, and it starts, stops and reads the logs of the same Services, instead of a `pnpm dev` in a shell you can't see. What it starts shows in the window. See [Coding agents (MCP)](/docs/mcp) and the [agent skill](/docs/skills).
+Connect Claude Code, Cursor, Codex or another MCP client to `localhost mcp`, from **Get started**, **Settings → Agents**, the command palette, or with `npx @getlocalhost/cli mcp install` in a terminal, and it starts, stops and reads the logs of the same Services, instead of a `pnpm dev` in a shell you can't see. What it starts shows in the window. See [Coding agents (MCP)](/docs/mcp) and the [agent skill](/docs/skills).

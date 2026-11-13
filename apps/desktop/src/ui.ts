@@ -39,7 +39,9 @@ export type Sheet =
   /** The review step of an import, before anything is saved. */
   | { kind: "importProject"; file: string; preview: ImportPreview }
   /** Connect your agents: Claude Code, Cursor and Codex, and the command in terminals. */
-  | { kind: "connectAgents" };
+  | { kind: "connectAgents" }
+  /** The first launch's welcome, ending in Add Project…. */
+  | { kind: "welcome" };
 
 /** The UI's own state, outside the core. */
 export type UiState = {

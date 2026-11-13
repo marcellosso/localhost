@@ -2,7 +2,7 @@ import LocalhostCore
 import SwiftUI
 
 /// Connect Your Agents as a sheet over the main window: from the app menu,
-/// the command palette and the first-run empty state. Settings › Agents
+/// the command palette, the empty state and Get started. Settings › Agents
 /// shows the same `AgentsContent`.
 struct ConnectAgentsView: View {
     static let title = "Connect your agents"

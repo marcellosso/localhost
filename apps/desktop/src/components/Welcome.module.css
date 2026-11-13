@@ -1,0 +1,191 @@
+/* The first launch's welcome: a picture of the window, a title and a line,
+ * then Skip, where the user is, and the way on. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.2);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: hidden auto;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.picture {
+  display: grid;
+  place-items: center;
+  height: 176px;
+  flex: none;
+  border-bottom: 1px solid var(--separator);
+  background:
+    radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--surface-column);
+}
+
+/* A few rows of the window, raised off the picture. */
+.card {
+  display: grid;
+  gap: 2px;
+  width: 280px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.1), 0 0 0 0.5px var(--separator);
+  font-size: 12.5px;
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 7px;
+  color: var(--accent-text);
+  font-size: 12px;
+}
+
+/* From the folder down to its Project. */
+.arrow {
+  justify-self: center;
+  width: 1px;
+  height: 12px;
+  margin: 2px 0;
+  background: var(--separator);
+}
+
+.row,
+.service {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+
+.selected {
+  background: var(--selection-quiet);
+}
+
+.service {
+  min-height: 40px;
+  border-left: 3px solid var(--service);
+  border-radius: 4px 6px 6px 4px;
+}
+
+.service + .service {
+  margin-top: 4px;
+}
+
+.serviceText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command {
+  font-size: 11px;
+}
+
+.running {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--state-running);
+}
+
+.text {
+  display: grid;
+  gap: 6px;
+  padding: 18px 24px 4px;
+}
+
+.caption {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.body {
+  min-height: 3.2em;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--fill);
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px 18px;
+}
+
+.skip {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.skip:hover {
+  color: var(--text);
+}
+
+.dots {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fill-strong);
+}
+
+.dots > .current {
+  background: var(--accent);
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}

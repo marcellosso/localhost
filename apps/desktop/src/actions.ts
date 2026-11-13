@@ -9,6 +9,8 @@ import {
   type Result,
 } from "./bindings";
 import { listenerKey } from "./listeners";
+import { startOnboarding } from "./onboarding";
+import { currentCore } from "./store";
 import { currentUi, setProgress, setStoppingListener, showAlert, showSheet } from "./ui";
 
 // What the main window's buttons do, on this computer or, given its id,
@@ -73,7 +75,7 @@ export async function stopListener(details: ListenerDetails) {
 
 /**
  * What the user must hear about at launch: unreadable Project files, then
- * Orphans. The first launch also opens Connect your agents, once.
+ * Orphans. The first launch also opens the welcome, once.
  */
 export async function runLaunchChecks() {
   const result = await commands.launchChecks();
@@ -81,7 +83,9 @@ export async function runLaunchChecks() {
   const { unreadableFiles, orphans } = result.data;
   if (unreadableFiles.length > 0) showAlert({ kind: "unreadableFiles", files: unreadableFiles });
   if (orphans.length > 0 && !isAskingAboutOrphans()) showAlert({ kind: "orphans", orphans });
-  if (!currentUi().sheet && (await commands.takeConnectAgentsOffer())) showSheet({ kind: "connectAgents" });
+  const core = currentCore();
+  if (core.phase !== "ready") return;
+  if ((await startOnboarding(core.view.projects.length)) && !currentUi().sheet) showSheet({ kind: "welcome" });
 }
 
 /** A WSL distro found Orphans as it connected: asks about them, unless the question is already up. */
