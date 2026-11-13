@@ -5,6 +5,7 @@ import { projectShortcut, SHORTCUTS, type Shortcut, serviceShortcut, shortcutLab
 import { tildePath } from "./paths";
 import type { ServiceSelection } from "./selection";
 import { isActive } from "./status";
+import { showChecklistAgain } from "./onboarding";
 import { showAlert, showSheet } from "./ui";
 import { checkForUpdates } from "./updates";
 
@@ -19,7 +20,7 @@ export type Navigator = {
 };
 
 export type PaletteIcon =
-  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" | "keyboard" | "agents" }
+  | { kind: "symbol"; name: "folder" | "service" | "play" | "stop" | "restart" | "browser" | "terminal" | "editor" | "ports" | "new" | "keyboard" | "agents" | "help" }
   /** A Service: its colour (by position) and state glyph. */
   | { kind: "service"; index: number; state: ServiceState };
 
@@ -97,6 +98,20 @@ export function paletteItems(
     icon: { kind: "symbol", name: "agents" },
     keywords: "mcp claude cursor codex agent skill path terminal cli",
     run: () => showSheet({ kind: "connectAgents" }),
+  });
+  items.push({
+    id: "other:show-welcome",
+    title: "Show Welcome…",
+    icon: { kind: "symbol", name: "help" },
+    keywords: "help onboarding introduction tour first run",
+    run: () => showSheet({ kind: "welcome" }),
+  });
+  items.push({
+    id: "other:show-checklist",
+    title: "Show Get Started Checklist",
+    icon: { kind: "symbol", name: "help" },
+    keywords: "help onboarding get started first run",
+    run: showChecklistAgain,
   });
   items.push({
     id: "other:check-for-updates",

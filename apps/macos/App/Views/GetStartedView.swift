@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The Get started checklist, at the foot of the sidebar once there is a
 /// Project: each row ticks from what is true, an open row takes the user
-/// there. It goes away for good when every row is ticked or it is closed.
+/// there. It goes away for good when every row is ticked or it is closed;
+/// shown again from Help, it stays until closed.
 /// Ticks use the accent: green belongs to Service State.
 struct GetStartedView: View {
     @Environment(AppModel.self) private var model
@@ -16,7 +17,7 @@ struct GetStartedView: View {
             )
             let isComplete = items.allSatisfy(\.isDone)
             Group {
-                if !isComplete {
+                if !isComplete || model.isChecklistReplayed {
                     checklist(items)
                 }
             }
@@ -28,7 +29,7 @@ struct GetStartedView: View {
                 if isRunning { model.updateOnboarding { $0.hasStartedService = true } }
             }
             .onChange(of: isComplete, initial: true) {
-                if isComplete { model.updateOnboarding { $0.isChecklistDone = true } }
+                if isComplete, !model.isChecklistReplayed { model.updateOnboarding { $0.isChecklistDone = true } }
             }
         }
     }
@@ -43,9 +44,7 @@ struct GetStartedView: View {
                 Text("\(items.filter(\.isDone).count) of \(items.count)")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
-                Button("Hide Get Started", systemImage: "xmark") {
-                    model.updateOnboarding { $0.isChecklistDone = true }
-                }
+                Button("Hide Get Started", systemImage: "xmark") { model.hideChecklist() }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .font(.system(size: 10, weight: .semibold))

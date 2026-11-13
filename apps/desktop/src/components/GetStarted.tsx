@@ -6,9 +6,11 @@ import {
   type ChecklistItem,
   checklistItems,
   hasRunningService,
+  hideChecklist,
   isAnyAgentConnected,
   isChecklistShown,
   updateOnboarding,
+  useIsChecklistReplayed,
   useOnboarding,
 } from "../onboarding";
 import { showSheet, useUi } from "../ui";
@@ -25,10 +27,12 @@ type Props = {
 /**
  * The Get started checklist, at the foot of the sidebar once there is a
  * Project: each row ticks from what is true, an open row takes the user
- * there. It goes away for good when every row is ticked or it is closed.
+ * there. It goes away for good when every row is ticked or it is closed;
+ * shown again from Help, it stays until closed.
  */
 export function GetStarted({ view, selectedProjectId, onSelectProject }: Props) {
   const onboarding = useOnboarding();
+  const isReplayed = useIsChecklistReplayed();
   const isShown = onboarding !== null && isChecklistShown(onboarding, view);
   const hasConnectedAgent = useHasConnectedAgent(isShown);
   const isRunning = hasRunningService(view);
@@ -39,10 +43,10 @@ export function GetStarted({ view, selectedProjectId, onSelectProject }: Props) 
     if (isShown && isRunning && !onboarding?.hasStartedService) updateOnboarding({ hasStartedService: true });
   }, [isShown, isRunning, onboarding]);
   useEffect(() => {
-    if (isShown && isComplete) updateOnboarding({ isChecklistDone: true });
-  }, [isShown, isComplete]);
+    if (isShown && isComplete && !isReplayed) updateOnboarding({ isChecklistDone: true });
+  }, [isShown, isComplete, isReplayed]);
 
-  if (!isShown || isComplete) return null;
+  if (!isShown || (isComplete && !isReplayed)) return null;
   const doneCount = items.filter((item) => item.isDone).length;
   const act = (item: ChecklistItem) => {
     if (item.step === "agents") {
@@ -70,7 +74,7 @@ export function GetStarted({ view, selectedProjectId, onSelectProject }: Props) 
           className={styles.close}
           aria-label="Hide Get Started"
           title="Hide Get Started"
-          onClick={() => updateOnboarding({ isChecklistDone: true })}
+          onClick={hideChecklist}
         >
           <ClearIcon size={13} />
         </button>

@@ -11,7 +11,7 @@ import styles from "./Welcome.module.css";
 /**
  * The first launch's welcome: what a Project, a Service and a Port are, one
  * step each, ending in Add Project…. Skipping, Escape or finishing all
- * mean it never opens again.
+ * mean it never opens by itself again; Help › Show Welcome… opens it anyway.
  */
 export function Welcome() {
   const [index, setIndex] = useState(0);

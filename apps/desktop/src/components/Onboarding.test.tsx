@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { viewFromSnapshot } from "../core";
-import { resetOnboarding, startOnboarding } from "../onboarding";
+import { resetOnboarding, showChecklistAgain, startOnboarding } from "../onboarding";
 import { project, service, status } from "../test/fixtures";
 import { currentUi, resetUi } from "../ui";
 import { GetStarted } from "./GetStarted";
+import { helpMenuItems } from "./Sidebar";
 import { Welcome } from "./Welcome";
 
 const commands = vi.hoisted(() => ({
@@ -92,5 +93,56 @@ describe("GetStarted", () => {
     const view = viewFromSnapshot({ projects: [shop], statuses: [], projectStates: [] });
     const { container } = render(<GetStarted view={view} selectedProjectId={null} onSelectProject={vi.fn()} />);
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("Help", () => {
+  const shop = project("Shop", 0, [service("Web")]);
+  const used = { hasSeenWelcome: true, isChecklistDone: true, hasStartedService: true };
+  const help = (label: string) => {
+    const item = helpMenuItems().find((item) => item !== "separator" && item.label === label);
+    if (!item || item === "separator") throw new Error(`no ${label}`);
+    return item;
+  };
+
+  it("shows the welcome again with Projects present, and leaves the saved state as it was", async () => {
+    commands.onboarding.mockResolvedValue({ onboarding: used, hasOpenedBefore: true });
+    await act(() => startOnboarding(1));
+    act(() => help("Show Welcome…").onSelect());
+    expect(currentUi().sheet).toEqual({ kind: "welcome" });
+
+    render(<Welcome />);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(currentUi().sheet).toBeNull();
+    expect(commands.saveOnboarding).not.toHaveBeenCalled();
+  });
+
+  it("brings back the checklist, ticked from what is true, until closed again", async () => {
+    commands.onboarding.mockResolvedValue({ onboarding: used, hasOpenedBefore: true });
+    commands.agentStatuses.mockResolvedValue([{ connection: "connected" }]);
+    await act(() => startOnboarding(1));
+    const view = viewFromSnapshot({ projects: [shop], statuses: [status(shop.services[0].id, "running")], projectStates: [] });
+    const { container } = render(<GetStarted view={view} selectedProjectId={null} onSelectProject={vi.fn()} />);
+    expect(container.innerHTML).toBe("");
+
+    act(() => help("Show Get Started Checklist").onSelect());
+    expect(commands.saveOnboarding).toHaveBeenLastCalledWith({ ...used, isChecklistDone: false });
+    // Every row is ticked, yet it stays: it was asked for.
+    await waitFor(() => expect(screen.getByText("4 of 4")).toBeTruthy());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(screen.getByText("4 of 4")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Get Started" }));
+    expect(container.innerHTML).toBe("");
+    expect(commands.saveOnboarding).toHaveBeenLastCalledWith(used);
+  });
+
+  it("shows a closed checklist again even before it was complete", async () => {
+    commands.onboarding.mockResolvedValue({ onboarding: { ...used, hasStartedService: false }, hasOpenedBefore: true });
+    await act(() => startOnboarding(1));
+    const view = viewFromSnapshot({ projects: [shop], statuses: [], projectStates: [] });
+    render(<GetStarted view={view} selectedProjectId={null} onSelectProject={vi.fn()} />);
+    act(() => showChecklistAgain());
+    expect(screen.getByText("2 of 4")).toBeTruthy();
   });
 });

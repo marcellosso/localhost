@@ -99,6 +99,15 @@ struct AppCommands: Commands {
                 model.toggleKeyboardShortcuts()
             }
             .keyboardShortcut("/")
+            Divider()
+            Button("Show Welcome…") {
+                openWindow(id: "main")
+                model.showWelcome()
+            }
+            Button("Show Get Started Checklist") {
+                openWindow(id: "main")
+                model.showChecklistAgain()
+            }
         }
         CommandGroup(before: .windowList) {
             Button("Main Window") { openWindow(id: "main") }

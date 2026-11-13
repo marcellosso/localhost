@@ -7,10 +7,11 @@ import { importProject } from "../editors";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import type { ShownMachine } from "../machines";
 import { isActive, projectServicesSummary } from "../status";
+import { showChecklistAgain } from "../onboarding";
 import { showAlert, showSheet } from "../ui";
 import { useUpdate } from "../updates";
 import { GetStarted } from "./GetStarted";
-import { ClearIcon, GearIcon, GlobeIcon, KeyboardIcon, PlusIcon, SearchIcon } from "./Icons";
+import { ClearIcon, GearIcon, GlobeIcon, HelpIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
 import { projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
@@ -29,8 +30,8 @@ type Props = {
 
 /**
  * The wordmark and project search, Ports and the Projects, then each other
- * Machine's, a newer version when there is one, and a footer with Settings
- * and how many Services run.
+ * Machine's, a newer version when there is one, and a footer with Settings,
+ * Help and how many Services run.
  */
 export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
   const [search, setSearch] = useState("");
@@ -167,19 +168,31 @@ export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
           >
             <GearIcon size={15} />
           </button>
-          <button
-            className="iconButton"
-            aria-label="Keyboard Shortcuts"
-            title={`Keyboard Shortcuts (${shortcutLabel(SHORTCUTS.keyboardShortcuts)})`}
-            onClick={() => showAlert({ kind: "keyboardShortcuts" })}
-          >
-            <KeyboardIcon size={15} />
-          </button>
+          <Menu
+            label="Help"
+            items={helpMenuItems()}
+            button={{ content: <HelpIcon size={15} />, className: "iconButton" }}
+            align="left"
+            isAbove
+          />
         </div>
         {running > 0 && <span className={`${styles.running} mono secondary`}>{running} running</span>}
       </footer>
     </nav>
   );
+}
+
+/**
+ * The macOS app's Help menu, as this window has no menu bar: Keyboard
+ * Shortcuts, and the first run's welcome and checklist on request.
+ */
+export function helpMenuItems(): MenuItem[] {
+  return [
+    { label: "Keyboard Shortcuts", onSelect: () => showAlert({ kind: "keyboardShortcuts" }) },
+    "separator",
+    { label: "Show Welcome…", onSelect: () => showSheet({ kind: "welcome" }) },
+    { label: "Show Get Started Checklist", onSelect: showChecklistAgain },
+  ];
 }
 
 type ProjectRowProps = {

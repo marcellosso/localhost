@@ -255,6 +255,14 @@ export const CheckIcon = (props: Props) => (
   </Icon>
 );
 
+/** `questionmark.circle`: Help. */
+export const HelpIcon = (props: Props) => (
+  <Icon {...props} strokeWidth={1.2}>
+    <circle cx="8" cy="8" r="6.5" />
+    <path d="M6.2 6.2a1.9 1.9 0 0 1 3.7.5c0 1.3-1.9 1.6-1.9 2.8M8 11.6h.01" />
+  </Icon>
+);
+
 /** `keyboard`: Keyboard Shortcuts. */
 export const KeyboardIcon = (props: Props) => (
   <Icon {...props} strokeWidth={1.2}>
