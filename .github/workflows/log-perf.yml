@@ -64,7 +64,7 @@ jobs:
       # Before it, the measurement opened no log: it is applied to an older baseline.
       HARNESS_FIX: 0ed4d216a1b1c514ffa37a8076c254b0770dc9c3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: current
           fetch-depth: 0
@@ -88,10 +88,10 @@ jobs:
           workspaces: |
             current/apps/desktop/src-tauri
             baseline/apps/desktop/src-tauri
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: current/apps/desktop/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Build
@@ -135,7 +135,7 @@ jobs:
             done
           } >>"$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: log-perf
           path: results/
