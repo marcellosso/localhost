@@ -6,6 +6,7 @@ import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
 import { isActive, isManual, isWarning, projectServicesSummary, rowSummary, rowSummaryHelp, serviceRowLabel } from "../status";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
+import { SERVICE_CONCEPT } from "../onboarding";
 import { showAlert, showSheet } from "../ui";
 import { EmptyState } from "./EmptyState";
 import { ArrowUpRightIcon, LayersIcon, PlayIcon, PlusIcon, StopIcon, TerminalIcon } from "./Icons";
@@ -51,7 +52,7 @@ export function ServicesColumn({ project, view, selection, onSelect, place = thi
         <EmptyState
           icon={<TerminalIcon size={40} />}
           title="No Services"
-          description="A service is a command that runs in this project, like “pnpm dev”."
+          description={SERVICE_CONCEPT}
         >
           <button className="button accent" onClick={() => showSheet({ kind: "detectServices", projectId: project.id })}>
             Detect Services…

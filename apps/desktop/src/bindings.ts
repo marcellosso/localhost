@@ -474,6 +474,15 @@ async saveSettings(settings: Settings) : Promise<Result<null, CommandError>> {
 }
 },
 /**
+ * Where the first run stands, and whether localhost was used before it existed.
+ */
+async onboarding() : Promise<OnboardingLaunch> {
+    return await TAURI_INVOKE("onboarding");
+},
+async saveOnboarding(onboarding: Onboarding) : Promise<void> {
+    await TAURI_INVOKE("save_onboarding", { onboarding });
+},
+/**
  * Streams `source` over `batches`: what is buffered first, then new
  * lines; on another Machine (`machine_id`), through its connection.
  * Returns the id to close it with.
@@ -588,13 +597,6 @@ async telemetryNoticePending() : Promise<boolean> {
 },
 async acknowledgeTelemetryNotice() : Promise<void> {
     await TAURI_INVOKE("acknowledge_telemetry_notice");
-},
-/**
- * Whether Connect your agents should open by itself at this launch: once,
- * the first time localhost runs with it.
- */
-async takeConnectAgentsOffer() : Promise<boolean> {
-    return await TAURI_INVOKE("take_connect_agents_offer");
 },
 /**
  * Each agent and where it stands.
@@ -1360,6 +1362,18 @@ summary: string; isConnected: boolean;
  * It waits for the user to connect it again.
  */
 needsUser: boolean; projects: Project[]; statuses: StatusView[]; projectStates: ProjectState[] }
+/**
+ * Where the user is in the first run: whether the welcome was finished
+ * or skipped, whether the Get started checklist is over (dismissed,
+ * complete, or never shown to someone who used localhost before), and
+ * whether a Service has been Running, which the checklist keeps ticked.
+ */
+export type Onboarding = { hasSeenWelcome: boolean; isChecklistDone: boolean; hasStartedService: boolean }
+/**
+ * What the first run starts from: the saved record, if any, and whether
+ * this app was opened before the welcome existed.
+ */
+export type OnboardingLaunch = { onboarding: Onboarding | null; hasOpenedBefore: boolean }
 /**
  * Who or what requested a state-changing action.
  * 

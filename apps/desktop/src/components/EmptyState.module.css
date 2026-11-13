@@ -42,6 +42,27 @@
   max-width: 220px;
 }
 
+/* Quieter actions: a row of links under the main one. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin-top: 4px;
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 12px;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
 .tip {
   margin: 4px 0 0;
   font-size: 12px;

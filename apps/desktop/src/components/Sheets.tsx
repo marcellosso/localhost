@@ -8,6 +8,7 @@ import { ImportProjectForm } from "./ImportProjectForm";
 import { ProjectForm } from "./ProjectForm";
 import { ServiceForm } from "./ServiceForm";
 import { DetectServicesForm } from "./SuggestionReview";
+import { Welcome } from "./Welcome";
 
 type Props = {
   view: CoreView;
@@ -56,5 +57,7 @@ function sheetContent(sheet: Sheet, view: CoreView, onSelectProject: Props["onSe
       return <ImportProjectForm file={sheet.file} preview={sheet.preview} onImported={(imported) => onSelectProject(imported.id)} />;
     case "connectAgents":
       return <ConnectAgentsSheet onClose={closeSheet} />;
+    case "welcome":
+      return <Welcome />;
   }
 }

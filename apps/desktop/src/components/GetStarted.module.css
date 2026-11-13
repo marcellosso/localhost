@@ -1,0 +1,98 @@
+/* The Get started checklist, a sidebar notice like the update's. Ticks use
+ * the accent: green belongs to Service State. */
+
+.checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0 10px 10px;
+  padding: 9px 10px 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised));
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.count {
+  font: 500 11px var(--font-mono);
+}
+
+.close {
+  display: grid;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.close:hover {
+  background: var(--fill);
+  color: var(--text);
+}
+
+.items {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.items li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 12px;
+}
+
+.mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--text-tertiary);
+  border-radius: 50%;
+}
+
+.done .mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.label {
+  color: var(--text-secondary);
+}
+
+.action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.action:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.optional {
+  font-weight: 400;
+}

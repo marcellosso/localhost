@@ -63,9 +63,35 @@ struct Stored {
     /// Whether closing the window has said that localhost keeps running (`lifecycle`).
     #[serde(default)]
     has_explained_close: bool,
-    /// Whether Connect your agents has opened by itself, once, at a launch.
+    /// Whether Connect your agents opened by itself at a launch, as versions
+    /// before the welcome did: also a sign the app was opened before.
     #[serde(default)]
     has_offered_agents: bool,
+    /// The first-run welcome and checklist; `None` until the first launch
+    /// that has them decides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    onboarding: Option<Onboarding>,
+}
+
+/// Where the user is in the first run: whether the welcome was finished
+/// or skipped, whether the Get started checklist is over (dismissed,
+/// complete, or never shown to someone who used localhost before), and
+/// whether a Service has been Running, which the checklist keeps ticked.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Onboarding {
+    pub has_seen_welcome: bool,
+    pub is_checklist_done: bool,
+    pub has_started_service: bool,
+}
+
+/// What the first run starts from: the saved record, if any, and whether
+/// this app was opened before the welcome existed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardingLaunch {
+    pub onboarding: Option<Onboarding>,
+    pub has_opened_before: bool,
 }
 
 pub struct SettingsStore {
@@ -107,18 +133,21 @@ impl SettingsStore {
         }
     }
 
-    /// Whether Connect your agents should open by itself: only the first
-    /// time this is asked, remembered from then on (for this session only if
-    /// the file can't be written).
-    pub fn take_agents_offer(&self) -> bool {
-        let stored = self.stored.lock().unwrap().clone();
-        if stored.has_offered_agents {
-            return false;
+    pub fn onboarding_launch(&self) -> OnboardingLaunch {
+        let stored = self.stored.lock().unwrap();
+        OnboardingLaunch {
+            onboarding: stored.onboarding,
+            has_opened_before: stored.has_offered_agents || stored.has_explained_close,
         }
-        if self.write(Stored { has_offered_agents: true, ..stored }).is_err() {
-            self.stored.lock().unwrap().has_offered_agents = true;
+    }
+
+    /// Remembers the first run's progress; for this session only if the
+    /// file can't be written, so the welcome never shows twice in one.
+    pub fn set_onboarding(&self, onboarding: Onboarding) {
+        let stored = Stored { onboarding: Some(onboarding), ..self.stored.lock().unwrap().clone() };
+        if self.write(stored).is_err() {
+            self.stored.lock().unwrap().onboarding = Some(onboarding);
         }
-        true
     }
 
     fn write(&self, stored: Stored) -> Result<(), LocalhostError> {
@@ -164,6 +193,19 @@ pub fn save_settings(state: tauri::State<'_, AppState>, settings: Settings) -> C
     Ok(())
 }
 
+/// Where the first run stands, and whether localhost was used before it existed.
+#[tauri::command]
+#[specta::specta]
+pub fn onboarding(state: tauri::State<'_, AppState>) -> OnboardingLaunch {
+    state.settings.onboarding_launch()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_onboarding(state: tauri::State<'_, AppState>, onboarding: Onboarding) {
+    state.settings.set_onboarding(onboarding);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +242,33 @@ mod tests {
         let reopened = SettingsStore::open(Some(path));
         assert!(reopened.has_explained_close());
         assert_eq!(reopened.get(), changed);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn remembers_the_first_run_and_who_opened_localhost_before_it() {
+        let folder = std::env::temp_dir().join(format!("localhost-settings-onboarding-{}", std::process::id()));
+        let path = folder.join("settings.json");
+        let store = SettingsStore::open(Some(path.clone()));
+        assert_eq!(store.onboarding_launch(), OnboardingLaunch { onboarding: None, has_opened_before: false });
+
+        let onboarding = Onboarding { has_seen_welcome: true, ..Onboarding::default() };
+        store.set_onboarding(onboarding);
+        store.save(Settings { log_font_size: 14, ..Settings::default() }).unwrap();
+        let reopened = SettingsStore::open(Some(path));
+        assert_eq!(reopened.onboarding_launch().onboarding, Some(onboarding));
+        assert_eq!(reopened.get().log_font_size, 14);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn an_earlier_version_s_file_counts_as_opened_before() {
+        let folder = std::env::temp_dir().join(format!("localhost-settings-earlier-{}", std::process::id()));
+        let path = folder.join("settings.json");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(&path, r#"{"logFontSize":12,"hasOfferedAgents":true}"#).unwrap();
+        let launch = SettingsStore::open(Some(path)).onboarding_launch();
+        assert_eq!(launch, OnboardingLaunch { onboarding: None, has_opened_before: true });
         let _ = std::fs::remove_dir_all(folder);
     }
 
