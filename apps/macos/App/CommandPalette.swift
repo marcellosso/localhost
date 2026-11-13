@@ -61,6 +61,16 @@ extension AppModel {
                                  keywords: "mcp claude cursor codex agent skill path terminal cli") { [weak self] in
             self?.showConnectAgents()
         })
+        if onboarding != nil {
+            items.append(PaletteItem(id: "other:show-welcome", title: "Show Welcome…", icon: .symbol("questionmark.circle"),
+                                     keywords: "help onboarding introduction tour first run") { [weak self] in
+                self?.showWelcome()
+            })
+            items.append(PaletteItem(id: "other:show-checklist", title: "Show Get Started Checklist",
+                                     icon: .symbol("questionmark.circle"), keywords: "help onboarding get started first run") { [weak self] in
+                self?.showChecklistAgain()
+            })
+        }
         items.append(PaletteItem(id: "other:check-for-updates", title: "Check for Updates…",
                                  icon: .symbol("arrow.down.circle"), keywords: "update upgrade version release") { [weak self] in
             self?.updates.checkForUpdates()

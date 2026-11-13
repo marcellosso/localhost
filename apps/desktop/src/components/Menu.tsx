@@ -15,10 +15,12 @@ type Props = {
   button?: { content: ReactNode; className: string };
   /** Which side of the button the menu lines up with. */
   align?: "left" | "right";
+  /** Opens upward, for a button at the foot of the window. */
+  isAbove?: boolean;
 };
 
 /** A button opening a menu: by default a borderless `⋯`, for rare actions. */
-export function Menu({ label, items, button: custom, align = "right" }: Props) {
+export function Menu({ label, items, button: custom, align = "right", isAbove = false }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const menuId = useId();
@@ -44,7 +46,7 @@ export function Menu({ label, items, button: custom, align = "right" }: Props) {
           id={menuId}
           label={label}
           items={items}
-          className={`${styles.below} ${align === "left" ? styles.alignLeft : ""}`}
+          className={`${isAbove ? styles.above : styles.below} ${align === "left" ? styles.alignLeft : ""}`}
           onClose={(returnFocus) => {
             setIsOpen(false);
             if (returnFocus) button.current?.focus();

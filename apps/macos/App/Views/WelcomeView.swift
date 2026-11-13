@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The first launch's welcome: what a Project, a Service and a Port are, one
 /// step each, ending in Add Project…. Skipping, Escape or finishing all mean
-/// it never opens again.
+/// it never opens by itself again; Help › Show Welcome… opens it anyway.
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
     @State private var index = 0

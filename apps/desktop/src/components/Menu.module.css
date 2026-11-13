@@ -47,6 +47,12 @@
   right: 0;
 }
 
+.above {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+}
+
 .alignLeft {
   right: auto;
   left: 0;

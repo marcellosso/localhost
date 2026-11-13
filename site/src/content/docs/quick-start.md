@@ -1,8 +1,10 @@
 Shortcuts are written for macOS; on Linux and Windows use Ctrl for ⌘ and Alt for ⌥ (see [Keyboard shortcuts](/docs/keyboard)).
 
-The first time you open localhost, a short welcome explains the three words that matter: a **Project** is a folder, a **Service** is a long-running command in it (`pnpm dev`, `docker compose up`), and its **Port** is how localhost knows it is Running. It ends in **Add Project…**, which is step 1 below; **Skip** or **Not Now** closes it, and it doesn't come back. If you used localhost before, you won't see it.
+The first time you open localhost, a short welcome explains the three words that matter: a **Project** is a folder, a **Service** is a long-running command in it (`pnpm dev`, `docker compose up`), and its **Port** is how localhost knows it is Running. It ends in **Add Project…**, which is step 1 below; **Skip** or **Not Now** closes it, and it doesn't come back by itself. If you used localhost before, you won't see it.
 
 Once you have a Project, a **Get started** checklist at the foot of the sidebar ticks off adding a Project, adding a Service and starting your first one, plus connecting your coding agents if you want to. Click an open item to go there. It disappears once everything is ticked, or close it with **×**.
+
+To see either again, choose **Show Welcome…** or **Show Get Started Checklist** from the **Help** menu (the **?** at the foot of the sidebar on Linux and Windows) or the command palette.
 
 ## 1. Add a Project
 

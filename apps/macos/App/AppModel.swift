@@ -179,6 +179,9 @@ final class AppModel {
     private(set) var isTelemetryNoticePending = false
     /// The first run's welcome and checklist; `nil` when the core couldn't open.
     private(set) var onboarding: Onboarding?
+    /// The checklist was asked for again from Help: it stays until closed,
+    /// even with every row ticked. Not saved, so the next launch is as before.
+    private(set) var isChecklistReplayed = false
 
     /// What the app sends when it opens, worded once for the notice and Settings.
     static let telemetrySummary = "When localhost opens it sends a random id, its version, your OS and architecture, and how it was installed. Never your projects, commands, paths or logs."
@@ -813,10 +816,31 @@ final class AppModel {
         next.save()
     }
 
-    /// The welcome was finished or skipped: it never opens again.
+    /// The welcome was finished or skipped: it never opens by itself again.
     func finishWelcome(addingProject: Bool) {
         updateOnboarding { $0.hasSeenWelcome = true }
         presentedSheet = addingProject ? .addProject : nil
+    }
+
+    /// Help › Show Welcome…: the first run's welcome on request, Projects or not.
+    func showWelcome() {
+        guard onboarding != nil, presentedSheet == nil else { return }
+        isShowingPalette = false
+        presentedSheet = .welcome
+    }
+
+    /// Help › Show Get Started Checklist: brings the checklist back after it
+    /// was closed or completed. Its rows still tick from what is true.
+    func showChecklistAgain() {
+        guard onboarding != nil else { return }
+        isChecklistReplayed = true
+        updateOnboarding { $0.isChecklistDone = false }
+    }
+
+    /// The checklist's close button: gone until asked for again.
+    func hideChecklist() {
+        isChecklistReplayed = false
+        updateOnboarding { $0.isChecklistDone = true }
     }
 
     /// Whether a Service on this Mac is Running now.

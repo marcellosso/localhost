@@ -61,4 +61,15 @@ describe("palette", () => {
     item.run();
     expect(currentUi().sheet).toEqual({ kind: "connectAgents" });
   });
+
+  it("offers Show Welcome… and Show Get Started Checklist when typed for", () => {
+    resetUi();
+    const items = paletteItems(view, shop, { kind: "all" }, navigator);
+    const welcome = items.find((item) => item.title === "Show Welcome…")!;
+    const checklist = items.find((item) => item.title === "Show Get Started Checklist")!;
+    expect(welcome.id.startsWith("other:")).toBe(true);
+    expect(checklist.id.startsWith("other:")).toBe(true);
+    welcome.run();
+    expect(currentUi().sheet).toEqual({ kind: "welcome" });
+  });
 });

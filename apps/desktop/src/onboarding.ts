@@ -92,11 +92,18 @@ export function isAnyAgentConnected(agents: readonly AgentStatus[]): boolean {
 // so nothing shows before then.
 
 let current: Onboarding | null = null;
+// The checklist was asked for again from Help: it stays until closed, even
+// with every row ticked. Not saved, so the next launch is as before.
+let isChecklistReplayed = false;
 const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((listener) => listener());
+}
 
 function publish(next: Onboarding) {
   current = next;
-  listeners.forEach((listener) => listener());
+  notify();
 }
 
 /** At launch, once the Projects are known: whether to open the welcome. */
@@ -118,17 +125,40 @@ export function updateOnboarding(change: Partial<Onboarding>) {
   void commands.saveOnboarding(next);
 }
 
+/**
+ * Help › Show Get Started Checklist: brings the checklist back after it was
+ * closed or completed. Its rows still tick from what is true.
+ */
+export function showChecklistAgain() {
+  if (!current) return;
+  isChecklistReplayed = true;
+  if (current.isChecklistDone) updateOnboarding({ isChecklistDone: false });
+  else notify();
+}
+
+/** The checklist's close button: gone until asked for again. */
+export function hideChecklist() {
+  isChecklistReplayed = false;
+  updateOnboarding({ isChecklistDone: true });
+  notify();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+}
+
 export function useOnboarding(): Onboarding | null {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    () => current,
-  );
+  return useSyncExternalStore(subscribe, () => current);
+}
+
+/** Whether the checklist was asked for again, so a complete one stays until closed. */
+export function useIsChecklistReplayed(): boolean {
+  return useSyncExternalStore(subscribe, () => isChecklistReplayed);
 }
 
 /** For tests. */
 export function resetOnboarding() {
   current = null;
+  isChecklistReplayed = false;
 }

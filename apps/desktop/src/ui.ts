@@ -40,7 +40,7 @@ export type Sheet =
   | { kind: "importProject"; file: string; preview: ImportPreview }
   /** Connect your agents: Claude Code, Cursor and Codex, and the command in terminals. */
   | { kind: "connectAgents" }
-  /** The first launch's welcome, ending in Add Project…. */
+  /** The first launch's welcome, ending in Add Project…; also Help › Show Welcome…. */
   | { kind: "welcome" };
 
 /** The UI's own state, outside the core. */
