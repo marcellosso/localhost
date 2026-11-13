@@ -19,34 +19,30 @@ struct MainView: View {
                     ProjectDetailView(project: project)
                 } else {
                     ContentUnavailableView {
-                        Label(model.projects.isEmpty ? "No Projects" : "No Project Selected", systemImage: "folder")
+                        Label(model.projects.isEmpty ? "Add Your First Project" : "No Project Selected", systemImage: "folder")
                     } description: {
-                        Text(model.projects.isEmpty ? "Add a project folder to get started." : "Select a project in the sidebar.")
+                        Text(model.projects.isEmpty ? Onboarding.projectConcept : "Select a project in the sidebar.")
                         if !model.projects.isEmpty {
                             KeyTip(before: "or press", keys: "⌘1–9")
                         }
                     } actions: {
                         if model.projects.isEmpty {
                             VStack(spacing: 12) {
-                                // Stacked at one width, the first action on top: three
-                                // side by side don't fit the column.
-                                VStack(spacing: 8) {
-                                    if model.core != nil {
-                                        Button { model.presentedSheet = .addProject } label: {
-                                            Text("Add Project…").frame(maxWidth: .infinity)
-                                        }
+                                // One primary action; the rarer ones as links under it.
+                                if model.core != nil {
+                                    Button("Add Project…") { model.presentedSheet = .addProject }
                                         .buttonStyle(AccentButtonStyle())
-                                        Button { model.isChoosingImportFile = true } label: {
-                                            Text("Import Project…").frame(maxWidth: .infinity)
-                                        }
-                                        .buttonStyle(PillButtonStyle())
-                                    }
-                                    Button { model.showConnectAgents() } label: {
-                                        Text("Connect Your Agents").frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(PillButtonStyle())
                                 }
-                                .frame(width: 200)
+                                HStack(spacing: 14) {
+                                    if model.core != nil {
+                                        Button("Import Project…") { model.isChoosingImportFile = true }
+                                    }
+                                    Button("Connect Your Agents…") { model.showConnectAgents() }
+                                }
+                                .buttonStyle(.plain)
+                                .font(.callout)
+                                .foregroundStyle(Theme.accentText)
+                                .pointerStyle(.link)
                                 KeyTip(before: "Press", keys: "⌘/", after: "to see every keyboard shortcut.")
                             }
                         }
@@ -124,6 +120,8 @@ struct MainView: View {
                 KeyboardShortcutsView()
             case .connectAgents:
                 ConnectAgentsView()
+            case .welcome:
+                WelcomeView()
             }
         }
         .fileImporter(isPresented: $model.isChoosingImportFile, allowedContentTypes: [.yaml]) { result in

@@ -54,7 +54,7 @@ struct ProjectDetailView: View {
                 ContentUnavailableView {
                     Label("No Services", systemImage: "terminal")
                 } description: {
-                    Text("A service is a command that runs in this project, like “pnpm dev”.")
+                    Text(Onboarding.serviceConcept)
                 } actions: {
                     Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
                         .buttonStyle(AccentButtonStyle())

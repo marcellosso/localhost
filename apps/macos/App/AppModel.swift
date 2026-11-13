@@ -30,6 +30,8 @@ final class AppModel {
         case keyboardShortcuts
         /// Connect Your Agents, as in Settings › Agents.
         case connectAgents
+        /// The first launch's welcome, ending in Add Project….
+        case welcome
 
         var id: Self { self }
     }
@@ -175,6 +177,8 @@ final class AppModel {
     @ObservationIgnored let telemetry = Telemetry(storageRoot: AppModel.storageRoot)
     /// Whether the sidebar says, once, what is sent and how to turn it off.
     private(set) var isTelemetryNoticePending = false
+    /// The first run's welcome and checklist; `nil` when the core couldn't open.
+    private(set) var onboarding: Onboarding?
 
     /// What the app sends when it opens, worded once for the notice and Settings.
     static let telemetrySummary = "When localhost opens it sends a random id, its version, your OS and architecture, and how it was installed. Never your projects, commands, paths or logs."
@@ -255,6 +259,7 @@ final class AppModel {
         connectToSharedCore()
         updates.model = self
         isTelemetryNoticePending = telemetry.isNoticePending
+        startOnboarding()
         // Returns at once: the event goes out on a thread of its own, or not at all.
         telemetry.recordAppOpen()
     }
@@ -759,7 +764,7 @@ final class AppModel {
             return
         }
         await checkForOrphans()
-        offerConnectAgentsOnce()
+        offerWelcome()
     }
 
     /// The telemetry notice was read: it never shows again.
@@ -768,15 +773,55 @@ final class AppModel {
         telemetry.acknowledgeNotice()
     }
 
-    static let hasOfferedAgentsKey = "hasOfferedConnectAgents"
+    /// Set once Connect Your Agents had opened by itself, as versions before
+    /// the welcome did: a sign the app was opened before.
+    private static let hasOfferedAgentsKey = "hasOfferedConnectAgents"
 
-    /// Opens Connect Your Agents by itself once, at the first launch that has
-    /// it; the empty state, the menu and Settings offer it from then on.
-    private func offerConnectAgentsOnce() {
-        let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: Self.hasOfferedAgentsKey), presentedSheet == nil, !isShowingOrphanAlert else { return }
-        defaults.set(true, forKey: Self.hasOfferedAgentsKey)
-        showConnectAgents()
+    /// Decides the first run from what was saved, the Projects, and whether
+    /// an earlier version was opened; saves what it decided.
+    private func startOnboarding() {
+        guard let library = core?.library else { return }
+        let projectCount = library.projects().count
+        let saved = Onboarding.load()
+        var onboarding = Onboarding.atLaunch(
+            saved: saved,
+            hasOpenedBefore: UserDefaults.standard.bool(forKey: Self.hasOfferedAgentsKey),
+            projectCount: projectCount
+        )
+        if !onboarding.hasSeenWelcome, !onboarding.isWelcomeDue(projectCount: projectCount) {
+            onboarding.hasSeenWelcome = true
+        }
+        if onboarding != saved { onboarding.save() }
+        self.onboarding = onboarding
+    }
+
+    /// Opens the welcome at the first launch, unless a question is up; it
+    /// then waits for the next launch.
+    private func offerWelcome() {
+        guard let onboarding, let library = core?.library,
+              onboarding.isWelcomeDue(projectCount: library.projects().count),
+              presentedSheet == nil, !isShowingOrphanAlert
+        else { return }
+        presentedSheet = .welcome
+    }
+
+    func updateOnboarding(_ change: (inout Onboarding) -> Void) {
+        guard var next = onboarding else { return }
+        change(&next)
+        guard next != onboarding else { return }
+        onboarding = next
+        next.save()
+    }
+
+    /// The welcome was finished or skipped: it never opens again.
+    func finishWelcome(addingProject: Bool) {
+        updateOnboarding { $0.hasSeenWelcome = true }
+        presentedSheet = addingProject ? .addProject : nil
+    }
+
+    /// Whether a Service on this Mac is Running now.
+    var hasRunningService: Bool {
+        core?.statuses.statuses.values.contains { $0.state == .running } ?? false
     }
 
     var unreadableFilesTitle: String {
@@ -797,7 +842,7 @@ final class AppModel {
         }
         Task {
             await checkForOrphans()
-            offerConnectAgentsOnce()
+            offerWelcome()
         }
     }
 
