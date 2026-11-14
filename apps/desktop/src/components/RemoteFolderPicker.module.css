@@ -1,0 +1,106 @@
+/* The remote folder picker: path field, breadcrumb, then the folder's contents. */
+
+.pathRow {
+  display: flex;
+  gap: 8px;
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  user-select: text;
+}
+
+.path:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+}
+
+.up {
+  rotate: -90deg;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.crumbButton {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.crumbButton:hover,
+.crumbButton[aria-current="location"] {
+  color: var(--text);
+}
+
+.crumbButton:hover {
+  background: var(--selection-quiet);
+}
+
+.home {
+  margin-left: auto;
+}
+
+.list {
+  height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fill) 50%, transparent);
+}
+
+.list ul {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.list ul:focus-visible {
+  outline: none;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.name {
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+}

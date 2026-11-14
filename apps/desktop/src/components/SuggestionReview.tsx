@@ -12,6 +12,7 @@ import {
   type ProjectFolder,
   type Service,
 } from "../bindings";
+import { editorCommands, type MachineRef, onMachine } from "../editing";
 import {
   canSplit,
   directoryLabel,
@@ -23,7 +24,6 @@ import {
   suggestionDrafts,
   suggestionEdits,
 } from "../editors";
-import { tildePath } from "../paths";
 import { portVariable, projectFolder } from "../targets";
 import { closeSheet } from "../ui";
 import {
@@ -36,6 +36,7 @@ import {
   FieldRow,
   FormCard,
   FormSheet,
+  ProjectContext,
   SwitchRow,
   TextField,
   Working,
@@ -51,6 +52,8 @@ type Props = {
   isScanning: boolean;
   /** The Project's folder, where working directories are chosen. */
   project: ProjectFolder;
+  /** The Machine the folder is on, when it isn't this computer. */
+  machine?: MachineRef;
   /**
    * The Services the Project already has: new ones show the colours they'll
    * keep after them, and can start after them.
@@ -70,6 +73,7 @@ export function SuggestionReview({
   setDrafts,
   isScanning,
   project,
+  machine,
   existingServices = [],
   emptyMessage,
 }: Props) {
@@ -157,6 +161,7 @@ export function SuggestionReview({
           draft={draft}
           color={color(draft)}
           project={project}
+          machine={machine}
           isExpanded={merging === null && expandedId === draft.id}
           onToggleExpanded={() =>
             setExpandedId(expandedId === draft.id ? null : draft.id)
@@ -296,6 +301,7 @@ type RowProps = {
   draft: SuggestionDraft;
   color: string;
   project: ProjectFolder;
+  machine?: MachineRef;
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onChange: (change: Partial<SuggestionDraft>) => void;
@@ -333,7 +339,7 @@ function SuggestionRow(props: RowProps) {
     }
   };
   const chooseDirectory = async () => {
-    const workingDirectory = await commands.chooseWorkingDirectory(project);
+    const workingDirectory = await editorCommands(props.machine ?? null).chooseWorkingDirectory(project);
     if (workingDirectory !== null) onChange({ workingDirectory });
   };
   const after = draft.isChecked
@@ -526,11 +532,15 @@ function SuggestionRow(props: RowProps) {
 /** Scans an existing Project's folder again and adds the Services the user picks from what it finds. */
 export function DetectServicesForm({
   project,
+  machine,
   onAdded,
 }: {
   project: Project;
+  /** The Machine whose Project it is, scanned there. */
+  machine?: MachineRef;
   onAdded: (serviceId: string) => void;
 }) {
+  const editor = editorCommands(machine ?? null);
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
   const [isScanning, setIsScanning] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -538,7 +548,7 @@ export function DetectServicesForm({
 
   useEffect(() => {
     let isCurrent = true;
-    void commands.scanProject(project.id).then((result) => {
+    void editor.scanProject(project.id).then((result) => {
       if (!isCurrent) return;
       if (result.status === "ok") setDrafts(suggestionDrafts(result.data));
       else setError(result.error.message);
@@ -547,12 +557,13 @@ export function DetectServicesForm({
     return () => {
       isCurrent = false;
     };
-  }, [project.id]);
+    // The editor changes with `machine`, which a sheet keeps.
+  }, [project.id, machine?.id]);
 
   const count = drafts.filter((draft) => draft.isChecked).length;
   const save = async () => {
     setIsSaving(true);
-    const result = await commands.addServices(
+    const result = await editor.addServices(
       project.id,
       suggestionEdits(drafts),
     );
@@ -564,13 +575,8 @@ export function DetectServicesForm({
   return (
     <FormSheet
       icon={<DetectIcon size={15} />}
-      title="Detect Services"
-      subtitle={
-        <>
-          in <strong>{project.name}</strong> ·{" "}
-          <span className="mono">{tildePath(project.path)}</span>
-        </>
-      }
+      title={`Detect Services${onMachine(machine)}`}
+      subtitle={<ProjectContext name={project.name} path={project.path} machine={machine?.name} />}
       hint={count === 0 ? null : "↩ to add"}
       error={error}
       primaryTitle={
@@ -588,6 +594,7 @@ export function DetectServicesForm({
         setDrafts={setDrafts}
         isScanning={isScanning}
         project={projectFolder(project)}
+        machine={machine}
         existingServices={project.services}
         emptyMessage="Nothing new found. Services this project already runs aren’t suggested again."
       />

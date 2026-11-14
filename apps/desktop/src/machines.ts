@@ -17,6 +17,8 @@ export type ShownMachine = {
   isConnected: boolean;
   /** It waits for the user to connect it again. */
   needsUser: boolean;
+  /** Why its Projects can't be changed from here now (not connected, or an older localhost there); `null` when they can. */
+  editProblem: string | null;
   /** Its Projects and statuses, those of its last connection while it reconnects. */
   view: CoreView;
 };
@@ -28,6 +30,7 @@ export function shownMachine(view: MachineView): ShownMachine {
     summary: view.summary,
     isConnected: view.isConnected,
     needsUser: view.needsUser,
+    editProblem: view.editProblem,
     view: viewFromSnapshot({ projects: view.projects, statuses: view.statuses, projectStates: view.projectStates }),
   };
 }

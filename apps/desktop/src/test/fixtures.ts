@@ -51,10 +51,11 @@ export function machineView(
 ): MachineView {
   return {
     machine: { id: id(), name, destination: name },
-    state: { kind: "connected", detail: { version: "0.5.0" } },
+    state: { kind: "connected", detail: { version: "0.5.0", managesProjects: true } },
     summary: "Connected · localhost 0.5.0",
     isConnected: true,
     needsUser: false,
+    editProblem: null,
     projects,
     statuses,
     projectStates: [],

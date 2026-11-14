@@ -92,6 +92,27 @@
   color: var(--text-secondary);
 }
 
+/* Another Machine's name, with its Add Project menu. */
+.machineHeading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.machineName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.machineAdd {
+  width: 20px;
+  height: 20px;
+}
+
 .note {
   padding: 4px 8px;
   font-size: 12px;

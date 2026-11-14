@@ -28,6 +28,9 @@ pub struct MachineView {
     is_connected: bool,
     /// It waits for the user to connect it again.
     needs_user: bool,
+    /// Why its Projects can't be added, edited or removed now: it isn't
+    /// connected, or its localhost is too old. `None` when they can.
+    edit_problem: Option<String>,
     projects: Vec<localhost_core::Project>,
     statuses: Vec<StatusView>,
     project_states: Vec<ProjectState>,
@@ -66,12 +69,24 @@ impl Shown {
             summary: self.state.summary(&self.machine.name),
             is_connected: matches!(self.state, MachineState::Connected { .. }),
             needs_user: self.state.needs_user(),
+            edit_problem: edit_problem(&self.state, &self.machine.name),
             machine: self.machine.clone(),
             state: self.state.clone(),
             projects: self.view.projects.clone(),
             statuses: self.view.status_views(),
             project_states: self.view.project_states(),
         }
+    }
+}
+
+/// Why the Machine's Projects can't be changed from here now, if they can't.
+fn edit_problem(state: &MachineState, machine: &str) -> Option<String> {
+    match state {
+        MachineState::Connected { manages_projects: true, .. } => None,
+        MachineState::Connected { manages_projects: false, .. } => {
+            Some(LocalhostError::MachineNeedsUpdate { machine: machine.to_string() }.message())
+        }
+        other => Some(other.summary(machine)),
     }
 }
 
@@ -302,14 +317,20 @@ mod tests {
         let sent = apply(&mut shown, MachinesEvent::MachinesChanged { machines: vec![devbox.clone()] });
         let [MachineEvent::Machines { machines }] = sent.as_slice() else { panic!("not every Machine") };
         assert_eq!((machines[0].summary.as_str(), machines[0].needs_user), ("Not connected", true));
+        assert_eq!(machines[0].edit_problem.as_deref(), Some("Not connected"));
 
         let project = project();
         let web = project.services[0].clone();
         apply(&mut shown, MachinesEvent::ProjectsChanged { machine_id: devbox.id, projects: vec![project.clone()] });
-        let state = MachineState::Connected { version: "0.5.0".into() };
+        let state = MachineState::Connected { version: "0.5.6".into(), manages_projects: false };
+        let sent = apply(&mut shown, MachinesEvent::StateChanged { machine_id: devbox.id, state });
+        let [MachineEvent::Machines { machines }] = sent.as_slice() else { panic!("not every Machine") };
+        assert_eq!(machines[0].edit_problem.as_deref(), Some("Update localhost on devbox to manage its Projects."));
+        let state = MachineState::Connected { version: "0.5.7".into(), manages_projects: true };
         let sent = apply(&mut shown, MachinesEvent::StateChanged { machine_id: devbox.id, state });
         let [MachineEvent::Machines { machines }] = sent.as_slice() else { panic!("not every Machine") };
         assert!(machines[0].is_connected);
+        assert_eq!(machines[0].edit_problem, None);
         assert_eq!(machines[0].project_states[0].state, Some(ServiceState::Stopped));
 
         let mut status = ServiceStatus::never_run(web.id);

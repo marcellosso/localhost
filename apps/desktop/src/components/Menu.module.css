@@ -74,6 +74,16 @@
   color: var(--on-destructive);
 }
 
+.menu .disabled {
+  color: var(--text-secondary);
+}
+
+.menu .disabled:hover,
+.menu .disabled:focus-visible {
+  background: var(--selection-quiet);
+  color: var(--text-secondary);
+}
+
 .atPointer {
   position: fixed;
 }

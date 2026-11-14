@@ -1,6 +1,9 @@
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "./actions";
 import { commands, type Id, type Project, type Service, type ServiceState } from "./bindings";
 import { type CoreView, serviceStatus } from "./core";
+import { machineRef } from "./editing";
+import { importProject, setFavorite } from "./editors";
+import type { ShownMachine } from "./machines";
 import { projectShortcut, SHORTCUTS, type Shortcut, serviceShortcut, shortcutLabel } from "./keyboard";
 import { tildePath } from "./paths";
 import type { ServiceSelection } from "./selection";
@@ -248,4 +251,89 @@ function projectActions(view: CoreView, project: Project, isSelected: boolean): 
   item("project-terminal", `Open ${project.name} in Terminal`, "terminal", null, () => void openFolder(folder, "terminal"));
   item("project-files", `Open ${project.name} in File Manager`, "folder", null, () => void openFolder(folder, "fileManager"));
   return items;
+}
+
+/**
+ * Another Machine's actions: for its selected Project, the same as for one
+ * here (first, as an empty query shows them), made there; and for every
+ * Machine, New Project… and Import Project… there, found by typing. While
+ * its Projects can't be changed, an edit says why instead.
+ */
+export function machinePaletteItems(
+  machines: ShownMachine[],
+  selected: { machine: ShownMachine; project: Project; selection: ServiceSelection } | null,
+): { first: PaletteItem[]; rest: PaletteItem[] } {
+  const first: PaletteItem[] = [];
+  const symbol = (name: Extract<PaletteIcon, { kind: "symbol" }>["name"]): PaletteIcon => ({ kind: "symbol", name });
+  /** Runs `run`, or says why the Machine's Projects can't be changed now. */
+  const editing = (shown: ShownMachine, run: () => void) => () =>
+    shown.editProblem ? showAlert({ kind: "error", message: shown.editProblem }) : run();
+  if (selected) {
+    const { machine: shown, project } = selected;
+    const machine = machineRef(shown);
+    const machineId = machine.id;
+    const view = shown.view;
+    const where = `${project.name} on ${machine.name}`;
+    const item = (id: string, title: string, icon: PaletteIcon, shortcut: Shortcut | null, run: () => void, subtitle = where) =>
+      first.push({ id: `machine:${id}:${project.id}`, title, subtitle, icon, shortcut: label(shortcut), keywords: project.key, boost: 2, run });
+    const selection = selected.selection;
+    const service =
+      selection.kind === "service" ? project.services.find((one) => one.id === selection.serviceId) : undefined;
+    if (service && shown.isConnected) {
+      const status = serviceStatus(view, service.id);
+      if (status.state === "starting" || status.state === "running") {
+        item(`restart:${service.id}`, `Restart ${service.name}`, symbol("restart"), SHORTCUTS.startOrRestart, () => void restart(service.id, machineId));
+        item(`stop:${service.id}`, `Stop ${service.name}`, symbol("stop"), SHORTCUTS.stop, () => void stop(service.id, machineId));
+        if (status.urlToOpen) {
+          item(`open-url:${service.id}`, `Open ${service.name} in Browser`, symbol("browser"), SHORTCUTS.openUrl, () => void openUrl(service.id, machineId));
+        }
+      } else if (status.state !== "stopping") {
+        item(`start:${service.id}`, `Start ${service.name}`, symbol("play"), SHORTCUTS.startOrRestart, () => void start(service.id, null, machineId));
+      }
+    }
+    if (shown.isConnected && project.services.length > 0) {
+      item("start-all", `Start All in ${project.name}`, symbol("play"), SHORTCUTS.startAll, () => void startAll(project.id, machineId));
+    }
+    if (shown.isConnected && project.services.some((one) => isActive(serviceStatus(view, one.id).state))) {
+      item("stop-all", `Stop All in ${project.name}`, symbol("stop"), SHORTCUTS.stopAll, () => void stopAll(project.id, machineId));
+    }
+    const subtitle = shown.editProblem ?? where;
+    const projectId = project.id;
+    item("new-service", "New Service…", symbol("new"), SHORTCUTS.newService, editing(shown, () => showSheet({ kind: "addService", projectId, machine })), subtitle);
+    item("edit-project", "Edit Project…", symbol("folder"), null, editing(shown, () => showSheet({ kind: "editProject", projectId, machine })), subtitle);
+    item("environment", "Edit Environment…", symbol("folder"), null, editing(shown, () => showSheet({ kind: "environment", projectId, machine })), subtitle);
+    item("detect", "Detect Services…", symbol("service"), null, editing(shown, () => showSheet({ kind: "detectServices", projectId, machine })), subtitle);
+    item(
+      "favorite",
+      project.isFavorite ? `Unfavorite ${project.name}` : `Favorite ${project.name}`,
+      symbol("folder"),
+      null,
+      editing(shown, () => void setFavorite(project, !project.isFavorite, machineId)),
+      subtitle,
+    );
+    item("remove", `Remove ${project.name}…`, symbol("stop"), null, editing(shown, () => showAlert({ kind: "removeProject", projectId, machine })), subtitle);
+  }
+  const rest: PaletteItem[] = machines.flatMap((shown) => {
+    const machine = machineRef(shown);
+    const subtitle = shown.editProblem ?? undefined;
+    return [
+      {
+        id: `other:machine-new-project:${machine.id}`,
+        title: `New Project on ${machine.name}…`,
+        subtitle,
+        icon: symbol("new"),
+        keywords: "add machine remote",
+        run: editing(shown, () => showSheet({ kind: "addProject", machine })),
+      },
+      {
+        id: `other:machine-import:${machine.id}`,
+        title: `Import Project on ${machine.name}…`,
+        subtitle,
+        icon: symbol("new"),
+        keywords: "add machine remote file yaml",
+        run: editing(shown, () => void importProject(machine)),
+      },
+    ];
+  });
+  return { first, rest };
 }

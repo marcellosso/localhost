@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { BlockedStart, Id, ImportPreview, ListenerDetails } from "./bindings";
+import type { MachineRef } from "./editing";
 
 /** A question or report over the main window. They are asked one at a time, in order. */
 export type Alert =
@@ -17,9 +18,9 @@ export type Alert =
   | { kind: "settings"; section?: SettingsSection; forEditor?: () => void }
   /** Every shortcut, grouped (Ctrl+/). */
   | { kind: "keyboardShortcuts" }
-  /** Removing a Project or Service, which stops it first. */
-  | { kind: "removeProject"; projectId: Id }
-  | { kind: "removeService"; serviceId: Id; dependents: string[] }
+  /** Removing a Project or Service, which stops it first; on `machine`, there. */
+  | { kind: "removeProject"; projectId: Id; machine?: MachineRef }
+  | { kind: "removeService"; serviceId: Id; dependents: string[]; machine?: MachineRef }
   /** A Project file that can't be imported, and why. */
   | { kind: "importFailure"; fileName: string; message: string }
   /** Check for Updates found nothing newer than `version`. */
@@ -28,16 +29,19 @@ export type Alert =
 /** The sections of Settings, in the rail's order. */
 export type SettingsSection = "general" | "appearance" | "ports" | "machines" | "agents";
 
-/** An editor over the main window, one at a time. */
+/**
+ * An editor over the main window, one at a time. With `machine`, it edits
+ * that Machine's Projects, there.
+ */
 export type Sheet =
-  | { kind: "addProject" }
-  | { kind: "editProject"; projectId: Id }
-  | { kind: "addService"; projectId: Id }
-  | { kind: "editService"; serviceId: Id }
-  | { kind: "detectServices"; projectId: Id }
-  | { kind: "environment"; projectId: Id }
-  /** The review step of an import, before anything is saved. */
-  | { kind: "importProject"; file: string; preview: ImportPreview }
+  | { kind: "addProject"; machine?: MachineRef }
+  | { kind: "editProject"; projectId: Id; machine?: MachineRef }
+  | { kind: "addService"; projectId: Id; machine?: MachineRef }
+  | { kind: "editService"; serviceId: Id; machine?: MachineRef }
+  | { kind: "detectServices"; projectId: Id; machine?: MachineRef }
+  | { kind: "environment"; projectId: Id; machine?: MachineRef }
+  /** The review step of an import, before anything is saved; `file` is the Machine's with `machine`. */
+  | { kind: "importProject"; file: string; preview: ImportPreview; machine?: MachineRef }
   /** Connect your agents: Claude Code, Cursor and Codex, and the command in terminals. */
   | { kind: "connectAgents" }
   /** The first launch's welcome, ending in Add Project…; also Help › Show Welcome…. */

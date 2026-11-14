@@ -3,8 +3,11 @@ import { CheckIcon, EllipsisIcon } from "./Icons";
 import styles from "./Menu.module.css";
 
 export type MenuItem =
-  /** `isChecked` makes it one of a set of choices, with a checkmark on the chosen one. */
-  | { label: string; onSelect: () => void; isChecked?: boolean; isDestructive?: boolean }
+  /**
+   * `isChecked` makes it one of a set of choices, with a checkmark on the
+   * chosen one. `disabledReason` shows it dimmed, saying why it can't be used.
+   */
+  | { label: string; onSelect: () => void; isChecked?: boolean; isDestructive?: boolean; disabledReason?: string | null }
   | "separator";
 
 type Props = {
@@ -142,9 +145,14 @@ function MenuList({ id, label, items, className, style, onClose }: ListProps) {
             <button
               role={item.isChecked === undefined ? "menuitem" : "menuitemradio"}
               aria-checked={item.isChecked}
-              className={item.isDestructive ? styles.destructive : undefined}
+              className={item.disabledReason ? styles.disabled : item.isDestructive ? styles.destructive : undefined}
               tabIndex={-1}
+              // Still focusable, so the reason is read out.
+              aria-disabled={item.disabledReason ? true : undefined}
+              aria-description={item.disabledReason ?? undefined}
+              title={item.disabledReason ?? undefined}
               onClick={() => {
+                if (item.disabledReason) return;
                 onClose(true);
                 item.onSelect();
               }}

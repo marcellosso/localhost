@@ -130,3 +130,13 @@
   display: inline-flex;
   flex: none;
 }
+
+/* Why another Machine's Services can't be added from here now. */
+.column > .editProblem {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.editProblem:hover {
+  color: var(--text-secondary);
+}

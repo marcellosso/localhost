@@ -2,7 +2,16 @@ import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from 
 import type { Project } from "../bindings";
 import type { CoreView } from "../core";
 import { focusColumn } from "../keyboard";
-import { emptyQueryResults, type Navigator, type PaletteIcon, type PaletteItem, paletteItems, rankItems } from "../palette";
+import type { ShownMachine } from "../machines";
+import {
+  emptyQueryResults,
+  machinePaletteItems,
+  type Navigator,
+  type PaletteIcon,
+  type PaletteItem,
+  paletteItems,
+  rankItems,
+} from "../palette";
 import type { ServiceSelection } from "../selection";
 import { setPaletteOpen } from "../ui";
 import {
@@ -25,9 +34,13 @@ import styles from "./CommandPalette.module.css";
 
 type Props = {
   view: CoreView;
+  /** The selected Project of this computer; none while another Machine's is. */
   selected: Project | undefined;
   selection: ServiceSelection;
   navigator: Navigator;
+  /** Other Machines, and the selected Project when it is one of theirs. */
+  machines?: ShownMachine[];
+  onMachine?: { machine: ShownMachine; project: Project } | null;
 };
 
 /**
@@ -35,9 +48,15 @@ type Props = {
  * and action. ↑/↓ (or Ctrl+P/Ctrl+N) move, ↩ runs, Escape or a click outside
  * closes, and focus goes back where it was.
  */
-export function CommandPalette({ view, selected, selection, navigator }: Props) {
+/** No other Machines, the same array each render so the items aren't rebuilt. */
+const NO_MACHINES: ShownMachine[] = [];
+
+export function CommandPalette({ view, selected, selection, navigator, machines = NO_MACHINES, onMachine = null }: Props) {
   const [query, setQuery] = useState("");
-  const items = useMemo(() => paletteItems(view, selected, selection, navigator), [view, selected, selection, navigator]);
+  const items = useMemo(() => {
+    const { first, rest } = machinePaletteItems(machines, onMachine && { ...onMachine, selection });
+    return [...first, ...paletteItems(view, selected, selection, navigator), ...rest];
+  }, [view, selected, selection, navigator, machines, onMachine]);
   const [results, setResults] = useState(() => emptyQueryResults(items));
   const [selectedId, setSelectedId] = useState<string | null>(() => results[0]?.id ?? null);
   const listId = useId();

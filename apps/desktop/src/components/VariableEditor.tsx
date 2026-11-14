@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
-import { commands, type VariableLayer } from "../bindings";
+import type { VariableLayer } from "../bindings";
 import { report } from "../actions";
+import { editorCommands, type MachineRef } from "../editing";
 import { newVariableDraft, type VariableDraft } from "../editors";
 import { FormCard } from "./Form";
 import { EyeIcon, EyeSlashIcon, LockIcon, LockOpenIcon, MinusCircleIcon, PlusIcon } from "./Icons";
@@ -13,6 +14,8 @@ type Props = {
   layer: VariableLayer | null;
   /** Names the table for screen readers, e.g. "Project variables". */
   label: string;
+  /** The Machine whose secret store keeps the layer's Secrets, when it isn't this computer. */
+  machine?: MachineRef;
 };
 
 /**
@@ -20,14 +23,15 @@ type Props = {
  * lock turns a variable into a Secret or back. A stored Secret's value is only
  * read from the system's secret store when revealed or made plain.
  */
-export function VariableEditor({ variables, setVariables, layer, label }: Props) {
+export function VariableEditor({ variables, setVariables, layer, label, machine }: Props) {
   const update = (id: number, change: Partial<VariableDraft>) =>
     setVariables((variables) => variables.map((draft) => (draft.id === id ? { ...draft, ...change } : draft)));
 
   /** The draft with its stored value loaded, if it had one to load. */
   const withStoredValue = async (draft: VariableDraft): Promise<VariableDraft> => {
     if (draft.isValueKnown || !layer || draft.storedSecretName === null) return draft;
-    const result = await commands.secretValue(draft.storedSecretName, layer);
+    // Shown here only; it stays in the Machine's store.
+    const result = await editorCommands(machine ?? null).secretValue(draft.storedSecretName, layer);
     if (result.status === "error") {
       report(result);
       return draft;
@@ -90,7 +94,7 @@ export function VariableEditor({ variables, setVariables, layer, label }: Props)
                 aria-pressed={draft.isSecret}
                 title={
                   draft.isSecret
-                    ? "Secret: stored in your system’s secret store, never in the project file. Click to make it a plain variable."
+                    ? `Secret: stored in ${machine ? `${machine.name}’s` : "your system’s"} secret store, never in the project file. Click to make it a plain variable.`
                     : "Make it a secret"
                 }
                 onClick={() => void toggleSecret(draft)}
