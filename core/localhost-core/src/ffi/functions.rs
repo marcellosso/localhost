@@ -73,6 +73,13 @@ pub fn suggested_project_key(projects: Vec<Project>, name: &str, excluding: Opti
     crate::suggested_project_key(&projects, name, excluding)
 }
 
+/// `key` if none of `projects` uses it, else the first free `key-2`, …: the
+/// Key "Keep both" imports under, e.g. among another Machine's Projects.
+#[uniffi::export]
+pub fn free_project_key(projects: Vec<Project>, key: Key) -> Key {
+    crate::free_project_key(&projects, &key)
+}
+
 #[uniffi::export]
 pub fn project_suggested_service_key(project: &Project, name: &str, excluding: Option<Id>) -> Key {
     project.suggested_service_key(name, excluding)

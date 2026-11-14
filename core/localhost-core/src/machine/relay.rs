@@ -2,7 +2,10 @@
 //! over SSH. It is one more client of this Machine's shared core, as
 //! `localhost mcp` is, with this Machine's own `ProjectLibrary` and secret
 //! store: the app sees the Projects saved here, and a start reads the
-//! Secret values here. No Secret value is ever written to the app.
+//! Secret values here. Changes the app makes to the Project Configuration
+//! are made here, by the same calls this Machine's own app makes, then
+//! announced to the shared core so an app open here shows them. A Secret
+//! value is written to the app only to reveal it in an editor.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -13,9 +16,12 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use super::protocol::{MachineCall, MachineHello, MachineMessage, MachineRequest};
+use super::protocol::{MachineCall, MachineHello, MachineMessage, MachineRequest, ProjectFileText};
 use crate::remote::forward_batches;
-use crate::{LocalhostError, Origin, ProjectLibrary, Targets};
+use crate::{
+    CommandSyntax, ExecutionTarget, LocalhostError, Origin, ProjectDocument, ProjectLibrary, Targets, editing,
+    existing_project_folder,
+};
 
 /// How long the app may stay silent before the connection counts as lost.
 /// The app pings far more often; a laptop that went to sleep never closes
@@ -153,7 +159,104 @@ impl Relay {
                 done()
             }
             MachineRequest::Unsupported => Err(LocalhostError::Unsupported),
+            request => self.manage(request).await,
         }
+    }
+
+    /// The Project Configuration's requests: folders and Suggestions read
+    /// here, then changes saved here and announced.
+    async fn manage(&self, request: MachineRequest) -> Result<serde_json::Value, LocalhostError> {
+        let (library, targets) = (&*self.library, &self.targets);
+        let result = match request {
+            MachineRequest::ListDirectory { path, show_hidden, include_files } => {
+                return value(
+                    blocking(move || editing::list_directory(path.as_deref(), show_hidden, include_files)).await?,
+                );
+            }
+            MachineRequest::ScanFolder { path } => {
+                let path = existing_project_folder(&path)?;
+                return value(targets.scan_folder(&ExecutionTarget::ThisMachine, &path).await?);
+            }
+            MachineRequest::ScanProject { project_id } => {
+                return value(targets.scan_project(&library.project(project_id)?).await?);
+            }
+            MachineRequest::DetectPythonEnvironment { project_id, working_directory, command_line } => {
+                let project = library.project(project_id)?;
+                if !project.execution_target.is_this_machine() {
+                    return value(None::<String>);
+                }
+                return value(
+                    blocking(move || {
+                        Ok(crate::detect_python_environment(
+                            &project.path,
+                            &working_directory,
+                            &command_line,
+                            CommandSyntax::HERE,
+                        ))
+                    })
+                    .await?,
+                );
+            }
+            MachineRequest::SecretValue { name, layer } => {
+                let library = self.library.clone();
+                return value(blocking(move || library.secret_value(&name, layer)).await?);
+            }
+            MachineRequest::ReadProjectFile { path } => {
+                let text = blocking(move || editing::read_project_file(&path)).await?;
+                let document = ProjectDocument::from_yaml(&text)?;
+                let folder_exists = editing::folder_exists(document.path());
+                return value(ProjectFileText { text, folder_exists });
+            }
+
+            MachineRequest::AddProject { name, key, path, services } => {
+                let path = existing_project_folder(&path)?;
+                value(library.add_project(&name, key, &path, services, ORIGIN)?)
+            }
+            MachineRequest::EditProject { project_id, mut changes } => {
+                if let Some(path) = &changes.path
+                    && library.project(project_id)?.execution_target.is_this_machine()
+                {
+                    changes.path = Some(existing_project_folder(path)?);
+                }
+                value(editing::edit_project(library, targets, project_id, changes, ORIGIN).await?)
+            }
+            MachineRequest::RemoveProject { project_id } => {
+                editing::remove_project(library, targets, project_id, ORIGIN).await?;
+                done()
+            }
+            MachineRequest::AddService { project_id, service, variables, dependencies } => {
+                value(library.add_service(project_id, service, variables, dependencies, ORIGIN)?)
+            }
+            MachineRequest::AddServices { project_id, services } => {
+                value(library.add_services(services, project_id, ORIGIN)?)
+            }
+            MachineRequest::EditService { service_id, changes } => {
+                value(library.edit_service(service_id, changes, ORIGIN)?)
+            }
+            MachineRequest::RemoveService { service_id } => {
+                editing::remove_service(library, targets, service_id, ORIGIN).await?;
+                done()
+            }
+            MachineRequest::SaveEnvironment { project_id, variables, profiles, active } => {
+                editing::save_environment(library, project_id, variables, profiles, active, ORIGIN)?;
+                done()
+            }
+            MachineRequest::SetActiveProfile { project_id, profile_id } => {
+                library.set_active_profile(profile_id, project_id, ORIGIN)?;
+                done()
+            }
+            MachineRequest::ImportProject { text, path, on_key_clash } => {
+                let mut document = ProjectDocument::from_yaml(&text)?;
+                document.set_path(existing_project_folder(&path)?);
+                document.set_execution_target(ExecutionTarget::ThisMachine);
+                value(editing::import_project(library, targets, &document, on_key_clash, ORIGIN).await?)
+            }
+            _ => unreachable!("answered by `handle`"),
+        };
+        // An app open here reads the change again; one that misses it reads
+        // it at its next launch.
+        let _ = targets.announce_projects_saved(ORIGIN).await;
+        result
     }
 
     /// Replies with the Projects, then sends them again after every change:
@@ -199,6 +302,13 @@ impl Relay {
             previous.abort();
         }
     }
+}
+
+/// Runs file system and secret store work off the runtime's threads.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, LocalhostError> + Send + 'static,
+) -> Result<T, LocalhostError> {
+    tokio::task::spawn_blocking(work).await.unwrap_or_else(|_| Err(LocalhostError::Unsupported))
 }
 
 async fn write_messages<W: AsyncWrite + Unpin>(mut receiver: mpsc::UnboundedReceiver<MachineMessage>, mut output: W) {

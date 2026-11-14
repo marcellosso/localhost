@@ -12,6 +12,7 @@ mod agents;
 mod ansi;
 mod dependencies;
 mod detection;
+pub mod editing;
 mod error;
 #[cfg(feature = "ffi")]
 mod ffi;
@@ -54,6 +55,7 @@ pub use detection::{
     PythonDetector, ScannedDirectory, ServiceDetector, ServiceSuggestion, detect_python_environment, merge_suggestions,
     runs_in_python_environment,
 };
+pub use editing::{DirectoryEntry, DirectoryListing, ProfileInput};
 pub use error::LocalhostError;
 pub use fuzzy::FuzzyMatch;
 pub use id::Id;
@@ -65,7 +67,7 @@ pub use logs::{LogBuffer, LogStore};
 pub use machine::{Machine, MachineProblem};
 pub use model::{
     EnvironmentProfile, ExecutionTarget, NewService, Project, Service, VariableInput, VariableLayer, VariableValue,
-    Variables, service_label, suggested_project_key,
+    Variables, free_project_key, service_label, suggested_project_key,
 };
 pub use origin::Origin;
 pub use output::{OutputChannel, OutputLine, ServiceOutputLine};

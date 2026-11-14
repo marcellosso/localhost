@@ -10,10 +10,18 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Id, LocalhostError, OutputLine, Project, ServiceEvent, ServiceOutputLine};
+use crate::{
+    Id, KeyClash, LocalhostError, NewService, OutputLine, ProfileInput, Project, ProjectChanges, ServiceChanges,
+    ServiceEvent, ServiceOutputLine, VariableInput, VariableLayer,
+};
 
 /// Grows by one whenever a request or message is added. Never reset.
-pub const MACHINE_PROTOCOL_VERSION: u32 = 1;
+///
+/// 2: the Project Configuration is changed from the app (`MANAGES_PROJECTS`).
+pub const MACHINE_PROTOCOL_VERSION: u32 = 2;
+
+/// The first version whose Projects the app can add, edit and remove.
+pub const MANAGES_PROJECTS: u32 = 2;
 
 /// The first line `localhost remote --stdio` writes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,9 +109,95 @@ pub(crate) enum MachineRequest {
     CloseLog {
         stream: u64,
     },
+
+    // Since `MANAGES_PROJECTS`: changes to the Project Configuration there,
+    // validated and saved there, as its own app makes them.
+    /// Replies with a `DirectoryListing`; `None` is the home folder.
+    ListDirectory {
+        path: Option<String>,
+        show_hidden: bool,
+        include_files: bool,
+    },
+    /// Replies with the Suggestions for a folder there, once it exists.
+    ScanFolder {
+        path: String,
+    },
+    ScanProject {
+        project_id: Id,
+    },
+    DetectPythonEnvironment {
+        project_id: Id,
+        working_directory: String,
+        command_line: String,
+    },
+    AddProject {
+        name: String,
+        key: crate::Key,
+        path: String,
+        services: Vec<NewService>,
+    },
+    EditProject {
+        project_id: Id,
+        changes: ProjectChanges,
+    },
+    RemoveProject {
+        project_id: Id,
+    },
+    AddService {
+        project_id: Id,
+        service: NewService,
+        variables: Vec<VariableInput>,
+        dependencies: Vec<Id>,
+    },
+    AddServices {
+        project_id: Id,
+        services: Vec<NewService>,
+    },
+    EditService {
+        service_id: Id,
+        changes: ServiceChanges,
+    },
+    RemoveService {
+        service_id: Id,
+    },
+    SaveEnvironment {
+        project_id: Id,
+        variables: Vec<VariableInput>,
+        profiles: Vec<ProfileInput>,
+        active: Option<u32>,
+    },
+    SetActiveProfile {
+        project_id: Id,
+        profile_id: Option<Id>,
+    },
+    /// Replies with a stored Secret's value, to reveal it in the editor.
+    SecretValue {
+        name: String,
+        layer: VariableLayer,
+    },
+    /// Replies with a `ProjectFileText`.
+    ReadProjectFile {
+        path: String,
+    },
+    /// Imports the Project file's `text` into the folder `path` there.
+    ImportProject {
+        text: String,
+        path: String,
+        on_key_clash: Option<KeyClash>,
+    },
     /// A request from a newer app.
     #[serde(other)]
     Unsupported,
+}
+
+/// A Project file on the Machine, for the import's review.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+pub struct ProjectFileText {
+    pub text: String,
+    /// Whether the folder the file names is there.
+    pub folder_exists: bool,
 }
 
 /// What `localhost remote --stdio` writes.

@@ -75,7 +75,7 @@ async fn run(destination: &str) -> Result<(), LocalhostError> {
             }
             Some(event) = machine_events.recv() => match event {
                 MachinesEvent::StateChanged { state, .. } => match state {
-                    MachineState::Connected { version } => println!("Connected: localhost {version} there."),
+                    MachineState::Connected { version, .. } => println!("Connected: localhost {version} there."),
                     MachineState::Unavailable { problem, is_retrying } => {
                         println!("{}{}", problem.message(&machine.name), if is_retrying { " Trying again…" } else { "" });
                     }

@@ -12,14 +12,15 @@ use super::runtime::{blocking, on_runtime};
 use super::subscriptions::{
     FoundOrphansEvents, LibraryEvents, MachinesEvents, OutputLines, ServiceEvents, ServiceOutputLines,
 };
-use crate::machine::{Forward, MachineSnapshot, Machines};
+use crate::machine::{Forward, MachineSnapshot, Machines, ProjectFileText};
 use crate::remote::{Client, shared};
 use crate::{
-    AgentClient, AgentSetup, AgentStatus, CommandLineStatus, EnvironmentProfile, ExecutionTarget, Id, Key, KeyClash,
-    Link, Listener, LocalhostError, LogStore, Machine, NewService, Origin, Orphan, OutputLine, ProfileChanges, Project,
-    ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats, Service, ServiceChanges, ServiceManager,
-    ServiceManagerOptions, ServiceOutputLine, ServiceStatus, StopPolicy, SystemSecretStore, Targets, Telemetry,
-    UnreadableProjectFile, VariableInput, VariableLayer,
+    AgentClient, AgentSetup, AgentStatus, CommandLineStatus, DirectoryListing, EnvironmentProfile, ExecutionTarget, Id,
+    Key, KeyClash, Link, Listener, LocalhostError, LogStore, Machine, NewService, Origin, Orphan, OutputLine,
+    ProfileChanges, ProfileInput, Project, ProjectChanges, ProjectDocument, ProjectLibrary, RunRegistry, RunStats,
+    Service, ServiceChanges, ServiceManager, ServiceManagerOptions, ServiceOutputLine, ServiceStatus,
+    ServiceSuggestion, StopPolicy, SystemSecretStore, Targets, Telemetry, UnreadableProjectFile, VariableInput,
+    VariableLayer,
 };
 
 // MARK: ProjectLibrary
@@ -732,6 +733,177 @@ impl Machines {
     #[uniffi::method]
     pub fn ffi_forwards(&self, machine_id: Id) -> Vec<Forward> {
         self.forwards(machine_id)
+    }
+
+    // Its Project Configuration, changed there. An older localhost there
+    // refuses with `MachineNeedsUpdate`.
+
+    /// A folder there, for the folder picker; `None` is the home folder there.
+    #[uniffi::method]
+    pub async fn ffi_list_directory(
+        self: Arc<Self>,
+        machine_id: Id,
+        path: Option<String>,
+        show_hidden: bool,
+        include_files: bool,
+    ) -> Result<DirectoryListing, LocalhostError> {
+        on_runtime(async move { self.list_directory(machine_id, path, show_hidden, include_files).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_scan_folder(
+        self: Arc<Self>,
+        machine_id: Id,
+        path: String,
+    ) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        on_runtime(async move { self.scan_folder(machine_id, path).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_scan_project(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+    ) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        on_runtime(async move { self.scan_project(machine_id, project_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_detect_python_environment(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        working_directory: String,
+        command_line: String,
+    ) -> Result<Option<String>, LocalhostError> {
+        on_runtime(async move {
+            self.detect_python_environment(machine_id, project_id, working_directory, command_line).await
+        })
+        .await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_add_project(
+        self: Arc<Self>,
+        machine_id: Id,
+        name: String,
+        key: Key,
+        path: String,
+        services: Vec<NewService>,
+    ) -> Result<Project, LocalhostError> {
+        on_runtime(async move { self.add_project(machine_id, name, key, path, services).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_edit_project(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        changes: ProjectChanges,
+    ) -> Result<Project, LocalhostError> {
+        on_runtime(async move { self.edit_project(machine_id, project_id, changes).await }).await
+    }
+
+    /// Stops its Services there first, then removes it and their logs.
+    #[uniffi::method]
+    pub async fn ffi_remove_project(self: Arc<Self>, machine_id: Id, project_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.remove_project(machine_id, project_id).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_add_service(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        service: NewService,
+        variables: Vec<VariableInput>,
+        dependencies: Vec<Id>,
+    ) -> Result<Service, LocalhostError> {
+        on_runtime(async move { self.add_service(machine_id, project_id, service, variables, dependencies).await })
+            .await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_add_services(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        services: Vec<NewService>,
+    ) -> Result<Vec<Service>, LocalhostError> {
+        on_runtime(async move { self.add_services(machine_id, project_id, services).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_edit_service(
+        self: Arc<Self>,
+        machine_id: Id,
+        service_id: Id,
+        changes: ServiceChanges,
+    ) -> Result<Service, LocalhostError> {
+        on_runtime(async move { self.edit_service(machine_id, service_id, changes).await }).await
+    }
+
+    /// Stops the Service there first, then removes it and its logs.
+    #[uniffi::method]
+    pub async fn ffi_remove_service(self: Arc<Self>, machine_id: Id, service_id: Id) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.remove_service(machine_id, service_id).await }).await
+    }
+
+    /// The Environment editor: the Project's variables, its Profiles, and
+    /// which one is active (an index into `profiles`).
+    #[uniffi::method]
+    pub async fn ffi_save_environment(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        variables: Vec<VariableInput>,
+        profiles: Vec<ProfileInput>,
+        active: Option<u32>,
+    ) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.save_environment(machine_id, project_id, variables, profiles, active).await })
+            .await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_set_active_profile(
+        self: Arc<Self>,
+        machine_id: Id,
+        project_id: Id,
+        profile_id: Option<Id>,
+    ) -> Result<(), LocalhostError> {
+        on_runtime(async move { self.set_active_profile(machine_id, project_id, profile_id).await }).await
+    }
+
+    /// A Secret's value there, to reveal it. Never stored here.
+    #[uniffi::method]
+    pub async fn ffi_secret_value(
+        self: Arc<Self>,
+        machine_id: Id,
+        name: String,
+        layer: VariableLayer,
+    ) -> Result<Option<String>, LocalhostError> {
+        on_runtime(async move { self.secret_value(machine_id, name, layer).await }).await
+    }
+
+    #[uniffi::method]
+    pub async fn ffi_read_project_file(
+        self: Arc<Self>,
+        machine_id: Id,
+        path: String,
+    ) -> Result<ProjectFileText, LocalhostError> {
+        on_runtime(async move { self.read_project_file(machine_id, path).await }).await
+    }
+
+    /// Imports a Project file's `text` into the folder `path` there.
+    #[uniffi::method]
+    pub async fn ffi_import_project(
+        self: Arc<Self>,
+        machine_id: Id,
+        text: String,
+        path: String,
+        on_key_clash: Option<KeyClash>,
+    ) -> Result<Project, LocalhostError> {
+        on_runtime(async move { self.import_project(machine_id, text, path, on_key_clash).await }).await
     }
 }
 

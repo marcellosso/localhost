@@ -22,8 +22,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle;
 
-use super::{Forward, Machine, MachineConnection, MachineProblem, SshLink};
-use crate::{Id, LocalhostError, OutputLine, Project, ServiceEvent, ServiceOutputLine, ServiceStatus};
+use super::{Forward, Machine, MachineConnection, MachineProblem, ProjectFileText, SshLink};
+use crate::{
+    DirectoryListing, Id, Key, KeyClash, LocalhostError, NewService, OutputLine, ProfileInput, Project, ProjectChanges,
+    Service, ServiceChanges, ServiceEvent, ServiceOutputLine, ServiceStatus, ServiceSuggestion, VariableInput,
+    VariableLayer,
+};
 
 const FILE_NAME: &str = "machines.json";
 const SCHEMA_VERSION: i64 = 1;
@@ -45,9 +49,14 @@ const RETRY_DELAYS: [Duration; 5] = [
 pub enum MachineState {
     NotConnected,
     Connecting,
-    /// Connected to the localhost of this version there.
+    /// Connected to the localhost of this version there. Without
+    /// `manages_projects`, it is too old for its Projects to be changed from
+    /// here: they are shown and run only.
+    #[serde(rename_all = "camelCase")]
     Connected {
         version: String,
+        #[serde(default)]
+        manages_projects: bool,
     },
     /// Not connected, for this reason. `is_retrying`: another attempt comes
     /// on its own.
@@ -65,7 +74,7 @@ impl MachineState {
         match self {
             MachineState::NotConnected => "Not connected".into(),
             MachineState::Connecting => "Connecting…".into(),
-            MachineState::Connected { version } => format!("Connected · localhost {version}"),
+            MachineState::Connected { version, .. } => format!("Connected · localhost {version}"),
             MachineState::Unavailable { problem, is_retrying: true } => {
                 format!("{} Trying again…", problem.message(machine))
             }
@@ -386,6 +395,155 @@ impl Machines {
         self.connection(machine_id)?.subscribe_to_services(service_ids).await
     }
 
+    // MARK: Its Project Configuration
+    //
+    // Made there, as `Origin::Machine`; what changed comes back with its
+    // Projects. A Machine with an older localhost refuses with
+    // `MachineNeedsUpdate`.
+
+    /// Its Projects, as last read: for a Key no other Project there has.
+    pub fn projects(&self, machine_id: Id) -> Result<Vec<Project>, LocalhostError> {
+        let state = self.inner.state();
+        state.machine(machine_id)?;
+        Ok(state.slots.get(&machine_id).map(|slot| slot.projects.clone()).unwrap_or_default())
+    }
+
+    /// A folder there, for a folder picker; `None` is the home folder there.
+    pub async fn list_directory(
+        &self,
+        machine_id: Id,
+        path: Option<String>,
+        show_hidden: bool,
+        include_files: bool,
+    ) -> Result<DirectoryListing, LocalhostError> {
+        self.connection(machine_id)?.list_directory(path, show_hidden, include_files).await
+    }
+
+    /// Suggestions for a folder there, scanned there.
+    pub async fn scan_folder(&self, machine_id: Id, path: String) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        self.connection(machine_id)?.scan_folder(path).await
+    }
+
+    pub async fn scan_project(&self, machine_id: Id, project_id: Id) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        self.connection(machine_id)?.scan_project(project_id).await
+    }
+
+    pub async fn detect_python_environment(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        working_directory: String,
+        command_line: String,
+    ) -> Result<Option<String>, LocalhostError> {
+        self.connection(machine_id)?.detect_python_environment(project_id, working_directory, command_line).await
+    }
+
+    pub async fn add_project(
+        &self,
+        machine_id: Id,
+        name: String,
+        key: Key,
+        path: String,
+        services: Vec<NewService>,
+    ) -> Result<Project, LocalhostError> {
+        self.connection(machine_id)?.add_project(name, key, path, services).await
+    }
+
+    pub async fn edit_project(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        changes: ProjectChanges,
+    ) -> Result<Project, LocalhostError> {
+        self.connection(machine_id)?.edit_project(project_id, changes).await
+    }
+
+    /// Stops its Services there, then removes it and their logs. Its folder
+    /// is not touched.
+    pub async fn remove_project(&self, machine_id: Id, project_id: Id) -> Result<(), LocalhostError> {
+        self.connection(machine_id)?.remove_project(project_id).await
+    }
+
+    pub async fn add_service(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        service: NewService,
+        variables: Vec<VariableInput>,
+        dependencies: Vec<Id>,
+    ) -> Result<Service, LocalhostError> {
+        self.connection(machine_id)?.add_service(project_id, service, variables, dependencies).await
+    }
+
+    pub async fn add_services(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        services: Vec<NewService>,
+    ) -> Result<Vec<Service>, LocalhostError> {
+        self.connection(machine_id)?.add_services(project_id, services).await
+    }
+
+    pub async fn edit_service(
+        &self,
+        machine_id: Id,
+        service_id: Id,
+        changes: ServiceChanges,
+    ) -> Result<Service, LocalhostError> {
+        self.connection(machine_id)?.edit_service(service_id, changes).await
+    }
+
+    /// Stops the Service there, then removes it and its logs.
+    pub async fn remove_service(&self, machine_id: Id, service_id: Id) -> Result<(), LocalhostError> {
+        self.connection(machine_id)?.remove_service(service_id).await
+    }
+
+    pub async fn save_environment(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        variables: Vec<VariableInput>,
+        profiles: Vec<ProfileInput>,
+        active: Option<u32>,
+    ) -> Result<(), LocalhostError> {
+        self.connection(machine_id)?.save_environment(project_id, variables, profiles, active).await
+    }
+
+    pub async fn set_active_profile(
+        &self,
+        machine_id: Id,
+        project_id: Id,
+        profile_id: Option<Id>,
+    ) -> Result<(), LocalhostError> {
+        self.connection(machine_id)?.set_active_profile(project_id, profile_id).await
+    }
+
+    /// A Secret's value there, to reveal it. Never kept here.
+    pub async fn secret_value(
+        &self,
+        machine_id: Id,
+        name: String,
+        layer: VariableLayer,
+    ) -> Result<Option<String>, LocalhostError> {
+        self.connection(machine_id)?.secret_value(name, layer).await
+    }
+
+    /// A Project file there, for the import's review.
+    pub async fn read_project_file(&self, machine_id: Id, path: String) -> Result<ProjectFileText, LocalhostError> {
+        self.connection(machine_id)?.read_project_file(path).await
+    }
+
+    /// Imports a Project file's `text` into the folder `path` there.
+    pub async fn import_project(
+        &self,
+        machine_id: Id,
+        text: String,
+        path: String,
+        on_key_clash: Option<KeyClash>,
+    ) -> Result<Project, LocalhostError> {
+        self.connection(machine_id)?.import_project(text, path, on_key_clash).await
+    }
+
     /// The URL to open for a Service of the Machine on this computer, as
     /// for a Service here (`Service::url_to_open`), its Port forwarded to the
     /// same port here first. `None` when it has nothing to open. A URL that
@@ -655,7 +813,8 @@ async fn follow(inner: &Weak<Inner>, machine_id: Id, link: Arc<SshLink>, connect
                 state.publish(MachinesEvent::ProjectsChanged { machine_id, projects });
                 state.publish(MachinesEvent::StatusesChanged { machine_id, statuses });
                 let version = connection.hello().version.clone();
-                state.set(machine_id, MachineState::Connected { version });
+                let manages_projects = connection.manages_projects();
+                state.set(machine_id, MachineState::Connected { version, manages_projects });
             }
             loop {
                 tokio::select! {
@@ -859,7 +1018,7 @@ mod tests {
         let untrusted = MachineState::Unavailable { problem: MachineProblem::HostKeyNotTrusted, is_retrying: false };
         assert!(untrusted.needs_user());
         assert_eq!(
-            MachineState::Connected { version: "0.5.0".into() }.summary("devbox"),
+            MachineState::Connected { version: "0.5.0".into(), manages_projects: true }.summary("devbox"),
             "Connected · localhost 0.5.0"
         );
         assert!(MachineState::NotConnected.needs_user());
