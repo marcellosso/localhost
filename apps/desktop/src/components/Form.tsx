@@ -117,6 +117,29 @@ type FieldProps = {
   children: (id: string) => ReactNode;
 };
 
+/**
+ * Which Project a sheet works on, under its title: "in My SaaS · ~/code/saas",
+ * or "in My SaaS on devbox · /srv/saas", whose path isn't one here.
+ */
+export function ProjectContext({
+  preposition = "in",
+  name,
+  path,
+  machine,
+}: {
+  preposition?: string;
+  name: string;
+  path: string;
+  machine?: string;
+}) {
+  return (
+    <>
+      {preposition} <strong>{name}</strong>
+      {machine && ` on ${machine}`} · <span className="mono">{machine ? path : tildePath(path)}</span>
+    </>
+  );
+}
+
 /** A labelled field: the label above, then the control, then an optional hint. */
 export function Field({ title, note, hint, width, children }: FieldProps) {
   const id = useId();
@@ -203,12 +226,14 @@ type FolderProps = {
   id?: string;
   path: string;
   target?: ExecutionTarget;
+  /** The Machine the folder is on, when it isn't this computer. */
+  machine?: string;
   onChoose: () => void;
 };
 
-/** A Project's folder, after its distro's name when it runs in WSL. */
-export function FolderField({ id, path, target, onChoose }: FolderProps) {
-  const distro = distroOf(target);
+/** A Project's folder, after its distro's or Machine's name when it isn't this computer's. */
+export function FolderField({ id, path, target, machine, onChoose }: FolderProps) {
+  const distro = machine ?? distroOf(target);
   return (
     <button
       type="button"

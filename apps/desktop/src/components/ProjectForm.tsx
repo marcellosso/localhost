@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { commands, type ExecutionTarget, type Project, type ProjectFolder } from "../bindings";
+import { editorCommands, type MachineRef, onMachine } from "../editing";
 import { type SuggestionDraft, suggestionDrafts, suggestionEdits } from "../editors";
 import { folderName, isSameTarget, projectFolder, targetId, thisMachine } from "../targets";
 import { closeSheet } from "../ui";
@@ -10,6 +11,8 @@ import { SuggestionReview } from "./SuggestionReview";
 type Props = {
   /** The Project to edit; a new one when absent. */
   editing?: Project;
+  /** The Machine whose Project it is, when it isn't this computer's. */
+  machine?: MachineRef;
   onAdded?: (project: Project) => void;
 };
 
@@ -22,14 +25,18 @@ type Props = {
  * default for a new Project) or in a WSL distro. A folder picked inside a
  * distro runs there; one on a Windows drive, on Windows itself, or in the
  * chosen distro through its mount.
+ *
+ * On another Machine, the folder is that Machine's, picked with the remote
+ * folder picker and scanned there, and the Project is saved there.
  */
-export function ProjectForm({ editing, onAdded }: Props) {
+export function ProjectForm({ editing, machine, onAdded }: Props) {
+  const editor = editorCommands(machine ?? null);
   const [folder, setFolder] = useState<ProjectFolder | null>(editing ? projectFolder(editing) : null);
   const [target, setTarget] = useState<ExecutionTarget>(editing ? projectFolder(editing).target : thisMachine);
   const [distros, setDistros] = useState<string[]>([]);
   const [name, setName] = useState(editing?.name ?? "");
   const key = useFollowingKey(editing?.key ?? "", editing !== undefined, async (name) => {
-    const result = await commands.suggestedProjectKey(name, editing?.id ?? null);
+    const result = await editor.suggestedProjectKey(name, editing?.id ?? null);
     return result.status === "ok" ? result.data : null;
   });
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
@@ -40,8 +47,9 @@ export function ProjectForm({ editing, onAdded }: Props) {
   const scannedFolder = useRef("");
 
   useEffect(() => {
-    void commands.wslDistros().then(setDistros);
-  }, []);
+    // A Machine's Projects run on it, never in a distro of this computer.
+    if (!machine) void commands.wslDistros().then(setDistros);
+  }, [machine]);
 
   const changeName = (value: string) => {
     setName(value);
@@ -61,7 +69,7 @@ export function ProjectForm({ editing, onAdded }: Props) {
 
   const chooseFolder = async () => {
     const start = folder?.path && isSameTarget(folder.target, target) ? folder.path : null;
-    const chosen = await commands.chooseFolder(target, start);
+    const chosen = await editor.chooseFolder(target, start);
     if (chosen === null) return;
     setFolder(chosen);
     setTarget(chosen.target);
@@ -74,7 +82,7 @@ export function ProjectForm({ editing, onAdded }: Props) {
     scannedFolder.current = scanned;
     setDrafts([]);
     setIsScanning(true);
-    const result = await commands.scanFolder(chosen);
+    const result = await editor.scanFolder(chosen);
     if (scannedFolder.current !== scanned) return;
     if (result.status === "ok") setDrafts(suggestionDrafts(result.data));
     else setError(result.error.message);
@@ -86,12 +94,12 @@ export function ProjectForm({ editing, onAdded }: Props) {
     setIsSaving(true);
     setError(null);
     if (editing) {
-      const result = await commands.editProject(editing.id, name, key.key, folder);
+      const result = await editor.editProject(editing.id, name, key.key, folder);
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
     } else {
-      const result = await commands.addProject(name, key.key, folder, suggestionEdits(drafts));
+      const result = await editor.addProject(name, key.key, folder, suggestionEdits(drafts));
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
@@ -106,8 +114,8 @@ export function ProjectForm({ editing, onAdded }: Props) {
   return (
     <FormSheet
       icon={<FolderIcon size={16} />}
-      title={editing ? `Edit ${editing.name}` : "New Project"}
-      subtitle="A folder whose services localhost runs."
+      title={editing ? `Edit ${editing.name}` : `New Project${onMachine(machine)}`}
+      subtitle={machine ? `A folder on ${machine.name} whose services localhost runs there.` : "A folder whose services localhost runs."}
       hint={hint}
       error={error}
       primaryTitle={editing ? "Save" : "Add Project"}
@@ -122,7 +130,9 @@ export function ProjectForm({ editing, onAdded }: Props) {
         </Field>
       )}
       <Field title="Folder">
-        {(id) => <FolderField id={id} path={path} target={folder?.target} onChoose={() => void chooseFolder()} />}
+        {(id) => (
+          <FolderField id={id} path={path} target={folder?.target} machine={machine?.name} onChoose={() => void chooseFolder()} />
+        )}
       </Field>
       <FieldRow>
         <Field title="Name">
@@ -138,6 +148,7 @@ export function ProjectForm({ editing, onAdded }: Props) {
           setDrafts={setDrafts}
           isScanning={isScanning}
           project={folder ?? { target, path }}
+          machine={machine}
           emptyMessage="Nothing recognised in this folder. Add the project, then add its services yourself."
         />
       )}

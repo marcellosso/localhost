@@ -15,6 +15,7 @@ mod launch;
 mod lifecycle;
 mod listeners;
 mod logs;
+mod machine_editors;
 mod machines;
 mod palette;
 mod perf;
@@ -191,6 +192,27 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             machines::machine_start_all,
             machines::machine_stop_all,
             machines::machine_open_service,
+            machine_editors::machine_list_directory,
+            machine_editors::relative_folder,
+            machine_editors::machine_suggested_project_key,
+            machine_editors::machine_suggested_service_key,
+            machine_editors::machine_add_project,
+            machine_editors::machine_edit_project,
+            machine_editors::machine_set_favorite,
+            machine_editors::machine_remove_project,
+            machine_editors::machine_add_service,
+            machine_editors::machine_edit_service,
+            machine_editors::machine_add_services,
+            machine_editors::machine_remove_service,
+            machine_editors::machine_service_relations,
+            machine_editors::machine_scan_folder,
+            machine_editors::machine_scan_project,
+            machine_editors::machine_detect_python_environment,
+            machine_editors::machine_save_environment,
+            machine_editors::machine_set_active_profile,
+            machine_editors::machine_secret_value,
+            machine_editors::machine_read_project_file,
+            machine_editors::machine_import_project,
         ])
         .events(collect_events![lifecycle::Reveal, launch::OrphansFound, updates::UpdateState])
 }

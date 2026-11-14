@@ -310,7 +310,8 @@ private final class TemporaryRoot {
         #expect(MachineProblem.hostKeyNotTrusted.message(machine: "devbox").contains("ssh devbox"))
         let error = LocalhostError.MachineUnavailable(machine: "devbox", problem: .notInstalled)
         #expect(error.message.contains("isn’t installed on devbox"))
-        #expect(MachineState.connected(version: "0.5.0").summary(machine: "devbox") == "Connected · localhost 0.5.0")
+        #expect(MachineState.connected(version: "0.5.0", managesProjects: true).summary(machine: "devbox") == "Connected · localhost 0.5.0")
+        #expect(LocalhostError.MachineNeedsUpdate(machine: "devbox").message == "Update localhost on devbox to manage its Projects.")
         #expect(MachineState.unavailable(problem: .hostKeyChanged, isRetrying: false).needsUser)
     }
 }

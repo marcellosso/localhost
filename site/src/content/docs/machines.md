@@ -1,6 +1,6 @@
-A **Machine** is another computer whose localhost this app shows and controls: a dev box under the desk, a home server, a cloud VM. localhost reaches it with your system's `ssh`, as you already do from a terminal. Its Projects show in the sidebar below this computer's, and you start, stop and watch them from here.
+A **Machine** is another computer whose localhost this app shows and controls: a dev box under the desk, a home server, a cloud VM. localhost reaches it with your system's `ssh`, as you already do from a terminal. Its Projects show in the sidebar below this computer's, and you add, edit, start, stop and watch them from here.
 
-Everything stays on the Machine: its Project Configuration, its Secrets and its Runs. Its Services run there, in its login shell, with its files, and read its Secrets from its own secret store; no Secret value ever reaches this computer. Projects on a Machine are edited on that Machine.
+Everything stays on the Machine: its Project Configuration, its Secrets and its Runs. Its Services run there, in its login shell, with its files, and read its Secrets from its own secret store. A Secret you type here is sent to the Machine and stored there only; nothing of a Machine's Projects is saved on this computer.
 
 ## Add a Machine
 
@@ -45,7 +45,22 @@ If that port is taken on this computer, Open in Browser says so and names who ho
 
 ## In the sidebar
 
-Each Machine has its own section below this computer's Projects, under its name. Its Projects look and act like local ones: Start, Stop, Restart, Start All, Stop All, logs and Open in Browser. While the Machine isn't connected, its Projects are dimmed and show what they showed last; the section says why, with **Reconnect** when it waits for you. A connected Machine with no Projects says so.
+Each Machine has its own section below this computer's Projects, under its name, with a `+` to add a Project there. Its Projects look and act like local ones: Start, Stop, Restart, Start All, Stop All, logs, Open in Browser, and [their edits](#manage-its-projects). While the Machine isn't connected, its Projects are dimmed and show what they showed last; the section says why, with **Reconnect** when it waits for you. A connected Machine with no Projects says so.
+
+## Manage its Projects
+
+A connected Machine's Projects are managed from here as this computer's are, with the same sheets, menus, command palette entries and shortcuts. Each change is made on the Machine, by its localhost, and shows at once in an app open there.
+
+- **Add a Project**: the `+` next to the Machine's name in the sidebar, then **New Project on devbox…**. With one of its Projects selected, the usual shortcut adds there too. Its folder is picked on the Machine, scanned there, and the Suggestions are reviewed as for a local folder.
+- **Import a Project** from a [Project file](/docs/configuration) on the Machine: **Import Project on devbox…**.
+- **Edit** a Project, its Environment and Profiles, its Services (add, edit, remove, Detect Services), and **Favorite** it, from its context menu, its `⋯` menu, the Services column or the command palette.
+- **Remove** a Project or Service: as here, its running Services are stopped first, on the Machine, and their logs there are deleted. The Project's folder is not touched.
+
+Folders of a Machine are picked in localhost's own folder picker, since the system's can't browse another computer: a path you can type, its folders in a list, a **Show hidden** switch, and **Choose**. It starts in the Machine's home folder. Paths are checked on the Machine: a folder that isn't there, or that you can't open, says so.
+
+A Secret's value is set from here like any variable, and stored only in the Machine's secret store. **Reveal** reads it from the Machine to show it, without keeping it here.
+
+These need a connection: while the Machine isn't connected, they are disabled and say why; nothing is queued for later. A Machine running a localhost from before this was possible shows its Projects and runs them, and says **Update localhost on devbox to manage its Projects.**
 
 ## Connections, sleep and quitting
 

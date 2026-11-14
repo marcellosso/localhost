@@ -9,7 +9,7 @@ import { Sheets } from "./components/Sheets";
 import { FolderIcon, LinesIcon } from "./components/Icons";
 import { LogPane } from "./components/LogPane";
 import { PortsView } from "./components/PortsView";
-import { type Place, ProjectActions, ServicesColumn, thisComputer } from "./components/ServicesColumn";
+import { machinePlace, type Place, ProjectActions, ServicesColumn, thisComputer } from "./components/ServicesColumn";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { importProject } from "./editors";
@@ -84,8 +84,7 @@ function MainWindow({ view }: { view: CoreView }) {
   const onMachine = sidebarSelection?.kind === "machineProject" ? sidebarSelection : null;
   const machine = onMachine ? machines.find((shown) => shown.machine.id === onMachine.machineId) : undefined;
   const machineProject = machine?.view.projects.find((project) => project.id === onMachine?.projectId);
-  const place: Place =
-    machine && machineProject ? { machineId: machine.machine.id, isReachable: machine.isConnected } : thisComputer;
+  const place: Place = machine && machineProject ? machinePlace(machine) : thisComputer;
   const selectedView = machine && machineProject ? machine.view : view;
   const selected = isPorts
     ? undefined
@@ -204,10 +203,26 @@ function MainWindow({ view }: { view: CoreView }) {
           </>
         )}
       </div>
-      <Sheets view={view} onSelectProject={navigator.selectProject} onSelectService={navigator.selectService} />
+      <Sheets
+        view={view}
+        onSelectProject={(projectId, onMachine) =>
+          onMachine ? select({ kind: "machineProject", machineId: onMachine.id, projectId }) : navigator.selectProject(projectId)
+        }
+        onSelectService={(projectId, serviceId, onMachine) => {
+          if (!onMachine) return navigator.selectService(projectId, serviceId);
+          setSidebarSelection({ kind: "machineProject", machineId: onMachine.id, projectId });
+          setSelection({ kind: "service", serviceId });
+        }}
+      />
       {isPaletteOpen && (
-        // Another Machine's Projects are controlled from the window for now.
-        <CommandPalette view={view} selected={place.machineId ? undefined : selected} selection={selection} navigator={navigator} />
+        <CommandPalette
+          view={view}
+          selected={place.machineId ? undefined : selected}
+          selection={selection}
+          navigator={navigator}
+          machines={machines}
+          onMachine={machine && machineProject ? { machine, project: machineProject } : null}
+        />
       )}
       <Alerts view={view} />
       <Announcer view={view} selectedProjectId={place.machineId ? null : (selected?.id ?? null)} />

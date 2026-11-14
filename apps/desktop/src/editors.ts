@@ -9,6 +9,8 @@ import {
   type Variables,
 } from "./bindings";
 import { report } from "./actions";
+import type { MachineRef } from "./editing";
+import { chooseOnMachine } from "./remoteFolders";
 import { showAlert, showSheet } from "./ui";
 
 // What the editors work on before saving: variable rows and reviewed
@@ -343,13 +345,17 @@ export function directoryLabel(workingDirectory: string): string {
     : `./${workingDirectory}`;
 }
 
-/** Asks for a Project file, reads it, and opens its review sheet, or says why it can't be imported. */
-export async function importProject() {
-  const file = await commands.chooseProjectFile();
+/**
+ * Asks for a Project file, reads it, and opens its review sheet, or says why
+ * it can't be imported. On `machine`, the file is that Machine's, picked
+ * with the remote folder picker and read there.
+ */
+export async function importProject(machine: MachineRef | null = null) {
+  const file = machine ? await chooseOnMachine(machine, { isFile: true }) : await commands.chooseProjectFile();
   if (!file) return;
-  const result = await commands.readProjectFile(file);
+  const result = machine ? await commands.machineReadProjectFile(machine.id, file) : await commands.readProjectFile(file);
   if (result.status === "ok") {
-    showSheet({ kind: "importProject", file, preview: result.data });
+    showSheet({ kind: "importProject", file, preview: result.data, machine: machine ?? undefined });
   } else {
     showAlert({
       kind: "importFailure",
@@ -366,29 +372,42 @@ export async function exportProject(projectId: Id) {
   if (file.data) report(await commands.exportProject(projectId, file.data));
 }
 
-export async function setFavorite(project: Project, isFavorite: boolean) {
-  report(await commands.setFavorite(project.id, isFavorite));
+// Each on this computer, or with `machineId` on that Machine.
+
+export async function setFavorite(project: Project, isFavorite: boolean, machineId: Id | null = null) {
+  report(
+    await (machineId
+      ? commands.machineSetFavorite(machineId, project.id, isFavorite)
+      : commands.setFavorite(project.id, isFavorite)),
+  );
 }
 
-export async function setActiveProfile(projectId: Id, profileId: Id | null) {
-  report(await commands.setActiveProfile(projectId, profileId));
+export async function setActiveProfile(projectId: Id, profileId: Id | null, machineId: Id | null = null) {
+  report(
+    await (machineId
+      ? commands.machineSetActiveProfile(machineId, projectId, profileId)
+      : commands.setActiveProfile(projectId, profileId)),
+  );
 }
 
-export async function removeProject(projectId: Id) {
-  report(await commands.removeProject(projectId));
+export async function removeProject(projectId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineRemoveProject(machineId, projectId) : commands.removeProject(projectId)));
 }
 
 /** Asks before removing the Service, naming the Services that depend on it. */
-export async function requestRemoveService(serviceId: Id) {
-  const relations = await commands.serviceRelations(serviceId);
+export async function requestRemoveService(serviceId: Id, machine: MachineRef | null = null) {
+  const relations = machine
+    ? await commands.machineServiceRelations(machine.id, serviceId)
+    : await commands.serviceRelations(serviceId);
   if (relations.status === "error") return report(relations);
   showAlert({
     kind: "removeService",
     serviceId,
     dependents: relations.data.dependents,
+    machine: machine ?? undefined,
   });
 }
 
-export async function removeService(serviceId: Id) {
-  report(await commands.removeService(serviceId));
+export async function removeService(serviceId: Id, machineId: Id | null = null) {
+  report(await (machineId ? commands.machineRemoveService(machineId, serviceId) : commands.removeService(serviceId)));
 }

@@ -15,6 +15,9 @@ struct FormSheet<Content: View>: View {
     var error: String?
     let primaryTitle: String
     var isPrimaryDisabled = false
+    /// Whether ↩ triggers the primary action; off while ↩ means something
+    /// else, e.g. opening the selected folder.
+    var isPrimaryDefault = true
     var width: CGFloat = 560
     let cancel: () -> Void
     let primary: () -> Void
@@ -72,7 +75,7 @@ struct FormSheet<Content: View>: View {
                     .keyboardShortcut(.cancelAction)
                 Button(primaryTitle, action: primary)
                     .buttonStyle(AccentButtonStyle())
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(isPrimaryDefault ? KeyboardShortcut.defaultAction : nil)
                     .disabled(isPrimaryDisabled)
             }
             .padding(.horizontal, 24)
@@ -86,8 +89,10 @@ struct FormSheet<Content: View>: View {
 }
 
 /// A folder's path in a field box; choosing opens the folder picker.
+/// Another Machine's paths are shown as they are: `~` there isn't this Mac's.
 struct FolderButton: View {
     let path: String
+    var isOnThisMac = true
     let choose: () -> Void
 
     var body: some View {
@@ -95,7 +100,7 @@ struct FolderButton: View {
             HStack(spacing: 8) {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
-                Text(path.isEmpty ? "Choose a folder…" : (path as NSString).abbreviatingWithTildeInPath)
+                Text(path.isEmpty ? "Choose a folder…" : isOnThisMac ? (path as NSString).abbreviatingWithTildeInPath : path)
                     .font(.system(size: 12.5, design: .monospaced))
                     .foregroundStyle(path.isEmpty ? .secondary : .primary)
                     .lineLimit(1)

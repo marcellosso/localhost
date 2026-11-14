@@ -133,7 +133,7 @@ async fn pick(open: impl FnOnce(Box<dyn FnOnce(Option<FilePath>) + Send>)) -> Op
 
 /// `path` relative to `base`, e.g. `web` or `../shared`; `.` for `base`
 /// itself. `None` on another Windows drive or share, which no relative path reaches.
-fn relative_path(path: &Path, base: &Path) -> Option<String> {
+pub(crate) fn relative_path(path: &Path, base: &Path) -> Option<String> {
     let prefix = |path: &Path| match path.components().next() {
         Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_lowercase()),
         _ => None,

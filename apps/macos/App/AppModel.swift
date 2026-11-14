@@ -17,15 +17,21 @@ final class AppModel {
         var logs: Targets { services }
     }
 
+    /// The forms say where they make their changes: this Mac, or another
+    /// Machine, which makes them there.
     enum Sheet: Identifiable, Hashable {
-        case addProject
-        case editProject(UUID)
-        case addService(projectID: UUID)
-        case detectServices(projectID: UUID)
-        case editService(UUID)
-        case projectEnvironment(UUID)
-        /// The review step of an import, before anything is saved.
-        case importProject(ProjectDocument, fileName: String)
+        case addProject(on: Place = .thisMac)
+        case editProject(UUID, on: Place = .thisMac)
+        case addService(projectID: UUID, on: Place = .thisMac)
+        case detectServices(projectID: UUID, on: Place = .thisMac)
+        case editService(UUID, on: Place = .thisMac)
+        case projectEnvironment(UUID, on: Place = .thisMac)
+        /// The review step of an import, before anything is saved. On
+        /// another Machine, `folderExists` says whether the file's folder is
+        /// there; this Mac checks its own.
+        case importProject(ProjectDocument, fileName: String, on: Place = .thisMac, folderExists: Bool = true)
+        /// Import Project… on another Machine: choosing the Project file there.
+        case chooseProjectFile(machine: UUID)
         /// Every shortcut, grouped (⌘/).
         case keyboardShortcuts
         /// Connect Your Agents, as in Settings › Agents.
@@ -62,8 +68,8 @@ final class AppModel {
     }
 
     enum Removal: Identifiable, Hashable {
-        case project(UUID)
-        case service(UUID)
+        case project(UUID, on: Place = .thisMac)
+        case service(UUID, on: Place = .thisMac)
 
         var id: Self { self }
     }
@@ -275,7 +281,7 @@ final class AppModel {
         return project(id, on: selectedPlace)
     }
 
-    /// The selected Project when it is on this Mac: what can be edited.
+    /// The selected Project when it is on this Mac: its folder is here, and it can be exported.
     var selectedLocalProject: Project? {
         selectedPlace == .thisMac ? selectedProject : nil
     }
@@ -345,9 +351,17 @@ final class AppModel {
         }
     }
 
-    /// A Key derived from `name` that no other Project uses.
-    func suggestedProjectKey(for name: String, excluding projectID: UUID? = nil) -> String {
-        Project.suggestedKey(for: name, among: projects, excluding: projectID).rawValue
+    /// The Projects of `place`: this Mac's, or another Machine's as last shown.
+    func projects(on place: Place) -> [Project] {
+        switch place {
+        case .thisMac: projects
+        case .machine(let machineID): shownMachine(machineID)?.projects ?? []
+        }
+    }
+
+    /// A Key derived from `name` that no other Project of `place` uses.
+    func suggestedProjectKey(for name: String, excluding projectID: UUID? = nil, on place: Place = .thisMac) -> String {
+        Project.suggestedKey(for: name, among: projects(on: place), excluding: projectID).rawValue
     }
 
     /// A Key derived from `name` that no other Service of the Project uses.
@@ -524,18 +538,43 @@ final class AppModel {
 
     // MARK: Editing
 
-    /// Suggestions for a folder being added as a Project.
-    func suggestions(forFolderAt path: String) async -> [ServiceSuggestion] {
-        await ProjectScanner().scan(projectAt: path)
+    /// Suggestions for a folder being added as a Project, scanned where it is.
+    func suggestions(forFolderAt path: String, on place: Place = .thisMac) async throws(LocalhostError) -> [ServiceSuggestion] {
+        guard case .machine(let machineID) = place else { return await ProjectScanner().scan(projectAt: path) }
+        return try await machines(for: machineID).scan(projectAt: path, on: machineID)
     }
 
     /// Suggestions for an existing Project, without what its Services cover.
-    func suggestions(for project: Project) async -> [ServiceSuggestion] {
-        await ProjectScanner().scan(project)
+    func suggestions(for project: Project, on place: Place = .thisMac) async throws(LocalhostError) -> [ServiceSuggestion] {
+        guard case .machine(let machineID) = place else { return await ProjectScanner().scan(project) }
+        return try await machines(for: machineID).scan(project: project.id, on: machineID)
     }
 
+    /// The virtual environment a new Service of the Project would run in, found where the Project is.
+    func pythonEnvironment(
+        in project: Project, workingDirectory: String, commandLine: String, on place: Place = .thisMac
+    ) async -> String? {
+        guard case .machine(let machineID) = place else {
+            return await ProjectScanner().pythonEnvironment(
+                projectPath: project.path, workingDirectory: workingDirectory, commandLine: commandLine
+            )
+        }
+        return try? await machines(for: machineID).pythonEnvironment(
+            inProject: project.id, workingDirectory: workingDirectory, commandLine: commandLine, on: machineID
+        )
+    }
+
+    /// Adds the Project and selects it. Another Machine's arrives once it
+    /// reports the change.
     @discardableResult
-    func addProject(name: String, key: String, path: String, services: [NewService] = []) async throws(LocalhostError) -> Project {
+    func addProject(
+        name: String, key: String, path: String, services: [NewService] = [], on place: Place = .thisMac
+    ) async throws(LocalhostError) -> Project {
+        if case .machine(let machineID) = place {
+            let project = try await machines(for: machineID).addProject(name: name, key: Key(key), path: path, services: services, on: machineID)
+            sidebarSelection = .machineProject(project.id, machine: machineID)
+            return project
+        }
         guard let library = core?.library else { throw .ProjectNotFound(UUID()) }
         let project = try await library.addProject(name: name, key: Key(key), path: path, services: services, origin: .mainWindow)
         projects = library.projects()
@@ -543,18 +582,36 @@ final class AppModel {
         return project
     }
 
-    func editProject(_ id: UUID, name: String, key: String, path: String) async throws(LocalhostError) {
+    func editProject(_ id: UUID, name: String, key: String, path: String, on place: Place = .thisMac) async throws(LocalhostError) {
+        if case .machine(let machineID) = place {
+            try await machines(for: machineID).editProject(id: id, name: name, key: Key(key), path: path, on: machineID)
+            return
+        }
         guard let library = core?.library else { throw .ProjectNotFound(id) }
         try await library.editProject(id: id, name: name, key: Key(key), path: path, origin: .mainWindow)
     }
 
-    func setFavorite(_ id: UUID, _ isFavorite: Bool) {
+    func setFavorite(_ id: UUID, _ isFavorite: Bool, on place: Place = .thisMac) {
+        if case .machine(let machineID) = place {
+            Task {
+                await report { () throws(LocalhostError) in
+                    try await machines(for: machineID).editProject(id: id, isFavorite: isFavorite, on: machineID)
+                }
+            }
+            return
+        }
         guard let library = core?.library else { return }
         Task { await report { () throws(LocalhostError) in try await library.editProject(id: id, isFavorite: isFavorite, origin: .mainWindow) } }
     }
 
-    /// Stops the Project's Services, then removes it.
-    func removeProject(_ id: UUID) async {
+    /// Stops the Project's Services, then removes it. Another Machine does
+    /// both, and deletes their logs, there.
+    func removeProject(_ id: UUID, on place: Place = .thisMac) async {
+        if case .machine(let machineID) = place {
+            await report { () throws(LocalhostError) in try await machines(for: machineID).removeProject(id: id, on: machineID) }
+            if sidebarSelection == .machineProject(id, machine: machineID) { sidebarSelection = nil }
+            return
+        }
         guard let core, let project = project(id) else { return }
         await report { () throws(LocalhostError) in
             for service in project.services {
@@ -570,8 +627,19 @@ final class AppModel {
     func addService(
         to projectID: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?
+        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?,
+        on place: Place = .thisMac
     ) async throws(LocalhostError) -> Service {
+        if case .machine(let machineID) = place {
+            let service = try await machines(for: machineID).addService(
+                toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
+                commandLine: commandLine, variables: variables, dependencies: dependencies,
+                isExcludedFromStartAll: isExcludedFromStartAll, port: port, url: url, portCanChange: portCanChange,
+                pythonEnvironment: pythonEnvironment, runBefore: runBefore, on: machineID
+            )
+            selectedServiceID = service.id
+            return service
+        }
         guard let library = core?.library else { throw .ProjectNotFound(projectID) }
         let service = try await library.addService(
             toProject: projectID, name: name, key: Key(key), workingDirectory: workingDirectory,
@@ -584,7 +652,12 @@ final class AppModel {
         return service
     }
 
-    func addServices(_ services: [NewService], to projectID: UUID) async throws(LocalhostError) {
+    func addServices(_ services: [NewService], to projectID: UUID, on place: Place = .thisMac) async throws(LocalhostError) {
+        if case .machine(let machineID) = place {
+            let added = try await machines(for: machineID).addServices(services, toProject: projectID, on: machineID)
+            if let first = added.first { selectedServiceID = first.id }
+            return
+        }
         guard let library = core?.library else { throw .ProjectNotFound(projectID) }
         let added = try await library.addServices(services, toProject: projectID, origin: .mainWindow)
         projects = library.projects()
@@ -592,8 +665,18 @@ final class AppModel {
     }
 
     /// Saves a reviewed import. On Replace, Services the file no longer has
-    /// are stopped first, as when removing them.
-    func importProject(_ document: ProjectDocument, onKeyClash: ProjectLibrary.KeyClash?) async throws(LocalhostError) {
+    /// are stopped first, as when removing them. Another Machine imports
+    /// the file's text into the document's folder there.
+    func importProject(
+        _ document: ProjectDocument, onKeyClash: ProjectLibrary.KeyClash?, on place: Place = .thisMac
+    ) async throws(LocalhostError) {
+        if case .machine(let machineID) = place {
+            let project = try await machines(for: machineID).importProject(
+                text: document.yaml, path: document.path, onKeyClash: onKeyClash, on: machineID
+            )
+            sidebarSelection = .machineProject(project.id, machine: machineID)
+            return
+        }
         guard let core else { throw .ProjectNotFound(UUID()) }
         if onKeyClash == .replace, let existing = projectClashing(with: document) {
             let keptKeys = Set(document.services.map(\.key))
@@ -613,8 +696,19 @@ final class AppModel {
     func editService(
         _ id: UUID, name: String, key: String, workingDirectory: String,
         commandLine: String, variables: [VariableInput], dependencies: [UUID], isExcludedFromStartAll: Bool,
-        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?
+        port: Int?, url: String?, portCanChange: Bool, pythonEnvironment: String?, runBefore: String?,
+        on place: Place = .thisMac
     ) async throws(LocalhostError) {
+        if case .machine(let machineID) = place {
+            try await machines(for: machineID).editService(
+                id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
+                commandLine: commandLine, variables: variables, dependencies: dependencies,
+                isExcludedFromStartAll: isExcludedFromStartAll, port: .some(port), url: .some(url),
+                portCanChange: portCanChange, pythonEnvironment: .some(pythonEnvironment), runBefore: .some(runBefore),
+                on: machineID
+            )
+            return
+        }
         guard let library = core?.library else { throw .ServiceNotFound(id) }
         try await library.editService(
             id: id, name: name, key: Key(key), workingDirectory: workingDirectory,
@@ -636,16 +730,36 @@ final class AppModel {
         var variables: [VariableDraft]
     }
 
-    func setActiveProfile(_ profileID: UUID?, inProject projectID: UUID) {
+    func setActiveProfile(_ profileID: UUID?, inProject projectID: UUID, on place: Place = .thisMac) {
+        if case .machine(let machineID) = place {
+            Task {
+                await report { () throws(LocalhostError) in
+                    try await machines(for: machineID).setActiveProfile(profileID, inProject: projectID, on: machineID)
+                }
+            }
+            return
+        }
         guard let library = core?.library else { return }
         Task { await report { () throws(LocalhostError) in try await library.setActiveProfile(profileID, inProject: projectID, origin: .mainWindow) } }
     }
 
     /// Saves the Environment sheet: the Project's variables, its Profiles
-    /// (added, edited, removed), then which one is active.
+    /// (added, edited, removed), then which one is active. Another Machine
+    /// saves it all at once.
     func saveEnvironment(
-        of projectID: UUID, variables: [VariableInput], profiles: [ProfileDraft], activeDraftID: UUID?
+        of projectID: UUID, variables: [VariableInput], profiles: [ProfileDraft], activeDraftID: UUID?,
+        on place: Place = .thisMac
     ) async throws(LocalhostError) {
+        if case .machine(let machineID) = place {
+            let inputs = profiles.map { draft in
+                ProfileInput(profileId: draft.profileID, name: draft.name, variables: draft.variables.compactMap(\.input))
+            }
+            try await machines(for: machineID).saveEnvironment(
+                ofProject: projectID, variables: variables, profiles: inputs,
+                activeProfile: profiles.firstIndex { $0.id == activeDraftID }, on: machineID
+            )
+            return
+        }
         guard let library = core?.library, let project = project(projectID) else { throw .ProjectNotFound(projectID) }
         try await library.editProject(id: projectID, variables: variables, origin: .mainWindow)
         let kept = Set(profiles.compactMap(\.profileID))
@@ -666,10 +780,14 @@ final class AppModel {
         try await library.setActiveProfile(activeProfileID, inProject: projectID, origin: .mainWindow)
     }
 
-    /// A Secret's stored value, to reveal it; `nil` if it has none.
-    func secretValue(named name: String, in layer: VariableLayer) async -> String? {
-        guard let library = core?.library else { return nil }
+    /// A Secret's stored value, to reveal it; `nil` if it has none. Another
+    /// Machine's is read there each time, never kept here.
+    func secretValue(named name: String, in layer: VariableLayer, on place: Place = .thisMac) async -> String? {
         do {
+            if case .machine(let machineID) = place {
+                return try await machines(for: machineID).secretValue(named: name, in: layer, on: machineID)
+            }
+            guard let library = core?.library else { return nil }
             return try await library.secretValue(named: name, in: layer)
         } catch {
             actionError = error
@@ -677,8 +795,14 @@ final class AppModel {
         }
     }
 
-    /// Stops the Service, then removes it.
-    func removeService(_ id: UUID) async {
+    /// Stops the Service, then removes it. Another Machine does both, and
+    /// deletes its logs, there.
+    func removeService(_ id: UUID, on place: Place = .thisMac) async {
+        if case .machine(let machineID) = place {
+            await report { () throws(LocalhostError) in try await machines(for: machineID).removeService(id: id, on: machineID) }
+            if selectedServiceID == id { selectedServiceID = nil }
+            return
+        }
         guard let core else { return }
         await report { () throws(LocalhostError) in
             try await core.services.stop(id, origin: .mainWindow)
@@ -819,7 +943,7 @@ final class AppModel {
     /// The welcome was finished or skipped: it never opens by itself again.
     func finishWelcome(addingProject: Bool) {
         updateOnboarding { $0.hasSeenWelcome = true }
-        presentedSheet = addingProject ? .addProject : nil
+        presentedSheet = addingProject ? .addProject() : nil
     }
 
     /// Help › Show Welcome…: the first run's welcome on request, Projects or not.

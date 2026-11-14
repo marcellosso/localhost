@@ -10,6 +10,7 @@ import type { BlockedStart } from "../bindings";
 import { removeProject, removeService } from "../editors";
 import { type CoreView, findService } from "../core";
 import { processDescription } from "../listeners";
+import { currentMachines } from "../machines";
 import { formatList } from "../status";
 import { isNativeWindows } from "../targets";
 import { type Alert, alertKey, dismissAlert, useUi } from "../ui";
@@ -171,14 +172,19 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
 
     case "removeProject":
     case "removeService": {
+      const machineId = alert.machine?.id ?? null;
+      const shown = machineId ? currentMachines().find((one) => one.machine.id === machineId)?.view : view;
       const name =
         alert.kind === "removeProject"
-          ? view.projects.find((project) => project.id === alert.projectId)?.name
+          ? shown?.projects.find((project) => project.id === alert.projectId)?.name
           : (() => {
-              const found = findService(view, alert.serviceId);
+              const found = shown && findService(shown, alert.serviceId);
               return found?.project.services[found.index].name;
             })();
-      const remove = alert.kind === "removeProject" ? () => removeProject(alert.projectId) : () => removeService(alert.serviceId);
+      const remove =
+        alert.kind === "removeProject"
+          ? () => removeProject(alert.projectId, machineId)
+          : () => removeService(alert.serviceId, machineId);
       return (
         <Dialog
           title={`Remove “${name ?? (alert.kind === "removeProject" ? "project" : "service")}”?`}
@@ -246,7 +252,9 @@ function AlertDialog({ alert, view }: { alert: Alert; view: CoreView }) {
 /** What removing deletes, and which Services stop depending on a removed one. */
 export function removalMessage(alert: Extract<Alert, { kind: "removeProject" | "removeService" }>): string[] {
   const paragraphs = [
-    "Running services are stopped first. Their configuration is deleted; the project folder is not touched.",
+    alert.machine
+      ? `Running services are stopped first, on ${alert.machine.name}. Their configuration is deleted there; the project folder is not touched.`
+      : "Running services are stopped first. Their configuration is deleted; the project folder is not touched.",
   ];
   if (alert.kind === "removeService" && alert.dependents.length > 0) {
     paragraphs.push(`${formatList(alert.dependents.map((name) => `“${name}”`))} will no longer depend on it.`);

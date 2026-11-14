@@ -101,10 +101,14 @@ function runShortcut(event: KeyboardEvent, context: ShortcutContext): boolean {
   else if (is(SHORTCUTS.ports)) navigator.selectPorts();
   else if (is(SHORTCUTS.settings)) showAlert({ kind: "settings" });
   else if (is(SHORTCUTS.keyboardShortcuts)) showAlert({ kind: "keyboardShortcuts" });
-  else if (is(SHORTCUTS.newProject)) showSheet({ kind: "addProject" });
-  else if (is(SHORTCUTS.newService)) {
-    // Another Machine's Services are added there.
-    if (selected && !machineId) showSheet({ kind: "addService", projectId: selected.id });
+  // With another Machine's Project selected, they add there, once it can.
+  else if (is(SHORTCUTS.newProject)) {
+    if (!machineId) showSheet({ kind: "addProject" });
+    else if (place.editProblem) showAlert({ kind: "error", message: place.editProblem });
+    else showSheet({ kind: "addProject", machine: place.machine });
+  } else if (is(SHORTCUTS.newService)) {
+    if (selected && machineId && place.editProblem) showAlert({ kind: "error", message: place.editProblem });
+    else if (selected) showSheet({ kind: "addService", projectId: selected.id, machine: place.machine });
   } else if (is(SHORTCUTS.startOrRestart)) {
     if (service && canControl && state !== "stopping") {
       void (isLive ? restart(service.id, machineId) : start(service.id, null, machineId));

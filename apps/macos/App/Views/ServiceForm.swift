@@ -13,6 +13,7 @@ struct ServiceForm: View {
     @Environment(\.dismiss) private var dismiss
     let project: Project
     let editing: Service?
+    var place: AppModel.Place = .thisMac
 
     @State private var name = ""
     @State private var key = ""
@@ -38,11 +39,11 @@ struct ServiceForm: View {
             systemImage: "terminal",
             tint: Color(nsColor: serviceColor),
             title: editing == nil ? "New Service" : "Edit \(editing?.name ?? "Service")",
-            subtitle: Text("in **\(project.name)** · ") + Text((project.path as NSString).abbreviatingWithTildeInPath).monospaced(),
-            hint: "↩ to \(editing == nil ? "add" : "save")",
+            subtitle: Self.subtitle(of: project, on: model.machineName(place)),
+            hint: model.reasonCantChange(place) ?? "↩ to \(editing == nil ? "add" : "save")",
             error: error,
             primaryTitle: editing == nil ? "Add Service" : "Save",
-            isPrimaryDisabled: name.isEmpty || key.isEmpty || commandLine.isEmpty || isSaving,
+            isPrimaryDisabled: name.isEmpty || key.isEmpty || commandLine.isEmpty || isSaving || !model.canChange(place),
             width: 580,
             cancel: { dismiss() },
             primary: { Task { await save() } }
@@ -83,8 +84,8 @@ struct ServiceForm: View {
             .task(id: DetectionInput(workingDirectory: workingDirectory, commandLine: commandLine)) {
                 try? await Task.sleep(for: .milliseconds(250))
                 guard !Task.isCancelled else { return }
-                let detected = await ProjectScanner().pythonEnvironment(
-                    projectPath: project.path, workingDirectory: workingDirectory, commandLine: commandLine
+                let detected = await model.pythonEnvironment(
+                    in: project, workingDirectory: workingDirectory, commandLine: commandLine, on: place
                 )
                 guard !Task.isCancelled else { return }
                 detectedEnvironment = detected
@@ -111,7 +112,7 @@ struct ServiceForm: View {
                 }
             }
             Field(title: "Environment", note: "overrides the project’s · applies on next start") {
-                VariableEditor(variables: $variables, layer: editing.map { .service($0.id) })
+                VariableEditor(variables: $variables, layer: editing.map { .service($0.id) }, place: place)
             }
             if !otherServices.isEmpty {
                 Field(title: "Starts after", note: "waits until they’re running", hint: dependencyHint) {
@@ -124,9 +125,17 @@ struct ServiceForm: View {
             }
             SwitchRow(title: "Manual", detail: startFooter, isOn: $isExcludedFromStartAll)
         }
-        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
+        .fileImporter(isPresented: Binding { isChoosingFolder && place == .thisMac } set: { isChoosingFolder = $0 },
+                      allowedContentTypes: [.folder]) { result in
             guard case .success(let url) = result else { return }
             workingDirectory = Self.relativePath(of: url.path, to: project.path)
+        }
+        .sheet(isPresented: Binding { isChoosingFolder && place != .thisMac } set: { isChoosingFolder = $0 }) {
+            if case .machine(let machineID) = place {
+                RemoteFolderPicker(machineID: machineID, startingAt: project.path) { folder in
+                    workingDirectory = Self.relativePath(of: folder, to: project.path)
+                }
+            }
         }
         .onAppear {
             guard let editing else { return }
@@ -254,14 +263,14 @@ struct ServiceForm: View {
                     editing.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
-                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore
+                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore, on: place
                 )
             } else {
                 try await model.addService(
                     to: project.id, name: name, key: key, workingDirectory: workingDirectory,
                     commandLine: commandLine, variables: inputs, dependencies: dependencies,
                     isExcludedFromStartAll: isExcludedFromStartAll, port: parsedPort, url: url,
-                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore
+                    portCanChange: portCanChange, pythonEnvironment: pythonEnvironment, runBefore: runBefore, on: place
                 )
             }
             dismiss()
@@ -270,7 +279,17 @@ struct ServiceForm: View {
         }
     }
 
-    /// `path` relative to `base`, e.g. "web" or "../shared"; "." for `base` itself.
+    /// "in **My SaaS** · ~/code/my-saas"; on another Machine, "in **My SaaS**
+    /// on devbox · /srv/my-saas", its path as it is there.
+    static func subtitle(of project: Project, on machine: String?) -> Text {
+        guard let machine else {
+            return Text("in **\(project.name)** · ") + Text((project.path as NSString).abbreviatingWithTildeInPath).monospaced()
+        }
+        return Text("in **\(project.name)** on \(machine) · ") + Text(project.path).monospaced()
+    }
+
+    /// `path` relative to `base`, e.g. "web" or "../shared"; "." for `base`
+    /// itself. Also for another Machine's paths: both sides are standardized alike.
     static func relativePath(of path: String, to base: String) -> String {
         let target = URL(filePath: path).standardizedFileURL.pathComponents
         let root = URL(filePath: base).standardizedFileURL.pathComponents

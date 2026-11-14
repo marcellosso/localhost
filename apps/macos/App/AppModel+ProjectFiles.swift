@@ -59,13 +59,15 @@ extension AppModel {
         }
     }
 
-    /// The Project already using the document's Key, which the import would replace.
-    func projectClashing(with document: ProjectDocument) -> Project? {
-        projects.first { $0.key == document.key }
+    /// The Project of `place` already using the document's Key, which the import would replace.
+    func projectClashing(with document: ProjectDocument, on place: Place = .thisMac) -> Project? {
+        projects(on: place).first { $0.key == document.key }
     }
 
-    /// The Key "Keep both" would give the import.
-    func freeProjectKey(basedOn key: Key) async -> Key {
-        core?.library.freeProjectKey(basedOn: key) ?? key
+    /// The Key "Keep both" would give the import, by the core's rule; on
+    /// another Machine, among its Projects as shown.
+    func freeProjectKey(basedOn key: Key, on place: Place = .thisMac) async -> Key {
+        guard place == .thisMac else { return Project.freeKey(basedOn: key, among: projects(on: place)) }
+        return core?.library.freeProjectKey(basedOn: key) ?? key
     }
 }

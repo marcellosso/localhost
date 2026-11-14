@@ -5,13 +5,13 @@ import {
   type Service,
   type ServiceRelations,
 } from "../bindings";
+import { editorCommands, type MachineRef } from "../editing";
 import {
   serviceVariables,
   type VariableDraft,
   variableDrafts,
   variableEdits,
 } from "../editors";
-import { tildePath } from "../paths";
 import { formatList } from "../status";
 import { portVariable, projectFolder } from "../targets";
 import { closeSheet } from "../ui";
@@ -25,6 +25,7 @@ import {
   FieldHint,
   FieldRow,
   FormSheet,
+  ProjectContext,
   PythonEnvironmentField,
   SwitchRow,
   TextField,
@@ -38,6 +39,8 @@ type Props = {
   project: Project;
   /** The Service to edit; a new one when absent. */
   editing?: Service;
+  /** The Machine whose Project it is, when it isn't this computer's. */
+  machine?: MachineRef;
   onAdded?: (service: Service) => void;
 };
 
@@ -49,13 +52,14 @@ type Props = {
  * A new Service takes the virtual environment the core finds for its
  * command until the user edits that field; an existing one only offers it.
  */
-export function ServiceForm({ project, editing, onAdded }: Props) {
+export function ServiceForm({ project, editing, machine, onAdded }: Props) {
+  const editor = editorCommands(machine ?? null);
   const [name, setName] = useState(editing?.name ?? "");
   const key = useFollowingKey(
     editing?.key ?? "",
     editing !== undefined,
     async (name) => {
-      const result = await commands.suggestedServiceKey(
+      const result = await editor.suggestedServiceKey(
         project.id,
         name,
         editing?.id ?? null,
@@ -103,10 +107,11 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
 
   useEffect(() => {
     if (!editing) return;
-    void commands.serviceRelations(editing.id).then((result) => {
+    void editor.serviceRelations(editing.id).then((result) => {
       if (result.status === "ok") setRelations(result.data);
     });
-  }, [editing]);
+    // The editor changes with `machine`, which a sheet keeps.
+  }, [editing, machine?.id]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -121,7 +126,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
   useEffect(() => {
     let isCurrent = true;
     const timer = window.setTimeout(() => {
-      void commands
+      void editor
         .detectPythonEnvironment(project.id, workingDirectory, commandLine)
         .then((result) => {
           if (!isCurrent) return;
@@ -134,7 +139,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
       isCurrent = false;
       window.clearTimeout(timer);
     };
-  }, [project.id, workingDirectory, commandLine, isPythonEnvironmentEdited]);
+  }, [project.id, workingDirectory, commandLine, isPythonEnvironmentEdited, machine?.id]);
 
   const changePythonEnvironment = (value: string) => {
     setIsPythonEnvironmentEdited(true);
@@ -186,7 +191,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
   };
 
   const chooseDirectory = async () => {
-    const chosen = await commands.chooseWorkingDirectory(
+    const chosen = await editor.chooseWorkingDirectory(
       projectFolder(project),
     );
     if (chosen !== null) setWorkingDirectory(chosen);
@@ -210,12 +215,12 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
       runBefore,
     };
     if (editing) {
-      const result = await commands.editService(editing.id, service);
+      const result = await editor.editService(editing.id, service);
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
     } else {
-      const result = await commands.addService(project.id, service);
+      const result = await editor.addService(project.id, service);
       setIsSaving(false);
       if (result.status === "error") return setError(result.error.message);
       closeSheet();
@@ -229,12 +234,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
       icon={<TerminalIcon size={16} />}
       tint={serviceColor(index)}
       title={editing ? `Edit ${editing.name}` : "New Service"}
-      subtitle={
-        <>
-          in <strong>{project.name}</strong> ·{" "}
-          <span className="mono">{tildePath(project.path)}</span>
-        </>
-      }
+      subtitle={<ProjectContext name={project.name} path={project.path} machine={machine?.name} />}
       hint={`↩ to ${editing ? "save" : "add"}`}
       error={error}
       primaryTitle={editing ? "Save" : "Add Service"}
@@ -359,6 +359,7 @@ export function ServiceForm({ project, editing, onAdded }: Props) {
             setVariables={setVariables}
             layer={editing ? { kind: "service", id: editing.id } : null}
             label="Service variables"
+            machine={machine}
           />
         )}
       </Field>

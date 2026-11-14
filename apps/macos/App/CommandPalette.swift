@@ -31,7 +31,7 @@ extension AppModel {
     /// Project. The rest (ids starting `other:`) are reachable by typing.
     func paletteItems() -> [PaletteItem] {
         var items: [PaletteItem] = []
-        // Another Machine's Projects are controlled from the main window for now.
+        // Another Machine's Services are started from the main window for now; its changes are in `machineItems()`.
         let selected = selectedLocalProject
         if let service = selectedService, let selected {
             items += serviceActions(service, in: selected, isSelected: true)
@@ -49,10 +49,11 @@ extension AppModel {
         })
         if core != nil {
             items.append(PaletteItem(id: "new-project", title: "New Project…", icon: .symbol("folder.badge.plus"),
-                                     shortcut: "⌘N", keywords: "add") { [weak self] in
-                    self?.presentedSheet = .addProject
+                                     shortcut: selectedPlace == .thisMac ? "⌘N" : nil, keywords: "add") { [weak self] in
+                    self?.presentedSheet = .addProject()
             })
         }
+        items += machineItems()
         items.append(PaletteItem(id: "keyboard-shortcuts", title: "Keyboard Shortcuts", icon: .symbol("keyboard"),
                                  shortcut: "⌘/", keywords: "help keys cheat sheet") { [weak self] in
             self?.presentedSheet = .keyboardShortcuts
@@ -110,6 +111,54 @@ extension AppModel {
     }
 
     // MARK: Items
+
+    /// Another Machine's: changes to the selected Project there, then a new
+    /// or imported Project on each Machine that can take changes. Its
+    /// Services are started and stopped from the main window for now.
+    private func machineItems() -> [PaletteItem] {
+        var items: [PaletteItem] = []
+        if case .machine = selectedPlace, let project = selectedProject, canChange(selectedPlace) {
+            let place = selectedPlace
+            let keywords = "\(project.key) \(machineName(place) ?? "")"
+            items.append(PaletteItem(id: "machine-new-service:\(project.id)", title: "New Service in \(project.name)…",
+                                     icon: .symbol("plus"), shortcut: "⇧⌘N", keywords: "add \(keywords)", boost: 1) { [weak self] in
+                self?.presentedSheet = .addService(projectID: project.id, on: place)
+            })
+            items.append(PaletteItem(id: "machine-detect:\(project.id)", title: "Detect Services in \(project.name)…",
+                                     icon: .symbol("sparkle.magnifyingglass"), keywords: "scan suggest \(keywords)", boost: 1) { [weak self] in
+                self?.presentedSheet = .detectServices(projectID: project.id, on: place)
+            })
+            items.append(PaletteItem(id: "machine-edit:\(project.id)", title: "Edit \(project.name)…",
+                                     icon: .symbol("pencil"), keywords: "project \(keywords)", boost: 1) { [weak self] in
+                self?.presentedSheet = .editProject(project.id, on: place)
+            })
+            items.append(PaletteItem(id: "machine-environment:\(project.id)", title: "Edit Environment of \(project.name)…",
+                                     icon: .symbol("square.3.layers.3d"), keywords: "variables profiles secrets \(keywords)", boost: 1) { [weak self] in
+                self?.presentedSheet = .projectEnvironment(project.id, on: place)
+            })
+            items.append(PaletteItem(id: "machine-favorite:\(project.id)",
+                                     title: "\(project.isFavorite ? "Unfavorite" : "Favorite") \(project.name)",
+                                     icon: .symbol(project.isFavorite ? "star.slash" : "star"), keywords: keywords, boost: 1) { [weak self] in
+                self?.setFavorite(project.id, !project.isFavorite, on: place)
+            })
+        }
+        for shown in shownMachines where canChange(.machine(shown.id)) {
+            let place = Place.machine(shown.id)
+            let prefix = selectedPlace == place ? "" : "other:"
+            let name = shown.machine.name
+            items.append(PaletteItem(id: "\(prefix)machine-new-project:\(shown.id)", title: "New Project on \(name)…",
+                                     icon: .symbol("folder.badge.plus"), shortcut: selectedPlace == place ? "⌘N" : nil,
+                                     keywords: "add machine \(shown.machine.destination)") { [weak self] in
+                self?.presentedSheet = .addProject(on: place)
+            })
+            items.append(PaletteItem(id: "other:machine-import:\(shown.id)", title: "Import Project on \(name)…",
+                                     icon: .symbol("square.and.arrow.down"),
+                                     keywords: "project file yaml machine \(shown.machine.destination)") { [weak self] in
+                self?.chooseProjectFile(on: place)
+            })
+        }
+        return items
+    }
 
     private func projectJump(_ project: Project, index: Int) -> PaletteItem {
         PaletteItem(

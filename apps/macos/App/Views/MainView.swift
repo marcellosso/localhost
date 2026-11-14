@@ -30,7 +30,7 @@ struct MainView: View {
                             VStack(spacing: 12) {
                                 // One primary action; the rarer ones as links under it.
                                 if model.core != nil {
-                                    Button("Add Project…") { model.presentedSheet = .addProject }
+                                    Button("Add Project…") { model.presentedSheet = .addProject() }
                                         .buttonStyle(AccentButtonStyle())
                                 }
                                 HStack(spacing: 14) {
@@ -102,20 +102,26 @@ struct MainView: View {
         .background(ColumnNavigation(focusRequest: model.columnFocusRequest, isShowingPalette: model.isShowingPalette))
         .sheet(item: $model.presentedSheet) { sheet in
             switch sheet {
-            case .addProject:
-                ProjectForm(editing: nil)
-            case .editProject(let id):
-                ProjectForm(editing: model.project(id))
-            case .addService(let projectID):
-                if let project = model.project(projectID) { ServiceForm(project: project, editing: nil) }
-            case .detectServices(let projectID):
-                if let project = model.project(projectID) { DetectServicesForm(project: project) }
-            case .editService(let id):
-                if let (project, service) = model.service(id) { ServiceForm(project: project, editing: service) }
-            case .projectEnvironment(let id):
-                if let project = model.project(id) { EnvironmentForm(project: project) }
-            case .importProject(let document, let fileName):
-                ImportProjectForm(document: document, fileName: fileName)
+            case .addProject(let place):
+                ProjectForm(editing: nil, place: place)
+            case .editProject(let id, let place):
+                ProjectForm(editing: model.project(id, on: place), place: place)
+            case .addService(let projectID, let place):
+                if let project = model.project(projectID, on: place) { ServiceForm(project: project, editing: nil, place: place) }
+            case .detectServices(let projectID, let place):
+                if let project = model.project(projectID, on: place) { DetectServicesForm(project: project, place: place) }
+            case .editService(let id, let place):
+                if let (project, service) = model.service(id, on: place) {
+                    ServiceForm(project: project, editing: service, place: place)
+                }
+            case .projectEnvironment(let id, let place):
+                if let project = model.project(id, on: place) { EnvironmentForm(project: project, place: place) }
+            case .importProject(let document, let fileName, let place, let folderExists):
+                ImportProjectForm(document: document, fileName: fileName, place: place, remoteFolderExists: folderExists)
+            case .chooseProjectFile(let machineID):
+                RemoteFolderPicker(machineID: machineID, mode: .projectFile) { path in
+                    Task { await model.openProjectFile(at: path, on: machineID) }
+                }
             case .keyboardShortcuts:
                 KeyboardShortcutsView()
             case .connectAgents:
@@ -148,8 +154,8 @@ struct MainView: View {
             Button("Remove", role: .destructive) {
                 Task {
                     switch removal {
-                    case .project(let id): await model.removeProject(id)
-                    case .service(let id): await model.removeService(id)
+                    case .project(let id, let place): await model.removeProject(id, on: place)
+                    case .service(let id, let place): await model.removeService(id, on: place)
                     }
                 }
             }
@@ -215,15 +221,15 @@ struct MainView: View {
 
     private var removalTitle: String {
         switch model.pendingRemoval {
-        case .project(let id): "Remove “\(model.project(id)?.name ?? "project")”?"
-        case .service(let id): "Remove “\(model.service(id)?.service.name ?? "service")”?"
+        case .project(let id, let place): "Remove “\(model.project(id, on: place)?.name ?? "project")”?"
+        case .service(let id, let place): "Remove “\(model.service(id, on: place)?.service.name ?? "service")”?"
         case nil: ""
         }
     }
 
     private func removalMessage(_ removal: AppModel.Removal) -> String {
         var message = "Running services are stopped first. Their configuration is deleted; the project folder is not touched."
-        if case .service(let id) = removal, let (project, _) = model.service(id) {
+        if case .service(let id, let place) = removal, let (project, _) = model.service(id, on: place) {
             let dependents = project.dependents(of: id).map { "“\($0.name)”" }
             if !dependents.isEmpty {
                 message += "\n\n\(ListFormatter.localizedString(byJoining: dependents)) will no longer depend on it."

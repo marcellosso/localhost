@@ -119,24 +119,29 @@ struct AppCommands: Commands {
             Divider()
         }
         CommandGroup(replacing: .newItem) {
-            Button("New Project…") { model.presentedSheet = .addProject }
-                .keyboardShortcut("n")
-                .disabled(model.core == nil)
+            // With another Machine's Project selected, they act on that Machine.
+            let place = model.selectedPlace
+            let project = model.selectedProject
+            Button(model.machineName(place).map { "New Project on \($0)…" } ?? "New Project…") {
+                model.presentedSheet = .addProject(on: place)
+            }
+            .keyboardShortcut("n")
+            .disabled(!model.canChange(place))
             Button("New Service…") {
-                if let project = model.selectedLocalProject { model.presentedSheet = .addService(projectID: project.id) }
+                if let project { model.presentedSheet = .addService(projectID: project.id, on: place) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .disabled(model.selectedLocalProject == nil)
+            .disabled(project == nil || !model.canChange(place))
             Button("Detect Services…") {
-                if let project = model.selectedLocalProject { model.presentedSheet = .detectServices(projectID: project.id) }
+                if let project { model.presentedSheet = .detectServices(projectID: project.id, on: place) }
             }
-            .disabled(model.selectedLocalProject == nil)
+            .disabled(project == nil || !model.canChange(place))
             Divider()
-            Button("Import Project…") {
+            Button(model.machineName(place).map { "Import Project on \($0)…" } ?? "Import Project…") {
                 openWindow(id: "main")
-                model.isChoosingImportFile = true
+                model.chooseProjectFile(on: place)
             }
-            .disabled(model.core == nil)
+            .disabled(!model.canChange(place))
             Button("Export Project…") {
                 openWindow(id: "main")
                 if let project = model.selectedLocalProject { model.exportProject(project.id) }
@@ -173,12 +178,11 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(!isLive || model.selectedService.flatMap { model.urlToOpen($0, on: place) } == nil || !model.isReachable(place))
             Divider()
-            // Another Machine's Services are edited there.
-            let localService = place == .thisMac ? model.selectedService : nil
-            Button("Edit Service…") { localService.map { model.presentedSheet = .editService($0.id) } }
-                .disabled(localService == nil)
-            Button("Remove Service…") { localService.map { model.pendingRemoval = .service($0.id) } }
-                .disabled(localService == nil)
+            let editable = model.canChange(place) ? model.selectedService : nil
+            Button("Edit Service…") { editable.map { model.presentedSheet = .editService($0.id, on: place) } }
+                .disabled(editable == nil)
+            Button("Remove Service…") { editable.map { model.pendingRemoval = .service($0.id, on: place) } }
+                .disabled(editable == nil)
         }
         CommandMenu("Project") {
             let place = model.selectedPlace
@@ -191,19 +195,19 @@ struct AppCommands: Commands {
                 .disabled(!(shown.map { $0.services.contains { model.status(of: $0, on: place).state.isActive } } ?? false)
                     || !model.isReachable(place))
             Divider()
-            let project = model.selectedLocalProject
-            Button("Edit Project…") { project.map { model.presentedSheet = .editProject($0.id) } }
+            let project = model.canChange(place) ? shown : nil
+            Button("Edit Project…") { project.map { model.presentedSheet = .editProject($0.id, on: place) } }
                 .disabled(project == nil)
-            Button("Edit Environment…") { project.map { model.presentedSheet = .projectEnvironment($0.id) } }
+            Button("Edit Environment…") { project.map { model.presentedSheet = .projectEnvironment($0.id, on: place) } }
                 .disabled(project == nil)
             Button(project?.isFavorite == true ? "Unfavorite" : "Favorite") {
-                project.map { model.setFavorite($0.id, !$0.isFavorite) }
+                project.map { model.setFavorite($0.id, !$0.isFavorite, on: place) }
             }
             .disabled(project == nil)
             Divider()
             FolderActionCommands(model: model)
             Divider()
-            Button("Remove Project…") { project.map { model.pendingRemoval = .project($0.id) } }
+            Button("Remove Project…") { project.map { model.pendingRemoval = .project($0.id, on: place) } }
                 .disabled(project == nil)
         }
     }

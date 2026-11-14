@@ -1,12 +1,12 @@
 import { type CSSProperties, useState } from "react";
 import {
-  commands,
   type ImportChoice,
   type ImportedService,
   type ImportPreview,
   type Project,
   type ProjectFolder,
 } from "../bindings";
+import { editorCommands, type MachineRef } from "../editing";
 import { directoryLabel } from "../editors";
 import { closeSheet } from "../ui";
 import { Field, FieldHint, FolderField, FormCard, FormSheet, cardRow } from "./Form";
@@ -17,6 +17,8 @@ import styles from "./ImportProjectForm.module.css";
 type Props = {
   file: string;
   preview: ImportPreview;
+  /** The Machine the file is on, and the Project goes to, when it isn't this computer. */
+  machine?: MachineRef;
   onImported: (project: Project) => void;
 };
 
@@ -26,7 +28,8 @@ type Props = {
  * (Services, environment, and the Secrets that still need values). Nothing
  * is saved until Import or Replace.
  */
-export function ImportProjectForm({ file, preview, onImported }: Props) {
+export function ImportProjectForm({ file, preview, machine, onImported }: Props) {
+  const editor = editorCommands(machine ?? null);
   const [folder, setFolder] = useState<ProjectFolder>(preview.folder);
   const [folderExists, setFolderExists] = useState(preview.folderExists);
   const [choice, setChoice] = useState<ImportChoice>("keepBoth");
@@ -36,7 +39,7 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
   const isReplacing = clash !== null && choice === "replace";
 
   const chooseFolder = async () => {
-    const chosen = await commands.chooseFolder(folder.target, folderExists ? folder.path : null);
+    const chosen = await editor.chooseFolder(folder.target, folderExists ? folder.path : null);
     if (chosen === null) return;
     setFolder(chosen);
     setFolderExists(true);
@@ -45,7 +48,7 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
   const save = async () => {
     setIsSaving(true);
     setError(null);
-    const result = await commands.importProject(file, folder, clash ? choice : null);
+    const result = await editor.importProject(file, folder, clash ? choice : null);
     setIsSaving(false);
     if (result.status === "error") return setError(result.error.message);
     closeSheet();
@@ -60,6 +63,7 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
       subtitle={
         <>
           from <span className="mono">{preview.fileName}</span>
+          {machine && ` on ${machine.name}`}
         </>
       }
       hint={!folderExists ? null : isReplacing ? `Replaces “${clash.projectName}”` : "↩ to import"}
@@ -70,8 +74,19 @@ export function ImportProjectForm({ file, preview, onImported }: Props) {
       onCancel={closeSheet}
       onSubmit={() => void save()}
     >
-      <Field title="Folder" hint={folderExists ? null : "This folder isn’t on this computer. Choose where the project is."}>
-        {(id) => <FolderField id={id} path={folder.path} target={folder.target} onChoose={() => void chooseFolder()} />}
+      <Field
+        title="Folder"
+        hint={folderExists ? null : `This folder isn’t on ${machine?.name ?? "this computer"}. Choose where the project is.`}
+      >
+        {(id) => (
+          <FolderField
+            id={id}
+            path={folder.path}
+            target={folder.target}
+            machine={machine?.name}
+            onChoose={() => void chooseFolder()}
+          />
+        )}
       </Field>
       {clash && (
         <Field title="Key" note={`“${preview.key}” is already used by ${clash.projectName}`} hint={replacementHint}>

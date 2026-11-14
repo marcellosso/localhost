@@ -142,6 +142,13 @@ pub fn suggested_project_key(projects: &[Project], name: &str, excluding: Option
     })
 }
 
+/// `key` if no Project among `projects` uses it, else the first free
+/// `key-2`, `key-3`, …: the Key an import kept beside another gets, e.g.
+/// among another Machine's Projects.
+pub fn free_project_key(projects: &[Project], key: &Key) -> Key {
+    crate::library::free_key_among(projects, key)
+}
+
 /// How a Service is named outside its Project, e.g. "My SaaS › API".
 /// `None` if no Project has it.
 pub fn service_label(projects: &[Project], service_id: Id) -> Option<String> {
@@ -229,7 +236,8 @@ impl Service {
 
 /// A Service to add together with others in one save, e.g. a reviewed
 /// Suggestion. It has no variables yet.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct NewService {
     pub name: String,
@@ -244,9 +252,12 @@ pub struct NewService {
     /// The Keys of the Services it starts after: others added in the same
     /// save, or ones the Project already has. Keys, since Services added
     /// together have no ids yet; they are saved as ids like any Dependency.
+    #[serde(default)]
     pub dependency_keys: Vec<Key>,
+    #[serde(default)]
     #[cfg_attr(feature = "ffi", uniffi(default = None))]
     pub python_environment: Option<String>,
+    #[serde(default)]
     #[cfg_attr(feature = "ffi", uniffi(default = None))]
     pub run_before: Option<String>,
 }
@@ -297,15 +308,17 @@ impl Variables {
 }
 
 /// One variable as set from an editor. A Secret's value is written to the
-/// `SecretStore`; it is never kept in the Project Configuration.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// `SecretStore`; it is never kept in the Project Configuration. It crosses
+/// the Machine protocol to the Machine whose Secret it is, and no further.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct VariableInput {
     pub name: String,
     pub value: VariableValue,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum VariableValue {
     Plain(String),

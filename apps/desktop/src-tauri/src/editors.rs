@@ -5,18 +5,17 @@
 //! types (Keys, Ports, variables), so a mistake comes back in the core's
 //! words. Removing stops what is running first.
 
-use std::collections::HashSet;
-
+use localhost_core::editing::{self, clashing, removed_by};
 use localhost_core::{
-    Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileChanges, Project, ProjectChanges, ProjectDocument,
+    Id, Key, KeyClash, LocalhostError, NewService, Origin, ProfileInput, Project, ProjectChanges, ProjectDocument,
     Service, ServiceChanges, ServiceSuggestion, VariableInput, VariableLayer,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::AppState;
 use crate::bridge::{CommandError, CommandResult};
 use crate::dialogs::ProjectFolder;
-use crate::{AppState, Core};
 
 const ORIGIN: Origin = Origin::MainWindow;
 
@@ -57,7 +56,7 @@ impl From<VariableEdit> for VariableInput {
     }
 }
 
-fn inputs(variables: Vec<VariableEdit>) -> Vec<VariableInput> {
+pub(crate) fn inputs(variables: Vec<VariableEdit>) -> Vec<VariableInput> {
     variables.into_iter().map(VariableInput::from).collect()
 }
 
@@ -102,6 +101,44 @@ pub struct ServiceEdit {
     run_before: String,
 }
 
+impl ServiceEdit {
+    /// The Service to add, its variables, and its Dependencies.
+    pub(crate) fn new_service(self) -> Result<(NewService, Vec<VariableInput>, Vec<Id>), CommandError> {
+        let new = NewService {
+            name: self.name,
+            key: parse_key(&self.key)?,
+            working_directory: self.working_directory,
+            command_line: self.command_line,
+            port: parse_port(&self.port, None)?,
+            url: Some(self.url),
+            port_can_change: self.port_can_change,
+            is_excluded_from_start_all: self.is_excluded_from_start_all,
+            dependency_keys: Vec::new(),
+            python_environment: Some(self.python_environment),
+            run_before: Some(self.run_before),
+        };
+        Ok((new, inputs(self.variables), self.dependencies))
+    }
+
+    /// Every field of the editor, as changes to the Service.
+    pub(crate) fn changes(self) -> Result<ServiceChanges, CommandError> {
+        Ok(ServiceChanges {
+            name: Some(self.name),
+            key: Some(parse_key(&self.key)?),
+            working_directory: Some(self.working_directory),
+            command_line: Some(self.command_line),
+            variables: Some(inputs(self.variables)),
+            dependencies: Some(self.dependencies),
+            is_excluded_from_start_all: Some(self.is_excluded_from_start_all),
+            port: Some(parse_port(&self.port, None)?),
+            url: Some(Some(self.url)),
+            port_can_change: Some(self.port_can_change),
+            python_environment: Some(Some(self.python_environment)),
+            run_before: Some(Some(self.run_before)),
+        })
+    }
+}
+
 /// One Environment Profile as edited; `profile_id` is `None` for a new one.
 #[derive(Clone, Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -109,6 +146,13 @@ pub struct ProfileEdit {
     profile_id: Option<Id>,
     name: String,
     variables: Vec<VariableEdit>,
+}
+
+pub(crate) fn profile_inputs(profiles: Vec<ProfileEdit>) -> Vec<ProfileInput> {
+    profiles
+        .into_iter()
+        .map(|edit| ProfileInput { profile_id: edit.profile_id, name: edit.name, variables: inputs(edit.variables) })
+        .collect()
 }
 
 /// What a Service's editor needs to know about the others of its Project.
@@ -186,6 +230,15 @@ pub enum ImportChoice {
     Replace,
 }
 
+impl From<ImportChoice> for KeyClash {
+    fn from(choice: ImportChoice) -> KeyClash {
+        match choice {
+            ImportChoice::KeepBoth => KeyClash::KeepBoth,
+            ImportChoice::Replace => KeyClash::Replace,
+        }
+    }
+}
+
 // MARK: Keys
 
 /// A Key derived from `name` that no other Project uses.
@@ -247,13 +300,6 @@ pub async fn edit_project(
     folder: ProjectFolder,
 ) -> CommandResult {
     let core = state.core()?;
-    let project = core.library.project(project_id)?;
-    let moves = project.execution_target != folder.target;
-    if moves {
-        for service in &project.services {
-            core.targets.stop(service.id, ORIGIN).await?;
-        }
-    }
     let changes = ProjectChanges {
         name: Some(name),
         key: Some(parse_key(&key)?),
@@ -261,12 +307,7 @@ pub async fn edit_project(
         execution_target: Some(folder.target),
         ..Default::default()
     };
-    core.library.edit_project(project_id, changes, ORIGIN)?;
-    if moves {
-        for service in &project.services {
-            core.targets.remove_logs(&project.execution_target, service.id).await?;
-        }
-    }
+    editing::edit_project(&core.library, &core.targets, project_id, changes, ORIGIN).await?;
     Ok(())
 }
 
@@ -284,15 +325,7 @@ pub fn set_favorite(state: tauri::State<'_, AppState>, project_id: Id, is_favori
 #[specta::specta]
 pub async fn remove_project(state: tauri::State<'_, AppState>, project_id: Id) -> CommandResult {
     let core = state.core()?;
-    let project = core.library.project(project_id)?;
-    for service in &project.services {
-        core.targets.stop(service.id, ORIGIN).await?;
-    }
-    core.library.remove_project(project_id, ORIGIN)?;
-    for service in &project.services {
-        core.targets.remove_logs(&project.execution_target, service.id).await?;
-    }
-    Ok(())
+    Ok(editing::remove_project(&core.library, &core.targets, project_id, ORIGIN).await?)
 }
 
 // MARK: Services
@@ -300,41 +333,14 @@ pub async fn remove_project(state: tauri::State<'_, AppState>, project_id: Id) -
 #[tauri::command]
 #[specta::specta]
 pub fn add_service(state: tauri::State<'_, AppState>, project_id: Id, service: ServiceEdit) -> CommandResult<Service> {
-    let new = NewService {
-        name: service.name,
-        key: parse_key(&service.key)?,
-        working_directory: service.working_directory,
-        command_line: service.command_line,
-        port: parse_port(&service.port, None)?,
-        url: Some(service.url),
-        port_can_change: service.port_can_change,
-        is_excluded_from_start_all: service.is_excluded_from_start_all,
-        dependency_keys: Vec::new(),
-        python_environment: Some(service.python_environment),
-        run_before: Some(service.run_before),
-    };
-    let library = &state.core()?.library;
-    Ok(library.add_service(project_id, new, inputs(service.variables), service.dependencies, ORIGIN)?)
+    let (new, variables, dependencies) = service.new_service()?;
+    Ok(state.core()?.library.add_service(project_id, new, variables, dependencies, ORIGIN)?)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn edit_service(state: tauri::State<'_, AppState>, service_id: Id, service: ServiceEdit) -> CommandResult {
-    let changes = ServiceChanges {
-        name: Some(service.name),
-        key: Some(parse_key(&service.key)?),
-        working_directory: Some(service.working_directory),
-        command_line: Some(service.command_line),
-        variables: Some(inputs(service.variables)),
-        dependencies: Some(service.dependencies),
-        is_excluded_from_start_all: Some(service.is_excluded_from_start_all),
-        port: Some(parse_port(&service.port, None)?),
-        url: Some(Some(service.url)),
-        port_can_change: Some(service.port_can_change),
-        python_environment: Some(Some(service.python_environment)),
-        run_before: Some(Some(service.run_before)),
-    };
-    state.core()?.library.edit_service(service_id, changes, ORIGIN)?;
+    state.core()?.library.edit_service(service_id, service.changes()?, ORIGIN)?;
     Ok(())
 }
 
@@ -362,11 +368,7 @@ pub fn add_services(
 #[specta::specta]
 pub async fn remove_service(state: tauri::State<'_, AppState>, service_id: Id) -> CommandResult {
     let core = state.core()?;
-    let (project, _) = core.library.service(service_id)?;
-    core.targets.stop(service_id, ORIGIN).await?;
-    core.library.remove_service(service_id, ORIGIN)?;
-    core.targets.remove_logs(&project.execution_target, service_id).await?;
-    Ok(())
+    Ok(editing::remove_service(&core.library, &core.targets, service_id, ORIGIN).await?)
 }
 
 /// The Dependencies the Service can't have, and who depends on it.
@@ -377,7 +379,7 @@ pub fn service_relations(state: tauri::State<'_, AppState>, service_id: Id) -> C
     Ok(relations(&project, service_id))
 }
 
-fn relations(project: &Project, service_id: Id) -> ServiceRelations {
+pub(crate) fn relations(project: &Project, service_id: Id) -> ServiceRelations {
     let cycles = project
         .services
         .iter()
@@ -462,29 +464,8 @@ pub fn save_environment(
     active: Option<u32>,
 ) -> CommandResult {
     let library = &state.core()?.library;
-    let project = library.project(project_id)?;
-    let changes = ProjectChanges { variables: Some(inputs(variables)), ..Default::default() };
-    library.edit_project(project_id, changes, ORIGIN)?;
-    let kept: HashSet<Id> = profiles.iter().filter_map(|profile| profile.profile_id).collect();
-    for profile in project.profiles.iter().filter(|profile| !kept.contains(&profile.id)) {
-        library.remove_profile(profile.id, ORIGIN)?;
-    }
-    let mut active_id = None;
-    for (index, edit) in profiles.into_iter().enumerate() {
-        let variables = inputs(edit.variables);
-        let id = match edit.profile_id {
-            Some(id) => {
-                let changes = ProfileChanges { name: Some(edit.name), variables: Some(variables) };
-                library.edit_profile(id, changes, ORIGIN)?.id
-            }
-            None => library.add_profile(project_id, &edit.name, variables, ORIGIN)?.id,
-        };
-        if active == Some(index as u32) {
-            active_id = Some(id);
-        }
-    }
-    library.set_active_profile(active_id, project_id, ORIGIN)?;
-    Ok(())
+    let (variables, profiles) = (inputs(variables), profile_inputs(profiles));
+    Ok(editing::save_environment(library, project_id, variables, profiles, active, ORIGIN)?)
 }
 
 #[tauri::command]
@@ -513,7 +494,10 @@ pub fn secret_value(
 pub fn read_project_file(state: tauri::State<'_, AppState>, file: String) -> CommandResult<ImportPreview> {
     let core = state.core()?;
     let document = read_document(&file)?;
-    Ok(preview(core, &document, file_name(&file)))
+    let folder = ProjectFolder { target: document.execution_target().clone(), path: document.path().to_string() };
+    let folder_exists = folder.exists();
+    let is_active = |id: Id| core.targets.status(id).state.is_active();
+    Ok(preview(&core.library.projects(), is_active, &document, file_name(&file), folder, folder_exists))
 }
 
 /// Imports the Project file into `folder`. On Replace, Services the file no
@@ -531,33 +515,8 @@ pub async fn import_project(
     let mut document = read_document(&file)?;
     document.set_path(folder.path);
     document.set_execution_target(folder.target);
-    let on_key_clash = choice.map(|choice| match choice {
-        ImportChoice::KeepBoth => KeyClash::KeepBoth,
-        ImportChoice::Replace => KeyClash::Replace,
-    });
-    let replaced = match on_key_clash {
-        Some(KeyClash::Replace) => clashing(core, &document),
-        _ => None,
-    };
-    let moves = |existing: &Project| existing.execution_target != *document.execution_target();
-    if let Some(existing) = &replaced {
-        let stopped: Vec<&Service> = if moves(existing) {
-            existing.services.iter().collect()
-        } else {
-            removed_by(existing, &document).collect()
-        };
-        for service in stopped {
-            core.targets.stop(service.id, ORIGIN).await?;
-        }
-    }
-    let project = core.library.import_project(&document, on_key_clash, ORIGIN)?;
-    if let Some(existing) = &replaced {
-        let gone = |service: &&Service| moves(existing) || project.service(service.id).is_none();
-        for service in existing.services.iter().filter(gone) {
-            core.targets.remove_logs(&existing.execution_target, service.id).await?;
-        }
-    }
-    Ok(project)
+    let on_key_clash = choice.map(KeyClash::from);
+    Ok(editing::import_project(&core.library, &core.targets, &document, on_key_clash, ORIGIN).await?)
 }
 
 /// Writes the Project's file to `file`.
@@ -576,27 +535,26 @@ fn read_document(file: &str) -> Result<ProjectDocument, LocalhostError> {
     ProjectDocument::from_yaml(&text)
 }
 
-fn file_name(file: &str) -> String {
+pub(crate) fn file_name(file: &str) -> String {
     std::path::Path::new(file).file_name().map_or_else(|| file.to_string(), |name| name.to_string_lossy().into_owned())
 }
 
-fn clashing(core: &Core, document: &ProjectDocument) -> Option<Project> {
-    core.library.projects().into_iter().find(|project| project.key == *document.key())
-}
-
-/// The existing Project's Services that the file doesn't have.
-fn removed_by<'a>(existing: &'a Project, document: &ProjectDocument) -> impl Iterator<Item = &'a Service> {
-    let kept: HashSet<Key> = document.services().iter().map(|service| service.key.clone()).collect();
-    existing.services.iter().filter(move |service| !kept.contains(&service.key))
-}
-
-fn preview(core: &Core, document: &ProjectDocument, file_name: String) -> ImportPreview {
-    let clash = clashing(core, document).map(|existing| ImportClash {
+/// The review of an import among `projects` (this computer's, or a
+/// Machine's), whose active Services `is_active` says.
+pub(crate) fn preview(
+    projects: &[Project],
+    is_active: impl Fn(Id) -> bool,
+    document: &ProjectDocument,
+    file_name: String,
+    folder: ProjectFolder,
+    folder_exists: bool,
+) -> ImportPreview {
+    let clash = clashing(projects, document).map(|existing| ImportClash {
         project_name: existing.name.clone(),
-        free_key: core.library.free_project_key(document.key()),
+        free_key: localhost_core::free_project_key(projects, document.key()),
         removed: removed_by(&existing, document)
             .map(|service| {
-                if core.targets.status(service.id).state.is_active() {
+                if is_active(service.id) {
                     format!("{} (running, stopped first)", service.name)
                 } else {
                     service.name.clone()
@@ -631,12 +589,11 @@ fn preview(core: &Core, document: &ProjectDocument, file_name: String) -> Import
                 profile.variables.secret_names.iter().map(|name| secret(name, format!("profile {}", profile.name)))
             }))
             .collect();
-    let folder = ProjectFolder { target: document.execution_target().clone(), path: document.path().to_string() };
     ImportPreview {
         file_name,
         name: document.name().to_string(),
         key: document.key().clone(),
-        folder_exists: folder.exists(),
+        folder_exists,
         folder,
         services,
         environment: environment_summary(document),
@@ -673,7 +630,7 @@ fn environment_summary(document: &ProjectDocument) -> Option<String> {
 
 // MARK: Parsing
 
-fn parse_key(raw: &str) -> Result<Key, LocalhostError> {
+pub(crate) fn parse_key(raw: &str) -> Result<Key, LocalhostError> {
     Key::new(raw.trim())
 }
 
@@ -693,7 +650,7 @@ fn parse_port(raw: &str, service: Option<&str>) -> Result<Option<i64>, CommandEr
     })
 }
 
-fn new_services(edits: Vec<SuggestionEdit>) -> Result<Vec<NewService>, CommandError> {
+pub(crate) fn new_services(edits: Vec<SuggestionEdit>) -> Result<Vec<NewService>, CommandError> {
     edits
         .into_iter()
         .map(|edit| {
@@ -716,6 +673,7 @@ mod tests {
     use localhost_core::MemorySecretStore;
 
     use super::*;
+    use crate::Core;
 
     fn core() -> (Core, std::path::PathBuf) {
         let root = std::env::temp_dir().join(format!("localhost-editors-{}-{}", std::process::id(), Id::new()));
@@ -806,7 +764,9 @@ mod tests {
             .add_services(new_services(vec![suggestion("Docs", "docs", "")]).unwrap(), project.id, ORIGIN)
             .unwrap();
 
-        let preview = preview(&core, &document, "shop.yaml".into());
+        let folder = ProjectFolder { target: document.execution_target().clone(), path: document.path().to_string() };
+        let is_active = |id| core.targets.status(id).state.is_active();
+        let preview = preview(&core.library.projects(), is_active, &document, "shop.yaml".into(), folder, false);
         assert!(!preview.folder_exists);
         assert_eq!(preview.services.len(), 1);
         assert_eq!(preview.environment.as_deref(), Some("1 project variable · profile Testing"));

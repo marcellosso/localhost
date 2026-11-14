@@ -759,6 +759,205 @@ async machineOpenService(machineId: Id, serviceId: Id) : Promise<Result<null, Co
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * A folder of the Machine, for the folder picker: its folders, and with
+ * `include_files` its files. `None` is the home folder there.
+ */
+async machineListDirectory(machineId: Id, path: string | null, showHidden: boolean, includeFiles: boolean) : Promise<Result<DirectoryListing, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_list_directory", { machineId, path, showHidden, includeFiles }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * `path` relative to the Project's folder `base`, e.g. `web` or
+ * `../shared`, for a working directory picked on a Machine.
+ */
+async relativeFolder(path: string, base: string) : Promise<string | null> {
+    return await TAURI_INVOKE("relative_folder", { path, base });
+},
+async machineSuggestedProjectKey(machineId: Id, name: string, excluding: Id | null) : Promise<Result<Key, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_suggested_project_key", { machineId, name, excluding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineSuggestedServiceKey(machineId: Id, projectId: Id, name: string, excluding: Id | null) : Promise<Result<Key, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_suggested_service_key", { machineId, projectId, name, excluding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Adds a Project in the Machine's folder `path`, with the reviewed
+ * Suggestions as its first Services.
+ */
+async machineAddProject(machineId: Id, name: string, key: string, path: string, services: SuggestionEdit[]) : Promise<Result<Project, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_add_project", { machineId, name, key, path, services }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineEditProject(machineId: Id, projectId: Id, name: string, key: string, path: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_edit_project", { machineId, projectId, name, key, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineSetFavorite(machineId: Id, projectId: Id, isFavorite: boolean) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_set_favorite", { machineId, projectId, isFavorite }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops the Project's Services there, then removes it and their logs. Its
+ * folder is not touched.
+ */
+async machineRemoveProject(machineId: Id, projectId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_remove_project", { machineId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineAddService(machineId: Id, projectId: Id, service: ServiceEdit) : Promise<Result<Service, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_add_service", { machineId, projectId, service }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineEditService(machineId: Id, serviceId: Id, service: ServiceEdit) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_edit_service", { machineId, serviceId, service }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineAddServices(machineId: Id, projectId: Id, services: SuggestionEdit[]) : Promise<Result<Service[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_add_services", { machineId, projectId, services }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops the Service there, then removes it and its logs.
+ */
+async machineRemoveService(machineId: Id, serviceId: Id) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_remove_service", { machineId, serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The Dependencies the Service can't have, and who depends on it.
+ */
+async machineServiceRelations(machineId: Id, serviceId: Id) : Promise<Result<ServiceRelations, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_service_relations", { machineId, serviceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Suggestions for a folder of the Machine, scanned there.
+ */
+async machineScanFolder(machineId: Id, path: string) : Promise<Result<ServiceSuggestion[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_scan_folder", { machineId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineScanProject(machineId: Id, projectId: Id) : Promise<Result<ServiceSuggestion[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_scan_project", { machineId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineDetectPythonEnvironment(machineId: Id, projectId: Id, workingDirectory: string, commandLine: string) : Promise<Result<string | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_detect_python_environment", { machineId, projectId, workingDirectory, commandLine }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineSaveEnvironment(machineId: Id, projectId: Id, variables: VariableEdit[], profiles: ProfileEdit[], active: number | null) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_save_environment", { machineId, projectId, variables, profiles, active }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async machineSetActiveProfile(machineId: Id, projectId: Id, profileId: Id | null) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_set_active_profile", { machineId, projectId, profileId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A Secret's value there, to reveal it in the editor. Not kept here.
+ */
+async machineSecretValue(machineId: Id, name: string, layer: VariableLayer) : Promise<Result<string | null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_secret_value", { machineId, name, layer }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Reads a Project file of the Machine for the import's review, among the
+ * Machine's Projects.
+ */
+async machineReadProjectFile(machineId: Id, file: string) : Promise<Result<ImportPreview, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_read_project_file", { machineId, file }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Imports the Machine's Project file into its folder `path` there, read
+ * again as Import is pressed.
+ */
+async machineImportProject(machineId: Id, file: string, path: string, choice: ImportChoice | null) : Promise<Result<Project, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("machine_import_project", { machineId, file, path, choice }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -922,6 +1121,27 @@ export type CoreEvent = { kind: "library"; event: ProjectLibraryEvent } |
  */
 { kind: "projectState"; event: ProjectState }
 export type Cycle = { serviceId: Id; message: string }
+export type DirectoryEntry = { name: string; isDirectory: boolean }
+/**
+ * A folder as a picker shows it: where it is, its parent, and what it holds.
+ */
+export type DirectoryListing = { 
+/**
+ * Absolute and standardized.
+ */
+path: string; 
+/**
+ * `None` at the root.
+ */
+parent: string | null; 
+/**
+ * The user's home folder, where a picker starts.
+ */
+home: string; 
+/**
+ * Folders first, then files; each sorted by name, ignoring case.
+ */
+entries: DirectoryEntry[] }
 /**
  * A named set of environment variables for a Project (e.g. Development,
  * Testing) applying to all its Services; at most one is active at a time.
@@ -1223,7 +1443,16 @@ export type LocalhostError = { kind: "invalidKey"; detail: string } | { kind: "i
 /**
  * The other end runs an older localhost, which can't do this.
  */
-{ kind: "unsupported" }
+{ kind: "unsupported" } | 
+/**
+ * The Machine (by name) runs a localhost too old to change its
+ * Projects from here; they can still be viewed and run.
+ */
+{ kind: "machineNeedsUpdate"; detail: { machine: string } } | 
+/**
+ * A folder exists but can't be listed: the system's reason.
+ */
+{ kind: "folderUnreadable"; detail: { path: string; reason: string } }
 export type LogBatch = { lines: LogLine[]; 
 /**
  * Lines that arrived but were left out because the batch kept only its
@@ -1341,9 +1570,11 @@ export type MachineProblem =
  */
 export type MachineState = { kind: "notConnected" } | { kind: "connecting" } | 
 /**
- * Connected to the localhost of this version there.
+ * Connected to the localhost of this version there. Without
+ * `manages_projects`, it is too old for its Projects to be changed from
+ * here: they are shown and run only.
  */
-{ kind: "connected"; detail: { version: string } } | 
+{ kind: "connected"; detail: { version: string; managesProjects?: boolean } } | 
 /**
  * Not connected, for this reason. `is_retrying`: another attempt comes
  * on its own.
@@ -1361,7 +1592,12 @@ summary: string; isConnected: boolean;
 /**
  * It waits for the user to connect it again.
  */
-needsUser: boolean; projects: Project[]; statuses: StatusView[]; projectStates: ProjectState[] }
+needsUser: boolean; 
+/**
+ * Why its Projects can't be added, edited or removed now: it isn't
+ * connected, or its localhost is too old. `None` when they can.
+ */
+editProblem: string | null; projects: Project[]; statuses: StatusView[]; projectStates: ProjectState[] }
 /**
  * Where the user is in the first run: whether the welcome was finished
  * or skipped, whether the Get started checklist is over (dismissed,

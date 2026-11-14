@@ -1,7 +1,9 @@
 import { type CSSProperties, useId, useState } from "react";
 import { openFolder, openUrl, restart, start, startAll, stop, stopAll } from "../actions";
 import type { Folder, Id, Project, Service, StatusView } from "../bindings";
+import { machineRef, type MachineRef } from "../editing";
 import { exportProject, requestRemoveService, setActiveProfile, setFavorite } from "../editors";
+import type { ShownMachine } from "../machines";
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
 import { isActive, isManual, isWarning, projectServicesSummary, rowSummary, rowSummaryHelp, serviceRowLabel } from "../status";
@@ -19,11 +21,32 @@ import styles from "./ServicesColumn.module.css";
 
 /**
  * Where a Project is: this computer (`machineId` null), or another Machine,
- * whose Services are controlled while it is connected and edited there.
+ * whose Services are controlled while it is connected, and whose Projects
+ * are edited there unless `editProblem` says why not.
  */
-export type Place = { machineId: Id | null; isReachable: boolean };
+export type Place = {
+  machineId: Id | null;
+  isReachable: boolean;
+  machine?: MachineRef;
+  editProblem?: string | null;
+};
 
 export const thisComputer: Place = { machineId: null, isReachable: true };
+
+/** Where another Machine's Projects are. */
+export function machinePlace(shown: ShownMachine): Place {
+  return {
+    machineId: shown.machine.id,
+    isReachable: shown.isConnected,
+    machine: machineRef(shown),
+    editProblem: shown.editProblem,
+  };
+}
+
+/** Why the Place's Projects can't be changed now; `null` when they can. */
+function editProblem(place: Place): string | null {
+  return place.machineId ? (place.editProblem ?? null) : null;
+}
 
 type Props = {
   project: Project;
@@ -35,31 +58,29 @@ type Props = {
 
 /** The selected Project's Services with their state and actions, the combined stream on top. */
 export function ServicesColumn({ project, view, selection, onSelect, place = thisComputer }: Props) {
-  if (project.services.length === 0 && place.machineId) {
-    return (
-      <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
-        <EmptyState
-          icon={<TerminalIcon size={40} />}
-          title="No Services"
-          description="Add services to this project on its machine."
-        />
-      </section>
-    );
-  }
+  const machine = place.machine;
+  const problem = editProblem(place);
   if (project.services.length === 0) {
     return (
       <section className={styles.column} aria-label={`${project.name} services`} data-column="list">
         <EmptyState
           icon={<TerminalIcon size={40} />}
           title="No Services"
-          description={SERVICE_CONCEPT}
+          description={problem ?? (machine ? `${SERVICE_CONCEPT} They run on ${machine.name}.` : SERVICE_CONCEPT)}
         >
-          <button className="button accent" onClick={() => showSheet({ kind: "detectServices", projectId: project.id })}>
-            Detect Services…
-          </button>
-          <button className="button" onClick={() => showSheet({ kind: "addService", projectId: project.id })}>
-            Add Service…
-          </button>
+          {!problem && (
+            <>
+              <button
+                className="button accent"
+                onClick={() => showSheet({ kind: "detectServices", projectId: project.id, machine })}
+              >
+                Detect Services…
+              </button>
+              <button className="button" onClick={() => showSheet({ kind: "addService", projectId: project.id, machine })}>
+                Add Service…
+              </button>
+            </>
+          )}
         </EmptyState>
       </section>
     );
@@ -117,10 +138,12 @@ export function ServicesColumn({ project, view, selection, onSelect, place = thi
           />
         ))}
       </ul>
-      {!place.machineId && (
+      {problem ? (
+        <p className={`${styles.addService} ${styles.editProblem} secondary`}>{problem}</p>
+      ) : (
         <button
           className={`${styles.addService} secondary`}
-          onClick={() => showSheet({ kind: "addService", projectId: project.id })}
+          onClick={() => showSheet({ kind: "addService", projectId: project.id, machine })}
         >
           <PlusIcon size={11} />
           <span className={styles.addServiceTitle}>Add Service</span>
@@ -133,15 +156,16 @@ export function ServicesColumn({ project, view, selection, onSelect, place = thi
 
 /**
  * The selected Project's toolbar actions: its Environment Profile once it
- * has one, Start All, Stop All, and the rest in `⋯`. Another Machine's
- * Projects have only Start All and Stop All: the rest is changed there.
+ * has one, Start All, Stop All, and the rest in `⋯`. Another Machine's are
+ * the same, changed there, without Stats and the folder's actions, which
+ * are this computer's.
  */
 export function ProjectActions({ project, view, place = thisComputer }: { project: Project; view: CoreView; place?: Place }) {
   const anyActive = project.services.some((service) => isActive(serviceStatus(view, service.id).state));
   const [showsStats, setShowsStats] = useState(false);
   return (
     <>
-      {(project.profiles ?? []).length > 0 && !place.machineId && <ProfileMenu project={project} />}
+      {(project.profiles ?? []).length > 0 && <ProfileMenu project={project} place={place} />}
       <button
         className="button accent"
         disabled={project.services.length === 0 || !place.isReachable}
@@ -160,22 +184,26 @@ export function ProjectActions({ project, view, place = thisComputer }: { projec
         <StopIcon size={11} />
         Stop All
       </button>
-      {!place.machineId && (
-      <span className={styles.statsAnchor}>
-        <Menu
-          label={`More actions for ${project.name}`}
-          items={[{ label: "Stats…", onSelect: () => setShowsStats(true) }, "separator", ...projectMenuItems(project, true)]}
-        />
-        {showsStats && <ProjectStats project={project} view={view} onClose={() => setShowsStats(false)} />}
-      </span>
+      {place.machineId ? (
+        <Menu label={`More actions for ${project.name}`} items={projectMenuItems(project, true, place)} />
+      ) : (
+        <span className={styles.statsAnchor}>
+          <Menu
+            label={`More actions for ${project.name}`}
+            items={[{ label: "Stats…", onSelect: () => setShowsStats(true) }, "separator", ...projectMenuItems(project, true)]}
+          />
+          {showsStats && <ProjectStats project={project} view={view} onClose={() => setShowsStats(false)} />}
+        </span>
       )}
     </>
   );
 }
 
 /** Switches the active Environment Profile; opens the Environment editor. */
-function ProfileMenu({ project }: { project: Project }) {
+function ProfileMenu({ project, place }: { project: Project; place: Place }) {
   const profiles = project.profiles ?? [];
+  const { machineId, machine } = place;
+  const disabledReason = editProblem(place);
   const active = profiles.find((profile) => profile.id === project.activeProfileID);
   return (
     <Menu
@@ -190,22 +218,59 @@ function ProfileMenu({ project }: { project: Project }) {
         ),
       }}
       items={[
-        { label: "No Profile", isChecked: !active, onSelect: () => void setActiveProfile(project.id, null) },
+        {
+          label: "No Profile",
+          isChecked: !active,
+          disabledReason,
+          onSelect: () => void setActiveProfile(project.id, null, machineId),
+        },
         ...profiles.map((profile) => ({
           label: profile.name,
           isChecked: profile.id === active?.id,
-          onSelect: () => void setActiveProfile(project.id, profile.id),
+          disabledReason,
+          onSelect: () => void setActiveProfile(project.id, profile.id, machineId),
         })),
         "separator",
-        { label: "Edit Environment…", onSelect: () => showSheet({ kind: "environment", projectId: project.id }) },
+        {
+          label: "Edit Environment…",
+          disabledReason,
+          onSelect: () => showSheet({ kind: "environment", projectId: project.id, machine }),
+        },
       ]}
     />
   );
 }
 
-/** A Project's actions, in the toolbar's `⋯` (with Detect Services…) and the sidebar's context menu. */
-export function projectMenuItems(project: Project, withDetect = false): MenuItem[] {
+/**
+ * A Project's actions, in the toolbar's `⋯` (with Detect Services…) and the
+ * sidebar's context menu. Another Machine's are made there, and say why not
+ * while they can't be; its folder isn't one here to open or export to.
+ */
+export function projectMenuItems(project: Project, withDetect = false, place: Place = thisComputer): MenuItem[] {
   const projectId = project.id;
+  if (place.machineId) {
+    const { machineId, machine } = place;
+    const disabledReason = editProblem(place);
+    return [
+      { label: "Edit Project…", disabledReason, onSelect: () => showSheet({ kind: "editProject", projectId, machine }) },
+      { label: "Edit Environment…", disabledReason, onSelect: () => showSheet({ kind: "environment", projectId, machine }) },
+      ...(withDetect
+        ? [{ label: "Detect Services…", disabledReason, onSelect: () => showSheet({ kind: "detectServices", projectId, machine }) }]
+        : []),
+      {
+        label: project.isFavorite ? "Unfavorite" : "Favorite",
+        disabledReason,
+        onSelect: () => void setFavorite(project, !project.isFavorite, machineId),
+      },
+      "separator",
+      {
+        label: "Remove Project…",
+        isDestructive: true,
+        disabledReason,
+        onSelect: () => showAlert({ kind: "removeProject", projectId, machine }),
+      },
+    ];
+  }
   return [
     { label: "Edit Project…", onSelect: () => showSheet({ kind: "editProject", projectId }) },
     { label: "Edit Environment…", onSelect: () => showSheet({ kind: "environment", projectId }) },
@@ -240,12 +305,24 @@ function ServiceRow({ project, service, status, index, id, isSelected, onSelect,
   const port = isActive(state) ? (status.run?.port ?? service.port) : service.port;
   const summary = rowSummary(project, service, status);
   const summaryClass = state === "failed" ? styles.failed : isWarning(status) ? styles.warning : "secondary";
+  const problem = editProblem(place);
   const edit = () => {
-    if (!place.machineId) showSheet({ kind: "editService", serviceId: service.id });
+    if (!problem) showSheet({ kind: "editService", serviceId: service.id, machine: place.machine });
   };
   const context = useContextMenu(`${service.name} actions`, () =>
     place.machineId
-      ? stateMenuItems(service, status, place)
+      ? [
+          ...stateMenuItems(service, status, place),
+          "separator",
+          { label: "Edit Service…", disabledReason: problem, onSelect: edit },
+          "separator",
+          {
+            label: "Remove Service…",
+            isDestructive: true,
+            disabledReason: problem,
+            onSelect: () => void requestRemoveService(service.id, place.machine ?? null),
+          },
+        ]
       : [
           ...stateMenuItems(service, status, place),
           "separator",
@@ -346,16 +423,15 @@ function ServiceActions({ service, status, place }: { service: Service; status: 
       >
         Start
       </button>
-      {!machineId && (
-        <button
-          className="button compact"
-          title="Edit Service"
-          aria-label={`Edit ${service.name}…`}
-          onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id }))}
-        >
-          Edit…
-        </button>
-      )}
+      <button
+        className="button compact"
+        title={editProblem(place) ?? "Edit Service"}
+        aria-label={`Edit ${service.name}…`}
+        disabled={editProblem(place) !== null}
+        onClick={act(async () => showSheet({ kind: "editService", serviceId: service.id, machine: place.machine }))}
+      >
+        Edit…
+      </button>
     </div>
   );
 }

@@ -105,6 +105,223 @@ extension Machines {
         MachineLogs(machines: self, machineID: machineID)
     }
 
+    // MARK: Its Project Configuration
+
+    // Changed there, as `Origin.machine`; the Projects come back through
+    // `subscribe()`. An older localhost there throws `.MachineNeedsUpdate`.
+
+    /// A folder there, for a folder picker; `nil` is the home folder there.
+    /// Folders only, unless `includeFiles`.
+    public func listDirectory(
+        _ path: String?,
+        on machineID: UUID,
+        showHidden: Bool = false,
+        includeFiles: Bool = false
+    ) async throws(LocalhostError) -> DirectoryListing {
+        try await core {
+            try await ffiListDirectory(machineId: machineID, path: path, showHidden: showHidden, includeFiles: includeFiles)
+        }
+    }
+
+    /// Suggestions for a folder there being added as a Project, scanned there.
+    public func scan(projectAt path: String, on machineID: UUID) async throws(LocalhostError) -> [ServiceSuggestion] {
+        try await core { try await ffiScanFolder(machineId: machineID, path: path) }
+    }
+
+    /// Suggestions for an existing Project there, without what its Services cover.
+    public func scan(project projectID: UUID, on machineID: UUID) async throws(LocalhostError) -> [ServiceSuggestion] {
+        try await core { try await ffiScanProject(machineId: machineID, projectId: projectID) }
+    }
+
+    /// The virtual environment a new Service of the Project would run in
+    /// there, when its command starts a Python program; `nil` otherwise.
+    public func pythonEnvironment(
+        inProject projectID: UUID,
+        workingDirectory: String,
+        commandLine: String,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> String? {
+        try await core {
+            try await ffiDetectPythonEnvironment(
+                machineId: machineID, projectId: projectID, workingDirectory: workingDirectory, commandLine: commandLine
+            )
+        }
+    }
+
+    @discardableResult
+    public func addProject(
+        name: String,
+        key: Key,
+        path: String,
+        services: [NewService] = [],
+        on machineID: UUID
+    ) async throws(LocalhostError) -> Project {
+        try await core { try await ffiAddProject(machineId: machineID, name: name, key: key, path: path, services: services) }
+    }
+
+    @discardableResult
+    public func editProject(
+        id: UUID,
+        name: String? = nil,
+        key: Key? = nil,
+        path: String? = nil,
+        isFavorite: Bool? = nil,
+        variables: [VariableInput]? = nil,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> Project {
+        let changes = ProjectChanges(name: name, key: key, path: path, isFavorite: isFavorite, variables: variables)
+        return try await core { try await ffiEditProject(machineId: machineID, projectId: id, changes: changes) }
+    }
+
+    /// Stops its Services there first, then removes it and their logs.
+    public func removeProject(id: UUID, on machineID: UUID) async throws(LocalhostError) {
+        try await core { try await ffiRemoveProject(machineId: machineID, projectId: id) }
+    }
+
+    @discardableResult
+    public func addService(
+        toProject projectID: UUID,
+        name: String,
+        key: Key,
+        workingDirectory: String = ".",
+        commandLine: String,
+        variables: [VariableInput] = [],
+        dependencies: [UUID] = [],
+        isExcludedFromStartAll: Bool = false,
+        port: Int? = nil,
+        url: String? = nil,
+        portCanChange: Bool = true,
+        pythonEnvironment: String? = nil,
+        runBefore: String? = nil,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> Service {
+        let service = NewService(
+            name: name,
+            key: key,
+            workingDirectory: workingDirectory,
+            commandLine: commandLine,
+            port: port,
+            url: url,
+            portCanChange: portCanChange,
+            isExcludedFromStartAll: isExcludedFromStartAll,
+            pythonEnvironment: pythonEnvironment,
+            runBefore: runBefore
+        )
+        return try await core {
+            try await ffiAddService(
+                machineId: machineID,
+                projectId: projectID,
+                service: service,
+                variables: variables,
+                dependencies: dependencies
+            )
+        }
+    }
+
+    @discardableResult
+    public func addServices(
+        _ services: [NewService],
+        toProject projectID: UUID,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> [Service] {
+        try await core { try await ffiAddServices(machineId: machineID, projectId: projectID, services: services) }
+    }
+
+    /// Changes what is given; `port: .some(nil)` clears the port, and the
+    /// same for `url`, `pythonEnvironment` and `runBefore`.
+    @discardableResult
+    public func editService(
+        id: UUID,
+        name: String? = nil,
+        key: Key? = nil,
+        workingDirectory: String? = nil,
+        commandLine: String? = nil,
+        variables: [VariableInput]? = nil,
+        dependencies: [UUID]? = nil,
+        isExcludedFromStartAll: Bool? = nil,
+        port: Int?? = nil,
+        url: String?? = nil,
+        portCanChange: Bool? = nil,
+        pythonEnvironment: String?? = nil,
+        runBefore: String?? = nil,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> Service {
+        let changes = ServiceChanges(
+            name: name,
+            key: key,
+            workingDirectory: workingDirectory,
+            commandLine: commandLine,
+            variables: variables,
+            dependencies: dependencies,
+            isExcludedFromStartAll: isExcludedFromStartAll,
+            port: port.map { $0.map(Int64.init) },
+            url: url,
+            portCanChange: portCanChange,
+            pythonEnvironment: pythonEnvironment,
+            runBefore: runBefore
+        )
+        return try await core { try await ffiEditService(machineId: machineID, serviceId: id, changes: changes) }
+    }
+
+    /// Stops the Service there first, then removes it and its logs.
+    public func removeService(id: UUID, on machineID: UUID) async throws(LocalhostError) {
+        try await core { try await ffiRemoveService(machineId: machineID, serviceId: id) }
+    }
+
+    /// Saves the Environment editor at once: the Project's variables, its
+    /// Profiles (those without an id are added, those missing removed), and
+    /// which one is active, an index into `profiles`.
+    public func saveEnvironment(
+        ofProject projectID: UUID,
+        variables: [VariableInput],
+        profiles: [ProfileInput],
+        activeProfile: Int?,
+        on machineID: UUID
+    ) async throws(LocalhostError) {
+        let active = activeProfile.map { UInt32($0) }
+        try await core {
+            try await ffiSaveEnvironment(
+                machineId: machineID, projectId: projectID, variables: variables, profiles: profiles, active: active
+            )
+        }
+    }
+
+    /// Makes `profileID` the Project's active profile; `nil` for none.
+    public func setActiveProfile(
+        _ profileID: UUID?,
+        inProject projectID: UUID,
+        on machineID: UUID
+    ) async throws(LocalhostError) {
+        try await core { try await ffiSetActiveProfile(machineId: machineID, projectId: projectID, profileId: profileID) }
+    }
+
+    /// A Secret's value there, to reveal it. Never stored here.
+    public func secretValue(
+        named name: String,
+        in layer: VariableLayer,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> String? {
+        try await core { try await ffiSecretValue(machineId: machineID, name: name, layer: layer) }
+    }
+
+    /// A Project file there, and whether the folder it names is there.
+    public func readProjectFile(at path: String, on machineID: UUID) async throws(LocalhostError) -> ProjectFileText {
+        try await core { try await ffiReadProjectFile(machineId: machineID, path: path) }
+    }
+
+    /// Adds the Project a Project file's `text` describes, in the folder
+    /// `path` there. If another Project there has its Key, nothing changes
+    /// unless `onKeyClash` says what to do.
+    @discardableResult
+    public func importProject(
+        text: String,
+        path: String,
+        onKeyClash: ProjectLibrary.KeyClash? = nil,
+        on machineID: UUID
+    ) async throws(LocalhostError) -> Project {
+        try await core { try await ffiImportProject(machineId: machineID, text: text, path: path, onKeyClash: onKeyClash) }
+    }
+
     /// The hosts named in `~/.ssh/config` (following `Include`, without
     /// patterns), to suggest as a destination. Only read.
     public static func sshConfigHosts() async -> [String] {
@@ -193,6 +410,12 @@ public final class MachinesStore {
 
         public var isConnected: Bool {
             if case .connected = state { true } else { false }
+        }
+
+        /// Whether its Projects can be changed from here now: connected, to a
+        /// localhost new enough to take the changes.
+        public var managesProjects: Bool {
+            if case .connected(_, let managesProjects) = state { managesProjects } else { false }
         }
 
         public func status(of serviceID: UUID) -> ServiceStatus {

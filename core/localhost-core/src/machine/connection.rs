@@ -11,8 +11,12 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 use tokio::sync::{mpsc, oneshot, watch};
 
 use super::MachineProblem;
-use super::protocol::{MachineCall, MachineHello, MachineMessage, MachineRequest};
-use crate::{Id, LocalhostError, OutputLine, Project, ServiceEvent, ServiceOutputLine, ServiceStatus};
+use super::protocol::{MANAGES_PROJECTS, MachineCall, MachineHello, MachineMessage, MachineRequest, ProjectFileText};
+use crate::{
+    DirectoryListing, Id, Key, KeyClash, LocalhostError, NewService, OutputLine, ProfileInput, Project, ProjectChanges,
+    Service, ServiceChanges, ServiceEvent, ServiceOutputLine, ServiceStatus, ServiceSuggestion, VariableInput,
+    VariableLayer,
+};
 
 /// How often the app tells the other end it is still there, well within
 /// `relay::SILENCE_TIMEOUT`, and how long an answer may take before the
@@ -218,7 +222,132 @@ impl MachineConnection {
         Ok((lines, receiver))
     }
 
+    // MARK: Its Project Configuration
+
+    /// Whether the other end changes its Projects for this app: an older
+    /// localhost only shows and runs them.
+    pub fn manages_projects(&self) -> bool {
+        self.inner.hello.machine_protocol >= MANAGES_PROJECTS
+    }
+
+    /// A folder there, for a folder picker; `None` is the home folder there.
+    pub async fn list_directory(
+        &self,
+        path: Option<String>,
+        show_hidden: bool,
+        include_files: bool,
+    ) -> Result<DirectoryListing, LocalhostError> {
+        self.manage(MachineRequest::ListDirectory { path, show_hidden, include_files }).await
+    }
+
+    pub async fn scan_folder(&self, path: String) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        self.manage(MachineRequest::ScanFolder { path }).await
+    }
+
+    pub async fn scan_project(&self, project_id: Id) -> Result<Vec<ServiceSuggestion>, LocalhostError> {
+        self.manage(MachineRequest::ScanProject { project_id }).await
+    }
+
+    pub async fn detect_python_environment(
+        &self,
+        project_id: Id,
+        working_directory: String,
+        command_line: String,
+    ) -> Result<Option<String>, LocalhostError> {
+        self.manage(MachineRequest::DetectPythonEnvironment { project_id, working_directory, command_line }).await
+    }
+
+    pub async fn add_project(
+        &self,
+        name: String,
+        key: Key,
+        path: String,
+        services: Vec<NewService>,
+    ) -> Result<Project, LocalhostError> {
+        self.manage(MachineRequest::AddProject { name, key, path, services }).await
+    }
+
+    pub async fn edit_project(&self, project_id: Id, changes: ProjectChanges) -> Result<Project, LocalhostError> {
+        self.manage(MachineRequest::EditProject { project_id, changes }).await
+    }
+
+    pub async fn remove_project(&self, project_id: Id) -> Result<(), LocalhostError> {
+        self.manage(MachineRequest::RemoveProject { project_id }).await
+    }
+
+    pub async fn add_service(
+        &self,
+        project_id: Id,
+        service: NewService,
+        variables: Vec<VariableInput>,
+        dependencies: Vec<Id>,
+    ) -> Result<Service, LocalhostError> {
+        self.manage(MachineRequest::AddService { project_id, service, variables, dependencies }).await
+    }
+
+    pub async fn add_services(
+        &self,
+        project_id: Id,
+        services: Vec<NewService>,
+    ) -> Result<Vec<Service>, LocalhostError> {
+        self.manage(MachineRequest::AddServices { project_id, services }).await
+    }
+
+    pub async fn edit_service(&self, service_id: Id, changes: ServiceChanges) -> Result<Service, LocalhostError> {
+        self.manage(MachineRequest::EditService { service_id, changes }).await
+    }
+
+    pub async fn remove_service(&self, service_id: Id) -> Result<(), LocalhostError> {
+        self.manage(MachineRequest::RemoveService { service_id }).await
+    }
+
+    pub async fn save_environment(
+        &self,
+        project_id: Id,
+        variables: Vec<VariableInput>,
+        profiles: Vec<ProfileInput>,
+        active: Option<u32>,
+    ) -> Result<(), LocalhostError> {
+        self.manage(MachineRequest::SaveEnvironment { project_id, variables, profiles, active }).await
+    }
+
+    pub async fn set_active_profile(&self, project_id: Id, profile_id: Option<Id>) -> Result<(), LocalhostError> {
+        self.manage(MachineRequest::SetActiveProfile { project_id, profile_id }).await
+    }
+
+    /// A Secret's value there, to reveal it. It is only shown, never kept.
+    pub async fn secret_value(&self, name: String, layer: VariableLayer) -> Result<Option<String>, LocalhostError> {
+        self.manage(MachineRequest::SecretValue { name, layer }).await
+    }
+
+    pub async fn read_project_file(&self, path: String) -> Result<ProjectFileText, LocalhostError> {
+        self.manage(MachineRequest::ReadProjectFile { path }).await
+    }
+
+    /// Imports the Project file's `text` into the folder `path` there.
+    pub async fn import_project(
+        &self,
+        text: String,
+        path: String,
+        on_key_clash: Option<KeyClash>,
+    ) -> Result<Project, LocalhostError> {
+        self.manage(MachineRequest::ImportProject { text, path, on_key_clash }).await
+    }
+
     // MARK: Plumbing
+
+    /// A request an older localhost can't answer: refused here when its
+    /// hello says so, and its `Unsupported` worded the same way.
+    async fn manage<T: DeserializeOwned>(&self, request: MachineRequest) -> Result<T, LocalhostError> {
+        let needs_update = || LocalhostError::MachineNeedsUpdate { machine: self.inner.machine.clone() };
+        if !self.manages_projects() {
+            return Err(needs_update());
+        }
+        self.call(request).await.map_err(|error| match error {
+            LocalhostError::Unsupported => needs_update(),
+            error => error,
+        })
+    }
 
     fn state(&self) -> MutexGuard<'_, State> {
         self.inner.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())

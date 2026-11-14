@@ -3,6 +3,7 @@ import { report, startAll, stopAll } from "../actions";
 import { commands, type Project } from "../bindings";
 import { type CoreView, serviceState } from "../core";
 import type { SidebarSelection } from "../selection";
+import { machineRef } from "../editing";
 import { importProject } from "../editors";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import type { ShownMachine } from "../machines";
@@ -13,7 +14,7 @@ import { useUpdate } from "../updates";
 import { GetStarted } from "./GetStarted";
 import { ClearIcon, GearIcon, GlobeIcon, HelpIcon, PlusIcon, SearchIcon } from "./Icons";
 import { Menu, type MenuItem, useContextMenu } from "./Menu";
-import { projectMenuItems } from "./ServicesColumn";
+import { machinePlace, projectMenuItems } from "./ServicesColumn";
 import { ShortcutBadge } from "./ShortcutBadge";
 import { StateGlyph } from "./StateGlyph";
 import { TelemetryNotice } from "./TelemetryNotice";
@@ -132,8 +133,13 @@ export function Sidebar({ view, machines = [], selection, onSelect }: Props) {
         {machines.map((shown) => {
           const machineId = shown.machine.id;
           return [
-            <li key={`${machineId}:heading`} className={styles.heading} role="presentation">
-              {shown.machine.name}
+            <li key={`${machineId}:heading`} className={`${styles.heading} ${styles.machineHeading}`} role="presentation">
+              <span className={styles.machineName}>{shown.machine.name}</span>
+              <Menu
+                label={`Add Project on ${shown.machine.name}`}
+                button={{ className: `iconButton ${styles.machineAdd}`, content: <PlusIcon size={12} /> }}
+                items={machineAddItems(shown)}
+              />
             </li>,
             <MachineNote key={`${machineId}:note`} shown={shown} />,
             ...matching(shown.view.projects).map((project) => (
@@ -245,9 +251,8 @@ function ProjectRow({ project, view, index, id, isSelected, onSelect, isDimmed =
 function MachineNote({ shown }: { shown: ShownMachine }) {
   const isReconnecting = shown.state.kind === "connecting" && shown.view.projects.length > 0;
   const text = shown.isConnected
-    ? shown.view.projects.length === 0
-      ? `No projects on ${shown.machine.name}.`
-      : null
+    ? // Connected to an older localhost: its Projects are shown and run only.
+      (shown.editProblem ?? (shown.view.projects.length === 0 ? `No projects on ${shown.machine.name}.` : null))
     : isReconnecting
       ? null
       : shown.summary;
@@ -272,7 +277,17 @@ async function reconnect(machineId: string) {
   report(await commands.reconnectMachine(machineId));
 }
 
-/** Another Machine's Project: Start All and Stop All; it is edited there. */
+/** New Project… and Import Project… on another Machine, with why not while they can't be. */
+export function machineAddItems(shown: ShownMachine): MenuItem[] {
+  const machine = machineRef(shown);
+  const disabledReason = shown.editProblem;
+  return [
+    { label: `New Project on ${machine.name}…`, disabledReason, onSelect: () => showSheet({ kind: "addProject", machine }) },
+    { label: `Import Project on ${machine.name}…`, disabledReason, onSelect: () => void importProject(machine) },
+  ];
+}
+
+/** Another Machine's Project: Start All and Stop All, then its edits, made there. */
 function machineProjectMenuItems(shown: ShownMachine, project: Project): MenuItem[] {
   const machineId = shown.machine.id;
   const anyActive = project.services.some((service) => isActive(serviceState(shown.view, service.id)));
@@ -282,5 +297,7 @@ function machineProjectMenuItems(shown: ShownMachine, project: Project): MenuIte
       : []),
     ...(shown.isConnected && anyActive ? [{ label: "Stop All", onSelect: () => void stopAll(project.id, machineId) }] : []),
     { label: "Reconnect", onSelect: () => void reconnect(machineId) },
+    "separator",
+    ...projectMenuItems(project, true, machinePlace(shown)),
   ];
 }

@@ -172,7 +172,7 @@ A dev box or home server you reach with `ssh` can be a **Machine**: its Projects
 
 1. Check that `ssh devbox localhost --version` works from a terminal without asking anything (a key, in the SSH agent if it has a passphrase, and a host key you already trusted). It runs without your interactive profile: with zsh, put `localhost` on the `PATH` in `~/.zshenv`, not `~/.zshrc`.
 2. Open **Settings → Machines → Add Machine…**. In **SSH host**, type a `Host` from `~/.ssh/config` (the field lists them), or `user@host:port`. localhost connects first, and says why and what to do if it can't.
-3. The Machine's Projects show in the sidebar under its name, below this computer's: Start, Stop, Restart, logs. They are edited on the Machine.
+3. The Machine's Projects show in the sidebar under its name, below this computer's: Start, Stop, Restart, logs, and add, import, edit or remove them there, with its folders picked and scanned on the Machine.
 4. **Open in Browser** forwards the Service's Port to the same port here, through the SSH connection and on loopback only, then opens it.
 
 Any network `ssh` uses works: a LAN, a VPN, `ProxyJump`, Tailscale. Nothing new listens on either computer. A lost connection is made again on its own; Services you started from here stop on the Machine when the connection ends, unless localhost is open there. More in the [Machines docs](https://www.getlocalhost.app/docs/machines).

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::model::VariableValue;
@@ -35,7 +35,8 @@ pub enum ProjectLibraryEvent {
 }
 
 /// What to do when an imported Project's Key is already used.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum KeyClash {
     /// Swap the imported Configuration into the Project with that Key,
@@ -46,7 +47,8 @@ pub enum KeyClash {
 }
 
 /// The fields of a Project to change; `None` leaves a field as it is.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ProjectChanges {
     pub name: Option<String>,
@@ -62,7 +64,8 @@ pub struct ProjectChanges {
 /// The fields of a Service to change; `None` leaves a field as it is. For
 /// `port`, `url`, `python_environment` and `run_before`, `Some(None)`
 /// removes the value.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ServiceChanges {
     pub name: Option<String>,
@@ -72,17 +75,41 @@ pub struct ServiceChanges {
     pub variables: Option<Vec<VariableInput>>,
     pub dependencies: Option<Vec<Id>>,
     pub is_excluded_from_start_all: Option<bool>,
+    #[serde(with = "double_option", skip_serializing_if = "Option::is_none")]
     pub port: Option<Option<i64>>,
+    #[serde(with = "double_option", skip_serializing_if = "Option::is_none")]
     pub url: Option<Option<String>>,
     pub port_can_change: Option<bool>,
+    #[serde(with = "double_option", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ffi", uniffi(default = None))]
     pub python_environment: Option<Option<String>>,
+    #[serde(with = "double_option", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ffi", uniffi(default = None))]
     pub run_before: Option<Option<String>>,
 }
 
+/// `Option<Option<T>>` as a field that is absent (`None`), `null`
+/// (`Some(None)`), or a value, so "leave it" and "remove it" stay apart.
+mod double_option {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<T: Serialize, S: Serializer>(value: &Option<Option<T>>, serializer: S) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(inner) => inner.serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Option<T>>, D::Error> {
+        Option::<T>::deserialize(deserializer).map(Some)
+    }
+}
+
 /// The fields of an Environment Profile to change; `None` leaves a field as it is.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 pub struct ProfileChanges {
     pub name: Option<String>,
@@ -745,7 +772,12 @@ fn broadcast(state: &mut State, event: ProjectLibraryEvent) {
 }
 
 fn free_project_key(state: &State, key: &Key) -> Key {
-    let taken: HashSet<&str> = state.projects.values().map(|project| project.key.as_str()).collect();
+    free_key_among(state.projects.values(), key)
+}
+
+/// `key` if none of `projects` uses it, else the first free `key-2`, `key-3`, ….
+pub(crate) fn free_key_among<'a>(projects: impl IntoIterator<Item = &'a Project>, key: &Key) -> Key {
+    let taken: HashSet<&str> = projects.into_iter().map(|project| project.key.as_str()).collect();
     let base: String = key.as_str().chars().take(Key::MAX_LENGTH - 4).collect();
     let mut candidate = key.as_str().to_string();
     let mut suffix = 2;

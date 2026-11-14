@@ -1,8 +1,9 @@
 //! Machines: other computers whose localhost this app shows, reached over
 //! SSH as the user already reaches them (`~/.ssh/config`, keys, the agent,
 //! Tailscale or any other network). Each Machine keeps its own Project
-//! Configuration, Secrets, shared core and Runs; this app only views and
-//! controls them.
+//! Configuration, Secrets, shared core and Runs; this app views, controls
+//! and edits them there. A Secret typed here is sent to the Machine that
+//! keeps it, and never stored here.
 //!
 //! The app runs `ssh <destination> localhost remote --stdio` (`ssh`), which
 //! serves the other Machine's Projects, statuses and logs over the Machine
@@ -23,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 pub use connection::MachineConnection;
 pub use machines::{MachineSnapshot, MachineState, Machines, MachinesEvent};
-pub use protocol::{MACHINE_PROTOCOL_VERSION, MachineHello};
+pub use protocol::{MACHINE_PROTOCOL_VERSION, MANAGES_PROJECTS, MachineHello, ProjectFileText};
 pub use ssh::{Forward, SshLink};
 pub use ssh_config::ssh_config_hosts;
 

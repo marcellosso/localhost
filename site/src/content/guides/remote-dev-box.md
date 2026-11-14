@@ -45,7 +45,7 @@ If the key has a passphrase, `ssh-add` keeps it in the SSH agent. The first `ssh
 
 [localhost](/) is a free, open-source desktop app that remembers how each Project runs. A dev box you reach with `ssh` can be one of its [Machines](/docs/machines): its Projects show in the window on your laptop, below the laptop's own, and you start and stop them there.
 
-1. [Install localhost](/docs/install) on both computers, and add your Projects on the dev box, in its app as on any computer ([Quick start](/docs/quick-start)), or through a coding agent there with [`localhost mcp`](/docs/mcp). Projects on the dev box are edited on the dev box; the app there doesn't have to stay open.
+1. [Install localhost](/docs/install) on both computers, and add your Projects on the dev box: from the laptop once it is connected (the `+` next to its name in the sidebar picks a folder on the dev box and scans it there), in its own app ([Quick start](/docs/quick-start)), or through a coding agent there with [`localhost mcp`](/docs/mcp). However they are added, they are saved on the dev box; the app there doesn't have to stay open.
 2. Check that the laptop's `ssh` finds it. A command run over SSH doesn't read your interactive profile, so with zsh, set `PATH` in `~/.zshenv`, not `~/.zshrc`:
 
    ```sh
@@ -56,6 +56,6 @@ If the key has a passphrase, `ssh-add` keeps it in the SSH agent. The first `ssh
 4. The dev box's Projects show in the sidebar under its name. **Start All**, Stop, Restart and logs work as for a Project on the laptop, and the state of each Service is there at a glance.
 5. **Open in Browser** forwards the Service's Port to the same port on your laptop, through the same SSH connection, then opens it: `http://localhost:5173` there is `http://localhost:5173` here, so OAuth callbacks and cookies keep working.
 
-The Services run on the dev box, with its shell, its files and its Secrets; no Secret value reaches the laptop. Nothing new listens on either computer's network: Forwards are bound to the laptop's loopback only. If the connection drops, localhost makes it again on its own, without starting or stopping anything. Services you started from the laptop stop when the connection ends, unless localhost is open on the dev box.
+The Services run on the dev box, with its shell, its files and its Secrets; a Secret set from the laptop is stored on the dev box only. Nothing new listens on either computer's network: Forwards are bound to the laptop's loopback only. If the connection drops, localhost makes it again on its own, without starting or stopping anything. Services you started from the laptop stop when the connection ends, unless localhost is open on the dev box.
 
 When something doesn't connect, [Machines](/docs/machines#when-it-cant-connect) lists every message localhost shows and what to do.

@@ -390,3 +390,66 @@ async fn until_event(
     };
     tokio::time::timeout(PATIENCE, wait).await.unwrap_or_else(|_| panic!("never {what}"));
 }
+
+/// What the apps do to manage a Machine's Projects: pick a folder there,
+/// add it with what scanning there suggests, edit the Project and a
+/// Service, then remove it. All of it is saved there; this computer keeps
+/// only its list of Machines.
+#[tokio::test(flavor = "multi_thread")]
+async fn adds_and_edits_a_project_on_another_machine() {
+    let Some(other) = OtherMachine::start() else { return };
+    let folder = other.path().join("shop");
+    std::fs::create_dir_all(folder.join("web")).unwrap();
+    std::fs::write(folder.join("package.json"), r#"{"scripts": {"dev": "vite"}}"#).unwrap();
+
+    let app_root = other.path().join("app-storage");
+    let machines = Machines::open(&app_root, &other.ssh()).unwrap();
+    let (_, mut events) = machines.subscribe();
+    let devbox = tokio::time::timeout(PATIENCE, machines.add(None, "devbox")).await.expect("ssh hung").unwrap();
+    until_event(&mut events, "connected", |event| {
+        matches!(
+            event,
+            MachinesEvent::StateChanged { state: MachineState::Connected { manages_projects: true, .. }, .. }
+        )
+    })
+    .await;
+
+    let listing =
+        machines.list_directory(devbox.id, Some(other.path().display().to_string()), false, false).await.unwrap();
+    assert!(listing.entries.iter().any(|entry| entry.name == "shop" && entry.is_directory));
+    let path = folder.display().to_string();
+    let suggestions = machines.scan_folder(devbox.id, path.clone()).await.unwrap();
+    let services =
+        suggestions.into_iter().filter(|suggestion| suggestion.is_recommended).map(NewService::from).collect();
+    let project =
+        machines.add_project(devbox.id, "Shop".into(), Key::new("shop").unwrap(), path, services).await.unwrap();
+    assert!(!project.services.is_empty(), "nothing suggested");
+    until_event(&mut events, "showed the new Project", |event| {
+        matches!(event, MachinesEvent::ProjectsChanged { projects, .. } if projects.iter().any(|shown| shown.id == project.id))
+    })
+    .await;
+
+    let changes = localhost_core::ProjectChanges {
+        name: Some("Shop 2".into()),
+        is_favorite: Some(true),
+        variables: Some(vec![localhost_core::VariableInput::plain("MODE", "dev")]),
+        ..Default::default()
+    };
+    machines.edit_project(devbox.id, project.id, changes).await.unwrap();
+    let changes = localhost_core::ServiceChanges { port: Some(Some(4321)), ..Default::default() };
+    machines.edit_service(devbox.id, project.services[0].id, changes).await.unwrap();
+    until_event(&mut events, "showed the edits", |event| {
+        matches!(event, MachinesEvent::ProjectsChanged { projects, .. }
+            if projects.iter().any(|shown| shown.name == "Shop 2" && shown.services[0].port == Some(4321)))
+    })
+    .await;
+
+    // Saved on the Machine, as its own app would have.
+    let saved = other.library().project(project.id).unwrap();
+    assert_eq!((saved.name.as_str(), saved.is_favorite, saved.services[0].port), ("Shop 2", true, Some(4321)));
+    assert_eq!(saved.variables.values.get("MODE").map(String::as_str), Some("dev"));
+    assert!(!app_root.join("projects").exists(), "a Project of the Machine was saved here");
+
+    machines.remove_project(devbox.id, project.id).await.unwrap();
+    assert!(other.library().projects().is_empty());
+}

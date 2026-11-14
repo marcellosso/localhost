@@ -1,8 +1,9 @@
 import { type Dispatch, type SetStateAction, useState } from "react";
-import { commands, type Id, type Project } from "../bindings";
+import type { Id, Project } from "../bindings";
+import { editorCommands, type MachineRef } from "../editing";
 import { type VariableDraft, variableDrafts, variableEdits } from "../editors";
 import { closeSheet } from "../ui";
-import { ChipList, ChipToggle, Field, FieldHint, FieldLabel, FormSheet } from "./Form";
+import { ChipList, ChipToggle, Field, FieldHint, FieldLabel, FormSheet, ProjectContext } from "./Form";
 import { LayersIcon, PlusIcon, TrashIcon } from "./Icons";
 import { VariableEditor } from "./VariableEditor";
 import styles from "./EnvironmentForm.module.css";
@@ -13,7 +14,7 @@ type ProfileDraft = { id: number; profileId: Id | null; name: string; variables:
 let nextProfileId = 0;
 
 /** Edits a Project's variables and its Environment Profiles, and which Profile is active. */
-export function EnvironmentForm({ project }: { project: Project }) {
+export function EnvironmentForm({ project, machine }: { project: Project; machine?: MachineRef }) {
   const [variables, setVariables] = useState(() => variableDrafts(project.variables));
   const [profiles, setProfiles] = useState<ProfileDraft[]>(() =>
     (project.profiles ?? []).map((profile) => ({
@@ -56,7 +57,7 @@ export function EnvironmentForm({ project }: { project: Project }) {
     setIsSaving(true);
     setError(null);
     const active = profiles.findIndex((profile) => profile.id === activeId);
-    const result = await commands.saveEnvironment(
+    const result = await editorCommands(machine ?? null).saveEnvironment(
       project.id,
       variableEdits(variables),
       profiles.map((profile) => ({
@@ -76,9 +77,13 @@ export function EnvironmentForm({ project }: { project: Project }) {
       icon={<LayersIcon size={16} />}
       title="Environment"
       subtitle={
-        <>
-          for <strong>{project.name}</strong>
-        </>
+        machine ? (
+          <ProjectContext preposition="for" name={project.name} path={project.path} machine={machine.name} />
+        ) : (
+          <>
+            for <strong>{project.name}</strong>
+          </>
+        )
       }
       hint="Running services show “restart to apply” when their environment changes."
       error={error}
@@ -95,6 +100,7 @@ export function EnvironmentForm({ project }: { project: Project }) {
             setVariables={setVariables}
             layer={{ kind: "project", id: project.id }}
             label="Project variables"
+            machine={machine}
           />
         )}
       </Field>
@@ -171,6 +177,7 @@ export function EnvironmentForm({ project }: { project: Project }) {
                   setVariables={profileVariables(profile.id)}
                   layer={profile.profileId ? { kind: "profile", id: profile.profileId } : null}
                   label={`Variables of ${profile.name || "the profile"}`}
+                  machine={machine}
                 />
               </div>
             ))}

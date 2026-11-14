@@ -2,11 +2,12 @@ import LocalhostCore
 import SwiftUI
 
 /// Edits a Project's variables and its Environment Profiles, and which
-/// Profile is active.
+/// Profile is active. Another Machine's are saved there, Secrets included.
 struct EnvironmentForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let project: Project
+    var place: AppModel.Place = .thisMac
 
     @State private var variables: [VariableDraft] = []
     @State private var profiles: [AppModel.ProfileDraft] = []
@@ -18,18 +19,18 @@ struct EnvironmentForm: View {
         FormSheet(
             systemImage: "square.3.layers.3d",
             title: "Environment",
-            subtitle: Text("for **\(project.name)**"),
-            hint: "Running services show “restart to apply” when their environment changes.",
+            subtitle: subtitle,
+            hint: model.reasonCantChange(place) ?? "Running services show “restart to apply” when their environment changes.",
             error: error,
             primaryTitle: "Save",
-            isPrimaryDisabled: isSaving,
+            isPrimaryDisabled: isSaving || !model.canChange(place),
             width: 600,
             cancel: { dismiss() },
             primary: { Task { await save() } }
         ) {
             Field(title: "Project variables", note: "every service gets these",
                   hint: "A service’s own variables override them.") {
-                VariableEditor(variables: $variables, layer: .project(project.id))
+                VariableEditor(variables: $variables, layer: .project(project.id), place: place)
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -99,8 +100,13 @@ struct EnvironmentForm: View {
                 .foregroundStyle(.secondary)
                 .help("Remove this profile")
             }
-            VariableEditor(variables: binding.variables, layer: profile.profileID.map { .profile($0) })
+            VariableEditor(variables: binding.variables, layer: profile.profileID.map { .profile($0) }, place: place)
         }
+    }
+
+    private var subtitle: Text {
+        guard let machine = model.machineName(place) else { return Text("for **\(project.name)**") }
+        return Text("for **\(project.name)** on \(machine)")
     }
 
     private var suggestedProfileName: String {
@@ -113,7 +119,8 @@ struct EnvironmentForm: View {
         defer { isSaving = false }
         do {
             try await model.saveEnvironment(
-                of: project.id, variables: variables.compactMap(\.input), profiles: profiles, activeDraftID: activeDraftID
+                of: project.id, variables: variables.compactMap(\.input), profiles: profiles, activeDraftID: activeDraftID,
+                on: place
             )
             dismiss()
         } catch {

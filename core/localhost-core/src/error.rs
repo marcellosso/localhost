@@ -148,6 +148,16 @@ pub enum LocalhostError {
     },
     /// The other end runs an older localhost, which can't do this.
     Unsupported,
+    /// The Machine (by name) runs a localhost too old to change its
+    /// Projects from here; they can still be viewed and run.
+    MachineNeedsUpdate {
+        machine: String,
+    },
+    /// A folder exists but can't be listed: the system's reason.
+    FolderUnreadable {
+        path: String,
+        reason: String,
+    },
 }
 
 impl LocalhostError {
@@ -236,6 +246,8 @@ impl LocalhostError {
             MachineUnavailable { machine, problem } => problem.message(machine),
             ForwardFailed { port, reason } => format!("Port {port} couldn’t be forwarded: {reason}."),
             Unsupported => "The other Machine runs an older localhost that can’t do this. Update localhost there.".into(),
+            MachineNeedsUpdate { machine } => format!("Update localhost on {machine} to manage its Projects."),
+            FolderUnreadable { path, reason } => format!("{path} can’t be opened: {reason}."),
             InvalidProjectFile { problem, field, line } => {
                 let line = line.map(|line| format!("Line {line}"));
                 let field = (!field.is_empty()).then(|| field.join(" › "));
