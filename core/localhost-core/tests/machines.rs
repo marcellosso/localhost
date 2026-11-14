@@ -8,7 +8,7 @@ mod common;
 use std::sync::Arc;
 use std::time::Duration;
 
-use common::{Fixture, PATIENCE, key, test_options};
+use common::{Fixture, PATIENCE, free_port, key, test_options};
 use localhost_core::machine::{MachineConnection, relay};
 use localhost_core::{
     KeyClash, Link, LocalhostError, MachineProblem, NewService, Origin, ProfileInput, Project, ProjectChanges,
@@ -227,7 +227,8 @@ async fn edits_projects_and_services_there_keeping_secrets_there() {
     assert_eq!(other.library.secret_value("TOKEN", layer).unwrap().as_deref(), Some("s3cret"));
     assert_eq!(connection.secret_value("TOKEN".into(), layer).await.unwrap().as_deref(), Some("s3cret"));
 
-    let web = NewService { port: Some(3000), ..NewService::new("Web", key("web"), "exec sleep 60") };
+    let port = free_port();
+    let web = NewService { port: Some(port.into()), ..NewService::new("Web", key("web"), "exec sleep 60") };
     let web = connection.add_service(project_id, web, vec![], vec![]).await.unwrap();
     let worker = NewService::new("Worker", key("worker"), "exec sleep 60");
     let added = connection.add_services(project_id, vec![worker]).await.unwrap();
@@ -244,7 +245,7 @@ async fn edits_projects_and_services_there_keeping_secrets_there() {
         (None, vec![web.id], Some("true"))
     );
     let changes = ServiceChanges { name: Some("Web app".into()), ..Default::default() };
-    assert_eq!(connection.edit_service(web.id, changes).await.unwrap().port, Some(3000));
+    assert_eq!(connection.edit_service(web.id, changes).await.unwrap().port, Some(port));
 
     let profiles = vec![ProfileInput {
         profile_id: None,
