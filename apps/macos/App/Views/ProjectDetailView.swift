@@ -2,7 +2,7 @@ import LocalhostCore
 import SwiftUI
 
 /// A Project's Services with their state and Start / Stop / Restart. Those
-/// of another Machine look and act the same, but are edited there.
+/// of another Machine look and act the same; their changes are made there.
 struct ProjectDetailView: View {
     @Environment(AppModel.self) private var model
     let project: Project
@@ -31,24 +31,29 @@ struct ProjectDetailView: View {
         .contextMenu(forSelectionType: UUID.self) { ids in
             if let id = ids.first, id != AppModel.allServicesID, let (_, service) = model.service(id, on: place) {
                 serviceStateButtons(service)
+                Divider()
+                Button("Edit Service…") { model.presentedSheet = .editService(id, on: place) }
+                    .disabled(!model.canChange(place))
                 if place == .thisMac {
                     Divider()
-                    Button("Edit Service…") { model.presentedSheet = .editService(id) }
-                    Divider()
                     if let folder = model.folder(ofService: id) { FolderActionButtons(folder: folder) }
-                    Divider()
-                    Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id) }
                 }
+                Divider()
+                Button("Remove Service…", role: .destructive) { model.pendingRemoval = .service(id, on: place) }
+                    .disabled(!model.canChange(place))
             }
         } primaryAction: { ids in
-            if place == .thisMac, let id = ids.first, id != AppModel.allServicesID { model.presentedSheet = .editService(id) }
+            if model.canChange(place), let id = ids.first, id != AppModel.allServicesID {
+                model.presentedSheet = .editService(id, on: place)
+            }
         }
         .overlay {
-            if project.services.isEmpty, case .machine(let machineID) = place {
+            if project.services.isEmpty, let reason = model.reasonCantChange(place) {
+                // Another Machine that can't take changes now: why, rather than buttons that fail.
                 ContentUnavailableView {
                     Label("No Services", systemImage: "terminal")
                 } description: {
-                    Text("Add services to this project on \(model.shownMachine(machineID)?.machine.name ?? "its machine").")
+                    Text(reason)
                 }
             } else if project.services.isEmpty {
                 ContentUnavailableView {
@@ -56,15 +61,21 @@ struct ProjectDetailView: View {
                 } description: {
                     Text(Onboarding.serviceConcept)
                 } actions: {
-                    Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id) }
+                    Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id, on: place) }
                         .buttonStyle(AccentButtonStyle())
-                    Button("Add Service…") { model.presentedSheet = .addService(projectID: project.id) }
+                    Button("Add Service…") { model.presentedSheet = .addService(projectID: project.id, on: place) }
                         .buttonStyle(PillButtonStyle())
                 }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !project.services.isEmpty, place == .thisMac { addServiceRow }
+            if let note = model.needsUpdateNote(place), !project.services.isEmpty {
+                updateNote(note)
+            } else if !project.services.isEmpty {
+                addServiceRow
+                    .disabled(!model.canChange(place))
+                    .help(model.reasonCantChange(place) ?? "")
+            }
         }
         .columnGlass()
         .navigationTitle(project.name)
@@ -96,8 +107,18 @@ struct ProjectDetailView: View {
         .disabled(!model.isReachable(place))
     }
 
+    /// Another Machine with an older localhost: its Projects are shown and run, not changed.
+    private func updateNote(_ note: String) -> some View {
+        Label(note, systemImage: "info.circle")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+    }
+
     private var addServiceRow: some View {
-        Button { model.presentedSheet = .addService(projectID: project.id) } label: {
+        Button { model.presentedSheet = .addService(projectID: project.id, on: place) } label: {
             HStack(spacing: 7) {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .semibold))
@@ -126,8 +147,7 @@ struct ProjectToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            // Another Machine's Profiles, configuration and folder are changed there.
-            if !project.profiles.isEmpty, place == .thisMac {
+            if !project.profiles.isEmpty {
                 profileMenu
             }
             Button("Start All", systemImage: "play.fill") { model.startAll(inProject: project.id, on: place) }
@@ -140,7 +160,22 @@ struct ProjectToolbar: ToolbarContent {
                 .disabled(!project.services.contains { model.status(of: $0, on: place).state.isActive } || !model.isReachable(place))
             if place == .thisMac {
                 moreMenu
+            } else {
+                machineMoreMenu
             }
+        }
+    }
+
+    /// Another Machine's: its configuration is changed there; its folder isn't on this Mac.
+    private var machineMoreMenu: some View {
+        MoreMenu(help: "More actions for this project") {
+            if let reason = model.reasonCantChange(place) {
+                Text(reason)
+            }
+            MachineProjectEditButtons(project: project, place: place)
+            Divider()
+            Button("Remove Project…", role: .destructive) { model.pendingRemoval = .project(project.id, on: place) }
+                .disabled(!model.canChange(place))
         }
     }
 
@@ -176,15 +211,17 @@ struct ProjectToolbar: ToolbarContent {
         Menu {
             Picker("Environment Profile", selection: Binding {
                 project.activeProfileID
-            } set: { model.setActiveProfile($0, inProject: project.id) }) {
+            } set: { model.setActiveProfile($0, inProject: project.id, on: place) }) {
                 Text("No Profile").tag(UUID?.none)
                 ForEach(project.profiles) { profile in
                     Text(profile.name).tag(UUID?.some(profile.id))
                 }
             }
             .pickerStyle(.inline)
+            .disabled(!model.canChange(place))
             Divider()
-            Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id) }
+            Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id, on: place) }
+                .disabled(!model.canChange(place))
         } label: {
             Label(project.activeProfile?.name ?? "No Profile", systemImage: "square.3.layers.3d")
                 .labelStyle(.titleAndIcon)
@@ -350,8 +387,8 @@ struct ServiceAccessibilityActions: View {
                 Button("Start") { model.start(service.id, on: place) }
             }
         }
-        if place == .thisMac {
-            Button("Edit Service") { model.presentedSheet = .editService(service.id) }
+        if model.canChange(place) {
+            Button("Edit Service") { model.presentedSheet = .editService(service.id, on: place) }
         }
     }
 }
@@ -394,8 +431,8 @@ struct ServiceActions: View {
                 Button("Start") { model.start(service.id, on: place) }
                     .buttonStyle(PillButtonStyle(isProminent: true, isCompact: true))
                     .help("Start (⌘R)")
-                if place == .thisMac {
-                    Button("Edit…") { model.presentedSheet = .editService(service.id) }
+                if place == .thisMac || model.canChange(place) {
+                    Button("Edit…") { model.presentedSheet = .editService(service.id, on: place) }
                         .buttonStyle(PillButtonStyle(isCompact: true))
                         .help("Edit Service")
                 }

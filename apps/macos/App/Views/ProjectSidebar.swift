@@ -37,6 +37,7 @@ struct ProjectSidebar: View {
                 } header: {
                     Text(shown.machine.name)
                         .accessibilityLabel("Machine \(shown.machine.name)")
+                        .contextMenu { MachineMenu(shown: shown) }
                 }
             }
         }
@@ -69,9 +70,55 @@ struct ProjectSidebar: View {
                 Button("Stop All") { model.stopAll(inProject: id, on: place) }
                     .disabled(!project.services.contains { model.status(of: $0, on: place).state.isActive } || !model.isReachable(place))
                 Divider()
+                MachineProjectEditButtons(project: project, place: place)
+                Divider()
                 Button("Reconnect") { model.reconnectMachine(machineID) }
+                Divider()
+                Button("Remove Project…", role: .destructive) { model.pendingRemoval = .project(id, on: place) }
+                    .disabled(!model.canChange(place))
             }
         }
+    }
+}
+
+/// What a Machine's heading offers: a new Project there, one from a Project
+/// file there, and Reconnect. While it can't take changes, why not.
+struct MachineMenu: View {
+    @Environment(AppModel.self) private var model
+    let shown: MachinesStore.Shown
+    var includesReconnect = true
+
+    var body: some View {
+        let place = AppModel.Place.machine(shown.id)
+        if let reason = model.reasonCantChange(place) {
+            Text(reason)
+        }
+        Button("New Project…") { model.presentedSheet = .addProject(on: place) }
+            .disabled(!model.canChange(place))
+        Button("Import Project…") { model.chooseProjectFile(on: place) }
+            .disabled(!model.canChange(place))
+        if includesReconnect {
+            Divider()
+            Button("Reconnect") { model.reconnectMachine(shown.id) }
+        }
+    }
+}
+
+/// Edit Project, Edit Environment, Detect Services and Favorite for a
+/// Project of another Machine, disabled while the Machine can't take changes.
+struct MachineProjectEditButtons: View {
+    @Environment(AppModel.self) private var model
+    let project: Project
+    let place: AppModel.Place
+
+    var body: some View {
+        Group {
+            Button("Edit Project…") { model.presentedSheet = .editProject(project.id, on: place) }
+            Button("Edit Environment…") { model.presentedSheet = .projectEnvironment(project.id, on: place) }
+            Button("Detect Services…") { model.presentedSheet = .detectServices(projectID: project.id, on: place) }
+            Button(project.isFavorite ? "Unfavorite" : "Favorite") { model.setFavorite(project.id, !project.isFavorite, on: place) }
+        }
+        .disabled(!model.canChange(place))
     }
 }
 
@@ -139,6 +186,10 @@ private struct MachineStateRow: View {
                     Button("Reconnect") { model.reconnectMachine(shown.id) }
                         .buttonStyle(PillButtonStyle(isCompact: true))
                         .accessibilityLabel("Reconnect \(shown.machine.name)")
+                } else if shown.projects.isEmpty, model.canChange(.machine(shown.id)) {
+                    Button("New Project…") { model.presentedSheet = .addProject(on: .machine(shown.id)) }
+                        .buttonStyle(PillButtonStyle(isCompact: true))
+                        .accessibilityLabel("New Project on \(shown.machine.name)")
                 }
             }
             .padding(.vertical, 2)
@@ -192,8 +243,17 @@ private struct SidebarHeader: View {
                 .background(Color.primary.opacity(isSearchFocused ? 0.09 : 0.06), in: .rect(cornerRadius: 7))
                 // A new Project from a folder, or one from a Project file.
                 Menu {
-                    Button("New Project…") { model.presentedSheet = .addProject }
+                    Button("New Project…") { model.presentedSheet = .addProject() }
+                        .disabled(model.core == nil)
                     Button("Import Project…") { model.isChoosingImportFile = true }
+                        .disabled(model.core == nil)
+                    // Each other Machine's, made there.
+                    if !model.shownMachines.isEmpty {
+                        Divider()
+                        ForEach(model.shownMachines) { shown in
+                            Menu("On \(shown.machine.name)") { MachineMenu(shown: shown, includesReconnect: false) }
+                        }
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -203,7 +263,7 @@ private struct SidebarHeader: View {
                 .fixedSize()
                 .accessibilityLabel("Add Project")
                 .help("Add Project")
-                .disabled(model.core == nil)
+                .disabled(model.core == nil && model.shownMachines.isEmpty)
             }
         }
         .padding(.horizontal, 10)

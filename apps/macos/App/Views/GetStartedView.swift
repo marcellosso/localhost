@@ -104,7 +104,7 @@ struct GetStartedView: View {
         let selected = model.projects.first { $0.id == model.selectedProjectID }
         switch item.step {
         case .project:
-            model.presentedSheet = .addProject
+            model.presentedSheet = .addProject()
         case .service:
             let target = selected?.services.isEmpty == true ? selected : model.projects.first { $0.services.isEmpty }
             if let target { model.presentedSheet = .detectServices(projectID: target.id) }

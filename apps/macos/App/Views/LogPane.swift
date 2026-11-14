@@ -284,8 +284,8 @@ private struct FailedBanner: View {
                     .buttonStyle(AccentButtonStyle(isCompact: true))
                     .help("Start (⌘R)")
                     .disabled(!model.isReachable(model.selectedPlace))
-                if model.selectedPlace == .thisMac {
-                    Button("Edit Service…") { model.presentedSheet = .editService(service.id) }
+                if model.canChange(model.selectedPlace) {
+                    Button("Edit Service…") { model.presentedSheet = .editService(service.id, on: model.selectedPlace) }
                         .buttonStyle(PillButtonStyle(isCompact: true))
                 }
                 Button("Hide", systemImage: "xmark") { dismiss() }

@@ -6,36 +6,43 @@ import UniformTypeIdentifiers
 /// Mac, what to do if its Key is taken, and what the file brings (Services,
 /// environment, and the Secrets that still need values). The file was
 /// validated when it was read; nothing is saved until Import or Replace.
+/// On another Machine, the file and the folder are there, and so is the
+/// Project it adds.
 struct ImportProjectForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let document: ProjectDocument
     let fileName: String
+    var place: AppModel.Place = .thisMac
+    /// On another Machine, whether the file's folder is there.
+    var remoteFolderExists = true
 
     @State private var path = ""
     @State private var choice: ProjectLibrary.KeyClash = .keepBoth
     @State private var freeKey: Key?
     @State private var isChoosingFolder = false
+    /// Another Machine's folder chosen in its picker, which only lists folders that are there.
+    @State private var isRemoteFolderChosen = false
     @State private var error: String?
     @State private var isSaving = false
 
     var body: some View {
-        let clash = model.projectClashing(with: document)
+        let clash = model.projectClashing(with: document, on: place)
         let isReplacing = clash != nil && choice == .replace
         FormSheet(
             systemImage: "square.and.arrow.down",
             title: "Import \(document.name)",
-            subtitle: Text("from ") + Text(fileName).monospaced(),
-            hint: !folderExists ? nil : isReplacing ? "Replaces “\(clash?.name ?? "")”" : "↩ to import",
+            subtitle: Text("from ") + Text(fileName).monospaced() + Text(model.machineName(place).map { " on \($0)" } ?? ""),
+            hint: model.reasonCantChange(place) ?? (!folderExists ? nil : isReplacing ? "Replaces “\(clash?.name ?? "")”" : "↩ to import"),
             error: error,
             primaryTitle: isReplacing ? "Replace" : "Import",
-            isPrimaryDisabled: !folderExists || isSaving,
+            isPrimaryDisabled: !folderExists || isSaving || !model.canChange(place),
             width: 600,
             cancel: { dismiss() },
             primary: { Task { await save(onKeyClash: clash == nil ? nil : choice) } }
         ) {
-            Field(title: "Folder", hint: folderExists ? nil : "This folder isn’t on this Mac. Choose where the project is.") {
-                FolderButton(path: path) { isChoosingFolder = true }
+            Field(title: "Folder", hint: folderExists ? nil : missingFolderHint) {
+                FolderButton(path: path, isOnThisMac: place == .thisMac) { isChoosingFolder = true }
             }
             if let clash {
                 Field(title: "Key", note: "“\(document.key)” is already used by \(clash.name)",
@@ -92,14 +99,34 @@ struct ImportProjectForm: View {
                 }
             }
         }
-        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
+        .fileImporter(isPresented: Binding { isChoosingFolder && place == .thisMac } set: { isChoosingFolder = $0 },
+                      allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { path = url.path }
         }
+        .sheet(isPresented: Binding { isChoosingFolder && place != .thisMac } set: { isChoosingFolder = $0 }) {
+            if case .machine(let machineID) = place {
+                RemoteFolderPicker(machineID: machineID, startingAt: remoteStartingFolder) { folder in
+                    path = folder
+                    isRemoteFolderChosen = true
+                }
+            }
+        }
         .onAppear { path = document.path }
-        .task { freeKey = await model.freeProjectKey(basedOn: document.key) }
+        .task { freeKey = await model.freeProjectKey(basedOn: document.key, on: place) }
+    }
+
+    private var missingFolderHint: String {
+        guard let machine = model.machineName(place) else { return "This folder isn’t on this Mac. Choose where the project is." }
+        return "This folder isn’t on \(machine). Choose where the project is."
+    }
+
+    /// The file's folder if it is there, else the Machine's home folder.
+    private var remoteStartingFolder: String? {
+        folderExists && !path.isEmpty ? path : nil
     }
 
     private var folderExists: Bool {
+        if place != .thisMac { return isRemoteFolderChosen || remoteFolderExists }
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: (path as NSString).expandingTildeInPath, isDirectory: &isDirectory)
             && isDirectory.boolValue
@@ -110,7 +137,7 @@ struct ImportProjectForm: View {
         let keptKeys = Set(document.services.map(\.key))
         let removed = existing.services.filter { !keptKeys.contains($0.key) }
         guard !removed.isEmpty else { return nil }
-        let names = removed.map { model.status(of: $0).state.isActive ? "\($0.name) (running, stopped first)" : $0.name }
+        let names = removed.map { model.status(of: $0, on: place).state.isActive ? "\($0.name) (running, stopped first)" : $0.name }
         return "Removes " + names.joined(separator: ", ") + ", which the file doesn’t have."
     }
 
@@ -138,7 +165,7 @@ struct ImportProjectForm: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            try await model.importProject(document, onKeyClash: onKeyClash)
+            try await model.importProject(document, onKeyClash: onKeyClash, on: place)
             dismiss()
         } catch {
             self.error = error.message

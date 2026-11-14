@@ -46,6 +46,11 @@ extension Project: Identifiable {
         projectSuggestedServiceKey(project: self, name: name, excluding: serviceID)
     }
 
+    /// `key` if none of `projects` uses it, else the Key "Keep both" imports under.
+    public static func freeKey(basedOn key: Key, among projects: [Project]) -> Key {
+        freeProjectKey(projects: projects, key: key)
+    }
+
     /// A Key derived from `name` that none of `projects` uses but the one being edited.
     public static func suggestedKey(for name: String, among projects: [Project], excluding projectID: UUID? = nil) -> Key {
         suggestedProjectKey(projects: projects, name: name, excluding: projectID)

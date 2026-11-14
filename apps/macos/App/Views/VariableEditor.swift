@@ -36,6 +36,9 @@ struct VariableEditor: View {
     @Binding var variables: [VariableDraft]
     /// Where stored Secrets are read from; `nil` while the layer is new.
     let layer: VariableLayer?
+    /// Where they are stored: another Machine's are read there to reveal
+    /// them, and what is typed is sent there, never kept on this Mac.
+    var place: AppModel.Place = .thisMac
 
     var body: some View {
         FormCard {
@@ -61,9 +64,7 @@ struct VariableEditor: View {
                         Task { await toggleSecret(binding) }
                     }
                     .foregroundStyle(variable.isSecret ? AnyShapeStyle(Theme.accentText) : AnyShapeStyle(.secondary))
-                    .help(variable.isSecret
-                          ? "Secret: stored in your Keychain, never in the project file. Click to make it a plain variable."
-                          : "Make it a secret")
+                    .help(variable.isSecret ? secretHelp : "Make it a secret")
                     Button("Remove Variable", systemImage: "minus.circle") {
                         variables.removeAll { $0.id == variable.id }
                     }
@@ -90,6 +91,13 @@ struct VariableEditor: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private var secretHelp: String {
+        guard let machine = model.machineName(place) else {
+            return "Secret: stored in your Keychain, never in the project file. Click to make it a plain variable."
+        }
+        return "Secret: stored on \(machine), never on this Mac or in the project file. Click to make it a plain variable."
     }
 
     @ViewBuilder
@@ -131,7 +139,7 @@ struct VariableEditor: View {
         guard !variable.wrappedValue.isValueKnown, let layer,
               let name = variable.wrappedValue.storedSecretName
         else { return }
-        variable.wrappedValue.value = await model.secretValue(named: name, in: layer) ?? ""
+        variable.wrappedValue.value = await model.secretValue(named: name, in: layer, on: place) ?? ""
         variable.wrappedValue.isValueKnown = true
     }
 }

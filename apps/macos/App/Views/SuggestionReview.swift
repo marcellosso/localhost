@@ -204,6 +204,8 @@ struct SuggestionReview: View {
     let isScanning: Bool
     /// The Project folder, for choosing working directories.
     let projectPath: String
+    /// Where the folder is: another Machine's is browsed with its own picker.
+    var place: AppModel.Place = .thisMac
     /// The Services the Project already has: new ones get the colours they'll
     /// keep after them, and can start after them.
     var existingServices: [Service] = []
@@ -263,12 +265,22 @@ struct SuggestionReview: View {
                 }
             }
         }
-        .fileImporter(isPresented: Binding { choosingFolderFor != nil } set: { if !$0 { choosingFolderFor = nil } },
+        .fileImporter(isPresented: Binding { choosingFolderFor != nil && place == .thisMac } set: { if !$0 { choosingFolderFor = nil } },
                       allowedContentTypes: [.folder]) { result in
-            guard case .success(let url) = result, let id = choosingFolderFor,
-                  let index = drafts.firstIndex(where: { $0.id == id }) else { return }
-            drafts[index].workingDirectory = ServiceForm.relativePath(of: url.path, to: projectPath)
+            guard case .success(let url) = result else { return }
+            setWorkingDirectory(url.path)
         }
+        .sheet(isPresented: Binding { choosingFolderFor != nil && place != .thisMac } set: { if !$0 { choosingFolderFor = nil } }) {
+            if case .machine(let machineID) = place {
+                RemoteFolderPicker(machineID: machineID, startingAt: projectPath, choose: setWorkingDirectory)
+            }
+        }
+    }
+
+    /// The chosen folder, relative to the Project's, as the working directory of the draft it was chosen for.
+    private func setWorkingDirectory(_ folder: String) {
+        guard let id = choosingFolderFor, let index = drafts.firstIndex(where: { $0.id == id }) else { return }
+        drafts[index].workingDirectory = ServiceForm.relativePath(of: folder, to: projectPath)
     }
 
     private var selectionNote: String {
@@ -577,6 +589,7 @@ struct DetectServicesForm: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let project: Project
+    var place: AppModel.Place = .thisMac
 
     @State private var drafts: [SuggestionDraft] = []
     @State private var isScanning = true
@@ -588,23 +601,27 @@ struct DetectServicesForm: View {
         FormSheet(
             systemImage: "sparkle.magnifyingglass",
             title: "Detect Services",
-            subtitle: Text("in **\(project.name)** · ") + Text((project.path as NSString).abbreviatingWithTildeInPath).monospaced(),
-            hint: count == 0 ? nil : "↩ to add",
+            subtitle: ServiceForm.subtitle(of: project, on: model.machineName(place)),
+            hint: model.reasonCantChange(place) ?? (count == 0 ? nil : "↩ to add"),
             error: error,
             primaryTitle: count == 0 ? "Add Services" : "Add \(count) Service\(count == 1 ? "" : "s")",
-            isPrimaryDisabled: count == 0 || isSaving,
+            isPrimaryDisabled: count == 0 || isSaving || !model.canChange(place),
             width: 640,
             cancel: { dismiss() },
             primary: { Task { await save() } }
         ) {
             SuggestionReview(
-                drafts: $drafts, isScanning: isScanning, projectPath: project.path,
+                drafts: $drafts, isScanning: isScanning, projectPath: project.path, place: place,
                 existingServices: project.services,
                 emptyMessage: "Nothing new found. Services this project already runs aren’t suggested again."
             )
         }
         .task {
-            drafts = await model.suggestions(for: project).map(SuggestionDraft.init)
+            do {
+                drafts = try await model.suggestions(for: project, on: place).map(SuggestionDraft.init)
+            } catch {
+                self.error = error.message
+            }
             isScanning = false
         }
     }
@@ -617,7 +634,7 @@ struct DetectServicesForm: View {
             isSaving = true
             defer { isSaving = false }
             do {
-                try await model.addServices(services, to: project.id)
+                try await model.addServices(services, to: project.id, on: place)
                 dismiss()
             } catch {
                 self.error = error.message
