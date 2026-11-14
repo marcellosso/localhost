@@ -617,7 +617,7 @@ struct DetectServicesForm: View {
             )
         }
         .task {
-            do {
+            do throws(LocalhostError) {
                 drafts = try await model.suggestions(for: project, on: place).map(SuggestionDraft.init)
             } catch {
                 self.error = error.message

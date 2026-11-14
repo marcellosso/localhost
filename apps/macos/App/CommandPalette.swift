@@ -117,7 +117,7 @@ extension AppModel {
     /// Services are started and stopped from the main window for now.
     private func machineItems() -> [PaletteItem] {
         var items: [PaletteItem] = []
-        if case .machine(let machineID) = selectedPlace, let project = selectedProject, canChange(selectedPlace) {
+        if case .machine = selectedPlace, let project = selectedProject, canChange(selectedPlace) {
             let place = selectedPlace
             let keywords = "\(project.key) \(machineName(place) ?? "")"
             items.append(PaletteItem(id: "machine-new-service:\(project.id)", title: "New Service in \(project.name)…",

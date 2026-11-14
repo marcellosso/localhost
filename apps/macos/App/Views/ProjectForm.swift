@@ -129,7 +129,7 @@ struct ProjectForm: View {
         isScanning = true
         Task {
             let suggestions: [ServiceSuggestion]
-            do {
+            do throws(LocalhostError) {
                 suggestions = try await model.suggestions(forFolderAt: folder, on: place)
             } catch {
                 guard scannedPath == folder else { return }
