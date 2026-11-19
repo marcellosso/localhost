@@ -45,9 +45,9 @@ jobs:
         run: |
           echo "::error::Publishing runs only from main, not $GITHUB_REF. Run it on main, or with dry-run."
           exit 1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Trusted publishing needs npm 11.5.1 or later.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: npm install -g npm@11
