@@ -91,7 +91,8 @@ struct ProjectDetailView: View {
     @ViewBuilder
     private func serviceStateButtons(_ service: Service) -> some View {
         Group {
-            switch model.status(of: service, on: place).state {
+            let state = model.status(of: service, on: place).state
+            switch state {
             case .starting, .running:
                 if model.urlToOpen(service, on: place) != nil {
                     Button("Open in Browser") { model.openURL(of: service.id, on: place) }
@@ -102,6 +103,9 @@ struct ProjectDetailView: View {
                 EmptyView()
             case .stopped, .exited, .failed:
                 Button("Start") { model.start(service.id, on: place) }
+                if state == .failed {
+                    Button("Dismiss") { model.stop(service.id, on: place) }
+                }
             }
         }
         .disabled(!model.isReachable(place))
@@ -157,7 +161,7 @@ struct ProjectToolbar: ToolbarContent {
             Button("Stop All", systemImage: "stop.fill") { model.stopAll(inProject: project.id, on: place) }
                 .buttonStyle(PillButtonStyle())
                 .help("Stop All (⇧⌘.)")
-                .disabled(!project.services.contains { model.status(of: $0, on: place).state.isActive } || !model.isReachable(place))
+                .disabled(!project.services.contains { model.status(of: $0, on: place).state.isStoppable } || !model.isReachable(place))
             if place == .thisMac {
                 moreMenu
             } else {
@@ -365,7 +369,7 @@ struct ServiceRow: View {
 }
 
 /// What a Service row offers VoiceOver, like its buttons: Open, Restart and
-/// Stop while live, Start and Edit otherwise.
+/// Stop while live, Start (and Dismiss when Failed) and Edit otherwise.
 struct ServiceAccessibilityActions: View {
     @Environment(AppModel.self) private var model
     let service: Service
@@ -385,6 +389,9 @@ struct ServiceAccessibilityActions: View {
                 EmptyView()
             case .stopped, .exited, .failed:
                 Button("Start") { model.start(service.id, on: place) }
+                if status.state == .failed {
+                    Button("Dismiss") { model.stop(service.id, on: place) }
+                }
             }
         }
         if model.canChange(place) {
@@ -394,7 +401,7 @@ struct ServiceAccessibilityActions: View {
 }
 
 /// The selected Service's labelled actions, its main one tinted: Open (or
-/// Restart) and Stop while live, Start and Edit otherwise.
+/// Restart) and Stop while live, Start, Dismiss when Failed, and Edit otherwise.
 struct ServiceActions: View {
     @Environment(AppModel.self) private var model
     let service: Service
@@ -431,6 +438,12 @@ struct ServiceActions: View {
                 Button("Start") { model.start(service.id, on: place) }
                     .buttonStyle(PillButtonStyle(isProminent: true, isCompact: true))
                     .help("Start (⌘R)")
+                if status.state == .failed {
+                    Button("Dismiss") { model.stop(service.id, on: place) }
+                        .buttonStyle(PillButtonStyle(isCompact: true))
+                        .help("Mark Stopped, keeping the log (⌘.)")
+                        .accessibilityLabel("Dismiss \(service.name)")
+                }
                 if place == .thisMac || model.canChange(place) {
                     Button("Edit…") { model.presentedSheet = .editService(service.id, on: place) }
                         .buttonStyle(PillButtonStyle(isCompact: true))

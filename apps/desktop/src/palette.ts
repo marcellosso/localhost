@@ -7,7 +7,7 @@ import type { ShownMachine } from "./machines";
 import { projectShortcut, SHORTCUTS, type Shortcut, serviceShortcut, shortcutLabel } from "./keyboard";
 import { tildePath } from "./paths";
 import type { ServiceSelection } from "./selection";
-import { isActive } from "./status";
+import { isStoppable } from "./status";
 import { showChecklistAgain } from "./onboarding";
 import { showAlert, showSheet } from "./ui";
 import { checkForUpdates } from "./updates";
@@ -220,6 +220,9 @@ function serviceActions(view: CoreView, service: Service, project: Project, isSe
       break;
     default:
       item("start", `Start ${service.name}`, symbol("play"), SHORTCUTS.startOrRestart, () => void start(service.id));
+      if (status.state === "failed") {
+        item("dismiss", `Dismiss ${service.name}`, symbol("stop"), SHORTCUTS.stop, () => void stop(service.id));
+      }
   }
   const folder = { kind: "service", serviceId: service.id } as const;
   item("terminal", `Open ${service.name} in Terminal`, symbol("terminal"), null, () => void openFolder(folder, "terminal"));
@@ -243,7 +246,7 @@ function projectActions(view: CoreView, project: Project, isSelected: boolean): 
   if (project.services.length > 0) {
     item("start-all", `Start All in ${project.name}`, "play", SHORTCUTS.startAll, () => void startAll(project.id));
   }
-  if (project.services.some((service) => isActive(serviceStatus(view, service.id).state))) {
+  if (project.services.some((service) => isStoppable(serviceStatus(view, service.id).state))) {
     item("stop-all", `Stop All in ${project.name}`, "stop", SHORTCUTS.stopAll, () => void stopAll(project.id));
   }
   const folder = { kind: "project", projectId: project.id } as const;
@@ -289,12 +292,15 @@ export function machinePaletteItems(
         }
       } else if (status.state !== "stopping") {
         item(`start:${service.id}`, `Start ${service.name}`, symbol("play"), SHORTCUTS.startOrRestart, () => void start(service.id, null, machineId));
+        if (status.state === "failed") {
+          item(`dismiss:${service.id}`, `Dismiss ${service.name}`, symbol("stop"), SHORTCUTS.stop, () => void stop(service.id, machineId));
+        }
       }
     }
     if (shown.isConnected && project.services.length > 0) {
       item("start-all", `Start All in ${project.name}`, symbol("play"), SHORTCUTS.startAll, () => void startAll(project.id, machineId));
     }
-    if (shown.isConnected && project.services.some((one) => isActive(serviceStatus(view, one.id).state))) {
+    if (shown.isConnected && project.services.some((one) => isStoppable(serviceStatus(view, one.id).state))) {
       item("stop-all", `Stop All in ${project.name}`, symbol("stop"), SHORTCUTS.stopAll, () => void stopAll(project.id, machineId));
     }
     const subtitle = shown.editProblem ?? where;

@@ -94,16 +94,18 @@ impl TrayMenu {
 
 impl ProjectSection {
     fn new(project: &Project, statuses: &HashMap<Id, ServiceStatus>) -> ProjectSection {
-        let is_any_active = project
-            .services
-            .iter()
-            .any(|service| statuses.get(&service.id).is_some_and(|status| status.state.is_active()));
+        // Stop All also dismisses Failed Services.
+        let is_any_stoppable = project.services.iter().any(|service| {
+            statuses
+                .get(&service.id)
+                .is_some_and(|status| status.state.is_active() || status.state == ServiceState::Failed)
+        });
         let mut actions =
             vec![("Show in localhost", Action::Show(Reveal::Project { project_id: project.id, service_id: None }))];
         if !project.services.is_empty() {
             actions.push(("Start All", Action::StartAll(project.id)));
         }
-        if is_any_active {
+        if is_any_stoppable {
             actions.push(("Stop All", Action::StopAll(project.id)));
         }
         let services = project

@@ -68,7 +68,7 @@ struct ProjectSidebar: View {
                 Button("Start All") { model.startAll(inProject: id, on: place) }
                     .disabled(project.services.isEmpty || !model.isReachable(place))
                 Button("Stop All") { model.stopAll(inProject: id, on: place) }
-                    .disabled(!project.services.contains { model.status(of: $0, on: place).state.isActive } || !model.isReachable(place))
+                    .disabled(!project.services.contains { model.status(of: $0, on: place).state.isStoppable } || !model.isReachable(place))
                 Divider()
                 MachineProjectEditButtons(project: project, place: place)
                 Divider()

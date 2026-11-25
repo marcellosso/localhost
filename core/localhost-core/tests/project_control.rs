@@ -181,7 +181,7 @@ async fn start_all_runs_an_exited_service_again_before_its_dependents() {
     let migrate = service(&s, "migrate", "exit 0", &[], false);
     let api = sleeper(&s, "api", &[&migrate]);
     s.manager.start_all(s.project.id, Origin::MainWindow).await.unwrap();
-    s.manager.stop_all(s.project.id, Origin::MainWindow).await.unwrap();
+    s.manager.stop(api.id, Origin::MainWindow).await.unwrap();
     assert_eq!(s.manager.status(migrate.id).state, ServiceState::Exited);
     let (_, mut stream) = s.manager.subscribe();
 
