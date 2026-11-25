@@ -17,7 +17,7 @@ import {
 import type { Navigator } from "./palette";
 import type { Place } from "./components/ServicesColumn";
 import type { ServiceSelection } from "./selection";
-import { isActive } from "./status";
+import { isStoppable } from "./status";
 import { currentUi, setPaletteOpen, showAlert, showSheet } from "./ui";
 
 export type ShortcutContext = {
@@ -114,14 +114,14 @@ function runShortcut(event: KeyboardEvent, context: ShortcutContext): boolean {
       void (isLive ? restart(service.id, machineId) : start(service.id, null, machineId));
     }
   } else if (is(SHORTCUTS.stop)) {
-    if (service && canControl && isLive) void stop(service.id, machineId);
+    if (service && canControl && (isLive || state === "failed")) void stop(service.id, machineId);
   } else if (is(SHORTCUTS.openUrl)) {
     if (service && canControl && isLive && serviceStatus(selectedView, service.id).urlToOpen) void openUrl(service.id, machineId);
   } else if (is(SHORTCUTS.startAll)) {
     if (selected && canControl && selected.services.length > 0) void startAll(selected.id, machineId);
   } else if (is(SHORTCUTS.stopAll)) {
-    const anyActive = selected?.services.some((service) => isActive(serviceStatus(selectedView, service.id).state));
-    if (selected && canControl && anyActive) void stopAll(selected.id, machineId);
+    const anyStoppable = selected?.services.some((service) => isStoppable(serviceStatus(selectedView, service.id).state));
+    if (selected && canControl && anyStoppable) void stopAll(selected.id, machineId);
   } else if (is(SHORTCUTS.previousService) || is(SHORTCUTS.nextService)) {
     if (selected) setSelection(adjacentRow(selected, selection, is(SHORTCUTS.nextService) ? 1 : -1));
   } else {

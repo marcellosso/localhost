@@ -232,7 +232,7 @@ extension AppModel {
         if !project.services.isEmpty {
             item("start-all", "Start All in \(project.name)", "play.fill", "⇧⌘R") { [weak self] in self?.startAll(inProject: project.id) }
         }
-        if project.services.contains(where: { status(of: $0).state.isActive }) {
+        if project.services.contains(where: { status(of: $0).state.isStoppable }) {
             item("stop-all", "Stop All in \(project.name)", "stop.fill", "⇧⌘.") { [weak self] in self?.stopAll(inProject: project.id) }
         }
         item("project-editor", "Open \(project.name) in Editor", "chevron.left.forwardslash.chevron.right", "⌥⌘E") { [weak self] in

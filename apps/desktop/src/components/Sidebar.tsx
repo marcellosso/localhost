@@ -7,7 +7,7 @@ import { machineRef } from "../editing";
 import { importProject } from "../editors";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import type { ShownMachine } from "../machines";
-import { isActive, projectServicesSummary } from "../status";
+import { isActive, isStoppable, projectServicesSummary } from "../status";
 import { showChecklistAgain } from "../onboarding";
 import { showAlert, showSheet } from "../ui";
 import { useUpdate } from "../updates";
@@ -290,12 +290,12 @@ export function machineAddItems(shown: ShownMachine): MenuItem[] {
 /** Another Machine's Project: Start All and Stop All, then its edits, made there. */
 function machineProjectMenuItems(shown: ShownMachine, project: Project): MenuItem[] {
   const machineId = shown.machine.id;
-  const anyActive = project.services.some((service) => isActive(serviceState(shown.view, service.id)));
+  const anyStoppable = project.services.some((service) => isStoppable(serviceState(shown.view, service.id)));
   return [
     ...(shown.isConnected && project.services.length > 0
       ? [{ label: "Start All", onSelect: () => void startAll(project.id, machineId) }]
       : []),
-    ...(shown.isConnected && anyActive ? [{ label: "Stop All", onSelect: () => void stopAll(project.id, machineId) }] : []),
+    ...(shown.isConnected && anyStoppable ? [{ label: "Stop All", onSelect: () => void stopAll(project.id, machineId) }] : []),
     { label: "Reconnect", onSelect: () => void reconnect(machineId) },
     "separator",
     ...projectMenuItems(project, true, machinePlace(shown)),

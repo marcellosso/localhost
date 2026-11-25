@@ -168,11 +168,12 @@ struct AppCommands: Commands {
             .disabled(status == nil || status?.state == .stopping || !model.isReachable(place))
             // In Ports, Stop applies to the selected Listener.
             let listener = model.sidebarSelection == .ports ? model.selectedListenerID.flatMap(model.listener) : nil
-            Button(listener.map { "Stop \($0.name)" + (model.service(of: $0) == nil ? "…" : "") } ?? "Stop") {
+            let isFailed = status?.state == .failed
+            Button(listener.map { "Stop \($0.name)" + (model.service(of: $0) == nil ? "…" : "") } ?? (isFailed ? "Dismiss" : "Stop")) {
                 if let listener { model.requestStop(listener) } else { model.selectedServiceID.map { model.stop($0, on: place) } }
             }
             .keyboardShortcut(".")
-            .disabled(listener.map { model.reasonNotStoppable($0) != nil } ?? (!isLive || !model.isReachable(place)))
+            .disabled(listener.map { model.reasonNotStoppable($0) != nil } ?? (!(isLive || isFailed) || !model.isReachable(place)))
             Divider()
             Button("Open URL") { model.selectedServiceID.map { model.openURL(of: $0, on: place) } }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
@@ -192,7 +193,7 @@ struct AppCommands: Commands {
                 .disabled((shown?.services.isEmpty ?? true) || !model.isReachable(place))
             Button("Stop All") { shown.map { model.stopAll(inProject: $0.id, on: place) } }
                 .keyboardShortcut(".", modifiers: [.command, .shift])
-                .disabled(!(shown.map { $0.services.contains { model.status(of: $0, on: place).state.isActive } } ?? false)
+                .disabled(!(shown.map { $0.services.contains { model.status(of: $0, on: place).state.isStoppable } } ?? false)
                     || !model.isReachable(place))
             Divider()
             let project = model.canChange(place) ? shown : nil

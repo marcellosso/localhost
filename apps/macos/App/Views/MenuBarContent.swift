@@ -133,7 +133,7 @@ private struct MenuBarProjectSection: View {
     let project: Project
 
     var body: some View {
-        let isAnyActive = project.services.contains { model.status(of: $0).state.isActive }
+        let isAnyStoppable = project.services.contains { model.status(of: $0).state.isStoppable }
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Button {
@@ -164,7 +164,7 @@ private struct MenuBarProjectSection: View {
                 MenuBarIconButton("Stop All", systemImage: "stop.fill", in: project.name) {
                     model.stopAll(inProject: project.id, origin: .menuBar)
                 }
-                .disabled(!isAnyActive)
+                .disabled(!isAnyStoppable)
             }
             .padding(.horizontal, 10)
             .padding(.top, 6)

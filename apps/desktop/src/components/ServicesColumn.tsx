@@ -6,7 +6,7 @@ import { exportProject, requestRemoveService, setActiveProfile, setFavorite } fr
 import type { ShownMachine } from "../machines";
 import { type CoreView, serviceStatus } from "../core";
 import type { ServiceSelection } from "../selection";
-import { isActive, isManual, isWarning, projectServicesSummary, rowSummary, rowSummaryHelp, serviceRowLabel } from "../status";
+import { isActive, isManual, isStoppable, isWarning, projectServicesSummary, rowSummary, rowSummaryHelp, serviceRowLabel } from "../status";
 import { SHORTCUTS, shortcutLabel } from "../keyboard";
 import { SERVICE_CONCEPT } from "../onboarding";
 import { showAlert, showSheet } from "../ui";
@@ -161,7 +161,7 @@ export function ServicesColumn({ project, view, selection, onSelect, place = thi
  * are this computer's.
  */
 export function ProjectActions({ project, view, place = thisComputer }: { project: Project; view: CoreView; place?: Place }) {
-  const anyActive = project.services.some((service) => isActive(serviceStatus(view, service.id).state));
+  const anyStoppable = project.services.some((service) => isStoppable(serviceStatus(view, service.id).state));
   const [showsStats, setShowsStats] = useState(false);
   return (
     <>
@@ -177,7 +177,7 @@ export function ProjectActions({ project, view, place = thisComputer }: { projec
       </button>
       <button
         className="button"
-        disabled={!anyActive || !place.isReachable}
+        disabled={!anyStoppable || !place.isReachable}
         title={`Stop All (${shortcutLabel(SHORTCUTS.stopAll)})`}
         onClick={() => void stopAll(project.id, place.machineId)}
       >
@@ -361,7 +361,7 @@ function ServiceRow({ project, service, status, index, id, isSelected, onSelect,
   );
 }
 
-/** Open (or Restart) and Stop while live, Start otherwise; the main one tinted. */
+/** Open (or Restart) and Stop while live, Start (and Dismiss when Failed) otherwise; the main one tinted. */
 function ServiceActions({ service, status, place }: { service: Service; status: StatusView; place: Place }) {
   const machineId = place.machineId;
   const disabled = !place.isReachable;
@@ -423,6 +423,17 @@ function ServiceActions({ service, status, place }: { service: Service; status: 
       >
         Start
       </button>
+      {status.state === "failed" && (
+        <button
+          className="button compact"
+          title={`Mark Stopped, keeping the log (${shortcutLabel(SHORTCUTS.stop)})`}
+          aria-label={`Dismiss ${service.name}`}
+          disabled={disabled}
+          onClick={act(() => stop(service.id, machineId))}
+        >
+          Dismiss
+        </button>
+      )}
       <button
         className="button compact"
         title={editProblem(place) ?? "Edit Service"}
@@ -451,7 +462,10 @@ function stateMenuItems(service: Service, status: StatusView, place: Place): Men
     case "stopping":
       return [];
     default:
-      return [{ label: "Start", onSelect: () => void start(service.id, null, machineId) }];
+      return [
+        { label: "Start", onSelect: () => void start(service.id, null, machineId) },
+        ...(status.state === "failed" ? [{ label: "Dismiss", onSelect: () => void stop(service.id, machineId) }] : []),
+      ];
   }
 }
 

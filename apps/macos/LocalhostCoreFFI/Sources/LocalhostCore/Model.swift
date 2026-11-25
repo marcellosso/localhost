@@ -163,6 +163,10 @@ extension ServiceState {
     /// Starting, Running or Stopping: a process may be alive.
     public var isActive: Bool { serviceStateIsActive(state: self) }
 
+    /// Active or Failed: Stop applies. Stopping a Failed Service dismisses
+    /// its failure, leaving it Stopped.
+    public var isStoppable: Bool { isActive || self == .failed }
+
     /// The state that says most about a group of Services (Failed first), or
     /// `nil` for none.
     public static func mostSignificant(of states: [ServiceState]) -> ServiceState? {

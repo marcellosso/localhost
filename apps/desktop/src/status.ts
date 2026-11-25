@@ -8,6 +8,11 @@ export function isActive(state: ServiceState): boolean {
   return state === "starting" || state === "running" || state === "stopping";
 }
 
+/** Active or Failed: Stop applies. Stopping a Failed Service dismisses its failure, leaving it Stopped. */
+export function isStoppable(state: ServiceState): boolean {
+  return isActive(state) || state === "failed";
+}
+
 const STATE_LABELS: Record<ServiceState, string> = {
   stopped: "Stopped",
   starting: "Starting",

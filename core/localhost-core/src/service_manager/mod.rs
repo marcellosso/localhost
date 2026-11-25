@@ -219,7 +219,8 @@ impl ServiceManager {
 
     /// Stops the active Run, if any, and returns once its whole process tree
     /// has ended. A requested stop always ends Stopped, including a start
-    /// still waiting for its Dependencies.
+    /// still waiting for its Dependencies, and a Service that already Exited
+    /// or Failed (which is how that outcome is dismissed).
     pub async fn stop(&self, service_id: Id, origin: Origin) -> Result<ServiceStatus, LocalhostError> {
         self.inner.library.service(service_id)?;
         if self.inner.lock_and(|inner, state| inner.cancel_pending_start(state, service_id)) {
@@ -927,6 +928,9 @@ impl Inner {
     async fn perform_stop(self: Arc<Self>, service_id: Id, origin: Origin) -> ServiceStatus {
         let target = self.lock_and(|_, state| {
             let mut status = status_in(state, service_id);
+            if matches!(status.state, ServiceState::Exited | ServiceState::Failed) {
+                return state.trees.get(&service_id).map(|tree| (tree.clone(), None));
+            }
             if !matches!(status.state, ServiceState::Starting | ServiceState::Running) {
                 return None;
             }
@@ -937,12 +941,38 @@ impl Inner {
                 run.stop_origin = Some(origin);
             }
             update(state, status);
-            Some((tree, run_id))
+            Some((tree, Some(run_id)))
         });
-        let Some((tree, run_id)) = target else { return self.status(service_id) };
-        let exit = tree.stop().await;
-        self.run_ended(service_id, run_id, exit);
+        if let Some((tree, run_id)) = target {
+            let exit = tree.stop().await;
+            if let Some(run_id) = run_id {
+                self.run_ended(service_id, run_id, exit);
+                return self.status(service_id);
+            }
+            // The Run already Exited or Failed; only its leftovers were still alive.
+            let run_id = self.lock_and(|_, state| Some(state.statuses.get(&service_id)?.run.as_ref()?.id));
+            if let Some(run_id) = run_id {
+                self.run_ended(service_id, run_id, exit);
+            }
+        }
+        self.dismiss_ended_run(service_id);
         self.status(service_id)
+    }
+
+    /// A stop requested after the Run ended on its own (Exited or Failed)
+    /// still ends Stopped: it is how the user dismisses that outcome. The
+    /// Run, its failure and its logs are kept.
+    fn dismiss_ended_run(&self, service_id: Id) {
+        self.lock_and(|_, state| {
+            let mut status = status_in(state, service_id);
+            if !matches!(status.state, ServiceState::Exited | ServiceState::Failed)
+                || state.trees.contains_key(&service_id)
+            {
+                return;
+            }
+            status.state = ServiceState::Stopped;
+            update(state, status);
+        });
     }
 
     /// Like `perform_stop`, but also ends a Run whose shell already exited and

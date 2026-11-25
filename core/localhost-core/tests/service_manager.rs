@@ -223,16 +223,60 @@ async fn stopping_during_starting_ends_stopped() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stop_is_a_no_op_when_nothing_is_running() {
+async fn stop_is_a_no_op_when_nothing_has_run() {
     let s = Services::new();
     let service = s.service("sleep 1000");
     assert_eq!(s.manager.stop(service.id, Origin::MainWindow).await.unwrap().state, ServiceState::Stopped);
+    assert_eq!(s.manager.status(service.id).run, None);
+}
 
-    let exited = s.service("exit 1");
+#[tokio::test(flavor = "multi_thread")]
+async fn stopping_a_failed_or_exited_service_dismisses_it_keeping_its_run() {
+    let s = Services::new();
+    for (command_line, ended) in [("exit 1", ServiceState::Failed), ("exit 0", ServiceState::Exited)] {
+        let service = s.service(command_line);
+        let (_, mut events) = s.manager.subscribe();
+        s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
+        events_until(&mut events, service.id, is_run_ended).await;
+        let before = s.manager.status(service.id);
+        assert_eq!(before.state, ended);
+
+        let status = s.manager.stop(service.id, Origin::MenuBar).await.unwrap();
+
+        assert_eq!(status.state, ServiceState::Stopped);
+        assert_eq!(status.run, before.run);
+        let seen = events_until(&mut events, service.id, reached(ServiceState::Stopped, service.id)).await;
+        assert_eq!(states(&seen), [ServiceState::Stopped]);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stopping_a_failed_service_whose_leftovers_are_alive_ends_them_then_stopped() {
+    let s = Services::new();
+    let service = s.service(&leftover_ignoring_signals("sleep 0.4; exit 1"));
     let (_, mut events) = s.manager.subscribe();
-    s.manager.start(exited.id, None, Origin::MainWindow).await.unwrap();
-    events_until(&mut events, exited.id, is_run_ended).await;
-    assert_eq!(s.manager.stop(exited.id, Origin::MainWindow).await.unwrap().state, ServiceState::Failed);
+    s.manager.start(service.id, None, Origin::MainWindow).await.unwrap();
+    events_until(&mut events, service.id, reached(ServiceState::Failed, service.id)).await;
+    assert_eq!(s.manager.status(service.id).run.unwrap().ended_at, None);
+
+    let status = s.manager.stop(service.id, Origin::MainWindow).await.unwrap();
+
+    assert_eq!(status.state, ServiceState::Stopped);
+    let run = status.run.unwrap();
+    assert!(run.ended_at.is_some());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stop_all_dismisses_failed_services() {
+    let s = Services::new();
+    let failed = s.service("exit 1");
+    let (_, mut events) = s.manager.subscribe();
+    s.manager.start(failed.id, None, Origin::MainWindow).await.unwrap();
+    events_until(&mut events, failed.id, is_run_ended).await;
+
+    s.manager.stop_all(s.project.id, Origin::MainWindow).await.unwrap();
+
+    assert_eq!(s.manager.status(failed.id).state, ServiceState::Stopped);
 }
 
 #[tokio::test(flavor = "multi_thread")]

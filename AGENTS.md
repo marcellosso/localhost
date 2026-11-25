@@ -95,7 +95,7 @@ These are product rules, not implementation details. A change that breaks one ne
 **States**
 - Without a Port, a Run is Running after 1.5 s alive. With a Port, once the Port accepts connections; after 30 s it is Running anyway, with a warning that clears when the Port opens.
 - Dying during Starting is Failed, with the output visible. Exiting 0 during Starting is Exited (one-shot steps such as migrations).
-- A requested stop always ends in **Stopped**.
+- A requested stop always ends in **Stopped**. Stopping a Service that already Exited or Failed is how its outcome is dismissed: the Run and its logs are kept. Stop All does it for the whole Project.
 - Stop sends SIGINT to the process group, SIGTERM after 5 s, SIGKILL after 3 more; on Windows, Ctrl-Break and then terminating the job. The Service stays Stopping until the whole tree is gone, and the log says when it had to be forced.
 - Timeouts count only time the machine is awake, so a Run frozen by sleep isn't escalated on wake.
 - Failed carries a typed reason (`CommandNotFound`, `PortConflict`, `DependencyFailed`, `DockerDaemonUnavailable`, …) or the exit code or signal. Docker's "daemon not running" is diagnosed from the output after the fact, never pre-checked.
